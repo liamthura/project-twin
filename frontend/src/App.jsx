@@ -4582,7 +4582,9 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
                   <p className="text-sm font-medium">Weekdays</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Bedtime</Label>
+                      <Label className="text-xs text-muted-foreground">
+                        Bedtime
+                      </Label>
                       <Input
                         type="time"
                         value={data.wellness?.sleep?.weekday?.bedtime || ""}
@@ -4604,7 +4606,9 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Wake up</Label>
+                      <Label className="text-xs text-muted-foreground">
+                        Wake up
+                      </Label>
                       <Input
                         type="time"
                         value={data.wellness?.sleep?.weekday?.wakeup || ""}
@@ -4631,7 +4635,9 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
                   <p className="text-sm font-medium">Weekends</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Bedtime</Label>
+                      <Label className="text-xs text-muted-foreground">
+                        Bedtime
+                      </Label>
                       <Input
                         type="time"
                         value={data.wellness?.sleep?.weekend?.bedtime || ""}
@@ -4653,7 +4659,9 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Wake up</Label>
+                      <Label className="text-xs text-muted-foreground">
+                        Wake up
+                      </Label>
                       <Input
                         type="time"
                         value={data.wellness?.sleep?.weekend?.wakeup || ""}
