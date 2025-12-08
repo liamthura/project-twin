@@ -102,3 +102,4 @@ coverage/
 *.pid.lock
 .vercel
 .turbo
+persona_mcp/

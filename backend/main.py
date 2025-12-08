@@ -30,6 +30,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Import and register persona routes
+from persona_routes import router as persona_router
+app.include_router(persona_router)
+
 # CORS configuration for local development
 app.add_middleware(
     CORSMiddleware,
@@ -51,15 +55,25 @@ VALID_FILES = ["profile", "knowledge", "preferences", "projects", "interests", "
 DEFAULTS = {
     "profile": {
         "name": "",
+        "preferred_name": "",
         "current_role": "",
         "organisation": "",
         "location": "",
+        "nationality": "",
         "languages_spoken": [],
         "bio": "",
-        "contact": {"email": "", "github": ""}
+        "work_experience": [],
+        "career_aspirations": [],
+        "education": [],
+        "goals_and_careers": [],
+        "contact": {
+            "emails": [],
+            "links": []
+        }
     },
     "knowledge": {
-        "domains": []
+        "domains": [],
+        "mental_tabs": []
     },
     "preferences": {
         "code_style": {
@@ -75,17 +89,20 @@ DEFAULTS = {
         "learning_style": {
             "preferred": [],
             "avoid": []
-        }
+        },
+        "dislikes": []
     },
     "projects": {
-        "projects": [],
+            "projects": [],
         "current_learning": [],
         "top_of_mind": []
     },
     "interests": {
         "hobbies": [],
         "passions": [],
-        "curiosities": []
+        "curiosities": [],
+        "personality_traits": [],
+        "values": []
     },
     "learning_log": {
         "entries": []
@@ -111,7 +128,95 @@ def read_json_file(file_type: str) -> Dict[str, Any]:
     if filepath.exists():
         try:
             with open(filepath, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                # Normalize legacy profile language entries (strings -> objects with fluency)
+                if file_type == "profile":
+                    languages = data.get("languages_spoken", [])
+                    if languages and isinstance(languages[0], str):
+                        data["languages_spoken"] = [
+                            {"name": lang, "fluency": "conversational"}
+                            for lang in languages
+                        ]
+                    
+                    # Migrate education from object to array if needed
+                    education = data.get("education", {})
+                    if isinstance(education, dict) and education:
+                        # Old format was a single education object
+                        data["education"] = [{
+                            "institution": education.get("university", ""),
+                            "degree_level": education.get("degree_level", ""),
+                            "field_of_study": education.get("major", ""),
+                            "start_year": "",
+                            "end_year": education.get("graduation_year", ""),
+                            "status": "completed",
+                            "coursework": education.get("coursework", []),
+                            "clubs": education.get("clubs", []),
+                            "highlights": [],
+                        }]
+                    elif isinstance(education, list):
+                        # Ensure all education entries have highlights field
+                        for edu in education:
+                            if isinstance(edu, dict):
+                                edu.setdefault("highlights", [])
+                    else:
+                        data["education"] = []
+                    
+                    # Ensure goals_and_careers is at profile level
+                    if isinstance(education, dict) and education.get("goals_and_careers"):
+                        data.setdefault("goals_and_careers", education["goals_and_careers"])
+                    data.setdefault("goals_and_careers", [])
+                    
+                    contact = data.get("contact", {})
+                    # Convert single email string -> emails array
+                    if isinstance(contact, dict):
+                        email_value = contact.get("email")
+                        if email_value and not contact.get("emails"):
+                            contact["emails"] = [{
+                                "address": email_value,
+                                "purpose": "primary"
+                            }]
+                            contact.pop("email", None)
+
+                        # Ensure emails list exists
+                        contact.setdefault("emails", [])
+
+                        # Normalize links if stored as list of strings
+                        links = contact.get("links", [])
+                        if links and isinstance(links, list) and links and isinstance(links[0], str):
+                            contact["links"] = [
+                                {"label": f"Link {i+1}", "url": url}
+                                for i, url in enumerate(links)
+                            ]
+
+                        contact.setdefault("links", [])
+                        data["contact"] = contact
+                if file_type == "projects":
+                    projects = data.get("projects", [])
+                    if isinstance(projects, list):
+                        for project in projects:
+                            if isinstance(project, dict):
+                                # migrate legacy tech_stack -> tags
+                                if "tags" not in project and "tech_stack" in project:
+                                    project["tags"] = project.get("tech_stack", [])
+                                    project.pop("tech_stack", None)
+                                project.setdefault("tags", [])
+                                project.setdefault("references", [])
+                                project.setdefault("notes", "")
+                if file_type == "knowledge":
+                    domains = data.get("domains", [])
+                    if isinstance(domains, list):
+                        for domain in domains:
+                            if isinstance(domain, dict):
+                                domain.setdefault("references", [])
+                    mental_tabs = data.get("mental_tabs", [])
+                    if isinstance(mental_tabs, list):
+                        for tab in mental_tabs:
+                            if isinstance(tab, dict):
+                                tab.setdefault("references", [])
+                if file_type == "preferences":
+                    if isinstance(data, dict):
+                        data.setdefault("dislikes", [])
+                return data
         except json.JSONDecodeError:
             return DEFAULTS.get(file_type, {})
     return DEFAULTS.get(file_type, {})

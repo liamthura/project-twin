@@ -1,646 +1,4690 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  User,
+  Brain,
+  Settings,
+  FolderKanban,
+  Heart,
+  Plus,
+  X,
+  RefreshCw,
+  Save,
+  Wifi,
+  WifiOff,
+  Loader2,
+  Check,
+  Trash2,
+  ChevronDown,
+  Info,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Toaster } from "@/components/ui/toaster";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 // API Configuration
-const API_BASE = '/api'
+const API_BASE = "/api";
 
-// API Helper
 async function api(endpoint, options = {}) {
   const response = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...options.headers,
     },
     ...options,
-  })
+  });
   if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`)
+    throw new Error(`API Error: ${response.status}`);
   }
-  return response.json()
+  return response.json();
 }
 
-// Debounce hook for auto-save
+// Debounce hook
 function useDebounce(callback, delay) {
-  const timeoutRef = useRef(null)
-  
-  const debouncedCallback = useCallback((...args) => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
-    timeoutRef.current = setTimeout(() => {
-      callback(...args)
-    }, delay)
-  }, [callback, delay])
-  
-  return debouncedCallback
+  const timeoutRef = useRef(null);
+
+  const debouncedCallback = useCallback(
+    (...args) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        callback(...args);
+      }, delay);
+    },
+    [callback, delay]
+  );
+
+  return debouncedCallback;
 }
 
 // Array Input Component
 function ArrayInput({ items = [], onChange, placeholder }) {
-  const [newItem, setNewItem] = useState('')
+  const [newItem, setNewItem] = useState("");
 
   const addItem = () => {
     if (newItem.trim()) {
-      onChange([...items, newItem.trim()])
-      setNewItem('')
+      onChange([...items, newItem.trim()]);
+      setNewItem("");
     }
-  }
+  };
 
   const removeItem = (index) => {
-    onChange(items.filter((_, i) => i !== index))
-  }
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      addItem()
-    }
-  }
+    onChange(items.filter((_, i) => i !== index));
+  };
 
   return (
-    <div className="array-field">
-      <div className="array-items">
-        {items.map((item, index) => (
-          <div key={index} className="array-item">
-            <span>{item}</span>
-            <button onClick={() => removeItem(index)}>×</button>
-          </div>
-        ))}
-      </div>
-      <div className="array-input-row">
-        <input
-          type="text"
+    <div className="space-y-2">
+      {items.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {items.map((item, index) => (
+            <Badge key={index} variant="secondary" className="gap-1 pr-1">
+              {item}
+              <button
+                onClick={() => removeItem(index)}
+                className="ml-1 hover:text-destructive transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Input
           value={newItem}
           onChange={(e) => setNewItem(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder={placeholder || 'Add item...'}
+          onKeyPress={(e) =>
+            e.key === "Enter" && (e.preventDefault(), addItem())
+          }
+          placeholder={placeholder}
+          className="flex-1"
         />
-        <button className="btn btn-primary btn-small" onClick={addItem}>+ Add</button>
+        <Button onClick={addItem} size="sm" variant="secondary">
+          <Plus className="h-4 w-4" />
+        </Button>
       </div>
     </div>
-  )
+  );
 }
 
 // Profile Editor
-function ProfileEditor({ data, onChange }) {
-  const update = (field, value) => {
-    onChange({ ...data, [field]: value })
-  }
+function ProfileEditor({ data, onChange, onShowConfirmation }) {
+  const update = (field, value) => onChange({ ...data, [field]: value });
+  const updateContact = (field, value) =>
+    onChange({ ...data, contact: { ...(data.contact || {}), [field]: value } });
+  const addEmail = () =>
+    updateContact("emails", [
+      ...(data.contact?.emails || []),
+      { address: "", purpose: "primary" },
+    ]);
+  const updateEmail = (index, field, value) => {
+    const next = [...(data.contact?.emails || [])];
+    next[index] = { ...(next[index] || {}), [field]: value };
+    updateContact("emails", next);
+  };
+  const removeEmail = (index) => {
+    const email = (data.contact?.emails || [])[index];
+    if (onShowConfirmation) {
+      onShowConfirmation(
+        "Remove Email",
+        `Remove "${email?.address || "email"}"? This action cannot be undone.`,
+        () => {
+          updateContact(
+            "emails",
+            (data.contact?.emails || []).filter((_, i) => i !== index)
+          );
+        }
+      );
+    } else {
+      updateContact(
+        "emails",
+        (data.contact?.emails || []).filter((_, i) => i !== index)
+      );
+    }
+  };
+  const addLink = () =>
+    updateContact("links", [
+      ...(data.contact?.links || []),
+      { label: "", url: "" },
+    ]);
+  const updateLink = (index, field, value) => {
+    const next = [...(data.contact?.links || [])];
+    next[index] = { ...(next[index] || {}), [field]: value };
+    updateContact("links", next);
+  };
+  const removeLink = (index) => {
+    const link = (data.contact?.links || [])[index];
+    if (onShowConfirmation) {
+      onShowConfirmation(
+        "Remove Link",
+        `Remove "${link?.label || "link"}"? This action cannot be undone.`,
+        () => {
+          updateContact(
+            "links",
+            (data.contact?.links || []).filter((_, i) => i !== index)
+          );
+        }
+      );
+    } else {
+      updateContact(
+        "links",
+        (data.contact?.links || []).filter((_, i) => i !== index)
+      );
+    }
+  };
+  const addLanguage = () =>
+    update("languages_spoken", [
+      ...(data.languages_spoken || []),
+      { name: "", fluency: "conversational" },
+    ]);
+  const updateLanguage = (index, field, value) => {
+    const next = [...(data.languages_spoken || [])];
+    next[index] = { ...(next[index] || {}), [field]: value };
+    update("languages_spoken", next);
+  };
+  const removeLanguage = (index) => {
+    const language = (data.languages_spoken || [])[index];
+    if (onShowConfirmation) {
+      onShowConfirmation(
+        "Remove Language",
+        `Remove "${
+          language?.name || "language"
+        }"? This action cannot be undone.`,
+        () => {
+          update(
+            "languages_spoken",
+            (data.languages_spoken || []).filter((_, i) => i !== index)
+          );
+        }
+      );
+    } else {
+      update(
+        "languages_spoken",
+        (data.languages_spoken || []).filter((_, i) => i !== index)
+      );
+    }
+  };
+  const addEducation = () =>
+    onChange({
+      ...data,
+      education: [
+        ...(data.education || []),
+        {
+          institution: "",
+          degree_level: "",
+          field_of_study: "",
+          start_year: "",
+          end_year: "",
+          status: "completed",
+          coursework: [],
+          clubs: [],
+          highlights: [],
+        },
+      ],
+    });
 
-  const updateContact = (field, value) => {
-    onChange({ ...data, contact: { ...(data.contact || {}), [field]: value } })
-  }
+  const updateEducation = (index, field, value) => {
+    const next = [...(data.education || [])];
+    next[index] = { ...(next[index] || {}), [field]: value };
+    onChange({ ...data, education: next });
+  };
+
+  const removeEducation = (index) => {
+    const edu = (data.education || [])[index];
+    if (onShowConfirmation) {
+      onShowConfirmation(
+        "Remove Education",
+        `Remove "${
+          edu?.institution || "education entry"
+        }"? This action cannot be undone.`,
+        () => {
+          onChange({
+            ...data,
+            education: (data.education || []).filter((_, i) => i !== index),
+          });
+        }
+      );
+    } else {
+      onChange({
+        ...data,
+        education: (data.education || []).filter((_, i) => i !== index),
+      });
+    }
+  };
+  const addCoursework = (eduIndex) => {
+    const edu = (data.education || [])[eduIndex];
+    updateEducation(eduIndex, "coursework", [
+      ...(edu?.coursework || []),
+      { name: "", topics: [] },
+    ]);
+  };
+
+  const updateCoursework = (eduIndex, courseIndex, field, value) => {
+    const edu = (data.education || [])[eduIndex];
+    const next = [...(edu?.coursework || [])];
+    next[courseIndex] = { ...(next[courseIndex] || {}), [field]: value };
+    updateEducation(eduIndex, "coursework", next);
+  };
+
+  const removeCoursework = (eduIndex, courseIndex) => {
+    const edu = (data.education || [])[eduIndex];
+    const course = (edu?.coursework || [])[courseIndex];
+    if (onShowConfirmation) {
+      onShowConfirmation(
+        "Remove Coursework",
+        `Remove "${
+          course?.name || "coursework"
+        }"? This action cannot be undone.`,
+        () => {
+          updateEducation(
+            eduIndex,
+            "coursework",
+            (edu?.coursework || []).filter((_, i) => i !== courseIndex)
+          );
+        }
+      );
+    } else {
+      updateEducation(
+        eduIndex,
+        "coursework",
+        (edu?.coursework || []).filter((_, i) => i !== courseIndex)
+      );
+    }
+  };
+  const addClub = (eduIndex) => {
+    const edu = (data.education || [])[eduIndex];
+    updateEducation(eduIndex, "clubs", [
+      ...(edu?.clubs || []),
+      { name: "", activities_involved: [] },
+    ]);
+  };
+
+  const updateClub = (eduIndex, clubIndex, field, value) => {
+    const edu = (data.education || [])[eduIndex];
+    const next = [...(edu?.clubs || [])];
+    next[clubIndex] = { ...(next[clubIndex] || {}), [field]: value };
+    updateEducation(eduIndex, "clubs", next);
+  };
+
+  const removeClub = (eduIndex, clubIndex) => {
+    const edu = (data.education || [])[eduIndex];
+    const club = (edu?.clubs || [])[clubIndex];
+    if (onShowConfirmation) {
+      onShowConfirmation(
+        "Remove Club",
+        `Remove "${club?.name || "club"}"? This action cannot be undone.`,
+        () => {
+          updateEducation(
+            eduIndex,
+            "clubs",
+            (edu?.clubs || []).filter((_, i) => i !== clubIndex)
+          );
+        }
+      );
+    } else {
+      updateEducation(
+        eduIndex,
+        "clubs",
+        (edu?.clubs || []).filter((_, i) => i !== clubIndex)
+      );
+    }
+  };
+  const addGoal = () =>
+    onChange({
+      ...data,
+      goals_and_careers: [
+        ...(data.goals_and_careers || []),
+        { goal: "", target: "" },
+      ],
+    });
+
+  const updateGoal = (index, field, value) => {
+    const next = [...(data.goals_and_careers || [])];
+    next[index] = { ...(next[index] || {}), [field]: value };
+    onChange({ ...data, goals_and_careers: next });
+  };
+
+  const removeGoal = (index) => {
+    const goal = (data.goals_and_careers || [])[index];
+    if (onShowConfirmation) {
+      onShowConfirmation(
+        "Remove Goal",
+        `Remove "${goal?.goal || "goal"}"? This action cannot be undone.`,
+        () => {
+          onChange({
+            ...data,
+            goals_and_careers: (data.goals_and_careers || []).filter(
+              (_, i) => i !== index
+            ),
+          });
+        }
+      );
+    } else {
+      onChange({
+        ...data,
+        goals_and_careers: (data.goals_and_careers || []).filter(
+          (_, i) => i !== index
+        ),
+      });
+    }
+  };
+
+  const [collapsedSections, setCollapsedSections] = useState({
+    academic: true,
+    contact: true,
+    languages: true,
+    workExp: true,
+  });
+
+  // Info modal state
+  const [infoModal, setInfoModal] = useState({
+    isOpen: false,
+    title: "",
+    overview: "",
+    tips: [],
+  });
+
+  const sectionInfo = {
+    personal: {
+      title: "Personal Information",
+      overview:
+        "This section captures who you are at a glance. It helps AI assistants address you correctly and understand your current context (student, professional, location, etc.).",
+      tips: [
+        "Name: Your full legal name as it appears on official documents.",
+        "Preferred Name: The name you'd like AI to call you (nickname, first name, etc.).",
+        "Current Role: Your primary occupation or status, e.g. 'Final Year Student', 'Software Engineer', 'Freelance Designer'.",
+        "Organisation: Your school, university, or employer.",
+        "Location: City and country—helps with locale-specific suggestions (holidays, time zones, spelling conventions).",
+        "Nationality: Useful for cultural context and language defaults.",
+        "Bio: A 2–3 sentence summary of who you are, your interests, and what you're working on. Think of it as your elevator pitch.",
+      ],
+    },
+    academic: {
+      title: "Education",
+      overview:
+        "Document your educational journey—schools, degrees, and achievements. This helps AI understand your academic background and tailor advice accordingly.",
+      tips: [
+        "Add one entry per institution or degree (e.g., separate entries for high school and university).",
+        "Institution Name: Full official name of the school or university.",
+        "Degree Level: e.g., 'High School Diploma', 'BSc', 'MSc', 'PhD'.",
+        "Field of Study: Your major, concentration, or programme name.",
+        "Status: Whether you're currently enrolled, have completed, or left incomplete.",
+        "Years: Start and end (or expected end) years.",
+        "Coursework: Key modules or classes you've taken. Add topics/skills learned in each.",
+        "Clubs & Societies: Extracurricular involvement—name the club and list your activities or roles.",
+        "Highlights: Notable achievements like awards, high grades, leadership roles, or recognitions. Use short, action-oriented bullet points.",
+        "Goals: Academic or career goals you're working toward, with specific targets.",
+      ],
+    },
+    work: {
+      title: "Work Experience",
+      overview:
+        "List your professional experiences—jobs, internships, placements, and volunteer work. This helps AI understand your skills and career trajectory.",
+      tips: [
+        "Add one entry per role. If you held multiple roles at the same company, consider separate entries.",
+        "Role: Your job title or position.",
+        "Company: The organisation you worked for.",
+        "Type: e.g., 'Full-time', 'Part-time', 'Internship', 'Placement', 'Volunteer', 'Freelance'.",
+        "Period: Date range in a readable format, e.g., 'Jan 2023 – Jun 2024' or 'Summer 2022'.",
+        "Highlights: 3–6 bullet points describing what you did and achieved. Focus on outcomes and impact. Use action verbs and include metrics where possible (e.g., 'Reduced processing time by 40%').",
+      ],
+    },
+    contact: {
+      title: "Contact & Links",
+      overview:
+        "Provide ways to reach you and links to your online profiles. AI can use this to reference your portfolio or suggest networking opportunities.",
+      tips: [
+        "Emails: Add all relevant email addresses and tag their purpose (Primary, Work, School, etc.). Primary is what AI will default to.",
+        "Links: Add your professional profiles—LinkedIn, GitHub, portfolio website, personal blog, etc.",
+        "Use descriptive labels like 'Portfolio', 'LinkedIn', 'GitHub' so it's clear what each link is.",
+        "Keep URLs up to date; broken links aren't helpful!",
+      ],
+    },
+    languages: {
+      title: "Languages",
+      overview:
+        "List the languages you speak and your proficiency level. This helps AI communicate with you appropriately and understand your linguistic capabilities.",
+      tips: [
+        "Add each language you can communicate in.",
+        "Fluency levels explained:",
+        "  • Beginner: Basic phrases and simple sentences.",
+        "  • Conversational: Can hold everyday conversations.",
+        "  • Fluent: Comfortable in most situations, may have occasional gaps.",
+        "  • Professional: Business-level proficiency, can write and present formally.",
+        "  • Native: Mother tongue or equivalent.",
+        "Order by strongest first—AI will prioritise top entries.",
+      ],
+    },
+  };
+
+  const openInfo = (sectionKey) => {
+    const info = sectionInfo[sectionKey];
+    if (info) {
+      setInfoModal({ isOpen: true, ...info });
+    }
+  };
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: "",
+    description: "",
+    action: null,
+  });
+
+  const showConfirmation = (title, description, action) => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      description,
+      action,
+    });
+  };
+
+  const handleConfirm = () => {
+    if (confirmDialog.action) {
+      confirmDialog.action();
+    }
+    setConfirmDialog({ ...confirmDialog, isOpen: false });
+  };
+
+  const handleCancel = () => {
+    setConfirmDialog({ ...confirmDialog, isOpen: false });
+  };
+
+  const toggleSection = (section) => {
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
 
   return (
-    <div className="editor-panel">
-      <h2 className="section-title">Profile</h2>
-      <div className="form-grid">
-        <div className="form-group">
-          <label>Name</label>
-          <input
-            type="text"
-            value={data.name || ''}
-            onChange={(e) => update('name', e.target.value)}
-            placeholder="Your name"
-          />
-        </div>
-        <div className="form-group">
-          <label>Current Role</label>
-          <input
-            type="text"
-            value={data.current_role || ''}
-            onChange={(e) => update('current_role', e.target.value)}
-            placeholder="e.g. Software Engineer at Company"
-          />
-        </div>
-        <div className="form-group">
-          <label>Organisation</label>
-          <input
-            type="text"
-            value={data.organisation || ''}
-            onChange={(e) => update('organisation', e.target.value)}
-            placeholder="Company or university"
-          />
-        </div>
-        <div className="form-group">
-          <label>Location</label>
-          <input
-            type="text"
-            value={data.location || ''}
-            onChange={(e) => update('location', e.target.value)}
-            placeholder="City, Country"
-          />
-        </div>
-        <div className="form-group">
-          <label>Email</label>
-          <input
-            type="email"
-            value={data.contact?.email || ''}
-            onChange={(e) => updateContact('email', e.target.value)}
-            placeholder="your@email.com"
-          />
-        </div>
-        <div className="form-group">
-          <label>GitHub Username</label>
-          <input
-            type="text"
-            value={data.contact?.github || ''}
-            onChange={(e) => updateContact('github', e.target.value)}
-            placeholder="username"
-          />
-        </div>
-        <div className="form-group full-width">
-          <label>Languages Spoken</label>
-          <ArrayInput
-            items={data.languages_spoken || []}
-            onChange={(items) => update('languages_spoken', items)}
-            placeholder="Add language..."
-          />
-        </div>
-        <div className="form-group full-width">
-          <label>Bio</label>
-          <textarea
-            value={data.bio || ''}
-            onChange={(e) => update('bio', e.target.value)}
-            placeholder="A brief description of who you are..."
-          />
-        </div>
-      </div>
+    <div className="space-y-6">
+      {/* Personal Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Personal Information
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-primary"
+              onClick={() => openInfo("personal")}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+          </CardTitle>
+          <CardDescription>
+            Your basic identity and current status
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              value={data.name || ""}
+              onChange={(e) => update("name", e.target.value)}
+              placeholder="Your name"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="preferred_name">Preferred Name</Label>
+            <Input
+              id="preferred_name"
+              value={data.preferred_name || ""}
+              onChange={(e) => update("preferred_name", e.target.value)}
+              placeholder="e.g. Liam"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="role">Current Role</Label>
+            <Input
+              id="role"
+              value={data.current_role || ""}
+              onChange={(e) => update("current_role", e.target.value)}
+              placeholder="e.g. Software Engineer"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="nationality">Nationality</Label>
+            <Input
+              id="nationality"
+              value={data.nationality || ""}
+              onChange={(e) => update("nationality", e.target.value)}
+              placeholder="e.g. Myanmar"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="location">Location</Label>
+            <Input
+              id="location"
+              value={data.location || ""}
+              onChange={(e) => update("location", e.target.value)}
+              placeholder="City, Country"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="org">Organisation</Label>
+            <Input
+              id="org"
+              value={data.organisation || ""}
+              onChange={(e) => update("organisation", e.target.value)}
+              placeholder="Company or university"
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="bio">Bio</Label>
+            <Textarea
+              id="bio"
+              value={data.bio || ""}
+              onChange={(e) => update("bio", e.target.value)}
+              placeholder="A brief description of who you are..."
+              className="min-h-[100px]"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Academic Information */}
+      <Card>
+        <CardHeader>
+          <div
+            className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
+            onClick={() => toggleSection("academic")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.academic ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Education
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("academic");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  Your educational background and qualifications
+                </CardDescription>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        {!collapsedSections.academic && (
+          <CardContent className="space-y-6">
+            {/* Education Entries */}
+            {Array.isArray(data.education) &&
+            (data.education || []).length > 0 ? (
+              <div className="space-y-4">
+                {(data.education || []).map((edu, eduIndex) => (
+                  <div
+                    key={eduIndex}
+                    className="p-4 rounded-lg border border-muted bg-muted/10 space-y-4"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-base">
+                          {edu.institution || "Untitled Institution"}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {edu.field_of_study && edu.degree_level
+                            ? `${edu.degree_level} in ${edu.field_of_study}`
+                            : edu.field_of_study || edu.degree_level || ""}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeEducation(eduIndex)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor={`institution-${eduIndex}`}>
+                          Institution Name
+                        </Label>
+                        <Input
+                          id={`institution-${eduIndex}`}
+                          value={edu.institution || ""}
+                          onChange={(e) =>
+                            updateEducation(
+                              eduIndex,
+                              "institution",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g. University of Cambridge, Harvard, etc."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`degree-${eduIndex}`}>
+                          Degree Level
+                        </Label>
+                        <Input
+                          id={`degree-${eduIndex}`}
+                          value={edu.degree_level || ""}
+                          onChange={(e) =>
+                            updateEducation(
+                              eduIndex,
+                              "degree_level",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g. Bachelor's, Master's, PhD, High School"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`field-${eduIndex}`}>
+                          Field of Study / Major
+                        </Label>
+                        <Input
+                          id={`field-${eduIndex}`}
+                          value={edu.field_of_study || ""}
+                          onChange={(e) =>
+                            updateEducation(
+                              eduIndex,
+                              "field_of_study",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g. Computer Science, Business, etc."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`status-${eduIndex}`}>Status</Label>
+                        <Select
+                          value={edu.status || "completed"}
+                          onValueChange={(value) =>
+                            updateEducation(eduIndex, "status", value)
+                          }
+                        >
+                          <SelectTrigger id={`status-${eduIndex}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="current">Current</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                            <SelectItem value="incomplete">
+                              Incomplete
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`start-${eduIndex}`}>Start Year</Label>
+                        <Input
+                          id={`start-${eduIndex}`}
+                          value={edu.start_year || ""}
+                          onChange={(e) =>
+                            updateEducation(
+                              eduIndex,
+                              "start_year",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g. 2020"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`end-${eduIndex}`}>End Year</Label>
+                        <Input
+                          id={`end-${eduIndex}`}
+                          value={edu.end_year || ""}
+                          onChange={(e) =>
+                            updateEducation(
+                              eduIndex,
+                              "end_year",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g. 2024 or Expected 2026"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Coursework Section */}
+                    <div className="space-y-2">
+                      <Label>Coursework / Modules</Label>
+                      <div className="space-y-3">
+                        {(edu.coursework || []).map((course, courseIdx) => (
+                          <div
+                            key={courseIdx}
+                            className="space-y-2 p-3 rounded border border-muted bg-muted/20"
+                          >
+                            <div className="flex justify-between items-center mb-2">
+                              <Label className="text-sm font-medium">
+                                {course.name || "Untitled Course"}
+                              </Label>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  removeCoursework(eduIndex, courseIdx)
+                                }
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs">Course Name</Label>
+                              <Input
+                                value={course.name || ""}
+                                onChange={(e) =>
+                                  updateCoursework(
+                                    eduIndex,
+                                    courseIdx,
+                                    "name",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="e.g. Data Structures"
+                                size="sm"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs">Topics Covered</Label>
+                              <ArrayInput
+                                items={course.topics || []}
+                                onChange={(items) =>
+                                  updateCoursework(
+                                    eduIndex,
+                                    courseIdx,
+                                    "topics",
+                                    items
+                                  )
+                                }
+                                placeholder="e.g. Algorithms, Hash tables"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        <Button
+                          onClick={() => addCoursework(eduIndex)}
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-dashed"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Coursework
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Clubs Section */}
+                    <div className="space-y-2">
+                      <Label>Clubs & Societies</Label>
+                      <div className="space-y-3">
+                        {(edu.clubs || []).map((club, clubIdx) => (
+                          <div
+                            key={clubIdx}
+                            className="space-y-2 p-3 rounded border border-muted bg-muted/20"
+                          >
+                            <div className="flex justify-between items-center mb-2">
+                              <Label className="text-sm font-medium">
+                                {club.name || "Untitled Club"}
+                              </Label>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeClub(eduIndex, clubIdx)}
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs">Club Name</Label>
+                              <Input
+                                value={club.name || ""}
+                                onChange={(e) =>
+                                  updateClub(
+                                    eduIndex,
+                                    clubIdx,
+                                    "name",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="e.g. Robotics Club"
+                                size="sm"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs">
+                                Activities Involved
+                              </Label>
+                              <ArrayInput
+                                items={club.activities_involved || []}
+                                onChange={(items) =>
+                                  updateClub(
+                                    eduIndex,
+                                    clubIdx,
+                                    "activities_involved",
+                                    items
+                                  )
+                                }
+                                placeholder="e.g. Project lead, Event organizer"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        <Button
+                          onClick={() => addClub(eduIndex)}
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-dashed"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Club
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Highlights Section */}
+                    <div className="space-y-2">
+                      <Label>Highlights</Label>
+                      <div className="space-y-3">
+                        {(edu.highlights || []).map((highlight, hIdx) => (
+                          <div
+                            key={hIdx}
+                            className="flex gap-2 items-start p-2 rounded border border-muted bg-muted/20"
+                          >
+                            <Input
+                              value={highlight || ""}
+                              onChange={(e) => {
+                                const updated = [...(data.education || [])];
+                                updated[eduIndex].highlights[hIdx] =
+                                  e.target.value;
+                                onChange({ ...data, education: updated });
+                              }}
+                              placeholder="e.g. Dean's List, Best Project Award"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                const updated = [...(data.education || [])];
+                                updated[eduIndex].highlights = (
+                                  edu.highlights || []
+                                ).filter((_, i) => i !== hIdx);
+                                onChange({ ...data, education: updated });
+                              }}
+                              className="h-10 w-10 text-destructive flex-shrink-0"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          onClick={() => {
+                            const updated = [...(data.education || [])];
+                            updated[eduIndex].highlights = [
+                              ...(edu.highlights || []),
+                              "",
+                            ];
+                            onChange({ ...data, education: updated });
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-dashed"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Highlight
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No education added yet. Click "Add Education" to get started.
+              </p>
+            )}
+
+            <Button
+              onClick={addEducation}
+              variant="outline"
+              className="w-full border-dashed"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Education
+            </Button>
+
+            {/* Goals Section - Moved outside education entries */}
+            <div className="space-y-2 pt-4 border-t">
+              <Label>Academic & Career Goals</Label>
+              <div className="space-y-3">
+                {(data.goals_and_careers || []).map((goalItem, idx) => (
+                  <div
+                    key={idx}
+                    className="space-y-2 p-3 rounded border border-muted bg-muted/20"
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <Label className="text-sm font-medium">
+                        {goalItem.goal || "Untitled Goal"}
+                      </Label>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeGoal(idx)}
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Goal</Label>
+                        <Input
+                          value={goalItem.goal || ""}
+                          onChange={(e) =>
+                            updateGoal(idx, "goal", e.target.value)
+                          }
+                          placeholder="e.g. Land ML internship"
+                          size="sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Target</Label>
+                        <Input
+                          value={goalItem.target || ""}
+                          onChange={(e) =>
+                            updateGoal(idx, "target", e.target.value)
+                          }
+                          placeholder="e.g. Build a portfolio project"
+                          size="sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  onClick={addGoal}
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-dashed"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Goal
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Work Experience */}
+      <Card>
+        <CardHeader>
+          <div
+            className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
+            onClick={() => toggleSection("workExp")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.workExp ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Work Experience
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("work");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>Your professional experience</CardDescription>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        {!collapsedSections.workExp && (
+          <CardContent className="space-y-4">
+            {data.work_experience && data.work_experience.length > 0 && (
+              <div className="space-y-3">
+                {data.work_experience.map((exp, idx) => (
+                  <div
+                    key={idx}
+                    className="space-y-3 p-3 rounded border border-muted bg-muted/20"
+                  >
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Role</Label>
+                        <Input
+                          value={exp.role || ""}
+                          onChange={(e) => {
+                            const updated = [...data.work_experience];
+                            updated[idx].role = e.target.value;
+                            update("work_experience", updated);
+                          }}
+                          placeholder="e.g. Software Engineer"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Company</Label>
+                        <Input
+                          value={exp.company || ""}
+                          onChange={(e) => {
+                            const updated = [...data.work_experience];
+                            updated[idx].company = e.target.value;
+                            update("work_experience", updated);
+                          }}
+                          placeholder="e.g. TechCorp"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Type</Label>
+                        <Input
+                          value={exp.type || ""}
+                          onChange={(e) => {
+                            const updated = [...data.work_experience];
+                            updated[idx].type = e.target.value;
+                            update("work_experience", updated);
+                          }}
+                          placeholder="e.g. Full-time"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Period</Label>
+                        <Input
+                          value={exp.period || ""}
+                          onChange={(e) => {
+                            const updated = [...data.work_experience];
+                            updated[idx].period = e.target.value;
+                            update("work_experience", updated);
+                          }}
+                          placeholder="e.g. Jan 2022 - Jun 2023"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Highlights</Label>
+                      <div className="space-y-3">
+                        {(exp.highlights || []).map((highlight, hIdx) => (
+                          <div
+                            key={hIdx}
+                            className="flex gap-2 items-start p-2 rounded border border-muted bg-muted/20"
+                          >
+                            <Input
+                              value={highlight || ""}
+                              onChange={(e) => {
+                                const updated = [...data.work_experience];
+                                updated[idx].highlights[hIdx] = e.target.value;
+                                update("work_experience", updated);
+                              }}
+                              placeholder="e.g. Led team of 5 engineers"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                const updated = [...data.work_experience];
+                                updated[idx].highlights = (
+                                  exp.highlights || []
+                                ).filter((_, i) => i !== hIdx);
+                                update("work_experience", updated);
+                              }}
+                              className="h-10 w-10 text-destructive flex-shrink-0"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          onClick={() => {
+                            const updated = [...data.work_experience];
+                            updated[idx].highlights = [
+                              ...(exp.highlights || []),
+                              "",
+                            ];
+                            update("work_experience", updated);
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-dashed"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Highlight
+                        </Button>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const updated = data.work_experience.filter(
+                          (_, i) => i !== idx
+                        );
+                        update("work_experience", updated);
+                      }}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Button
+              onClick={() => {
+                update("work_experience", [
+                  ...(data.work_experience || []),
+                  {
+                    role: "",
+                    company: "",
+                    type: "",
+                    period: "",
+                    highlights: [],
+                  },
+                ]);
+              }}
+              variant="outline"
+              className="w-full border-dashed"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Experience
+            </Button>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Contact Information */}
+      <Card>
+        <CardHeader>
+          <div
+            className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
+            onClick={() => toggleSection("contact")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.contact ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Contact & Links
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("contact");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  How to reach you and your online presence
+                </CardDescription>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        {!collapsedSections.contact && (
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label>Emails</Label>
+              <div className="space-y-3">
+                {(data.contact?.emails || []).map((email, index) => (
+                  <div
+                    key={index}
+                    className="p-3 rounded border border-muted bg-muted/20"
+                  >
+                    <div className="flex gap-3">
+                      <div className="grid gap-3 sm:grid-cols-2 flex-1">
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">
+                            Address
+                          </Label>
+                          <Input
+                            type="email"
+                            value={email?.address || ""}
+                            onChange={(e) =>
+                              updateEmail(index, "address", e.target.value)
+                            }
+                            placeholder="you@school.edu"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">
+                            Purpose
+                          </Label>
+                          <Select
+                            value={email?.purpose || "primary"}
+                            onValueChange={(value) =>
+                              updateEmail(index, "purpose", value)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="primary">Primary</SelectItem>
+                              <SelectItem value="general">General</SelectItem>
+                              <SelectItem value="school">School</SelectItem>
+                              <SelectItem value="personal">Personal</SelectItem>
+                              <SelectItem value="work">Work</SelectItem>
+                              <SelectItem value="recruiting">
+                                Recruiting
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeEmail(index)}
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive mt-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  onClick={addEmail}
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-dashed"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Email
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Profile Links</Label>
+              <div className="space-y-3">
+                {(data.contact?.links || []).map((link, index) => (
+                  <div
+                    key={index}
+                    className="p-3 rounded border border-muted bg-muted/20"
+                  >
+                    <div className="flex gap-3">
+                      <div className="grid gap-3 sm:grid-cols-2 flex-1">
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">
+                            Label
+                          </Label>
+                          <Input
+                            value={link?.label || ""}
+                            onChange={(e) =>
+                              updateLink(index, "label", e.target.value)
+                            }
+                            placeholder="e.g. Portfolio"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">
+                            URL
+                          </Label>
+                          <Input
+                            value={link?.url || ""}
+                            onChange={(e) =>
+                              updateLink(index, "url", e.target.value)
+                            }
+                            placeholder="https://example.com"
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeLink(index)}
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive mt-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  onClick={addLink}
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-dashed"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Link
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Languages */}
+      <Card>
+        <CardHeader>
+          <div
+            className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
+            onClick={() => toggleSection("languages")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.languages ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Languages
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("languages");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  Languages you speak and your fluency level
+                </CardDescription>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        {!collapsedSections.languages && (
+          <CardContent>
+            <div className="space-y-2">
+              <Label>Languages & Fluency</Label>
+              <div className="space-y-3">
+                {(data.languages_spoken || []).map((lang, index) => (
+                  <div
+                    key={index}
+                    className="p-3 rounded border border-muted bg-muted/20 space-y-3"
+                  >
+                    <div className="flex gap-3">
+                      <div className="grid gap-3 sm:grid-cols-2 flex-1">
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">
+                            Language
+                          </Label>
+                          <Input
+                            value={lang?.name || ""}
+                            onChange={(e) =>
+                              updateLanguage(index, "name", e.target.value)
+                            }
+                            placeholder="e.g. English"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">
+                            Fluency
+                          </Label>
+                          <Select
+                            value={lang?.fluency || "conversational"}
+                            onValueChange={(value) =>
+                              updateLanguage(index, "fluency", value)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="beginner">Beginner</SelectItem>
+                              <SelectItem value="conversational">
+                                Conversational
+                              </SelectItem>
+                              <SelectItem value="fluent">Fluent</SelectItem>
+                              <SelectItem value="native">Native</SelectItem>
+                              <SelectItem value="professional">
+                                Professional
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeLanguage(index)}
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive mt-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  onClick={addLanguage}
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-dashed"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Language
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Info Modal */}
+      <Dialog
+        open={infoModal.isOpen}
+        onOpenChange={(open) =>
+          setInfoModal((prev) => ({ ...prev, isOpen: open }))
+        }
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-primary" />
+              {infoModal.title}
+            </DialogTitle>
+            <DialogDescription>{infoModal.overview}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
+            <p className="font-medium text-foreground">
+              Tips for filling this section:
+            </p>
+            <ul className="space-y-2 text-muted-foreground">
+              {(infoModal.tips || []).map((tip, idx) => (
+                <li key={idx} className="flex gap-2">
+                  <span className="text-primary">•</span>
+                  <span>{tip}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() =>
+                setInfoModal((prev) => ({ ...prev, isOpen: false }))
+              }
+            >
+              Got it
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
 }
 
 // Knowledge Editor
-function KnowledgeEditor({ data, onChange }) {
-  const levels = ['beginner', 'learning', 'intermediate', 'advanced', 'expert']
+function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
+  const levels = ["beginner", "learning", "intermediate", "advanced", "expert"];
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterLevel, setFilterLevel] = useState("all");
+  const [expandedDomains, setExpandedDomains] = useState({});
+  const [expandedDomainReferences, setExpandedDomainReferences] = useState({});
+  const [expandedTabs, setExpandedTabs] = useState({});
+  const [expandedTabReferences, setExpandedTabReferences] = useState({});
+  const [collapsedSections, setCollapsedSections] = useState({
+    skills: true,
+    mentalTabs: true,
+  });
+  const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
+  const [isTabModalOpen, setIsTabModalOpen] = useState(false);
+  const [newDomainName, setNewDomainName] = useState("");
+  const [newDomainLevel, setNewDomainLevel] = useState("learning");
+  const [newDomainNotes, setNewDomainNotes] = useState("");
+  const [newTabTitle, setNewTabTitle] = useState("");
+  const [newTabContent, setNewTabContent] = useState("");
+  const [newTabTags, setNewTabTags] = useState([]);
+  const [tabSearchTerm, setTabSearchTerm] = useState("");
+
+  // Info modal state
+  const [infoModal, setInfoModal] = useState({
+    isOpen: false,
+    title: "",
+    overview: "",
+    tips: [],
+  });
+
+  const sectionInfo = {
+    skills: {
+      title: "Skills & Domains",
+      overview:
+        "This section tracks your technical and professional skills. It helps AI understand what you know, how well you know it, and in what context you've applied it.",
+      tips: [
+        "Skill Name: Be specific—use 'Python' not 'Programming', or 'React' not just 'Frontend'.",
+        "Proficiency Levels explained:",
+        "  • Beginner: Just started learning, basic understanding.",
+        "  • Learning: Actively studying, can do simple tasks.",
+        "  • Intermediate: Comfortable with common use cases, some hands-on experience.",
+        "  • Advanced: Deep knowledge, can solve complex problems independently.",
+        "  • Expert: Mastery level, can teach others and handle edge cases.",
+        "Notes: Add context about where and how you've used the skill—projects, tools, or specific experience.",
+        "References: Optional links to tutorials, documentation, or learning resources you've found helpful.",
+      ],
+    },
+    mentalTabs: {
+      title: "Mental Tabs",
+      overview:
+        "Mental Tabs are your personal knowledge snippets—random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
+      tips: [
+        "Title: A short, memorable name for the tab.",
+        "Content: A brief description or context explaining what this tab is about.",
+        "Tags: Keywords to help you (and AI) find this tab later.",
+        "References: Add items with a name, optional URL, and notes.",
+        "Use Mental Tabs for: favourite restaurants, book recommendations, gift ideas, recipes, travel tips, etc.",
+        "Think of it as your personal wiki that AI can reference when helping you.",
+      ],
+    },
+  };
+
+  const openInfo = (sectionKey) => {
+    const info = sectionInfo[sectionKey];
+    if (info) {
+      setInfoModal({ isOpen: true, ...info });
+    }
+  };
 
   const addDomain = () => {
-    const newDomains = [...(data.domains || []), { name: '', level: 'learning', notes: '' }]
-    onChange({ ...data, domains: newDomains })
-  }
+    onChange({
+      ...data,
+      domains: [
+        ...(data.domains || []),
+        { name: "", level: "learning", notes: "" },
+      ],
+    });
+  };
 
   const updateDomain = (index, field, value) => {
-    const newDomains = [...(data.domains || [])]
-    newDomains[index] = { ...newDomains[index], [field]: value }
-    onChange({ ...data, domains: newDomains })
-  }
+    const newDomains = [...(data.domains || [])];
+    newDomains[index] = { ...newDomains[index], [field]: value };
+    onChange({ ...data, domains: newDomains });
+  };
 
   const removeDomain = (index) => {
-    onChange({ ...data, domains: (data.domains || []).filter((_, i) => i !== index) })
-  }
+    const domain = (data.domains || [])[index];
+    if (onShowConfirmation) {
+      onShowConfirmation(
+        "Remove Knowledge Domain",
+        `Remove "${domain?.name || "domain"}"? This action cannot be undone.`,
+        () => {
+          onChange({
+            ...data,
+            domains: (data.domains || []).filter((_, i) => i !== index),
+          });
+        }
+      );
+    } else {
+      onChange({
+        ...data,
+        domains: (data.domains || []).filter((_, i) => i !== index),
+      });
+    }
+  };
+
+  const handleAddSkillFromModal = () => {
+    if (newDomainName.trim()) {
+      onChange({
+        ...data,
+        domains: [
+          ...(data.domains || []),
+          {
+            name: newDomainName.trim(),
+            level: newDomainLevel,
+            notes: newDomainNotes,
+            references: [],
+          },
+        ],
+      });
+      setNewDomainName("");
+      setNewDomainLevel("learning");
+      setNewDomainNotes("");
+      setIsSkillModalOpen(false);
+    }
+  };
+
+  const handleAddTabFromModal = () => {
+    if (newTabTitle.trim()) {
+      onChange({
+        ...data,
+        mental_tabs: [
+          {
+            title: newTabTitle.trim(),
+            content: newTabContent,
+            tags: newTabTags,
+            references: [],
+            created_at: new Date().toISOString(),
+          },
+          ...(data.mental_tabs || []),
+        ],
+      });
+      setNewTabTitle("");
+      setNewTabContent("");
+      setNewTabTags([]);
+      setIsTabModalOpen(false);
+    }
+  };
+
+  const updateTab = (index, field, value) => {
+    const newTabs = [...(data.mental_tabs || [])];
+    newTabs[index] = { ...newTabs[index], [field]: value };
+    onChange({ ...data, mental_tabs: newTabs });
+  };
+
+  const removeTab = (index) => {
+    const tab = (data.mental_tabs || [])[index];
+    if (onShowConfirmation) {
+      onShowConfirmation(
+        "Remove Mental Tab",
+        `Remove "${tab?.title || "tab"}"? This action cannot be undone.`,
+        () => {
+          onChange({
+            ...data,
+            mental_tabs: (data.mental_tabs || []).filter((_, i) => i !== index),
+          });
+        }
+      );
+    } else {
+      onChange({
+        ...data,
+        mental_tabs: (data.mental_tabs || []).filter((_, i) => i !== index),
+      });
+    }
+  };
+
+  const toggleTab = (index) => {
+    setExpandedTabs((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
+
+  const filteredDomains = (data.domains || []).filter((domain) => {
+    const matchesSearch = domain.name
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesLevel = filterLevel === "all" || domain.level === filterLevel;
+    return matchesSearch && matchesLevel;
+  });
+
+  const filteredTabs = (data.mental_tabs || []).filter((tab) => {
+    const searchLower = tabSearchTerm.toLowerCase();
+    const matchesTitle = tab.title?.toLowerCase().includes(searchLower);
+    const matchesTags = tab.tags?.some((tag) =>
+      tag.toLowerCase().includes(searchLower)
+    );
+    return matchesTitle || matchesTags;
+  });
+
+  const toggleDomain = (index) => {
+    setExpandedDomains((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
+
+  const toggleSection = (section) => {
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
 
   return (
-    <div className="editor-panel">
-      <h2 className="section-title">Knowledge Domains</h2>
-      {(data.domains || []).map((domain, index) => (
-        <div key={index} className="card">
-          <div className="card-header">
-            <div style={{ flex: 1 }} />
-            <button className="btn btn-danger btn-icon" onClick={() => removeDomain(index)}>×</button>
+    <div className="space-y-6">
+      {/* Skills Section */}
+      <Card>
+        <CardHeader>
+          <div
+            className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
+            onClick={() => toggleSection("skills")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.skills ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Skills & Domains
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("skills");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  Track your technical skills and proficiency levels
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsSkillModalOpen(true);
+              }}
+              size="sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Skill
+            </Button>
           </div>
-          <div className="card-grid">
-            <div className="form-group">
-              <label>Domain / Skill</label>
-              <input
-                type="text"
-                value={domain.name || ''}
-                onChange={(e) => updateDomain(index, 'name', e.target.value)}
-                placeholder="e.g. Python, Docker, React"
+        </CardHeader>
+        {!collapsedSections.skills && (
+          <CardContent className="space-y-4">
+            {/* Search and filter */}
+            {(data.domains || []).length > 0 && (
+              <div className="flex gap-3 flex-wrap items-end">
+                <div className="flex-1 min-w-[200px]">
+                  <Label
+                    htmlFor="search"
+                    className="text-xs text-muted-foreground mb-2 block"
+                  >
+                    Search
+                  </Label>
+                  <Input
+                    id="search"
+                    placeholder="Search skills..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="min-w-[150px]">
+                  <Label
+                    htmlFor="filter"
+                    className="text-xs text-muted-foreground mb-2 block"
+                  >
+                    Filter by Level
+                  </Label>
+                  <Select value={filterLevel} onValueChange={setFilterLevel}>
+                    <SelectTrigger id="filter" className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Levels</SelectItem>
+                      {levels.map((level) => (
+                        <SelectItem key={level} value={level}>
+                          {level.charAt(0).toUpperCase() + level.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {(searchTerm || filterLevel !== "all") && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setFilterLevel("all");
+                    }}
+                    className="h-9"
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Domains list */}
+            {filteredDomains.length > 0 ? (
+              <div className="space-y-2">
+                {filteredDomains.map((domain, index) => {
+                  const originalIndex = (data.domains || []).indexOf(domain);
+                  const isExpanded = expandedDomains[originalIndex];
+                  const hasNotes = !!domain.notes;
+
+                  return (
+                    <div
+                      key={originalIndex}
+                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                    >
+                      {/* Collapsed header */}
+                      <div
+                        className="flex items-center gap-2 p-3 cursor-pointer"
+                        onClick={() => toggleDomain(originalIndex)}
+                      >
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform text-muted-foreground ${
+                            isExpanded ? "" : "-rotate-90"
+                          }`}
+                        />
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          <span className="font-medium truncate">
+                            {domain.name || "Untitled domain"}
+                          </span>
+                          <div className="flex gap-1 items-center flex-shrink-0">
+                            <Badge variant="secondary" className="h-5 text-xs">
+                              {domain.level || "learning"}
+                            </Badge>
+                            {hasNotes && (
+                              <Badge
+                                variant="secondary"
+                                className="h-5 text-xs"
+                              >
+                                notes
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeDomain(originalIndex);
+                          }}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* Expanded content */}
+                      {isExpanded && (
+                        <div className="border-t bg-background/50 p-4 space-y-4">
+                          <div className="grid gap-4 sm:grid-cols-[1fr_180px]">
+                            <div className="space-y-2">
+                              <Label>Domain / Skill</Label>
+                              <Input
+                                value={domain.name || ""}
+                                onChange={(e) =>
+                                  updateDomain(
+                                    originalIndex,
+                                    "name",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="e.g. Python, Docker"
+                                className="h-8"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Proficiency</Label>
+                              <Select
+                                value={domain.level || "learning"}
+                                onValueChange={(value) =>
+                                  updateDomain(originalIndex, "level", value)
+                                }
+                              >
+                                <SelectTrigger className="h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {levels.map((level) => (
+                                    <SelectItem key={level} value={level}>
+                                      {level.charAt(0).toUpperCase() +
+                                        level.slice(1)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Notes</Label>
+                            <Textarea
+                              value={domain.notes || ""}
+                              onChange={(e) =>
+                                updateDomain(
+                                  originalIndex,
+                                  "notes",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Notes..."
+                              className="min-h-[80px] text-sm bg-background"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+
+                          {/* References Section */}
+                          <div className="space-y-2">
+                            <Label>References & Resources</Label>
+                            <div className="space-y-2">
+                              {(domain.references || []).map((ref, refIdx) => {
+                                const refKey = `${originalIndex}-${refIdx}`;
+                                const isRefExpanded =
+                                  expandedDomainReferences[refKey];
+                                return (
+                                  <div
+                                    key={refIdx}
+                                    className="rounded border bg-background"
+                                  >
+                                    <div
+                                      className="flex items-center gap-2 p-2 cursor-pointer hover:bg-muted/50"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setExpandedDomainReferences((prev) => ({
+                                          ...prev,
+                                          [refKey]: !prev[refKey],
+                                        }));
+                                      }}
+                                    >
+                                      <ChevronDown
+                                        className={`h-3 w-3 transition-transform ${
+                                          isRefExpanded ? "" : "-rotate-90"
+                                        }`}
+                                      />
+                                      <span className="text-xs flex-1 truncate">
+                                        {ref.name || "Untitled reference"}
+                                      </span>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const newRefs = (
+                                            domain.references || []
+                                          ).filter((_, i) => i !== refIdx);
+                                          updateDomain(
+                                            originalIndex,
+                                            "references",
+                                            newRefs
+                                          );
+                                        }}
+                                        className="h-6 w-6"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                    {isRefExpanded && (
+                                      <div className="border-t p-2 space-y-2">
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <Input
+                                            value={ref.name || ""}
+                                            onChange={(e) => {
+                                              const newRefs = [
+                                                ...(domain.references || []),
+                                              ];
+                                              newRefs[refIdx] = {
+                                                ...newRefs[refIdx],
+                                                name: e.target.value,
+                                              };
+                                              updateDomain(
+                                                originalIndex,
+                                                "references",
+                                                newRefs
+                                              );
+                                            }}
+                                            placeholder="Reference name"
+                                            className="h-7 text-xs"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                          <Input
+                                            value={ref.url || ""}
+                                            onChange={(e) => {
+                                              const newRefs = [
+                                                ...(domain.references || []),
+                                              ];
+                                              newRefs[refIdx] = {
+                                                ...newRefs[refIdx],
+                                                url: e.target.value,
+                                              };
+                                              updateDomain(
+                                                originalIndex,
+                                                "references",
+                                                newRefs
+                                              );
+                                            }}
+                                            placeholder="URL"
+                                            className="h-7 text-xs"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                        </div>
+                                        <Textarea
+                                          value={ref.notes || ""}
+                                          onChange={(e) => {
+                                            const newRefs = [
+                                              ...(domain.references || []),
+                                            ];
+                                            newRefs[refIdx] = {
+                                              ...newRefs[refIdx],
+                                              notes: e.target.value,
+                                            };
+                                            updateDomain(
+                                              originalIndex,
+                                              "references",
+                                              newRefs
+                                            );
+                                          }}
+                                          placeholder="Notes"
+                                          className="min-h-[50px] text-xs"
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newRefs = [
+                                    ...(domain.references || []),
+                                    { name: "", url: "", notes: "" },
+                                  ];
+                                  updateDomain(
+                                    originalIndex,
+                                    "references",
+                                    newRefs
+                                  );
+                                  const newRefIdx = newRefs.length - 1;
+                                  setExpandedDomainReferences((prev) => ({
+                                    ...prev,
+                                    [`${originalIndex}-${newRefIdx}`]: true,
+                                  }));
+                                }}
+                                className="w-full border-dashed text-xs h-7"
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add Reference
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {filteredDomains.length === 0 && (
+              <div className="px-4 py-8 text-center text-muted-foreground text-sm border rounded-lg bg-muted/20">
+                {searchTerm || filterLevel !== "all"
+                  ? "No skills match your filters."
+                  : "No skills yet. Add one to get started."}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Skills Add Modal */}
+      <Dialog open={isSkillModalOpen} onOpenChange={setIsSkillModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Skill</DialogTitle>
+            <DialogDescription>
+              Enter the skill name and proficiency level
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="skill-name">Skill Name</Label>
+              <Input
+                id="skill-name"
+                placeholder="e.g. Python, Docker, Machine Learning"
+                value={newDomainName}
+                onChange={(e) => setNewDomainName(e.target.value)}
+                onKeyPress={(e) =>
+                  e.key === "Enter" && handleAddSkillFromModal()
+                }
               />
             </div>
-            <div className="form-group">
-              <label>Proficiency Level</label>
-              <select
-                value={domain.level || 'learning'}
-                onChange={(e) => updateDomain(index, 'level', e.target.value)}
-              >
-                {levels.map((level) => (
-                  <option key={level} value={level}>
-                    {level.charAt(0).toUpperCase() + level.slice(1)}
-                  </option>
-                ))}
-              </select>
+            <div className="space-y-2">
+              <Label htmlFor="skill-level">Proficiency Level</Label>
+              <Select value={newDomainLevel} onValueChange={setNewDomainLevel}>
+                <SelectTrigger id="skill-level">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {levels.map((level) => (
+                    <SelectItem key={level} value={level}>
+                      {level.charAt(0).toUpperCase() + level.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="skill-notes">Notes (Optional)</Label>
+              <Textarea
+                id="skill-notes"
+                placeholder="Add context, projects, or experience..."
+                value={newDomainNotes}
+                onChange={(e) => setNewDomainNotes(e.target.value)}
+                className="min-h-[80px]"
+              />
             </div>
           </div>
-          <div className="form-group" style={{ marginTop: '1rem' }}>
-            <label>Notes</label>
-            <input
-              type="text"
-              value={domain.notes || ''}
-              onChange={(e) => updateDomain(index, 'notes', e.target.value)}
-              placeholder="Additional context about this skill..."
-            />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsSkillModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleAddSkillFromModal}>Add Skill</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mental Tabs Section */}
+      <Card>
+        <CardHeader>
+          <div
+            className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
+            onClick={() => toggleSection("mentalTabs")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.mentalTabs ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Mental Tabs
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("mentalTabs");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  Store random knowledge, notes, and insights that don't fit
+                  into skills
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsTabModalOpen(true);
+              }}
+              size="sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Tab
+            </Button>
           </div>
-        </div>
-      ))}
-      <button className="add-card-btn" onClick={addDomain}>
-        + Add Knowledge Domain
-      </button>
+        </CardHeader>
+        {!collapsedSections.mentalTabs && (
+          <CardContent className="space-y-4">
+            {/* Search */}
+            {(data.mental_tabs || []).length > 0 && (
+              <div className="flex gap-3 items-end">
+                <div className="flex-1 min-w-[200px]">
+                  <Label
+                    htmlFor="tab-search"
+                    className="text-xs text-muted-foreground mb-2 block"
+                  >
+                    Search
+                  </Label>
+                  <Input
+                    id="tab-search"
+                    placeholder="Search tabs..."
+                    value={tabSearchTerm}
+                    onChange={(e) => setTabSearchTerm(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                {tabSearchTerm && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTabSearchTerm("")}
+                    className="h-9"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Tabs list */}
+            {filteredTabs.length > 0 ? (
+              <div className="space-y-2">
+                {filteredTabs.map((tab, index) => {
+                  const originalIndex = (data.mental_tabs || []).indexOf(tab);
+                  const isExpanded = expandedTabs[originalIndex];
+                  const hasTags = tab.tags && tab.tags.length > 0;
+
+                  return (
+                    <div
+                      key={originalIndex}
+                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                    >
+                      {/* Collapsed header */}
+                      <div
+                        className="flex items-center gap-2 p-3 cursor-pointer"
+                        onClick={() => toggleTab(originalIndex)}
+                      >
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform text-muted-foreground ${
+                            isExpanded ? "" : "-rotate-90"
+                          }`}
+                        />
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          <span className="font-medium truncate">
+                            {tab.title || "Untitled tab"}
+                          </span>
+                          {hasTags && (
+                            <div className="flex gap-1 flex-wrap flex-shrink-0">
+                              {tab.tags.slice(0, 3).map((tag, i) => (
+                                <Badge
+                                  key={i}
+                                  variant="secondary"
+                                  className="h-5 text-xs"
+                                >
+                                  {tag}
+                                </Badge>
+                              ))}
+                              {tab.tags.length > 3 && (
+                                <Badge
+                                  variant="secondary"
+                                  className="h-5 text-xs"
+                                >
+                                  +{tab.tags.length - 3}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeTab(originalIndex);
+                          }}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* Expanded content */}
+                      {isExpanded && (
+                        <div className="border-t bg-background/50 p-4 space-y-4">
+                          <div className="space-y-2">
+                            <Label>Title</Label>
+                            <Input
+                              value={tab.title || ""}
+                              onChange={(e) =>
+                                updateTab(
+                                  originalIndex,
+                                  "title",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Tab title"
+                              className="h-8"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Content</Label>
+                            <Textarea
+                              value={tab.content || ""}
+                              onChange={(e) =>
+                                updateTab(
+                                  originalIndex,
+                                  "content",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Your notes, insights, reminders..."
+                              className="min-h-[120px] text-sm bg-background"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Tags</Label>
+                            <ArrayInput
+                              value={tab.tags || []}
+                              onChange={(newTags) =>
+                                updateTab(originalIndex, "tags", newTags)
+                              }
+                              placeholder="Add tag..."
+                            />
+                          </div>
+
+                          {/* References Section */}
+                          <div className="space-y-2">
+                            <Label>References & Resources</Label>
+                            <div className="space-y-2">
+                              {(tab.references || []).map((ref, refIdx) => {
+                                const refKey = `${originalIndex}-${refIdx}`;
+                                const isRefExpanded =
+                                  expandedTabReferences[refKey];
+                                return (
+                                  <div
+                                    key={refIdx}
+                                    className="rounded border bg-background"
+                                  >
+                                    <div
+                                      className="flex items-center gap-2 p-2 cursor-pointer hover:bg-muted/50"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setExpandedTabReferences((prev) => ({
+                                          ...prev,
+                                          [refKey]: !prev[refKey],
+                                        }));
+                                      }}
+                                    >
+                                      <ChevronDown
+                                        className={`h-3 w-3 transition-transform ${
+                                          isRefExpanded ? "" : "-rotate-90"
+                                        }`}
+                                      />
+                                      <span className="text-xs flex-1 truncate">
+                                        {ref.name || "Untitled reference"}
+                                      </span>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const newRefs = (
+                                            tab.references || []
+                                          ).filter((_, i) => i !== refIdx);
+                                          updateTab(
+                                            originalIndex,
+                                            "references",
+                                            newRefs
+                                          );
+                                        }}
+                                        className="h-6 w-6"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                    {isRefExpanded && (
+                                      <div className="border-t p-2 space-y-2">
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <Input
+                                            value={ref.name || ""}
+                                            onChange={(e) => {
+                                              const newRefs = [
+                                                ...(tab.references || []),
+                                              ];
+                                              newRefs[refIdx] = {
+                                                ...newRefs[refIdx],
+                                                name: e.target.value,
+                                              };
+                                              updateTab(
+                                                originalIndex,
+                                                "references",
+                                                newRefs
+                                              );
+                                            }}
+                                            placeholder="Reference name"
+                                            className="h-7 text-xs"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                          <Input
+                                            value={ref.url || ""}
+                                            onChange={(e) => {
+                                              const newRefs = [
+                                                ...(tab.references || []),
+                                              ];
+                                              newRefs[refIdx] = {
+                                                ...newRefs[refIdx],
+                                                url: e.target.value,
+                                              };
+                                              updateTab(
+                                                originalIndex,
+                                                "references",
+                                                newRefs
+                                              );
+                                            }}
+                                            placeholder="URL"
+                                            className="h-7 text-xs"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                        </div>
+                                        <Textarea
+                                          value={ref.notes || ""}
+                                          onChange={(e) => {
+                                            const newRefs = [
+                                              ...(tab.references || []),
+                                            ];
+                                            newRefs[refIdx] = {
+                                              ...newRefs[refIdx],
+                                              notes: e.target.value,
+                                            };
+                                            updateTab(
+                                              originalIndex,
+                                              "references",
+                                              newRefs
+                                            );
+                                          }}
+                                          placeholder="Notes"
+                                          className="min-h-[50px] text-xs"
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newRefs = [
+                                    ...(tab.references || []),
+                                    { name: "", url: "", notes: "" },
+                                  ];
+                                  updateTab(
+                                    originalIndex,
+                                    "references",
+                                    newRefs
+                                  );
+                                  const newRefIdx = newRefs.length - 1;
+                                  setExpandedTabReferences((prev) => ({
+                                    ...prev,
+                                    [`${originalIndex}-${newRefIdx}`]: true,
+                                  }));
+                                }}
+                                className="w-full border-dashed text-xs h-7"
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add Reference
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="px-4 py-8 text-center text-muted-foreground text-sm border rounded-lg bg-muted/20">
+                {tabSearchTerm
+                  ? "No tabs match your search."
+                  : "No mental tabs yet. Add one to save random knowledge."}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Mental Tabs Add Modal */}
+      <Dialog open={isTabModalOpen} onOpenChange={setIsTabModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Mental Tab</DialogTitle>
+            <DialogDescription>
+              Save random knowledge, notes, or insights
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="tab-title">Title</Label>
+              <Input
+                id="tab-title"
+                placeholder="e.g. AWS CLI Commands, Git Workflows"
+                value={newTabTitle}
+                onChange={(e) => setNewTabTitle(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tab-content">Content</Label>
+              <Textarea
+                id="tab-content"
+                placeholder="Your notes, code snippets, reminders..."
+                value={newTabContent}
+                onChange={(e) => setNewTabContent(e.target.value)}
+                className="min-h-[120px]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tab-tags">Tags (Optional)</Label>
+              <ArrayInput
+                value={newTabTags}
+                onChange={setNewTabTags}
+                placeholder="Add tag..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTabModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddTabFromModal}>Add Tab</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Info Modal */}
+      <Dialog
+        open={infoModal.isOpen}
+        onOpenChange={(open) =>
+          setInfoModal((prev) => ({ ...prev, isOpen: open }))
+        }
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-primary" />
+              {infoModal.title}
+            </DialogTitle>
+            <DialogDescription>{infoModal.overview}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
+            <p className="font-medium text-foreground">
+              Tips for filling this section:
+            </p>
+            <ul className="space-y-2 text-muted-foreground">
+              {(infoModal.tips || []).map((tip, idx) => (
+                <li key={idx} className="flex gap-2">
+                  <span className="text-primary">•</span>
+                  <span>{tip}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() =>
+                setInfoModal((prev) => ({ ...prev, isOpen: false }))
+              }
+            >
+              Got it
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
 }
 
 // Preferences Editor
 function PreferencesEditor({ data, onChange }) {
-  const updateCodeStyle = (field, value) => {
+  const updateCodeStyle = (field, value) =>
     onChange({
       ...data,
-      code_style: { ...(data.code_style || {}), [field]: value }
-    })
-  }
-
-  const updateCommunication = (field, value) => {
+      code_style: { ...(data.code_style || {}), [field]: value },
+    });
+  const updateCommunication = (field, value) =>
     onChange({
       ...data,
-      communication: { ...(data.communication || {}), [field]: value }
-    })
-  }
-
-  const updateLearning = (field, value) => {
+      communication: { ...(data.communication || {}), [field]: value },
+    });
+  const updateLearning = (field, value) =>
     onChange({
       ...data,
-      learning_style: { ...(data.learning_style || {}), [field]: value }
-    })
-  }
+      learning_style: { ...(data.learning_style || {}), [field]: value },
+    });
 
   return (
-    <div className="editor-panel">
-      <h2 className="section-title">Code Style</h2>
-      <div className="form-grid">
-        <div className="form-group full-width">
-          <label>Preferred Languages</label>
-          <ArrayInput
-            items={data.code_style?.preferred_languages || []}
-            onChange={(items) => updateCodeStyle('preferred_languages', items)}
-            placeholder="e.g. Python, TypeScript..."
-          />
-        </div>
-        <div className="form-group full-width">
-          <label>Frameworks</label>
-          <ArrayInput
-            items={data.code_style?.frameworks || []}
-            onChange={(items) => updateCodeStyle('frameworks', items)}
-            placeholder="e.g. FastAPI, Next.js..."
-          />
-        </div>
-        <div className="form-group full-width">
-          <label>Tools</label>
-          <ArrayInput
-            items={data.code_style?.tools || []}
-            onChange={(items) => updateCodeStyle('tools', items)}
-            placeholder="e.g. VS Code, Docker..."
-          />
-        </div>
-      </div>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Code Style</CardTitle>
+          <CardDescription>
+            Your preferred programming languages, frameworks, and tools
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Preferred Languages</Label>
+            <ArrayInput
+              items={data.code_style?.preferred_languages || []}
+              onChange={(items) =>
+                updateCodeStyle("preferred_languages", items)
+              }
+              placeholder="e.g. Python, TypeScript..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Frameworks</Label>
+            <ArrayInput
+              items={data.code_style?.frameworks || []}
+              onChange={(items) => updateCodeStyle("frameworks", items)}
+              placeholder="e.g. FastAPI, Next.js..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Tools</Label>
+            <ArrayInput
+              items={data.code_style?.tools || []}
+              onChange={(items) => updateCodeStyle("tools", items)}
+              placeholder="e.g. VS Code, Docker..."
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-      <h2 className="section-title" style={{ marginTop: '2rem' }}>Communication</h2>
-      <div className="form-grid">
-        <div className="form-group">
-          <label>Tone</label>
-          <input
-            type="text"
-            value={data.communication?.tone || ''}
-            onChange={(e) => updateCommunication('tone', e.target.value)}
-            placeholder="e.g. friendly but professional"
-          />
-        </div>
-        <div className="form-group">
-          <label>Detail Level</label>
-          <input
-            type="text"
-            value={data.communication?.detail_level || ''}
-            onChange={(e) => updateCommunication('detail_level', e.target.value)}
-            placeholder="e.g. comprehensive with examples"
-          />
-        </div>
-        <div className="form-group">
-          <label>Locale</label>
-          <input
-            type="text"
-            value={data.communication?.locale || ''}
-            onChange={(e) => updateCommunication('locale', e.target.value)}
-            placeholder="e.g. British English"
-          />
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Communication</CardTitle>
+          <CardDescription>
+            How you prefer AI responses to be formatted
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label>Tone</Label>
+            <Input
+              value={data.communication?.tone || ""}
+              onChange={(e) => updateCommunication("tone", e.target.value)}
+              placeholder="e.g. friendly but professional"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Detail Level</Label>
+            <Input
+              value={data.communication?.detail_level || ""}
+              onChange={(e) =>
+                updateCommunication("detail_level", e.target.value)
+              }
+              placeholder="e.g. comprehensive"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Locale</Label>
+            <Input
+              value={data.communication?.locale || ""}
+              onChange={(e) => updateCommunication("locale", e.target.value)}
+              placeholder="e.g. British English"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-      <h2 className="section-title" style={{ marginTop: '2rem' }}>Learning Style</h2>
-      <div className="form-grid">
-        <div className="form-group full-width">
-          <label>Preferred Methods</label>
+      <Card>
+        <CardHeader>
+          <CardTitle>Learning Style</CardTitle>
+          <CardDescription>How you learn best</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Preferred Methods</Label>
+            <ArrayInput
+              items={data.learning_style?.preferred || []}
+              onChange={(items) => updateLearning("preferred", items)}
+              placeholder="e.g. hands-on examples..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Things to Avoid</Label>
+            <ArrayInput
+              items={data.learning_style?.avoid || []}
+              onChange={(items) => updateLearning("avoid", items)}
+              placeholder="e.g. walls of text..."
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Dislikes & Deal-breakers</CardTitle>
+          <CardDescription>
+            Things you do not want in responses or suggestions
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label>List your dislikes or hard nos</Label>
           <ArrayInput
-            items={data.learning_style?.preferred || []}
-            onChange={(items) => updateLearning('preferred', items)}
-            placeholder="e.g. hands-on examples..."
+            items={data.dislikes || []}
+            onChange={(items) => onChange({ ...data, dislikes: items })}
+            placeholder="e.g. unsolicited sales tone, lorem ipsum, jargon..."
           />
-        </div>
-        <div className="form-group full-width">
-          <label>Things to Avoid</label>
-          <ArrayInput
-            items={data.learning_style?.avoid || []}
-            onChange={(items) => updateLearning('avoid', items)}
-            placeholder="e.g. walls of text..."
-          />
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
-  )
+  );
 }
 
 // Projects Editor
-function ProjectsEditor({ data, onChange }) {
+function ProjectsEditor({ data, onChange, onShowConfirmation }) {
+  const [expandedProjectReferences, setExpandedProjectReferences] = useState(
+    {}
+  );
+  const [expandedProjects, setExpandedProjects] = useState({});
+  const [collapsedSections, setCollapsedSections] = useState({
+    ideas: true,
+    projects: true,
+  });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [newIdea, setNewIdea] = useState("");
+  const [newIdeaNote, setNewIdeaNote] = useState("");
+  const [isIdeaModalOpen, setIsIdeaModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectStatus, setNewProjectStatus] = useState("active");
+
+  // Info modal state
+  const [infoModal, setInfoModal] = useState({
+    isOpen: false,
+    title: "",
+    overview: "",
+    tips: [],
+  });
+
+  const sectionInfo = {
+    topOfMind: {
+      title: "Top of Mind",
+      overview:
+        "Capture quick ideas, thoughts, or things you want to explore. Think of it as a scratchpad for inspiration before it becomes a full project.",
+      tips: [
+        "Idea: A short phrase or sentence describing what you're thinking about.",
+        "Note: Optional context—why this idea excites you, potential next steps, or related thoughts.",
+        "Use this for: half-baked concepts, 'what if' questions, problems you want to solve, things to research later.",
+        "When an idea matures, you can promote it to a full project with more details.",
+      ],
+    },
+    projects: {
+      title: "Projects",
+      overview:
+        "Track your active work, side projects, and completed endeavors. This helps AI understand what you're building and can reference past experience.",
+      tips: [
+        "Name: Clear, descriptive title for the project.",
+        "Status options:",
+        "  • Planning: Still in ideation/research phase.",
+        "  • Active: Currently working on it.",
+        "  • Paused: Temporarily on hold.",
+        "  • Completed: Finished and shipped.",
+        "  • Archived: No longer relevant but kept for reference.",
+        "Description: What the project is about and your goals.",
+        "Tags: Keywords for easy filtering and AI context.",
+        "References: Links to repos, docs, designs, or related resources.",
+        "Notes: Progress updates, blockers, or lessons learned.",
+      ],
+    },
+  };
+
+  const openInfo = (sectionKey) => {
+    const info = sectionInfo[sectionKey];
+    if (info) {
+      setInfoModal({ isOpen: true, ...info });
+    }
+  };
+
   const addProject = () => {
-    const newProjects = [
-      ...(data.projects || []),
-      { name: '', description: '', status: 'active', tech_stack: [] }
-    ]
-    onChange({ ...data, projects: newProjects })
-  }
+    if (newProjectName.trim()) {
+      onChange({
+        ...data,
+        projects: [
+          {
+            name: newProjectName.trim(),
+            description: "",
+            status: newProjectStatus,
+            tags: [],
+            references: [],
+            notes: "",
+          },
+          ...(data.projects || []),
+        ],
+      });
+      // Expand the newly added project
+      setExpandedProjects((prev) => ({
+        ...prev,
+        0: true,
+      }));
+      // Reset modal state
+      setNewProjectName("");
+      setNewProjectStatus("active");
+      setIsAddModalOpen(false);
+    }
+  };
+
+  const toggleProjectReference = (key) => {
+    setExpandedProjectReferences((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const toggleSection = (section) => {
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  const toggleProject = (index) => {
+    setExpandedProjects((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
 
   const updateProject = (index, field, value) => {
-    const newProjects = [...(data.projects || [])]
-    newProjects[index] = { ...newProjects[index], [field]: value }
-    onChange({ ...data, projects: newProjects })
-  }
+    const newProjects = [...(data.projects || [])];
+    newProjects[index] = { ...newProjects[index], [field]: value };
+    onChange({ ...data, projects: newProjects });
+  };
 
   const removeProject = (index) => {
-    onChange({ ...data, projects: (data.projects || []).filter((_, i) => i !== index) })
-  }
+    const project = (data.projects || [])[index];
+    if (onShowConfirmation) {
+      onShowConfirmation(
+        "Remove Project",
+        `Remove "${project?.name || "project"}"? This action cannot be undone.`,
+        () => {
+          onChange({
+            ...data,
+            projects: (data.projects || []).filter((_, i) => i !== index),
+          });
+        }
+      );
+    } else {
+      onChange({
+        ...data,
+        projects: (data.projects || []).filter((_, i) => i !== index),
+      });
+    }
+  };
+
+  // Filter projects
+  const filteredProjects = [...(data.projects || [])].filter((project) => {
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch =
+      project.name?.toLowerCase().includes(searchLower) ||
+      (project.tags || []).some((tag) =>
+        tag.toLowerCase().includes(searchLower)
+      );
+    const matchesStatus =
+      filterStatus === "all" || project.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
+
+  const hasActiveFilters = searchTerm || filterStatus !== "all";
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setFilterStatus("all");
+  };
 
   return (
-    <div className="editor-panel">
-      <h2 className="section-title">Projects</h2>
-      {(data.projects || []).map((project, index) => (
-        <div key={index} className="card">
-          <div className="card-header">
-            <div style={{ flex: 1 }} />
-            <button className="btn btn-danger btn-icon" onClick={() => removeProject(index)}>×</button>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div
+            className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
+            onClick={() => toggleSection("ideas")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.ideas ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Top of Mind
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("topOfMind");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  What you're currently focused on or thinking about
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsIdeaModalOpen(true);
+              }}
+              size="sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Idea
+            </Button>
           </div>
-          <div className="form-grid">
-            <div className="form-group">
-              <label>Project Name</label>
-              <input
-                type="text"
-                value={project.name || ''}
-                onChange={(e) => updateProject(index, 'name', e.target.value)}
-                placeholder="Project name"
-              />
-            </div>
-            <div className="form-group">
-              <label>Status</label>
-              <select
-                value={project.status || 'active'}
-                onChange={(e) => updateProject(index, 'status', e.target.value)}
-              >
-                <option value="active">Active</option>
-                <option value="paused">Paused</option>
-                <option value="completed">Completed</option>
-                <option value="archived">Archived</option>
-              </select>
-            </div>
-            <div className="form-group full-width">
-              <label>Description</label>
-              <textarea
-                value={project.description || ''}
-                onChange={(e) => updateProject(index, 'description', e.target.value)}
-                placeholder="Brief description..."
-              />
-            </div>
-            <div className="form-group full-width">
-              <label>Tech Stack</label>
-              <ArrayInput
-                items={project.tech_stack || []}
-                onChange={(items) => updateProject(index, 'tech_stack', items)}
-                placeholder="Add technology..."
-              />
-            </div>
-          </div>
-        </div>
-      ))}
-      <button className="add-card-btn" onClick={addProject}>
-        + Add Project
-      </button>
+        </CardHeader>
+        {!collapsedSections.ideas && (
+          <CardContent>
+            {/* List of ideas */}
+            {(data.top_of_mind || []).length > 0 ? (
+              <div className="space-y-2">
+                {(data.top_of_mind || []).map((item, index) => {
+                  const ideaObj =
+                    typeof item === "string" ? { idea: item, note: "" } : item;
+                  return (
+                    <div
+                      key={index}
+                      className="p-3 rounded border bg-muted/20 hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 space-y-1">
+                          <div className="font-medium text-sm">
+                            {ideaObj.idea}
+                          </div>
+                          {ideaObj.note && (
+                            <div className="text-xs text-muted-foreground">
+                              {ideaObj.note}
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            const updated = (data.top_of_mind || []).filter(
+                              (_, i) => i !== index
+                            );
+                            onChange({ ...data, top_of_mind: updated });
+                          }}
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="px-4 py-8 text-center text-muted-foreground text-sm border rounded-lg bg-muted/20">
+                No ideas yet. Click &quot;Add Idea&quot; to get started.
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
-      <h2 className="section-title" style={{ marginTop: '2rem' }}>Top of Mind</h2>
-      <ArrayInput
-        items={data.top_of_mind || []}
-        onChange={(items) => onChange({ ...data, top_of_mind: items })}
-        placeholder="What's on your mind right now..."
-      />
+      {/* Add Idea Modal */}
+      <Dialog open={isIdeaModalOpen} onOpenChange={setIsIdeaModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Idea</DialogTitle>
+            <DialogDescription>
+              Capture a project idea or something you want to build
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="modal-idea">Idea</Label>
+              <Input
+                id="modal-idea"
+                value={newIdea}
+                onChange={(e) => setNewIdea(e.target.value)}
+                placeholder="Project idea or thing you want to build..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="modal-idea-note">Notes (Optional)</Label>
+              <Textarea
+                id="modal-idea-note"
+                value={newIdeaNote}
+                onChange={(e) => setNewIdeaNote(e.target.value)}
+                placeholder="Quick notes, thoughts, or details..."
+                className="min-h-[80px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsIdeaModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (newIdea.trim()) {
+                  const normalizedIdeas = (data.top_of_mind || []).map((item) =>
+                    typeof item === "string" ? { idea: item, note: "" } : item
+                  );
+                  onChange({
+                    ...data,
+                    top_of_mind: [
+                      ...normalizedIdeas,
+                      { idea: newIdea.trim(), note: newIdeaNote.trim() },
+                    ],
+                  });
+                  setNewIdea("");
+                  setNewIdeaNote("");
+                  setIsIdeaModalOpen(false);
+                }
+              }}
+            >
+              Add Idea
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Card>
+        <CardHeader>
+          <div
+            className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
+            onClick={() => toggleSection("projects")}
+          >
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <ChevronDown
+                  className={`h-5 w-5 transition-transform ${
+                    collapsedSections.projects ? "-rotate-90" : ""
+                  }`}
+                />
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    Projects
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openInfo("projects");
+                      }}
+                    >
+                      <Info className="h-4 w-4" />
+                    </Button>
+                  </CardTitle>
+                  <CardDescription>
+                    Track your active, paused, and completed projects
+                  </CardDescription>
+                </div>
+              </div>
+            </div>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsAddModalOpen(true);
+              }}
+              size="sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Project
+            </Button>
+          </div>
+        </CardHeader>
+        {!collapsedSections.projects && (
+          <CardContent className="space-y-4">
+            {/* Search Bar */}
+            {(data.projects || []).length > 0 && (
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="flex-1 min-w-[200px] space-y-1.5">
+                  <Label htmlFor="project-search" className="text-xs">
+                    Search
+                  </Label>
+                  <Input
+                    id="project-search"
+                    placeholder="Search projects..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+                <div className="min-w-[150px] space-y-1.5">
+                  <Label htmlFor="project-status" className="text-xs">
+                    Status
+                  </Label>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger id="project-status" className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="planning">Planning</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="paused">Paused</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="h-8"
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Projects List */}
+            {filteredProjects.length > 0 ? (
+              <div className="space-y-2">
+                {filteredProjects.map((project) => {
+                  const originalIndex = (data.projects || []).indexOf(project);
+                  const tags = project.tags || project.tech_stack || [];
+                  const refCount = (project.references || []).length;
+                  const tagCount = tags.length;
+                  const hasNotes = (project.notes || "").trim().length > 0;
+                  const isExpanded = expandedProjects[originalIndex];
+
+                  return (
+                    <div
+                      key={originalIndex}
+                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                    >
+                      {/* Collapsed Header */}
+                      <div
+                        className="flex items-center gap-2 p-3 cursor-pointer"
+                        onClick={() => toggleProject(originalIndex)}
+                      >
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform text-muted-foreground ${
+                            isExpanded ? "" : "-rotate-90"
+                          }`}
+                        />
+                        <div className="flex-1 flex items-center gap-2 min-w-0">
+                          <span className="font-medium truncate">
+                            {project.name || "Untitled project"}
+                          </span>
+                          <div className="flex gap-1.5 items-center flex-shrink-0">
+                            {refCount > 0 && (
+                              <Badge
+                                variant="secondary"
+                                className="h-5 text-xs"
+                              >
+                                {refCount} refs
+                              </Badge>
+                            )}
+                            {tagCount > 0 && (
+                              <Badge
+                                variant="secondary"
+                                className="h-5 text-xs"
+                              >
+                                {tagCount} tags
+                              </Badge>
+                            )}
+                            {hasNotes && (
+                              <Badge
+                                variant="secondary"
+                                className="h-5 text-xs"
+                              >
+                                notes
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className="flex-shrink-0 capitalize"
+                        >
+                          {project.status || "active"}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeProject(originalIndex);
+                          }}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* Expanded Content */}
+
+                      {isExpanded && (
+                        <div className="border-t bg-background/50 p-4 space-y-4">
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Project Name</Label>
+                              <Input
+                                value={project.name || ""}
+                                onChange={(e) =>
+                                  updateProject(
+                                    originalIndex,
+                                    "name",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Project name"
+                                className="h-8 bg-background"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Status</Label>
+                              <Select
+                                value={project.status || "active"}
+                                onValueChange={(value) =>
+                                  updateProject(originalIndex, "status", value)
+                                }
+                              >
+                                <SelectTrigger className="h-8 bg-background">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="planning">
+                                    Planning
+                                  </SelectItem>
+                                  <SelectItem value="active">Active</SelectItem>
+                                  <SelectItem value="paused">Paused</SelectItem>
+                                  <SelectItem value="completed">
+                                    Completed
+                                  </SelectItem>
+                                  <SelectItem value="archived">
+                                    Archived
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Description</Label>
+                            <Textarea
+                              value={project.description || ""}
+                              onChange={(e) =>
+                                updateProject(
+                                  originalIndex,
+                                  "description",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Brief description..."
+                              className="bg-background text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Tags</Label>
+                            <ArrayInput
+                              items={tags}
+                              onChange={(items) =>
+                                updateProject(originalIndex, "tags", items)
+                              }
+                              placeholder="Add tag..."
+                            />
+                          </div>
+
+                          {/* References & Resources */}
+                          <div className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                              References & Resources
+                              {(project.references || []).length > 0 && (
+                                <span className="text-xs text-muted-foreground font-normal">
+                                  ({(project.references || []).length})
+                                </span>
+                              )}
+                            </Label>
+                            <div className="space-y-2 pl-3 border-l-2 border-muted">
+                              {(project.references || []).map((ref, refIdx) => {
+                                const refKey = `${originalIndex}-${refIdx}`;
+                                const isRefExpanded =
+                                  expandedProjectReferences[refKey];
+
+                                return (
+                                  <div
+                                    key={refIdx}
+                                    className="space-y-2 pb-3 border-b border-muted last:border-b-0 last:pb-0"
+                                  >
+                                    <div
+                                      className="flex items-center gap-2 cursor-pointer"
+                                      onClick={() =>
+                                        toggleProjectReference(refKey)
+                                      }
+                                    >
+                                      <ChevronDown
+                                        className={`h-3.5 w-3.5 transition-transform text-muted-foreground ${
+                                          isRefExpanded ? "" : "-rotate-90"
+                                        }`}
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium truncate">
+                                          {ref.name || "Untitled reference"}
+                                        </p>
+                                        <div className="flex flex-wrap gap-1 mt-1 text-xs text-muted-foreground">
+                                          {ref.url && (
+                                            <Badge
+                                              variant="secondary"
+                                              className="h-5 text-[11px]"
+                                            >
+                                              URL
+                                            </Badge>
+                                          )}
+                                          {ref.notes && (
+                                            <Badge
+                                              variant="secondary"
+                                              className="h-5 text-[11px]"
+                                            >
+                                              notes
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const newRefs = (
+                                            project.references || []
+                                          ).filter((_, i) => i !== refIdx);
+                                          updateProject(
+                                            originalIndex,
+                                            "references",
+                                            newRefs
+                                          );
+                                        }}
+                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+
+                                    {isRefExpanded && (
+                                      <div className="space-y-2 pt-2">
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                          <Input
+                                            value={ref.name || ""}
+                                            onChange={(e) => {
+                                              const newRefs = [
+                                                ...(project.references || []),
+                                              ];
+                                              newRefs[refIdx] = {
+                                                ...newRefs[refIdx],
+                                                name: e.target.value,
+                                              };
+                                              updateProject(
+                                                originalIndex,
+                                                "references",
+                                                newRefs
+                                              );
+                                            }}
+                                            placeholder="Reference name"
+                                            className="h-8 text-sm bg-background"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                          <Input
+                                            value={ref.url || ""}
+                                            onChange={(e) => {
+                                              const newRefs = [
+                                                ...(project.references || []),
+                                              ];
+                                              newRefs[refIdx] = {
+                                                ...newRefs[refIdx],
+                                                url: e.target.value,
+                                              };
+                                              updateProject(
+                                                originalIndex,
+                                                "references",
+                                                newRefs
+                                              );
+                                            }}
+                                            placeholder="URL (optional)"
+                                            className="h-8 text-sm bg-background"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                        </div>
+                                        <Textarea
+                                          value={ref.notes || ""}
+                                          onChange={(e) => {
+                                            const newRefs = [
+                                              ...(project.references || []),
+                                            ];
+                                            newRefs[refIdx] = {
+                                              ...newRefs[refIdx],
+                                              notes: e.target.value,
+                                            };
+                                            updateProject(
+                                              originalIndex,
+                                              "references",
+                                              newRefs
+                                            );
+                                          }}
+                                          placeholder="Notes about this resource (optional)..."
+                                          className="h-16 text-xs bg-background"
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newRefs = [
+                                    ...(project.references || []),
+                                    { name: "", url: "", notes: "" },
+                                  ];
+                                  updateProject(
+                                    originalIndex,
+                                    "references",
+                                    newRefs
+                                  );
+                                  const newKey = `${originalIndex}-${
+                                    (project.references || []).length
+                                  }`;
+                                  setExpandedProjectReferences((prev) => ({
+                                    ...prev,
+                                    [newKey]: true,
+                                  }));
+                                }}
+                                className="h-8 w-full border-dashed"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add reference
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Project Notes */}
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label>Notes</Label>
+                            <Textarea
+                              value={project.notes || ""}
+                              onChange={(e) =>
+                                updateProject(
+                                  originalIndex,
+                                  "notes",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Additional notes, blockers, or context..."
+                              className="min-h-[80px] bg-background text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                {hasActiveFilters
+                  ? "No projects match your search"
+                  : "No projects added yet"}
+              </p>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Add Project Modal */}
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Project</DialogTitle>
+            <DialogDescription>
+              Create a new project to track progress and resources
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="project-name">Project Name</Label>
+              <Input
+                id="project-name"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder="e.g., Personal Website, Mobile App"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newProjectName.trim()) {
+                    addProject();
+                  }
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="project-status">Status</Label>
+              <Select
+                value={newProjectStatus}
+                onValueChange={setNewProjectStatus}
+              >
+                <SelectTrigger id="project-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="planning">Planning</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="paused">Paused</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={addProject} disabled={!newProjectName.trim()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Info Modal */}
+      <Dialog
+        open={infoModal.isOpen}
+        onOpenChange={(open) =>
+          setInfoModal((prev) => ({ ...prev, isOpen: open }))
+        }
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-primary" />
+              {infoModal.title}
+            </DialogTitle>
+            <DialogDescription>{infoModal.overview}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
+            <p className="font-medium text-foreground">
+              Tips for filling this section:
+            </p>
+            <ul className="space-y-2 text-muted-foreground">
+              {(infoModal.tips || []).map((tip, idx) => (
+                <li key={idx} className="flex gap-2">
+                  <span className="text-primary">•</span>
+                  <span>{tip}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() =>
+                setInfoModal((prev) => ({ ...prev, isOpen: false }))
+              }
+            >
+              Got it
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
 }
 
 // Interests Editor
-function InterestsEditor({ data, onChange }) {
+function InterestsEditor({ data, onChange, onShowConfirmation }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterLevel, setFilterLevel] = useState("all");
+  const [expandedHobbies, setExpandedHobbies] = useState({});
+  const [expandedReferences, setExpandedReferences] = useState({});
+  const [collapsedSections, setCollapsedSections] = useState({
+    hobbies: true,
+    passions: true,
+    curiosities: true,
+    traits: true,
+    values: true,
+  });
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newHobbyName, setNewHobbyName] = useState("");
+  const [newHobbyLevel, setNewHobbyLevel] = useState("enthusiast");
+
+  // Info modal state
+  const [infoModal, setInfoModal] = useState({
+    isOpen: false,
+    title: "",
+    overview: "",
+    tips: [],
+  });
+
+  const sectionInfo = {
+    hobbies: {
+      title: "Hobbies & Activities",
+      overview:
+        "Track activities you enjoy outside of work. This helps AI understand your lifestyle and can suggest relevant recommendations.",
+      tips: [
+        "Name: The hobby or activity.",
+        "Skill Level options:",
+        "  • Casual: Do it occasionally for fun.",
+        "  • Enthusiast: Regularly engaged, developing skills.",
+        "  • Serious: Dedicated practice, may compete or create.",
+        "  • Expert: Highly skilled, possibly teach or mentor.",
+        "Specifics: Sub-areas or variations you focus on.",
+        "Notes: Your experience, goals, or what you enjoy most.",
+        "References: Links to gear, communities, or learning resources.",
+      ],
+    },
+    passions: {
+      title: "Passions",
+      overview:
+        "Things you care deeply about that drive you. These aren't necessarily skills—they're what gets you excited.",
+      tips: [
+        "Add topics, causes, or areas you're genuinely passionate about.",
+        "Examples: sustainability, design, storytelling, education, technology.",
+        "AI uses this to understand your motivations and tailor suggestions.",
+      ],
+    },
+    curiosities: {
+      title: "Curiosities",
+      overview:
+        "Topics you want to explore or learn more about. These are your 'I should look into that someday' items.",
+      tips: [
+        "Add subjects you're curious about but haven't dived into yet.",
+        "Examples: quantum computing, fermentation, urban planning, linguistics.",
+        "No pressure—these can be fleeting interests or serious research areas.",
+      ],
+    },
+    traits: {
+      title: "Personality Traits",
+      overview:
+        "Characteristics that define how you think, work, and interact. Helps AI understand your style and adapt its responses.",
+      tips: [
+        "Add adjectives or short phrases that describe you.",
+        "Examples: analytical, creative, detail-oriented, big-picture thinker, empathetic.",
+        "Be honest—both strengths and areas you're working on.",
+      ],
+    },
+    values: {
+      title: "Values",
+      overview:
+        "Core principles that guide your decisions and priorities. What matters most to you in life and work.",
+      tips: [
+        "Add words or short phrases representing your values.",
+        "Examples: integrity, growth, family, creativity, impact, balance.",
+        "These help AI align suggestions with what truly matters to you.",
+      ],
+    },
+  };
+
+  const openInfo = (sectionKey) => {
+    const info = sectionInfo[sectionKey];
+    if (info) {
+      setInfoModal({ isOpen: true, ...info });
+    }
+  };
+
+  const toggleHobby = (index) => {
+    setExpandedHobbies((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
+
+  const toggleReference = (key) => {
+    setExpandedReferences((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const toggleSection = (section) => {
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
   const addHobby = () => {
-    const newHobbies = [
-      ...(data.hobbies || []),
-      { name: '', specifics: [], skill_level: 'enthusiast' }
-    ]
-    onChange({ ...data, hobbies: newHobbies })
-  }
+    if (newHobbyName.trim()) {
+      onChange({
+        ...data,
+        hobbies: [
+          {
+            name: newHobbyName.trim(),
+            specifics: [],
+            skill_level: newHobbyLevel,
+            notes: "",
+            references: [],
+          },
+          ...(data.hobbies || []),
+        ],
+      });
+      // Expand the newly added hobby
+      setExpandedHobbies((prev) => ({
+        ...prev,
+        0: true,
+      }));
+      // Reset modal state
+      setNewHobbyName("");
+      setNewHobbyLevel("enthusiast");
+      setIsAddModalOpen(false);
+    }
+  };
 
   const updateHobby = (index, field, value) => {
-    const newHobbies = [...(data.hobbies || [])]
-    newHobbies[index] = { ...newHobbies[index], [field]: value }
-    onChange({ ...data, hobbies: newHobbies })
-  }
+    const newHobbies = [...(data.hobbies || [])];
+    newHobbies[index] = { ...newHobbies[index], [field]: value };
+    onChange({ ...data, hobbies: newHobbies });
+  };
 
   const removeHobby = (index) => {
-    onChange({ ...data, hobbies: (data.hobbies || []).filter((_, i) => i !== index) })
-  }
+    const hobby = (data.hobbies || [])[index];
+    if (onShowConfirmation) {
+      onShowConfirmation(
+        "Remove Hobby",
+        `Remove "${hobby?.name || "hobby"}"? This action cannot be undone.`,
+        () => {
+          onChange({
+            ...data,
+            hobbies: (data.hobbies || []).filter((_, i) => i !== index),
+          });
+        }
+      );
+    } else {
+      onChange({
+        ...data,
+        hobbies: (data.hobbies || []).filter((_, i) => i !== index),
+      });
+    }
+  };
+
+  // Filter hobbies (already in newest-first order from addHobby)
+  const filteredHobbies = [...(data.hobbies || [])].filter((hobby) => {
+    const matchesSearch = hobby.name
+      ?.toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesLevel =
+      filterLevel === "all" || hobby.skill_level === filterLevel;
+    return matchesSearch && matchesLevel;
+  });
+
+  const hasActiveFilters = searchTerm || filterLevel !== "all";
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setFilterLevel("all");
+  };
 
   return (
-    <div className="editor-panel">
-      <h2 className="section-title">Hobbies</h2>
-      {(data.hobbies || []).map((hobby, index) => (
-        <div key={index} className="card">
-          <div className="card-header">
-            <div style={{ flex: 1 }} />
-            <button className="btn btn-danger btn-icon" onClick={() => removeHobby(index)}>×</button>
+    <div className="space-y-6">
+      {/* Hobbies Section */}
+      <Card>
+        <CardHeader>
+          <div
+            className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
+            onClick={() => toggleSection("hobbies")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.hobbies ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Hobbies & Activities
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("hobbies");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  Things you enjoy doing in your free time
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsAddModalOpen(true);
+              }}
+              size="sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Hobby
+            </Button>
           </div>
-          <div className="form-grid">
-            <div className="form-group">
-              <label>Hobby</label>
-              <input
-                type="text"
-                value={hobby.name || ''}
-                onChange={(e) => updateHobby(index, 'name', e.target.value)}
-                placeholder="e.g. Cooking, Gaming"
+        </CardHeader>
+        {!collapsedSections.hobbies && (
+          <CardContent className="space-y-4">
+            {/* Search and Filter Bar */}
+            {(data.hobbies || []).length > 0 && (
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="flex-1 min-w-[200px] space-y-1.5">
+                  <Label htmlFor="hobby-search" className="text-xs">
+                    Search
+                  </Label>
+                  <Input
+                    id="hobby-search"
+                    placeholder="Search hobbies..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+                <div className="w-[160px] space-y-1.5">
+                  <Label htmlFor="level-filter" className="text-xs">
+                    Skill Level
+                  </Label>
+                  <Select value={filterLevel} onValueChange={setFilterLevel}>
+                    <SelectTrigger id="level-filter" className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Levels</SelectItem>
+                      <SelectItem value="casual">Casual</SelectItem>
+                      <SelectItem value="enthusiast">Enthusiast</SelectItem>
+                      <SelectItem value="serious">Serious</SelectItem>
+                      <SelectItem value="expert">Expert</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="h-8"
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Hobbies Table */}
+            {filteredHobbies.length > 0 ? (
+              <div className="space-y-2">
+                {filteredHobbies.map((hobby, idx) => {
+                  const originalIndex = (data.hobbies || []).indexOf(hobby);
+                  const isExpanded = expandedHobbies[originalIndex];
+                  const hasReferences = (hobby.references || []).length > 0;
+                  const hasSpecifics = (hobby.specifics || []).length > 0;
+                  const hasNotes = !!hobby.notes;
+
+                  return (
+                    <div
+                      key={idx}
+                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                    >
+                      {/* Collapsed Header */}
+                      <div
+                        className="flex items-center gap-2 p-3 cursor-pointer"
+                        onClick={() => toggleHobby(originalIndex)}
+                      >
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform text-muted-foreground ${
+                            isExpanded ? "" : "-rotate-90"
+                          }`}
+                        />
+                        <div className="flex-1 flex items-center gap-2 min-w-0">
+                          <span className="font-medium truncate">
+                            {hobby.name || "Untitled hobby"}
+                          </span>
+                          <div className="flex gap-1.5 items-center flex-shrink-0">
+                            {hasSpecifics && (
+                              <Badge
+                                variant="secondary"
+                                className="h-5 text-xs"
+                              >
+                                {hobby.specifics.length} specifics
+                              </Badge>
+                            )}
+                            {hasReferences && (
+                              <Badge
+                                variant="secondary"
+                                className="h-5 text-xs"
+                              >
+                                {hobby.references.length} refs
+                              </Badge>
+                            )}
+                            {hasNotes && (
+                              <Badge
+                                variant="secondary"
+                                className="h-5 text-xs"
+                              >
+                                notes
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="flex-shrink-0">
+                          {hobby.skill_level || "enthusiast"}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeHobby(originalIndex);
+                          }}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* Expanded Content */}
+                      {isExpanded && (
+                        <div className="border-t bg-background/50 p-4 space-y-4">
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Hobby Name</Label>
+                              <Input
+                                value={hobby.name || ""}
+                                onChange={(e) =>
+                                  updateHobby(
+                                    originalIndex,
+                                    "name",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Hobby name"
+                                className="h-8 bg-background"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Skill Level</Label>
+                              <Select
+                                value={hobby.skill_level || "enthusiast"}
+                                onValueChange={(value) =>
+                                  updateHobby(
+                                    originalIndex,
+                                    "skill_level",
+                                    value
+                                  )
+                                }
+                              >
+                                <SelectTrigger className="h-8 bg-background">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="casual">Casual</SelectItem>
+                                  <SelectItem value="enthusiast">
+                                    Enthusiast
+                                  </SelectItem>
+                                  <SelectItem value="serious">
+                                    Serious
+                                  </SelectItem>
+                                  <SelectItem value="expert">Expert</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          {/* Specifics */}
+                          <div className="space-y-2">
+                            <Label>Specifics</Label>
+                            <ArrayInput
+                              items={hobby.specifics || []}
+                              onChange={(items) =>
+                                updateHobby(originalIndex, "specifics", items)
+                              }
+                              placeholder="Add specifics..."
+                            />
+                          </div>
+
+                          {/* References Section */}
+                          <div className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                              References & URLs
+                              {hasReferences && (
+                                <span className="text-xs text-muted-foreground font-normal">
+                                  ({hobby.references.length})
+                                </span>
+                              )}
+                            </Label>
+                            <div className="space-y-2 pl-3 border-l-2 border-muted">
+                              {(hobby.references || []).map((ref, refIdx) => (
+                                <div
+                                  key={refIdx}
+                                  className="space-y-2 pb-3 border-b border-muted last:border-b-0 last:pb-0"
+                                >
+                                  {/* Reference header (compact) */}
+                                  <div
+                                    className="flex items-center gap-2 cursor-pointer"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleReference(
+                                        `${originalIndex}-${refIdx}`
+                                      );
+                                    }}
+                                  >
+                                    <ChevronDown
+                                      className={`h-3.5 w-3.5 transition-transform text-muted-foreground ${
+                                        expandedReferences[
+                                          `${originalIndex}-${refIdx}`
+                                        ]
+                                          ? ""
+                                          : "-rotate-90"
+                                      }`}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium truncate">
+                                        {ref.name || "Untitled reference"}
+                                      </p>
+                                      <div className="flex flex-wrap gap-1 mt-1 text-xs text-muted-foreground">
+                                        {ref.url && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="h-5 text-[11px]"
+                                          >
+                                            URL
+                                          </Badge>
+                                        )}
+                                        {ref.notes && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="h-5 text-[11px]"
+                                          >
+                                            notes
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const newRefs = (
+                                          hobby.references || []
+                                        ).filter((_, i) => i !== refIdx);
+                                        updateHobby(
+                                          originalIndex,
+                                          "references",
+                                          newRefs
+                                        );
+                                      }}
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+
+                                  {/* Expanded fields */}
+                                  {expandedReferences[
+                                    `${originalIndex}-${refIdx}`
+                                  ] && (
+                                    <div className="space-y-2 pt-2">
+                                      <div className="flex gap-2 items-start">
+                                        <div className="flex-1 grid gap-2 sm:grid-cols-2">
+                                          <Input
+                                            value={ref.name || ""}
+                                            onChange={(e) => {
+                                              const newRefs = [
+                                                ...(hobby.references || []),
+                                              ];
+                                              newRefs[refIdx] = {
+                                                ...newRefs[refIdx],
+                                                name: e.target.value,
+                                              };
+                                              updateHobby(
+                                                originalIndex,
+                                                "references",
+                                                newRefs
+                                              );
+                                            }}
+                                            placeholder="Reference name"
+                                            className="h-8 text-sm bg-background"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                          <Input
+                                            value={ref.url || ""}
+                                            onChange={(e) => {
+                                              const newRefs = [
+                                                ...(hobby.references || []),
+                                              ];
+                                              newRefs[refIdx] = {
+                                                ...newRefs[refIdx],
+                                                url: e.target.value,
+                                              };
+                                              updateHobby(
+                                                originalIndex,
+                                                "references",
+                                                newRefs
+                                              );
+                                            }}
+                                            placeholder="URL (optional)"
+                                            className="h-8 text-sm bg-background"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                        </div>
+                                      </div>
+                                      <Textarea
+                                        value={ref.notes || ""}
+                                        onChange={(e) => {
+                                          const newRefs = [
+                                            ...(hobby.references || []),
+                                          ];
+                                          newRefs[refIdx] = {
+                                            ...newRefs[refIdx],
+                                            notes: e.target.value,
+                                          };
+                                          updateHobby(
+                                            originalIndex,
+                                            "references",
+                                            newRefs
+                                          );
+                                        }}
+                                        placeholder="Notes about this reference (optional)..."
+                                        className="h-16 text-xs bg-background"
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newRefs = [
+                                    ...(hobby.references || []),
+                                    { name: "", url: "", notes: "" },
+                                  ];
+                                  updateHobby(
+                                    originalIndex,
+                                    "references",
+                                    newRefs
+                                  );
+                                  // Expand the newly added reference
+                                  const newKey = `${originalIndex}-${
+                                    (hobby.references || []).length
+                                  }`;
+                                  setExpandedReferences((prev) => ({
+                                    ...prev,
+                                    [newKey]: true,
+                                  }));
+                                }}
+                                className="h-8 w-full border-dashed"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add reference
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Notes */}
+                          <div className="space-y-2">
+                            <Label>Notes</Label>
+                            <Textarea
+                              value={hobby.notes || ""}
+                              onChange={(e) =>
+                                updateHobby(
+                                  originalIndex,
+                                  "notes",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Additional notes about this hobby..."
+                              className="min-h-[80px] bg-background text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                {hasActiveFilters
+                  ? "No hobbies match your filters"
+                  : "No hobbies added yet"}
+              </p>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Add Hobby Modal */}
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Hobby</DialogTitle>
+            <DialogDescription>
+              Create a new hobby to track your interests and activities
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="hobby-name">Hobby Name</Label>
+              <Input
+                id="hobby-name"
+                value={newHobbyName}
+                onChange={(e) => setNewHobbyName(e.target.value)}
+                placeholder="e.g., Reading Substacks, Photography"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newHobbyName.trim()) {
+                    addHobby();
+                  }
+                }}
               />
             </div>
-            <div className="form-group">
-              <label>Skill Level</label>
-              <select
-                value={hobby.skill_level || 'enthusiast'}
-                onChange={(e) => updateHobby(index, 'skill_level', e.target.value)}
-              >
-                <option value="casual">Casual</option>
-                <option value="enthusiast">Enthusiast</option>
-                <option value="serious">Serious</option>
-                <option value="expert">Expert</option>
-              </select>
-            </div>
-            <div className="form-group full-width">
-              <label>Specifics</label>
-              <ArrayInput
-                items={hobby.specifics || []}
-                onChange={(items) => updateHobby(index, 'specifics', items)}
-                placeholder="e.g. Asian cuisine, strategy games..."
-              />
+            <div className="space-y-2">
+              <Label htmlFor="hobby-level">Skill Level</Label>
+              <Select value={newHobbyLevel} onValueChange={setNewHobbyLevel}>
+                <SelectTrigger id="hobby-level">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="casual">Casual</SelectItem>
+                  <SelectItem value="enthusiast">Enthusiast</SelectItem>
+                  <SelectItem value="serious">Serious</SelectItem>
+                  <SelectItem value="expert">Expert</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </div>
-      ))}
-      <button className="add-card-btn" onClick={addHobby}>
-        + Add Hobby
-      </button>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={addHobby} disabled={!newHobbyName.trim()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Hobby
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <h2 className="section-title" style={{ marginTop: '2rem' }}>Passions</h2>
-      <ArrayInput
-        items={data.passions || []}
-        onChange={(items) => onChange({ ...data, passions: items })}
-        placeholder="Things you're passionate about..."
-      />
+      {/* Passions */}
+      <Card>
+        <CardHeader
+          className="cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+          onClick={() => toggleSection("passions")}
+        >
+          <div className="flex items-center gap-2">
+            <ChevronDown
+              className={`h-5 w-5 transition-transform ${
+                collapsedSections.passions ? "-rotate-90" : ""
+              }`}
+            />
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                Passions
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openInfo("passions");
+                  }}
+                >
+                  <Info className="h-4 w-4" />
+                </Button>
+              </CardTitle>
+              <CardDescription>
+                Things you're deeply passionate about
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        {!collapsedSections.passions && (
+          <CardContent>
+            <ArrayInput
+              items={data.passions || []}
+              onChange={(items) => onChange({ ...data, passions: items })}
+              placeholder="Add passion..."
+            />
+          </CardContent>
+        )}
+      </Card>
 
-      <h2 className="section-title" style={{ marginTop: '2rem' }}>Curiosities</h2>
-      <ArrayInput
-        items={data.curiosities || []}
-        onChange={(items) => onChange({ ...data, curiosities: items })}
-        placeholder="Things you're curious about..."
-      />
+      {/* Curiosities */}
+      <Card>
+        <CardHeader
+          className="cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+          onClick={() => toggleSection("curiosities")}
+        >
+          <div className="flex items-center gap-2">
+            <ChevronDown
+              className={`h-5 w-5 transition-transform ${
+                collapsedSections.curiosities ? "-rotate-90" : ""
+              }`}
+            />
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                Curiosities
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openInfo("curiosities");
+                  }}
+                >
+                  <Info className="h-4 w-4" />
+                </Button>
+              </CardTitle>
+              <CardDescription>
+                Topics you're curious to learn more about
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        {!collapsedSections.curiosities && (
+          <CardContent>
+            <ArrayInput
+              items={data.curiosities || []}
+              onChange={(items) => onChange({ ...data, curiosities: items })}
+              placeholder="Add curiosity..."
+            />
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Personality Traits */}
+      <Card>
+        <CardHeader
+          className="cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+          onClick={() => toggleSection("traits")}
+        >
+          <div className="flex items-center gap-2">
+            <ChevronDown
+              className={`h-5 w-5 transition-transform ${
+                collapsedSections.traits ? "-rotate-90" : ""
+              }`}
+            />
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                Personality Traits
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openInfo("traits");
+                  }}
+                >
+                  <Info className="h-4 w-4" />
+                </Button>
+              </CardTitle>
+              <CardDescription>Characteristics that define you</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        {!collapsedSections.traits && (
+          <CardContent>
+            <ArrayInput
+              items={data.personality_traits || []}
+              onChange={(items) =>
+                onChange({ ...data, personality_traits: items })
+              }
+              placeholder="e.g. Creative, Analytical..."
+            />
+          </CardContent>
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader
+          className="cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+          onClick={() => toggleSection("values")}
+        >
+          <div className="flex items-center gap-2">
+            <ChevronDown
+              className={`h-5 w-5 transition-transform ${
+                collapsedSections.values ? "-rotate-90" : ""
+              }`}
+            />
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                Values
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openInfo("values");
+                  }}
+                >
+                  <Info className="h-4 w-4" />
+                </Button>
+              </CardTitle>
+              <CardDescription>What's important to you</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        {!collapsedSections.values && (
+          <CardContent>
+            <ArrayInput
+              items={data.values || []}
+              onChange={(items) => onChange({ ...data, values: items })}
+              placeholder="e.g. Integrity, Growth..."
+            />
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Info Modal */}
+      <Dialog
+        open={infoModal.isOpen}
+        onOpenChange={(open) =>
+          setInfoModal((prev) => ({ ...prev, isOpen: open }))
+        }
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-primary" />
+              {infoModal.title}
+            </DialogTitle>
+            <DialogDescription>{infoModal.overview}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
+            <p className="font-medium text-foreground">
+              Tips for filling this section:
+            </p>
+            <ul className="space-y-2 text-muted-foreground">
+              {(infoModal.tips || []).map((tip, idx) => (
+                <li key={idx} className="flex gap-2">
+                  <span className="text-primary">•</span>
+                  <span>{tip}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() =>
+                setInfoModal((prev) => ({ ...prev, isOpen: false }))
+              }
+            >
+              Got it
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
-}
-
-// Toast Component
-function Toast({ message, type, onClose }) {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 3000)
-    return () => clearTimeout(timer)
-  }, [onClose])
-
-  return (
-    <div className={`toast ${type}`}>
-      {type === 'success' && '✓ '}
-      {type === 'error' && '✕ '}
-      {message}
-    </div>
-  )
+  );
 }
 
 // Main App
 export default function App() {
-  const [activeTab, setActiveTab] = useState('profile')
-  const [isConnected, setIsConnected] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState(null)
-  const [toast, setToast] = useState(null)
-  const [hasChanges, setHasChanges] = useState({})
-  const [lastSaved, setLastSaved] = useState(null)
+  const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [lastSaved, setLastSaved] = useState(null);
+  const [isAutosaveEnabled, setIsAutosaveEnabled] = useState(true);
+  const { toast } = useToast();
 
-  // Data state
-  const [profile, setProfile] = useState({})
-  const [knowledge, setKnowledge] = useState({})
-  const [preferences, setPreferences] = useState({})
-  const [projects, setProjects] = useState({})
-  const [interests, setInterests] = useState({})
+  const [profile, setProfile] = useState({});
+  const [knowledge, setKnowledge] = useState({});
+  const [preferences, setPreferences] = useState({});
+  const [projects, setProjects] = useState({});
+  const [interests, setInterests] = useState({});
 
-  const tabs = [
-    { id: 'profile', label: 'Profile' },
-    { id: 'knowledge', label: 'Knowledge' },
-    { id: 'preferences', label: 'Preferences' },
-    { id: 'projects', label: 'Projects' },
-    { id: 'interests', label: 'Interests' },
-  ]
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: "",
+    description: "",
+    action: null,
+  });
 
-  // Load all data on mount
+  const showConfirmation = (title, description, action) => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      description,
+      action,
+    });
+  };
+
+  const handleConfirm = () => {
+    if (confirmDialog.action) {
+      confirmDialog.action();
+    }
+    setConfirmDialog({ ...confirmDialog, isOpen: false });
+  };
+
+  const handleCancel = () => {
+    setConfirmDialog({ ...confirmDialog, isOpen: false });
+  };
+
   useEffect(() => {
-    loadAllData()
-  }, [])
+    loadAllData();
+  }, []);
 
   const loadAllData = async () => {
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
     try {
-      const response = await api('/all')
-      setProfile(response.data.profile || {})
-      setKnowledge(response.data.knowledge || {})
-      setPreferences(response.data.preferences || {})
-      setProjects(response.data.projects || {})
-      setInterests(response.data.interests || {})
-      setIsConnected(true)
-      setHasChanges({})
+      const response = await api("/all");
+      setProfile(response.data.profile || {});
+      setKnowledge(response.data.knowledge || {});
+      setPreferences(response.data.preferences || {});
+      setProjects(response.data.projects || {});
+      setInterests(response.data.interests || {});
+      setIsConnected(true);
     } catch (err) {
-      setError(err.message)
-      setIsConnected(false)
+      setError(err.message);
+      setIsConnected(false);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
-  // Save function
   const saveFile = async (fileType, data) => {
-    setIsSaving(true)
+    setIsSaving(true);
     try {
       await api(`/files/${fileType}`, {
-        method: 'PUT',
+        method: "PUT",
         body: JSON.stringify({ data }),
-      })
-      setHasChanges(prev => ({ ...prev, [fileType]: false }))
-      setLastSaved(new Date())
-      showToast('Saved', 'success')
+      });
+      setLastSaved(new Date());
+      toast({ title: "Saved", variant: "success" });
     } catch (err) {
-      showToast(`Failed to save: ${err.message}`, 'error')
+      toast({
+        title: "Failed to save",
+        description: err.message,
+        variant: "destructive",
+      });
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
-  // Debounced auto-save
-  const debouncedSave = useDebounce(saveFile, 1500)
+  const debouncedSave = useDebounce(saveFile, 1500);
 
-  // Change handlers with auto-save
   const handleProfileChange = (newData) => {
-    setProfile(newData)
-    setHasChanges(prev => ({ ...prev, profile: true }))
-    debouncedSave('profile', newData)
-  }
-
+    setProfile(newData);
+    if (isAutosaveEnabled) debouncedSave("profile", newData);
+  };
   const handleKnowledgeChange = (newData) => {
-    setKnowledge(newData)
-    setHasChanges(prev => ({ ...prev, knowledge: true }))
-    debouncedSave('knowledge', newData)
-  }
-
+    setKnowledge(newData);
+    if (isAutosaveEnabled) debouncedSave("knowledge", newData);
+  };
   const handlePreferencesChange = (newData) => {
-    setPreferences(newData)
-    setHasChanges(prev => ({ ...prev, preferences: true }))
-    debouncedSave('preferences', newData)
-  }
-
+    setPreferences(newData);
+    if (isAutosaveEnabled) debouncedSave("preferences", newData);
+  };
   const handleProjectsChange = (newData) => {
-    setProjects(newData)
-    setHasChanges(prev => ({ ...prev, projects: true }))
-    debouncedSave('projects', newData)
-  }
-
+    setProjects(newData);
+    if (isAutosaveEnabled) debouncedSave("projects", newData);
+  };
   const handleInterestsChange = (newData) => {
-    setInterests(newData)
-    setHasChanges(prev => ({ ...prev, interests: true }))
-    debouncedSave('interests', newData)
-  }
-
-  const showToast = (message, type = 'info') => {
-    setToast({ message, type })
-  }
+    setInterests(newData);
+    if (isAutosaveEnabled) debouncedSave("interests", newData);
+  };
 
   const saveAll = async () => {
-    setIsSaving(true)
+    setIsSaving(true);
     try {
-      await api('/all', {
-        method: 'PUT',
+      await api("/all", {
+        method: "PUT",
         body: JSON.stringify({
           profile,
           knowledge,
@@ -648,122 +4692,211 @@ export default function App() {
           projects,
           interests,
         }),
-      })
-      setHasChanges({})
-      setLastSaved(new Date())
-      showToast('All files saved', 'success')
+      });
+      setLastSaved(new Date());
+      toast({ title: "All files saved", variant: "success" });
     } catch (err) {
-      showToast(`Failed to save: ${err.message}`, 'error')
+      toast({
+        title: "Failed to save",
+        description: err.message,
+        variant: "destructive",
+      });
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
-  // Loading state
   if (isLoading) {
     return (
-      <div className="app">
-        <div className="loading">
-          <div className="spinner" />
-          <p>Connecting to backend...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Connecting to backend...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  // Error state
   if (error) {
     return (
-      <div className="app">
-        <header>
-          <div className="header-content">
-            <h1>Persona Manager</h1>
-            <p>Build your digital persona for personalised AI interactions</p>
-          </div>
-        </header>
-        <div className="error-state">
-          <h2>Connection Failed</h2>
-          <p>Could not connect to the backend server.</p>
-          <button className="btn btn-primary" onClick={loadAllData}>
-            Retry Connection
-          </button>
-          <code>
-            Make sure the backend is running:{'\n'}
-            cd backend{'\n'}
-            pip install -r requirements.txt{'\n'}
-            python main.py
-          </code>
-        </div>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <CardTitle className="text-destructive">
+              Connection Failed
+            </CardTitle>
+            <CardDescription>
+              Could not connect to the backend server.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button onClick={loadAllData} className="w-full">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry Connection
+            </Button>
+            <pre className="text-xs bg-muted p-3 rounded-md overflow-auto">
+              cd backend{"\n"}
+              pip install -r requirements.txt{"\n"}
+              python main.py
+            </pre>
+          </CardContent>
+        </Card>
       </div>
-    )
+    );
   }
 
-  const anyChanges = Object.values(hasChanges).some(Boolean)
-
   return (
-    <div className="app">
-      <header>
-        <div className="header-content">
-          <h1>Persona Manager</h1>
-          <p>Build your digital persona for personalised AI interactions</p>
-        </div>
-        <div className="connection-status">
-          <span className={`status-dot ${isConnected ? (isSaving ? 'saving' : 'connected') : ''}`} />
-          {isSaving ? 'Saving...' : isConnected ? 'Connected' : 'Disconnected'}
-        </div>
-      </header>
+    <div className="min-h-screen bg-background">
+      <div className="container max-w-4xl py-8 px-4">
+        {/* Header */}
+        <header className="mb-8">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+                Persona Manager
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Build your digital persona for personalised AI interactions
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              {isConnected ? (
+                <Badge variant="outline" className="gap-1.5">
+                  {isSaving ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Wifi className="h-3 w-3 text-green-500" />
+                  )}
+                  {isSaving ? "Saving..." : "Connected"}
+                </Badge>
+              ) : (
+                <Badge variant="destructive" className="gap-1.5">
+                  <WifiOff className="h-3 w-3" />
+                  Disconnected
+                </Badge>
+              )}
+            </div>
+          </div>
+        </header>
 
-      <div className="tabs">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            className={`tab ${activeTab === tab.id ? 'active' : ''} ${hasChanges[tab.id] ? 'has-changes' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {/* Tabs */}
+        <Tabs defaultValue="profile" className="space-y-6">
+          <TabsList className="w-full justify-start">
+            <TabsTrigger value="profile" className="gap-2">
+              <User className="h-4 w-4" />
+              <span className="hidden sm:inline">Profile</span>
+            </TabsTrigger>
+            <TabsTrigger value="knowledge" className="gap-2">
+              <Brain className="h-4 w-4" />
+              <span className="hidden sm:inline">Knowledge</span>
+            </TabsTrigger>
+            <TabsTrigger value="projects" className="gap-2">
+              <FolderKanban className="h-4 w-4" />
+              <span className="hidden sm:inline">Projects</span>
+            </TabsTrigger>
+            <TabsTrigger value="interests" className="gap-2">
+              <Heart className="h-4 w-4" />
+              <span className="hidden sm:inline">Interests</span>
+            </TabsTrigger>
+            <TabsTrigger value="preferences" className="gap-2">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Preferences</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="profile">
+            <ProfileEditor
+              data={profile}
+              onChange={handleProfileChange}
+              onShowConfirmation={showConfirmation}
+            />
+          </TabsContent>
+          <TabsContent value="knowledge">
+            <KnowledgeEditor
+              data={knowledge}
+              onChange={handleKnowledgeChange}
+              onShowConfirmation={showConfirmation}
+            />
+          </TabsContent>
+          <TabsContent value="projects">
+            <ProjectsEditor
+              data={projects}
+              onChange={handleProjectsChange}
+              onShowConfirmation={showConfirmation}
+            />
+          </TabsContent>
+          <TabsContent value="interests">
+            <InterestsEditor
+              data={interests}
+              onChange={handleInterestsChange}
+              onShowConfirmation={showConfirmation}
+            />
+          </TabsContent>
+          <TabsContent value="preferences">
+            <PreferencesEditor
+              data={preferences}
+              onChange={handlePreferencesChange}
+            />
+          </TabsContent>
+        </Tabs>
+
+        {/* Actions Bar */}
+        <div className="sticky bottom-4 mt-8">
+          <Card className="bg-card/80 backdrop-blur-sm">
+            <CardContent className="py-3 px-4 flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex gap-2">
+                <Button onClick={saveAll} disabled={isSaving}>
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save All
+                </Button>
+                <Button onClick={loadAllData} variant="outline">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Reload
+                </Button>
+              </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isAutosaveEnabled}
+                  onChange={(e) => setIsAutosaveEnabled(e.target.checked)}
+                  className="h-4 w-4 accent-primary"
+                />
+                Auto-save
+              </label>
+              {lastSaved && (
+                <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                  Last saved: {lastSaved.toLocaleTimeString()}
+                </span>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {activeTab === 'profile' && (
-        <ProfileEditor data={profile} onChange={handleProfileChange} />
-      )}
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmDialog.isOpen} onOpenChange={handleCancel}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{confirmDialog.title}</DialogTitle>
+            <DialogDescription>{confirmDialog.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={handleCancel}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirm}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {activeTab === 'knowledge' && (
-        <KnowledgeEditor data={knowledge} onChange={handleKnowledgeChange} />
-      )}
-
-      {activeTab === 'preferences' && (
-        <PreferencesEditor data={preferences} onChange={handlePreferencesChange} />
-      )}
-
-      {activeTab === 'projects' && (
-        <ProjectsEditor data={projects} onChange={handleProjectsChange} />
-      )}
-
-      {activeTab === 'interests' && (
-        <InterestsEditor data={interests} onChange={handleInterestsChange} />
-      )}
-
-      <div className="actions-bar">
-        <button className="btn btn-primary" onClick={saveAll} disabled={isSaving || !anyChanges}>
-          {isSaving ? 'Saving...' : 'Save All'}
-        </button>
-        <button className="btn btn-secondary" onClick={loadAllData}>
-          ↻ Reload
-        </button>
-        <div className="save-status">
-          {lastSaved && `Last saved: ${lastSaved.toLocaleTimeString()}`}
-        </div>
-      </div>
-
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+      <Toaster />
     </div>
-  )
+  );
 }
