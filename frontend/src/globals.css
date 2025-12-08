@@ -75,3 +75,24 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/50;
 }
+
+/* Time input styling - make native icons blend with theme */
+input[type="time"] {
+  position: relative;
+}
+
+input[type="time"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 8px;
+  filter: invert(0.5);
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.dark input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+}

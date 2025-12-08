@@ -1,258 +1,191 @@
 # Project Twin
 
-A personal digital twin system that stores your identity, knowledge, preferences, and projects — making them accessible to LLMs for truly personalized AI interactions.
+A personal digital twin that stores who you are — your skills, preferences, projects, and quirks — so AI assistants can actually remember you across conversations.
 
-## What is This?
+## Why This Exists
 
-Project Twin consists of three parts:
+Every time you start a new chat with Claude, GPT, or any AI, you're a stranger again. You have to re-explain your tech stack, your preferences, your ongoing projects. Project Twin solves this by giving AI access to a persistent "you" file.
 
-1. **Persona MCP Server** — A Model Context Protocol server that exposes your persona data as tools for Claude, Perplexity, and other LLM clients
-2. **Persona Manager UI** — A React app for manually viewing/editing your persona data
-3. **JSON Data Store** — Structured files containing everything about you
+## What's Inside
 
 ```
 project-twin/
 ├── backend/
-│   ├── main.py              # FastAPI server for the UI
-│   ├── mcp_server.py        # MCP server for LLM integration ⭐
-│   ├── persona_routes.py    # API routes
-│   └── requirements.txt
-├── frontend/                 # React + Vite + Tailwind UI
-│   ├── src/
-│   │   ├── App.jsx          # Main editor UI
-│   │   └── components/ui/   # shadcn/ui components
-│   └── package.json
-└── persona_mcp/
-    └── data/                 # Your persona JSON files
-        ├── profile.json      # Identity, contact, work, education
-        ├── interests.json    # Hobbies, passions, values, traits
-        ├── knowledge.json    # Skills/domains, mental tabs (lists)
-        ├── preferences.json  # Code style, communication, dislikes
-        ├── projects.json     # Current projects, learning, focus
-        └── learning_log.json # Timestamped learnings from convos
+│   ├── mcp_server.py    # MCP server for Claude Desktop (or any LLM tool that support MCP)
+│   └── main.py          # FastAPI server for the UI
+├── frontend/            # React app to manually edit your persona
+└── persona_mcp/data/    # Your persona files (JSON)
+    ├── profile.json     # Name, bio, work, education
+    ├── lifestyle.json   # Hobbies, values, wellness, sleep schedule
+    ├── knowledge.json   # Skills, domains, mental lists
+    ├── preferences.json # Code style, communication, dislikes
+    └── projects.json    # Current projects, learning goals
 ```
+
+---
 
 ## Quick Start
 
-### 1. Backend Setup
+### 1. Setup
 
 ```bash
 cd backend
-
-# Create virtual environment (recommended)
 python -m venv venv && source venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Create .env file
-echo "PERSONA_DATA_DIR=../persona_mcp/data" > .env
-
-# Run the FastAPI server (for UI)
-uvicorn main:app --reload
 ```
 
-Backend runs at `http://127.0.0.1:8000` (API docs at `/docs`)
+### 2. Connect to Claude Desktop
 
-### 2. Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend runs at `http://localhost:3000`
-
-### 3. MCP Server Setup (for LLM Integration)
-
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "persona": {
-      "command": "python",
+      "command": "/path/to/project-twin/backend/venv/bin/python",
       "args": ["/path/to/project-twin/backend/mcp_server.py"]
     }
   }
 }
 ```
 
-Restart Claude Desktop and your persona tools will be available! 🎉
+Restart Claude Desktop. Your persona tools are now available! 🎉
 
----
-
-## MCP Server Tools
-
-The MCP server provides **9 tools** for reading and modifying persona data:
-
-### Read Tools (7)
-
-| Tool               | Description                                                |
-| ------------------ | ---------------------------------------------------------- |
-| `get_persona`      | Get ALL persona data at once (best for initial context)    |
-| `get_profile`      | Identity, contact, languages, education, work experience   |
-| `get_interests`    | Hobbies, passions, curiosities, values, personality traits |
-| `get_knowledge`    | Skills/domains, mental tabs with references                |
-| `get_preferences`  | Code style, communication, learning style, dislikes        |
-| `get_projects`     | Projects, current learning, top of mind focus items        |
-| `get_learning_log` | Timestamped entries of things learned in conversations     |
-
-### Write Tools (2)
-
-| Tool             | Description                                    |
-| ---------------- | ---------------------------------------------- |
-| `persona_update` | Update a single field via dot-notation path    |
-| `persona_modify` | Add/update/remove items from any data category |
-
-### Key Features
-
-- **Flexible Field Names** — LLMs can use `hobby`, `name`, `activity`, or `hobby_name` interchangeably
-- **Decision Routing** — Tool descriptions include detailed guides on where data should go
-- **Mental Tabs** — Track lists of things (matcha spots, restaurants, resources) with nested references
-
-### Data Routing Examples
-
-```
-"I started photography"        → ADD hobby {name: "Photography"}
-"Add street photography focus" → ADD hobby_specific {hobby_name, specific}
-"Add this matcha spot"         → UPDATE mental_tab_reference notes
-"I don't like meetings"        → ADD dislike {dislike: "meetings"}
-"I'm learning Rust"            → ADD domain {name: "Rust", level: "learning"}
-"Working on Solterra now"      → UPDATE project {name: "Solterra", status: "active"}
-```
-
----
-
-## Data Structure
-
-### Profile (`profile.json`)
-
-```
-├── name, bio, location, nationality
-├── contact: { emails[], links[] }
-├── languages_spoken[]: { name, fluency }
-├── education[]: { institution, degree_level, field_of_study, highlights[] }
-├── work_experience[]: { role, company, type, period, highlights[] }
-└── career_aspirations[]
-```
-
-### Interests (`interests.json`)
-
-```
-├── hobbies[]:
-│   ├── name, skill_level, notes
-│   ├── specifics[]: sub-categories (e.g., "street photography")
-│   └── references[]: { name, url, notes } (gear, tutorials)
-├── passions[]: deep interests
-├── curiosities[]: things exploring
-├── personality_traits[]
-└── values[]
-```
-
-### Knowledge (`knowledge.json`)
-
-```
-├── domains[]:
-│   ├── name, level (learning/intermediate/advanced), notes
-│   └── references[]: docs, courses, resources
-└── mental_tabs[]:
-    ├── title, content (general notes), tags[], status
-    └── references[]: ← THE ACTUAL LISTS LIVE HERE
-        ├── name: section identifier
-        └── notes: the items/places/resources
-```
-
-### Preferences (`preferences.json`)
-
-```
-├── code_style: { languages, frameworks, tools, conventions }
-├── communication: { tone, detail_level, locale, avoid[], preferences[] }
-├── learning_style: { preferred[], avoid[] }
-├── response_format
-├── work_preferences
-└── dislikes[]: things to avoid in responses
-```
-
-### Projects (`projects.json`)
-
-```
-├── projects[]:
-│   ├── name, description, status, notes
-│   ├── tags[]
-│   └── references[]
-├── current_learning[]: { topic, context, priority }
-└── top_of_mind[]: current focus items
-```
-
-### Learning Log (`learning_log.json`)
-
-```
-└── entries[]: { timestamp, topic, details, source, tags[] }
-```
-
----
-
-## UI Features
-
-- **Tab-based editing** — Separate editors for each persona file
-- **Auto-save** — Debounced saving (1.5s after you stop typing)
-- **Connection status** — Visual indicator showing backend connection
-- **Array inputs** — Easy add/remove for list fields
-- **Mental tab editor** — Nested references for list tracking
-
----
-
-## API Endpoints (FastAPI)
-
-| Method | Endpoint            | Description                     |
-| ------ | ------------------- | ------------------------------- |
-| `GET`  | `/api/files`        | List all files and their status |
-| `GET`  | `/api/files/{type}` | Get a specific file             |
-| `PUT`  | `/api/files/{type}` | Update a specific file          |
-| `GET`  | `/api/all`          | Get all files                   |
-| `PUT`  | `/api/all`          | Update multiple files           |
-| `POST` | `/api/reset/{type}` | Reset a file to defaults        |
-
----
-
-## Development
-
-### Running Everything
+### 3. (Optional) Run the UI
 
 ```bash
-# Terminal 1: Backend
-cd backend && source venv/bin/activate && uvicorn main:app --reload
+# Backend
+cd backend && uvicorn main:app --reload
 
-# Terminal 2: Frontend
-cd frontend && npm run dev
-```
-
-### Testing MCP Server Locally
-
-```bash
-cd backend
-python mcp_server.py
-# Server runs on stdio - use with Claude Desktop or MCP inspector
+# Frontend  
+cd frontend && npm install && npm run dev
 ```
 
 ---
 
-## Environment Variables
+## How to Use It
 
-| Variable           | Default               | Description                |
-| ------------------ | --------------------- | -------------------------- |
-| `PERSONA_DATA_DIR` | `../persona_mcp/data` | Path to persona JSON files |
+### Reading Your Persona
+
+Just ask Claude things like:
+- "What do you know about me?"
+- "What are my current projects?"
+- "What's my tech stack?"
+
+Claude will call `get_persona` and respond with context about you.
+
+### Updating Your Persona
+
+**Option 1: Ask Claude directly**
+> "Add Rust to my skills as something I'm learning"
+> "Update my Solterra project status to completed"
+> "Add 'morning meetings' to my dislikes"
+
+**Option 2: Use the UI**  
+Open `http://localhost:3000` and edit your persona files directly.
+
+**Option 3: Smart capture (experimental)**  
+Tell Claude to watch for updates:
+> "For this conversation, use suggest_persona_update on my messages to catch anything worth remembering"
+
+Then chat naturally. If you say something like "I've been really getting into mechanical keyboards lately", Claude can detect that and ask if you want to add it.
+
+---
+
+## Important: MCP Tools Are Passive
+
+Here's something to understand about how this works:
+
+**Claude doesn't automatically scan your messages for persona updates.** MCP tools are passive — Claude only calls them when it decides to, or when you ask.
+
+This means:
+- Claude will read your persona when you ask about yourself
+- Claude will update your persona when you explicitly ask
+- Claude won't automatically detect "I started learning Rust" unless you tell it to
+
+**To enable smart capture**, start your conversation with:
+> "Call suggest_persona_update on my messages and update my persona when relevant"
+
+Or just update manually when you want to add something.
+
+---
+
+## What Gets Stored
+
+### Profile
+Name, bio, location, work experience, education, languages spoken, career aspirations
+
+### Lifestyle
+Hobbies (with sub-categories and gear lists), passions, curiosities, personality traits, values, sleep schedule, energy peaks
+
+### Knowledge
+Skills/domains with proficiency levels, mental tabs (custom lists like "favorite matcha spots" or "learning resources")
+
+### Preferences
+Code style, communication preferences, learning style, response format, dislikes
+
+### Projects
+Current projects, what you're learning, top-of-mind items
+
+---
+
+## Example Persona Updates
+
+| You say | What gets updated |
+|---------|-------------------|
+| "I started learning Rust" | Knowledge → Domains: Rust (learning) |
+| "I hate morning meetings" | Preferences → Dislikes: morning meetings |
+| "I picked up photography last month" | Lifestyle → Hobbies: Photography |
+| "I usually sleep around 1am" | Lifestyle → Wellness → Sleep |
+| "I'm really into mechanical keyboards" | Lifestyle → Passions |
+| "Just finished the Solterra project" | Projects → Status: completed |
+
+---
+
+## Smart Capture (Behind the Scenes)
+
+When you ask Claude to analyze your messages, it uses:
+
+**Sentiment Analysis** — Distinguishes between:
+- Declarative statements ("I am a developer") → High confidence
+- Hypotheticals ("Maybe I should try...") → Low confidence  
+- Venting ("Ugh, TypeScript is killing me") → Usually ignored
+- Questions ("Should I learn Rust?") → Ignored unless contains real info
+
+**Sentence-Level Analysis** — If you send a long message with a question at the end, the earlier statements still get detected.
+
+**Confidence Scoring**:
+- 0.5+ → Claude applies the update and mentions it
+- 0.4-0.5 → Claude asks "Want me to remember that?"
+- Below 0.4 → Ignored, no mention
+
+---
+
+## MCP Tools Reference
+
+| Tool | What it does |
+|------|--------------|
+| `get_persona` | Get all your data at once |
+| `get_profile` | Just your identity/work/education |
+| `get_lifestyle` | Hobbies, passions, values, wellness |
+| `get_knowledge` | Skills and mental tabs |
+| `get_preferences` | Code style, communication, dislikes |
+| `get_projects` | Current projects and learning goals |
+| `persona_update` | Update a single field |
+| `persona_modify` | Add/update/remove multiple items |
+| `suggest_persona_update` | Analyze a message for potential updates |
 
 ---
 
 ## Roadmap
 
-- [ ] Better Context Awareness
-- [ ] Data versioning/history
-- [ ] Export/import functionality
-- [ ] Token optimization when data grows
+- [x] Core persona read/write
+- [x] Smart context capture with sentiment analysis
+- [x] Sentence-level analysis for compound messages
+- [ ] Better auto-triggering (waiting on MCP improvements)
+- [ ] Conversation history for pattern detection
+- [ ] Data versioning
+- [ ] Export/import
 
 ---
 

@@ -3677,8 +3677,8 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
   );
 }
 
-// Interests Editor
-function InterestsEditor({ data, onChange, onShowConfirmation }) {
+// Lifestyle Editor
+function LifestyleEditor({ data, onChange, onShowConfirmation }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterLevel, setFilterLevel] = useState("all");
   const [expandedHobbies, setExpandedHobbies] = useState({});
@@ -3689,6 +3689,7 @@ function InterestsEditor({ data, onChange, onShowConfirmation }) {
     curiosities: true,
     traits: true,
     values: true,
+    wellness: true,
   });
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newHobbyName, setNewHobbyName] = useState("");
@@ -3757,6 +3758,17 @@ function InterestsEditor({ data, onChange, onShowConfirmation }) {
         "Add words or short phrases representing your values.",
         "Examples: integrity, growth, family, creativity, impact, balance.",
         "These help AI align suggestions with what truly matters to you.",
+      ],
+    },
+    wellness: {
+      title: "Wellness",
+      overview:
+        "Track your health patterns and energy rhythms. This helps AI understand when you're at your best and what affects your wellbeing.",
+      tips: [
+        "Sleep Schedule: When you typically go to bed and wake up (separate for weekdays vs weekends if different).",
+        "Energy Peaks: Times of day when you feel most focused and productive.",
+        "Stress Triggers: Situations, environments, or patterns that tend to increase your stress.",
+        "This info helps AI suggest optimal times for tasks and avoid recommending things during low-energy periods.",
       ],
     },
   };
@@ -4527,6 +4539,185 @@ function InterestsEditor({ data, onChange, onShowConfirmation }) {
         )}
       </Card>
 
+      {/* Wellness Section */}
+      <Card>
+        <CardHeader
+          className="cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+          onClick={() => toggleSection("wellness")}
+        >
+          <div className="flex items-center gap-2">
+            <ChevronDown
+              className={`h-5 w-5 transition-transform ${
+                collapsedSections.wellness ? "-rotate-90" : ""
+              }`}
+            />
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                Wellness
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openInfo("wellness");
+                  }}
+                >
+                  <Info className="h-4 w-4" />
+                </Button>
+              </CardTitle>
+              <CardDescription>
+                Sleep patterns, energy levels, and stress factors
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        {!collapsedSections.wellness && (
+          <CardContent className="space-y-6">
+            {/* Sleep Schedule */}
+            <div className="space-y-4">
+              <Label className="text-sm font-medium">Sleep Schedule</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3 p-4 border rounded-lg bg-muted/20">
+                  <p className="text-sm font-medium">Weekdays</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Bedtime</Label>
+                      <Input
+                        type="time"
+                        value={data.wellness?.sleep?.weekday?.bedtime || ""}
+                        onChange={(e) =>
+                          onChange({
+                            ...data,
+                            wellness: {
+                              ...data.wellness,
+                              sleep: {
+                                ...data.wellness?.sleep,
+                                weekday: {
+                                  ...data.wellness?.sleep?.weekday,
+                                  bedtime: e.target.value,
+                                },
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Wake up</Label>
+                      <Input
+                        type="time"
+                        value={data.wellness?.sleep?.weekday?.wakeup || ""}
+                        onChange={(e) =>
+                          onChange({
+                            ...data,
+                            wellness: {
+                              ...data.wellness,
+                              sleep: {
+                                ...data.wellness?.sleep,
+                                weekday: {
+                                  ...data.wellness?.sleep?.weekday,
+                                  wakeup: e.target.value,
+                                },
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-3 p-4 border rounded-lg bg-muted/20">
+                  <p className="text-sm font-medium">Weekends</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Bedtime</Label>
+                      <Input
+                        type="time"
+                        value={data.wellness?.sleep?.weekend?.bedtime || ""}
+                        onChange={(e) =>
+                          onChange({
+                            ...data,
+                            wellness: {
+                              ...data.wellness,
+                              sleep: {
+                                ...data.wellness?.sleep,
+                                weekend: {
+                                  ...data.wellness?.sleep?.weekend,
+                                  bedtime: e.target.value,
+                                },
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Wake up</Label>
+                      <Input
+                        type="time"
+                        value={data.wellness?.sleep?.weekend?.wakeup || ""}
+                        onChange={(e) =>
+                          onChange({
+                            ...data,
+                            wellness: {
+                              ...data.wellness,
+                              sleep: {
+                                ...data.wellness?.sleep,
+                                weekend: {
+                                  ...data.wellness?.sleep?.weekend,
+                                  wakeup: e.target.value,
+                                },
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Energy Peaks */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Energy Peaks</Label>
+              <p className="text-xs text-muted-foreground">
+                When do you feel most focused and productive?
+              </p>
+              <ArrayInput
+                items={data.wellness?.energy_peaks || []}
+                onChange={(items) =>
+                  onChange({
+                    ...data,
+                    wellness: { ...data.wellness, energy_peaks: items },
+                  })
+                }
+                placeholder="e.g. Early morning (6-9am), Late night (10pm-1am)..."
+              />
+            </div>
+
+            {/* Stress Triggers */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Stress Triggers</Label>
+              <p className="text-xs text-muted-foreground">
+                Situations or patterns that tend to increase your stress
+              </p>
+              <ArrayInput
+                items={data.wellness?.stress_triggers || []}
+                onChange={(items) =>
+                  onChange({
+                    ...data,
+                    wellness: { ...data.wellness, stress_triggers: items },
+                  })
+                }
+                placeholder="e.g. Tight deadlines, Back-to-back meetings..."
+              />
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
       {/* Info Modal */}
       <Dialog
         open={infoModal.isOpen}
@@ -4584,7 +4775,7 @@ export default function App() {
   const [knowledge, setKnowledge] = useState({});
   const [preferences, setPreferences] = useState({});
   const [projects, setProjects] = useState({});
-  const [interests, setInterests] = useState({});
+  const [lifestyle, setLifestyle] = useState({});
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -4627,7 +4818,7 @@ export default function App() {
       setKnowledge(response.data.knowledge || {});
       setPreferences(response.data.preferences || {});
       setProjects(response.data.projects || {});
-      setInterests(response.data.interests || {});
+      setLifestyle(response.data.lifestyle || {});
       setIsConnected(true);
     } catch (err) {
       setError(err.message);
@@ -4675,9 +4866,9 @@ export default function App() {
     setProjects(newData);
     if (isAutosaveEnabled) debouncedSave("projects", newData);
   };
-  const handleInterestsChange = (newData) => {
-    setInterests(newData);
-    if (isAutosaveEnabled) debouncedSave("interests", newData);
+  const handleLifestyleChange = (newData) => {
+    setLifestyle(newData);
+    if (isAutosaveEnabled) debouncedSave("lifestyle", newData);
   };
 
   const saveAll = async () => {
@@ -4690,7 +4881,7 @@ export default function App() {
           knowledge,
           preferences,
           projects,
-          interests,
+          lifestyle,
         }),
       });
       setLastSaved(new Date());
@@ -4794,9 +4985,9 @@ export default function App() {
               <FolderKanban className="h-4 w-4" />
               <span className="hidden sm:inline">Projects</span>
             </TabsTrigger>
-            <TabsTrigger value="interests" className="gap-2">
+            <TabsTrigger value="lifestyle" className="gap-2">
               <Heart className="h-4 w-4" />
-              <span className="hidden sm:inline">Interests</span>
+              <span className="hidden sm:inline">Lifestyle</span>
             </TabsTrigger>
             <TabsTrigger value="preferences" className="gap-2">
               <Settings className="h-4 w-4" />
@@ -4825,10 +5016,10 @@ export default function App() {
               onShowConfirmation={showConfirmation}
             />
           </TabsContent>
-          <TabsContent value="interests">
-            <InterestsEditor
-              data={interests}
-              onChange={handleInterestsChange}
+          <TabsContent value="lifestyle">
+            <LifestyleEditor
+              data={lifestyle}
+              onChange={handleLifestyleChange}
               onShowConfirmation={showConfirmation}
             />
           </TabsContent>

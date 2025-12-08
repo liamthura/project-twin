@@ -49,7 +49,7 @@ app.add_middleware(
 )
 
 # Valid file types
-VALID_FILES = ["profile", "knowledge", "preferences", "projects", "interests", "learning_log"]
+VALID_FILES = ["profile", "knowledge", "preferences", "projects", "lifestyle", "learning_log"]
 
 # Default data structures
 DEFAULTS = {
@@ -97,12 +97,20 @@ DEFAULTS = {
         "current_learning": [],
         "top_of_mind": []
     },
-    "interests": {
+    "lifestyle": {
         "hobbies": [],
         "passions": [],
         "curiosities": [],
         "personality_traits": [],
-        "values": []
+        "values": [],
+        "wellness": {
+            "sleep": {
+                "weekday": {"bedtime": "", "wakeup": ""},
+                "weekend": {"bedtime": "", "wakeup": ""}
+            },
+            "energy_peaks": [],
+            "stress_triggers": []
+        }
     },
     "learning_log": {
         "entries": []
@@ -216,6 +224,16 @@ def read_json_file(file_type: str) -> Dict[str, Any]:
                 if file_type == "preferences":
                     if isinstance(data, dict):
                         data.setdefault("dislikes", [])
+                if file_type == "lifestyle":
+                    if isinstance(data, dict):
+                        data.setdefault("wellness", {
+                            "sleep": {
+                                "weekday": {"bedtime": "", "wakeup": ""},
+                                "weekend": {"bedtime": "", "wakeup": ""}
+                            },
+                            "energy_peaks": [],
+                            "stress_triggers": []
+                        })
                 return data
         except json.JSONDecodeError:
             return DEFAULTS.get(file_type, {})
