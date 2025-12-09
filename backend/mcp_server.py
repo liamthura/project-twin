@@ -460,7 +460,7 @@ ENTITIES BY FILE:
 • profile: email, link, language, work_experience, work_highlight, education, career_aspiration
 • lifestyle: hobby, hobby_reference, passion, curiosity, personality_trait, value
 • knowledge: domain, domain_reference, mental_tab, mental_tab_reference
-• projects: project, project_reference, current_learning, top_of_mind
+• projects: project, project_reference, project_highlight, current_learning, top_of_mind
 • preferences: dislike, communication_default, mood_override
 
 DATA EXAMPLES (always include identifier + fields to change):
@@ -476,6 +476,7 @@ DATA EXAMPLES (always include identifier + fields to change):
 
 NESTED ITEMS (must include parent identifier):
 • work_highlight: {"company": "Honda", "highlight": "Led API migration"}
+• project_highlight: {"project_name": "MyApp", "highlight": "Increased performance by 40%"}
 • hobby_reference: {"hobby_name": "Coffee", "ref_name": "V60", "notes": "my daily driver"}
 • mental_tab_reference: {"title": "Matcha spots", "ref_name": "Ippodo", "notes": "best in London"}
 
@@ -506,10 +507,17 @@ KEY: For UPDATE/REMOVE, the 'name' field identifies WHICH item to modify.""",
 
 FORMAT: {"operations": [{"action": "add", "entity": "...", "data": {...}}, ...]}
 
-EXAMPLE - Add multiple work highlights:
+EXAMPLES:
+Add multiple work highlights:
 {"operations": [
   {"action": "add", "entity": "work_highlight", "data": {"company": "Honda", "highlight": "Led API project"}},
   {"action": "add", "entity": "work_highlight", "data": {"company": "Honda", "highlight": "Built dashboard"}}
+]}
+
+Add multiple project highlights:
+{"operations": [
+  {"action": "add", "entity": "project_highlight", "data": {"project_name": "MyApp", "highlight": "Increased performance by 40%"}},
+  {"action": "add", "entity": "project_highlight", "data": {"project_name": "MyApp", "highlight": "Implemented CI/CD pipeline"}}
 ]}
 
 Each operation has: action (add/update/remove), entity, data.""",
@@ -2926,6 +2934,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 "status": status,
                 "tags": data.get("tags", []),
                 "references": data.get("references", []),
+                "highlights": data.get("highlights", []),
                 "notes": notes,
                 "added_date": datetime.now().strftime("%Y-%m-%d")
             })
@@ -2936,7 +2945,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             idx, project = find_in_array(project_list, name or "", "name")
             if idx == -1:
                 return f"❌ Project '{name}' not found"
-            for field in ["description", "status", "url", "tags", "references", "notes", "challenges", "goals"]:
+            for field in ["description", "status", "url", "tags", "references", "highlights", "notes", "challenges", "goals"]:
                 if data.get(field):
                     project[field] = data[field]
             project["last_updated"] = datetime.now().strftime("%Y-%m-%d")
@@ -3012,7 +3021,53 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             refs.pop(ref_idx)
             save_json("projects.json", projects)
             return f"✅ Removed reference"
-    
+
+    elif entity == "project_highlight":
+        projects = load_json("projects.json")
+        project_list = projects.get("projects", [])
+
+        # Support multiple field names for project lookup
+        project_name = get_field(data, "project_name", "project", "for_project", "parent")
+        if not project_name:
+            return "❌ Project highlight requires 'project_name' to identify which project"
+
+        idx, project = find_in_array(project_list, project_name, "name")
+        if idx == -1:
+            return f"❌ Project '{project_name}' not found"
+
+        highlights = project.setdefault("highlights", [])
+        if action == "add":
+            # Support single highlight or array of highlights
+            new_highlights = data.get("highlights", [])
+            if not new_highlights:
+                single = get_field(data, "highlight", "item", "achievement", default="")
+                if single:
+                    new_highlights = [single]
+
+            if not new_highlights:
+                return "❌ Project highlight requires 'highlight' or 'highlights'"
+
+            added = []
+            for h in new_highlights:
+                if h and h not in highlights:
+                    highlights.append(h)
+                    added.append(h)
+
+            project["last_updated"] = datetime.now().strftime("%Y-%m-%d")
+            save_json("projects.json", projects)
+            if len(added) == 1:
+                return f"✅ Added highlight to {project_name}: {added[0]}"
+            return f"✅ Added {len(added)} highlights to {project_name}"
+
+        elif action == "remove":
+            highlight = get_field(data, "highlight", "item", default="")
+            if highlight in highlights:
+                highlights.remove(highlight)
+                project["last_updated"] = datetime.now().strftime("%Y-%m-%d")
+                save_json("projects.json", projects)
+                return f"✅ Removed highlight from {project_name}"
+            return f"❌ Highlight not found"
+
     elif entity == "current_learning":
         projects = load_json("projects.json")
         learning = projects.setdefault("current_learning", [])

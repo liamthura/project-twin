@@ -3521,6 +3521,7 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                   const refCount = (project.references || []).length;
                   const tagCount = tags.length;
                   const hasNotes = (project.notes || "").trim().length > 0;
+                  const highlightsCount = (project.highlights || []).length;
                   const isExpanded = expandedProjects[originalIndex];
 
                   return (
@@ -3565,6 +3566,14 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                 className="h-5 text-xs"
                               >
                                 notes
+                              </Badge>
+                            )}
+                            {highlightsCount > 0 && (
+                              <Badge
+                                variant="secondary"
+                                className="h-5 text-xs"
+                              >
+                                {highlightsCount} highlights
                               </Badge>
                             )}
                           </div>
@@ -3855,6 +3864,64 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                               className="min-h-[80px] bg-background text-sm"
                               onClick={(e) => e.stopPropagation()}
                             />
+                          </div>
+
+                          {/* Highlights Section */}
+                          <div className="space-y-2">
+                            <Label>Highlights & Achievements</Label>
+                            <div className="space-y-3">
+                              {(project.highlights || []).map((highlight, hIdx) => (
+                                <div
+                                  key={hIdx}
+                                  className="flex gap-2 items-start p-2 rounded border border-muted bg-muted/20"
+                                >
+                                  <Input
+                                    value={highlight || ""}
+                                    onChange={(e) => {
+                                      const updated = [...(data.projects || [])];
+                                      updated[originalIndex].highlights[hIdx] =
+                                        e.target.value;
+                                      onChange({ ...data, projects: updated });
+                                    }}
+                                    placeholder="e.g. Increased performance by 40%, Implemented CI/CD pipeline"
+                                    className="bg-background"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const updated = [...(data.projects || [])];
+                                      updated[originalIndex].highlights = (
+                                        project.highlights || []
+                                      ).filter((_, i) => i !== hIdx);
+                                      onChange({ ...data, projects: updated });
+                                    }}
+                                    className="h-10 w-10 text-destructive flex-shrink-0"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const updated = [...(data.projects || [])];
+                                  updated[originalIndex].highlights = [
+                                    ...(project.highlights || []),
+                                    "",
+                                  ];
+                                  onChange({ ...data, projects: updated });
+                                }}
+                                variant="outline"
+                                size="sm"
+                                className="w-full border-dashed"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Highlight
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       )}

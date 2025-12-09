@@ -213,6 +213,7 @@ def read_json_file(file_type: str) -> Dict[str, Any]:
                                 project.setdefault("tags", [])
                                 project.setdefault("references", [])
                                 project.setdefault("notes", "")
+                                project.setdefault("highlights", [])
                 if file_type == "knowledge":
                     domains = data.get("domains", [])
                     if isinstance(domains, list):
