@@ -487,10 +487,8 @@ DATA EXAMPLES (always include identifier + fields to change):
 • UPDATE communication_default: {"tone": "friendly", "detail_level": "concise"}
 
 NESTED ITEMS (must include parent identifier):
-• work_highlight: {"company": "Honda", "highlight": "Led API migration"}
-• project_highlight: {"project_name": "MyApp", "highlight": "Increased performance by 40%"}
-• hobby_reference: {"hobby_name": "Coffee", "ref_name": "V60", "notes": "my daily driver"}
-• mental_tab_reference: {"title": "Matcha spots", "ref_name": "Ippodo", "notes": "best in London"}
+• Highlights: {"company"/"project_name": "X", "highlight": "Achievement text"}
+• References: {"hobby_name"/"domain_name"/"project_name"/"title": "X", "ref_name": "Y", "url": "https://..."}
 
 KEY: For UPDATE/REMOVE, the 'name' field identifies WHICH item to modify.""",
             inputSchema={
