@@ -71,15 +71,38 @@ Just ask Claude things like:
 - "What do you know about me?"
 - "What are my current projects?"
 - "What's my tech stack?"
+- "What hobbies do I have?"
+- "Remind me what I'm currently learning"
 
 Claude will call `get_persona` and respond with context about you.
 
 ### Updating Your Persona
 
 **Option 1: Ask Claude directly**
+
+Skills & Knowledge:
 > "Add Rust to my skills as something I'm learning"
+> "Update my Python skill level to advanced"
+> "I'm now comfortable with Docker, update that"
+
+Projects:
 > "Update my Solterra project status to completed"
+> "Add a new project called 'Personal Blog' - it's a SvelteKit site"
+> "Mark CBC Hackathon as finished"
+
+Preferences & Dislikes:
 > "Add 'morning meetings' to my dislikes"
+> "I prefer dark mode for everything, save that"
+> "Add that I like detailed explanations over brief answers"
+
+Lifestyle:
+> "Add photography as a hobby"
+> "Update my sleep schedule - I sleep at 1am on weekdays"
+> "Add 'after coffee' as when I'm most productive"
+
+Personal Info:
+> "Update my bio to mention I'm a full-stack developer"
+> "Add that I speak Japanese at beginner level"
 
 **Option 2: Use the UI**  
 Open `http://localhost:3000` and edit your persona files directly.
@@ -89,6 +112,22 @@ Tell Claude to watch for updates:
 > "For this conversation, use suggest_persona_update on my messages to catch anything worth remembering"
 
 Then chat naturally. If you say something like "I've been really getting into mechanical keyboards lately", Claude can detect that and ask if you want to add it.
+
+### Using Your Persona in Context
+
+Once your persona is set up, Claude can use it to personalize responses:
+
+> "Help me write a bio for my portfolio"  
+Claude knows your skills, projects, and experience — writes a bio that actually reflects you.
+
+> "What should I learn next?"  
+Claude sees your current skills and learning goals, suggests something that makes sense for your path.
+
+> "I'm stuck on this Python problem"  
+Claude knows you're intermediate at Python and prefers detailed explanations.
+
+> "Recommend some side project ideas"  
+Claude factors in your interests, current skills, and what you're learning.
 
 ---
 
