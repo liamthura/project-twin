@@ -344,29 +344,16 @@ async def list_tools():
         # === SMART CONTEXT TOOL (1) - Use this first! ===
         Tool(
             name="get_context",
-            description="""🎯 RECOMMENDED: Get persona context optimized for your use case.
-            
-Instead of loading everything or making 6+ calls, get exactly what you need in ONE call.
+            description="""🚀 PRIMARY TOOL - Start here for any persona request.
 
-SCOPES (pick one):
-• minimal     → Name, role, quick bio (~200 tokens) - for simple greetings
-• professional → Work, skills, projects, domains (~800 tokens) - for code/career help
-• personal    → Hobbies, interests, values, personality (~600 tokens) - for lifestyle/fun
-• learning    → Current learning, domains, curiosities (~400 tokens) - for study help
-• full        → Everything (~2000+ tokens) - when you truly need it all
+Returns user context with communication preferences. Choose scope by need:
+• minimal (default) → Identity + communication style
+• professional → Work, skills, projects
+• personal → Hobbies, values, personality
+• learning → Domains, current learning
+• full → Everything
 
-TOPIC FILTER (optional):
-Add topic="python" to get only Python-related items from the scope.
-Great for focused assistance: topic="cooking", topic="fitness", topic="sveltekit"
-
-EXAMPLES:
-• User asks for code help → get_context(scope="professional")
-• User asks about hobbies → get_context(scope="personal")  
-• User asks about Python → get_context(scope="professional", topic="python")
-• User says "hi" → get_context(scope="minimal")
-• Complex persona question → get_context(scope="full")
-
-Returns: {scope, token_estimate, context: {...filtered data...}}""",
+Optional: topic="python" filters to relevant items only.""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -393,119 +380,44 @@ Returns: {scope, token_estimate, context: {...filtered data...}}""",
         # === INDIVIDUAL READ TOOLS (7) - For specific data needs ===
         Tool(
             name="get_persona",
-            description="""Get ALL persona data at once. Use for initial context gathering.
-Returns: profile, lifestyle, knowledge, preferences, projects, learning_log.
-
-TIP: Consider using get_context(scope=...) instead for token efficiency.
-This tool is best when you truly need everything.""",
+            description="""All persona data. Use get_context for scoped retrieval.
+Returns: profile, lifestyle, knowledge, preferences, projects, learning_log.""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ),
         Tool(
             name="get_profile",
-            description="""Get profile/identity data:
-├── name, bio, location
-├── contact: emails[], links[]
-├── languages_spoken[]: {name, fluency}
-├── education[]: degrees with highlights[]
-├── work_experience[]: jobs with highlights[]  
-└── career_aspirations[]: goal strings
-
-Use before: adding emails, links, languages, education, work experience.""",
+            description="""Raw profile data for editing and deeper specific understanding. Use get_context first for general persona requests.
+        Contains: name, bio, contact, languages, education[], work_experience[], career_aspirations[].""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ),
         Tool(
             name="get_lifestyle",
-            description="""Get lifestyle/personality data:
-├── hobbies[]: 
-│   ├── name, skill_level, notes
-│   ├── specifics[]: sub-focuses (e.g., "street photography")
-│   └── references[]: gear, tutorials, resources
-├── passions[]: deep passions (strings)
-├── curiosities[]: things exploring (strings)
-├── personality_traits[]: characteristics (strings)
-├── values[]: core beliefs (strings)
-└── wellness:
-    ├── sleep: {weekday: {bedtime, wakeup}, weekend: {bedtime, wakeup}}
-    └── energy_peaks[]: times when most productive (strings)
-
-⚡ BEFORE UPDATING: Check if hobby exists, then decide:
-- Update hobby itself → skill_level, notes
-- Add sub-category → hobby_specific
-- Add gear/resource → hobby_reference
-
-⚡ WELLNESS ROUTING:
-- "I sleep at 11pm" → UPDATE sleep {day_type: "weekday", bedtime: "23:00"}
-- "I wake up at 8am on weekends" → UPDATE sleep {day_type: "weekend", wakeup: "08:00"}
-- "I'm most productive at night" → ADD energy_peak {peak: "late night"}""",
+            description="""Raw lifestyle data for editing and deeper specific understanding. Use get_context(scope='personal') first for general persona requests.
+        Contains: hobbies[], passions[], curiosities[], personality_traits[], values[], wellness.""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ),
         Tool(
             name="get_knowledge",
-            description="""Get knowledge/expertise data:
-├── domains[]: skills/technologies
-│   ├── name, level (learning/intermediate/advanced), notes
-│   └── references[]: docs, courses, resources
-└── mental_tabs[]: topics being tracked/explored
-    ├── title: topic name (e.g., "Matcha Places")
-    ├── content: general notes about the topic
-    ├── tags[], status (open/exploring/resolved)
-    └── references[]: ⚠️ THE ACTUAL LISTS LIVE HERE
-        ├── name: section identifier (e.g., "good spots in newcastle")
-        └── notes: the actual items/places/resources
-
-⚡ MENTAL TAB ROUTING:
-When user says "add X to my [topic] list", find the mental_tab by title,
-then find the right reference by name, and UPDATE the notes field.
-Don't add to content - that's for general topic notes only.""",
+            description="""Raw knowledge data for editing and deeper specific understanding. Use get_context(scope='professional') first for general persona requests.
+        Contains: domains[] (skills with levels), mental_tabs[] (tracked topics with references).""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ),
         Tool(
             name="get_preferences",
-            description="""Get user preferences for AI interaction:
-├── code_style: languages, frameworks, tools, conventions
-├── communication:
-│   ├── default: {tone, detail_level, locale} - baseline style
-│   └── mood_overrides[]: {mood, tone, detail_level} - situational adjustments
-├── learning_style: preferred[], avoid[]
-├── response_format: code_blocks, bullet_points, etc.
-├── work_preferences: timezone, productivity_time, approach
-└── dislikes[]: things the user specifically does NOT like (strings)
-
-⚡ ROUTING:
-• "I don't like X" → ADD dislike {dislike: "X"}
-• "Actually I'm okay with X now" → REMOVE dislike {dislike: "X"}
-• "When I'm stressed, be more gentle" → ADD mood_override {mood: "stressed", tone: "gentle and supportive"}
-• "Change my default tone to casual" → UPDATE communication_default {tone: "casual"}
-• Use mood_overrides to adapt communication based on user's current state.""",
+            description="""Raw preferences data for editing and deeper specific understanding. Use get_context(scope='minimal') first for general persona requests.
+        Contains: code_style, communication (default + mood_overrides), learning_style, dislikes[].""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ),
         Tool(
             name="get_projects",
-            description="""Get projects/focus data:
-├── projects[]: 
-│   ├── name, description, status (planning/active/paused/completed)
-│   ├── notes: project thoughts
-│   ├── tags[]: technologies/categories
-│   └── references[]: related links, docs
-├── current_learning[]: 
-│   └── {topic, context, priority (high/medium/low)}
-└── top_of_mind[]: current focus items (strings)
-
-⚡ ROUTING:
-- Project update → UPDATE project {name, status/notes}
-- Add technology → ADD project_tag {project_name, tag}
-- Add resource link → ADD project_reference {project_name, ref_name, url}
-- Learning something → ADD current_learning OR ADD domain
-- Current focus → ADD/REMOVE top_of_mind""",
+            description="""Raw projects data for editing and deeper specific understanding. Use get_context(scope='professional') first for general persona requests.
+        Contains: projects[], current_learning[], top_of_mind[].""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ),
         Tool(
             name="get_learning_log",
-            description="""Get timestamped learning entries from conversations:
-entries[]: {timestamp, topic, details, source, tags[]}
-
-Add new learnings with: ADD learning_entry {topic, details, source, tags[]}
-This creates a searchable knowledge base of things learned over time.""",
+            description="""Raw learning log for editing and deeper specific understanding. Use get_context(scope='learning') first for general persona requests.
+        Contains: entries[] with {timestamp, topic, details, source, tags[]}.""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ),
         

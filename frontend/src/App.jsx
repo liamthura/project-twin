@@ -2815,36 +2815,42 @@ function PreferencesEditor({ data, onChange }) {
                 Always active
               </Badge>
             </div>
-            <div className="grid gap-4 sm:grid-cols-3 p-4 border rounded-lg bg-muted/20">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Tone</Label>
-                <Input
-                  value={comm.default.tone || ""}
-                  onChange={(e) => updateDefaultComm("tone", e.target.value)}
-                  placeholder="e.g. friendly but professional"
-                  className="h-8"
-                />
+            <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Tone</Label>
+                  <Input
+                    value={comm.default.tone || ""}
+                    onChange={(e) => updateDefaultComm("tone", e.target.value)}
+                    placeholder="e.g. friendly but professional"
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Locale
+                  </Label>
+                  <Input
+                    value={comm.default.locale || ""}
+                    onChange={(e) =>
+                      updateDefaultComm("locale", e.target.value)
+                    }
+                    placeholder="e.g. British English"
+                    className="h-8"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">
                   Detail Level
                 </Label>
-                <Input
+                <Textarea
                   value={comm.default.detail_level || ""}
                   onChange={(e) =>
                     updateDefaultComm("detail_level", e.target.value)
                   }
-                  placeholder="e.g. comprehensive"
-                  className="h-8"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Locale</Label>
-                <Input
-                  value={comm.default.locale || ""}
-                  onChange={(e) => updateDefaultComm("locale", e.target.value)}
-                  placeholder="e.g. British English"
-                  className="h-8"
+                  placeholder="e.g. comprehensive with examples, step-by-step breakdowns when explaining code..."
+                  className="min-h-[60px] resize-none text-sm"
                 />
               </div>
             </div>
@@ -2922,25 +2928,48 @@ function PreferencesEditor({ data, onChange }) {
                             className="h-8"
                           />
                         </div>
-                        <div className="grid gap-4 sm:grid-cols-3">
-                          <div className="space-y-2">
-                            <Label className="text-xs text-muted-foreground">
-                              Tone
-                            </Label>
-                            <Input
-                              value={mood.tone || ""}
-                              onChange={(e) =>
-                                updateMoodOverride(idx, "tone", e.target.value)
-                              }
-                              placeholder="e.g. gentle, encouraging"
-                              className="h-8"
-                            />
+                        <div className="space-y-4">
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">
+                                Tone
+                              </Label>
+                              <Input
+                                value={mood.tone || ""}
+                                onChange={(e) =>
+                                  updateMoodOverride(
+                                    idx,
+                                    "tone",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="e.g. gentle, encouraging"
+                                className="h-8"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">
+                                Locale
+                              </Label>
+                              <Input
+                                value={mood.locale || ""}
+                                onChange={(e) =>
+                                  updateMoodOverride(
+                                    idx,
+                                    "locale",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Leave blank to use default"
+                                className="h-8"
+                              />
+                            </div>
                           </div>
                           <div className="space-y-2">
                             <Label className="text-xs text-muted-foreground">
                               Detail Level
                             </Label>
-                            <Input
+                            <Textarea
                               value={mood.detail_level || ""}
                               onChange={(e) =>
                                 updateMoodOverride(
@@ -2949,25 +2978,8 @@ function PreferencesEditor({ data, onChange }) {
                                   e.target.value
                                 )
                               }
-                              placeholder="e.g. brief, just essentials"
-                              className="h-8"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs text-muted-foreground">
-                              Locale
-                            </Label>
-                            <Input
-                              value={mood.locale || ""}
-                              onChange={(e) =>
-                                updateMoodOverride(
-                                  idx,
-                                  "locale",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Leave blank to use default"
-                              className="h-8"
+                              placeholder="e.g. brief and to the point, skip the explanations..."
+                              className="min-h-[60px] resize-none text-sm"
                             />
                           </div>
                         </div>
