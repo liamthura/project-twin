@@ -1622,7 +1622,7 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
         "Mental Tabs are your personal knowledge snippets—random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
       tips: [
         "Title: A short, memorable name for the tab.",
-        "Content: A brief description or context explaining what this tab is about.",
+        "Notes: A brief description or context explaining what this tab is about.",
         "Tags: Keywords to help you (and AI) find this tab later.",
         "References: Add items with a name, optional URL, and notes.",
         "Use Mental Tabs for: favourite restaurants, book recommendations, gift ideas, recipes, travel tips, etc.",
@@ -1703,7 +1703,7 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
         mental_tabs: [
           {
             title: newTabTitle.trim(),
-            content: newTabContent,
+            notes: newTabContent,
             tags: newTabTags,
             references: [],
             created_at: new Date().toISOString(),
@@ -2388,13 +2388,13 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
                           </div>
 
                           <div className="space-y-2">
-                            <Label>Content</Label>
+                            <Label>Notes</Label>
                             <Textarea
-                              value={tab.content || ""}
+                              value={tab.notes || ""}
                               onChange={(e) =>
                                 updateTab(
                                   originalIndex,
-                                  "content",
+                                  "notes",
                                   e.target.value
                                 )
                               }
@@ -2598,9 +2598,9 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tab-content">Content</Label>
+              <Label htmlFor="tab-notes">Notes</Label>
               <Textarea
-                id="tab-content"
+                id="tab-notes"
                 placeholder="Your notes, code snippets, reminders..."
                 value={newTabContent}
                 onChange={(e) => setNewTabContent(e.target.value)}

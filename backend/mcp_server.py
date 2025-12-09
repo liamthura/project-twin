@@ -468,6 +468,11 @@ For complex operations (add/remove items), use persona_modify instead.""",
             name="persona_modify",
             description="""Add, update, or remove items from persona data.
 
+WRITING STYLE: Keep text SHORT and SCANNABLE. Use bullet points where possible.
+• notes/descriptions: Brief, focused phrases. Use bullets for multiple points.
+• highlights: One achievement per entry, focus on the key point
+• Exception: learning_log can be more detailed but stay focused
+
 ENTITIES BY FILE:
 • profile: email, link, language, work_experience, work_highlight, education, career_aspiration
 • lifestyle: hobby, hobby_reference, passion, curiosity, personality_trait, value
@@ -3376,9 +3381,9 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         tabs = knowledge.setdefault("mental_tabs", [])
         # Support both 'title' (frontend format) and 'topic' (original format)
         topic = get_field(data, "title", "topic", "name", "mental_tab", "subject")
-        context = get_field(data, "context", "content", "description", "details", default="")
+        context = get_field(data, "context", "notes", "description", "details", default="")
         status = get_field(data, "status", "state", default="open")
-        
+
         if action == "add":
             if not topic:
                 return "❌ Mental tab requires 'title' or 'topic'"
@@ -3387,7 +3392,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return f"ℹ️ Mental tab '{topic}' already exists"
             tabs.append({
                 "title": topic,  # Use 'title' to match frontend format
-                "content": context,
+                "notes": context,
                 "tags": data.get("tags", []),
                 "status": status,
                 "references": data.get("references", []),
@@ -3395,7 +3400,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             })
             save_json("knowledge.json", knowledge)
             return f"✅ Added mental tab: {topic}"
-        
+
         elif action == "update":
             # Try to find by 'title' first (frontend format), then 'topic'
             idx, tab = find_in_array(tabs, topic or "", "title")
@@ -3404,7 +3409,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             if idx == -1:
                 return f"❌ Mental tab '{topic}' not found"
             if context:
-                tab["content"] = context  # Use 'content' to match frontend format
+                tab["notes"] = context  # Use 'notes' to match frontend format
             if status != "open" or data.get("status"):
                 tab["status"] = status
             if data.get("tags"):
