@@ -3049,6 +3049,7 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectStatus, setNewProjectStatus] = useState("active");
+  const [editingIdeaIndex, setEditingIdeaIndex] = useState(null);
 
   // Info modal state
   const [infoModal, setInfoModal] = useState({
@@ -3247,30 +3248,87 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                 {(data.top_of_mind || []).map((item, index) => {
                   const ideaObj =
                     typeof item === "string" ? { idea: item, note: "" } : item;
+                  const isEditing = editingIdeaIndex === index;
+
+                  const updateIdea = (field, value) => {
+                    const updated = [...(data.top_of_mind || [])];
+                    const current =
+                      typeof updated[index] === "string"
+                        ? { idea: updated[index], note: "" }
+                        : { ...updated[index] };
+                    current[field] = value;
+                    updated[index] = current;
+                    onChange({ ...data, top_of_mind: updated });
+                  };
+
                   return (
                     <div
                       key={index}
-                      className="p-3 rounded border bg-muted/20 hover:bg-muted/30 transition-colors"
+                      className={`p-3 rounded border transition-colors ${
+                        isEditing
+                          ? "ring-1 ring-primary/30 bg-muted/30"
+                          : "bg-muted/20 hover:bg-muted/30 cursor-pointer"
+                      }`}
+                      onClick={() => !isEditing && setEditingIdeaIndex(index)}
                     >
                       <div className="flex items-start gap-2">
-                        <div className="flex-1 space-y-1">
-                          <div className="font-medium text-sm">
-                            {ideaObj.idea}
-                          </div>
-                          {ideaObj.note && (
-                            <div className="text-xs text-muted-foreground">
-                              {ideaObj.note}
-                            </div>
+                        <div className="flex-1 space-y-2">
+                          {isEditing ? (
+                            <>
+                              <Input
+                                value={ideaObj.idea}
+                                onChange={(e) =>
+                                  updateIdea("idea", e.target.value)
+                                }
+                                placeholder="What's the idea?"
+                                className="h-8 text-sm font-medium"
+                                autoFocus
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <Textarea
+                                value={ideaObj.note || ""}
+                                onChange={(e) =>
+                                  updateIdea("note", e.target.value)
+                                }
+                                placeholder="Add a note (optional)..."
+                                className="text-xs min-h-[60px] resize-none"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingIdeaIndex(null);
+                                }}
+                                className="h-7 text-xs"
+                              >
+                                Done
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <div className="font-medium text-sm">
+                                {ideaObj.idea || "Untitled idea"}
+                              </div>
+                              {ideaObj.note && (
+                                <div className="text-xs text-muted-foreground">
+                                  {ideaObj.note}
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             const updated = (data.top_of_mind || []).filter(
                               (_, i) => i !== index
                             );
                             onChange({ ...data, top_of_mind: updated });
+                            if (isEditing) setEditingIdeaIndex(null);
                           }}
                           className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0"
                         >

@@ -545,46 +545,44 @@ For complex operations (add/remove items), use persona_modify instead.""",
             description="""Add, update, or remove items from persona data.
 
 ENTITIES BY FILE:
-• profile: email, link, language, work_experience, work_highlight, education, education_highlight, career_aspiration
-• lifestyle: hobby, hobby_reference, hobby_specific, passion, curiosity, personality_trait, value, sleep, energy_peak
+• profile: email, link, language, work_experience, work_highlight, education, career_aspiration
+• lifestyle: hobby, hobby_reference, passion, curiosity, personality_trait, value
 • knowledge: domain, domain_reference, mental_tab, mental_tab_reference
-• projects: project, project_reference, project_tag, current_learning, top_of_mind
+• projects: project, project_reference, current_learning, top_of_mind
 • preferences: dislike, communication_default, mood_override
-• learning: learning_entry
 
-QUICK ROUTING:
-• "Add email" → ADD email {address, purpose}
-• "Add hobby" → ADD hobby {name, status: "active"}
-• "Stop doing X" → UPDATE hobby {name, status: "inactive"}
-• "Learning Rust" → ADD domain {name, level: "learning"}
-• "Add to matcha list" → UPDATE mental_tab_reference {title, ref_name, notes}
-• "New project" → ADD project {name, description}
-• "I hate X" → ADD dislike {dislike: "X"}
-• "When I'm tired, keep it brief" → ADD mood_override {mood: "tired", detail_level: "brief"}
-• "Default to friendly tone" → UPDATE communication_default {tone: "friendly"}
+DATA EXAMPLES (always include identifier + fields to change):
+• UPDATE project: {"name": "ProjectName", "status": "active", "notes": "new notes"}
+• ADD hobby: {"name": "Photography", "skill_level": "beginner", "status": "active"}
+• UPDATE hobby: {"name": "Badminton", "status": "inactive", "notes": "stopped playing"}
+• ADD domain: {"name": "Rust", "level": "learning"}
+• UPDATE domain: {"name": "Python", "level": "advanced"}
+• ADD top_of_mind: {"idea": "Build a blog", "note": "use SvelteKit"}
+• ADD dislike: {"dislike": "morning meetings"}
+• ADD mood_override: {"mood": "stressed", "tone": "calm", "detail_level": "brief"}
+• UPDATE communication_default: {"tone": "friendly", "detail_level": "concise"}
 
-NESTED ITEMS (include parent):
-• hobby_reference → {hobby_name, ref_name, notes}
-• domain_reference → {domain_name, ref_name, url, notes}
-• mental_tab_reference → {title, ref_name, notes}
-• project_reference → {project_name, ref_name, url}
+NESTED ITEMS (must include parent identifier):
+• work_highlight: {"company": "Honda", "highlight": "Led API migration"}
+• hobby_reference: {"hobby_name": "Coffee", "ref_name": "V60", "notes": "my daily driver"}
+• mental_tab_reference: {"title": "Matcha spots", "ref_name": "Ippodo", "notes": "best in London"}
 
-FIELD FLEXIBILITY: name/title/topic, notes/description/details all work.""",
+KEY: For UPDATE/REMOVE, the 'name' field identifies WHICH item to modify.""",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "action": {
                         "type": "string",
                         "enum": ["add", "update", "remove"],
-                        "description": "The action to perform"
+                        "description": "add = create new, update = modify existing, remove = delete"
                     },
                     "entity": {
                         "type": "string",
-                        "description": "Entity type: hobby, mental_tab_reference, domain, project, etc."
+                        "description": "Entity type: project, hobby, domain, dislike, mood_override, etc."
                     },
                     "data": {
                         "type": "object",
-                        "description": "Entity data. For nested items (references, specifics), include parent identifier."
+                        "description": "Must include identifier (name/title) + fields to set. Example: {\"name\": \"MyProject\", \"status\": \"active\"}"
                     }
                 },
                 "required": ["action", "entity", "data"]
