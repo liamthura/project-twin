@@ -3710,11 +3710,8 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
         "Track activities you enjoy outside of work. This helps AI understand your lifestyle and can suggest relevant recommendations.",
       tips: [
         "Name: The hobby or activity.",
-        "Skill Level options:",
-        "  • Casual: Do it occasionally for fun.",
-        "  • Enthusiast: Regularly engaged, developing skills.",
-        "  • Serious: Dedicated practice, may compete or create.",
-        "  • Expert: Highly skilled, possibly teach or mentor.",
+        "Skill Level: Casual, Enthusiast, Serious, or Expert.",
+        "Status: Active (currently doing) or Inactive (paused/stopped).",
         "Specifics: Sub-areas or variations you focus on.",
         "Notes: Your experience, goals, or what you enjoy most.",
         "References: Links to gear, communities, or learning resources.",
@@ -3810,6 +3807,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
             name: newHobbyName.trim(),
             specifics: [],
             skill_level: newHobbyLevel,
+            status: "active",
             notes: "",
             references: [],
           },
@@ -3979,7 +3977,9 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
                   return (
                     <div
                       key={idx}
-                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                      className={`rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden ${
+                        hobby.status === "inactive" ? "opacity-60" : ""
+                      }`}
                     >
                       {/* Collapsed Header */}
                       <div
@@ -4025,6 +4025,14 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
                         <Badge variant="outline" className="flex-shrink-0">
                           {hobby.skill_level || "enthusiast"}
                         </Badge>
+                        {hobby.status === "inactive" && (
+                          <Badge
+                            variant="secondary"
+                            className="flex-shrink-0 opacity-60"
+                          >
+                            inactive
+                          </Badge>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -4041,7 +4049,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
                       {/* Expanded Content */}
                       {isExpanded && (
                         <div className="border-t bg-background/50 p-4 space-y-4">
-                          <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="grid gap-4 sm:grid-cols-3">
                             <div className="space-y-2">
                               <Label>Hobby Name</Label>
                               <Input
@@ -4082,6 +4090,25 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
                                     Serious
                                   </SelectItem>
                                   <SelectItem value="expert">Expert</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Status</Label>
+                              <Select
+                                value={hobby.status || "active"}
+                                onValueChange={(value) =>
+                                  updateHobby(originalIndex, "status", value)
+                                }
+                              >
+                                <SelectTrigger className="h-8 bg-background">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="active">Active</SelectItem>
+                                  <SelectItem value="inactive">
+                                    Inactive
+                                  </SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>

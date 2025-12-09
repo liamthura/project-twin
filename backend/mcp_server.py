@@ -6,6 +6,7 @@ Streamlined tools for reading and modifying persona data.
 
 import json
 import sys
+import re
 import asyncio
 import logging
 from pathlib import Path
@@ -58,6 +59,212 @@ def save_json(filename: str, data: dict) -> bool:
 def get_all_persona_data() -> dict:
     """Get all persona data"""
     return {key: load_json(filename) for key, filename in FILE_MAP.items()}
+
+
+# -----------------------------------------------------------------------------
+# Scoped Context System - Token-efficient persona retrieval
+# -----------------------------------------------------------------------------
+
+CONTEXT_SCOPES = {
+    "minimal": {
+        "description": "Quick identity snapshot (~200 tokens)",
+        "fields": {
+            "profile": ["name", "bio", "location", "current_role"],
+            "projects": ["top_of_mind"]
+        }
+    },
+    "professional": {
+        "description": "Work-relevant context (~800 tokens)",
+        "fields": {
+            "profile": ["name", "bio", "location", "current_role", "work_experience", "education", "career_aspirations"],
+            "knowledge": ["domains"],
+            "projects": ["projects", "current_learning", "top_of_mind"],
+            "preferences": ["code_style", "work_preferences"]
+        }
+    },
+    "personal": {
+        "description": "Hobbies, interests, personality (~600 tokens)",
+        "fields": {
+            "profile": ["name", "bio", "location"],
+            "lifestyle": ["hobbies", "passions", "curiosities", "personality_traits", "values", "wellness"],
+            "preferences": ["communication", "dislikes"]
+        }
+    },
+    "learning": {
+        "description": "Current learning focus (~400 tokens)",
+        "fields": {
+            "profile": ["name"],
+            "knowledge": ["domains", "mental_tabs"],
+            "projects": ["current_learning", "top_of_mind"],
+            "learning_log": ["entries"]
+        }
+    },
+    "full": {
+        "description": "Complete persona (~2000+ tokens)",
+        "fields": "all"
+    }
+}
+
+def get_scoped_context(
+    scope: str = "minimal",
+    topic: str = None,
+    include_inactive: bool = False
+) -> dict:
+    """
+    Get persona context filtered by scope and optional topic.
+    
+    Args:
+        scope: minimal | professional | personal | learning | full
+        topic: Optional keyword to filter relevant items (e.g., "python", "cooking")
+        include_inactive: Whether to include inactive hobbies, paused projects, etc.
+    
+    Returns:
+        Scoped context with token estimate
+    """
+    if scope not in CONTEXT_SCOPES:
+        return {"error": f"Unknown scope '{scope}'. Valid: {list(CONTEXT_SCOPES.keys())}"}
+    
+    scope_config = CONTEXT_SCOPES[scope]
+    all_data = get_all_persona_data()
+    result = {}
+    
+    # Full scope = return everything
+    if scope_config["fields"] == "all":
+        result = all_data
+    else:
+        # Extract only specified fields
+        for file_key, fields in scope_config["fields"].items():
+            data = all_data.get(file_key, {})
+            if not data or "error" in data:
+                continue
+                
+            result[file_key] = {}
+            for field in fields:
+                if field in data:
+                    result[file_key][field] = data[field]
+    
+    # Apply topic filter if provided
+    if topic:
+        result = _filter_by_topic(result, topic.lower())
+    
+    # Filter inactive items unless requested
+    if not include_inactive:
+        result = _filter_inactive(result)
+    
+    # Estimate token count (rough: 4 chars ≈ 1 token)
+    json_str = json.dumps(result, ensure_ascii=False)
+    token_estimate = len(json_str) // 4
+    
+    return {
+        "scope": scope,
+        "scope_description": scope_config["description"],
+        "topic_filter": topic,
+        "token_estimate": token_estimate,
+        "context": result
+    }
+
+def _filter_by_topic(data: dict, topic: str) -> dict:
+    """Filter context to items relevant to a specific topic."""
+    filtered = {}
+    
+    for key, section in data.items():
+        if not isinstance(section, dict):
+            continue
+            
+        filtered[key] = {}
+        
+        for field, value in section.items():
+            if isinstance(value, list):
+                # Filter array items by topic relevance
+                filtered_items = []
+                for item in value:
+                    if _item_matches_topic(item, topic):
+                        filtered_items.append(item)
+                if filtered_items:
+                    filtered[key][field] = filtered_items
+            elif isinstance(value, dict):
+                # Check if dict is topic-relevant
+                if _item_matches_topic(value, topic):
+                    filtered[key][field] = value
+            elif isinstance(value, str):
+                # Include string fields if they mention topic
+                if topic in value.lower():
+                    filtered[key][field] = value
+                    
+        # Remove empty sections
+        if not filtered[key]:
+            del filtered[key]
+    
+    return filtered
+
+def _item_matches_topic(item, topic: str) -> bool:
+    """Check if an item is relevant to the given topic."""
+    if isinstance(item, str):
+        return topic in item.lower()
+    elif isinstance(item, dict):
+        # Check common fields for topic match
+        searchable_fields = ["name", "title", "topic", "description", "notes", "content", "tags"]
+        for field in searchable_fields:
+            value = item.get(field)
+            if isinstance(value, str) and topic in value.lower():
+                return True
+            elif isinstance(value, list):
+                for v in value:
+                    if isinstance(v, str) and topic in v.lower():
+                        return True
+        # Also check references
+        for ref in item.get("references", []):
+            if _item_matches_topic(ref, topic):
+                return True
+    return False
+
+def _filter_inactive(data: dict) -> dict:
+    """Remove inactive/paused items from context."""
+    filtered = {}
+    
+    for key, section in data.items():
+        if not isinstance(section, dict):
+            filtered[key] = section
+            continue
+            
+        filtered[key] = {}
+        
+        for field, value in section.items():
+            if isinstance(value, list):
+                # Filter out inactive items
+                active_items = []
+                for item in value:
+                    if isinstance(item, dict):
+                        status = item.get("status", "active")
+                        # Keep if active or no status field
+                        if status in ["active", "open", "exploring", "planning", None]:
+                            active_items.append(item)
+                        elif status == "completed":
+                            # Include completed but maybe summarize later
+                            active_items.append(item)
+                    else:
+                        active_items.append(item)
+                if active_items:
+                    filtered[key][field] = active_items
+            else:
+                filtered[key][field] = value
+                
+        # Remove empty sections
+        if not filtered[key]:
+            del filtered[key]
+    
+    return filtered
+
+
+def get_available_scopes() -> dict:
+    """Return available scopes with descriptions for LLM guidance."""
+    return {
+        scope: {
+            "description": config["description"],
+            "includes": list(config["fields"].keys()) if config["fields"] != "all" else ["all data"]
+        }
+        for scope, config in CONTEXT_SCOPES.items()
+    }
 
 def get_nested_value(data: dict, path: str):
     """Get a value from nested dict using dot notation path"""
@@ -125,16 +332,65 @@ server = Server("persona-mcp")
 
 @server.list_tools()
 async def list_tools():
-    """List available MCP tools - consolidated to 9 tools"""
+    """List available MCP tools - consolidated to 10 tools"""
     return [
-        # === READ TOOLS (7) ===
+        # === SMART CONTEXT TOOL (1) - Use this first! ===
+        Tool(
+            name="get_context",
+            description="""🎯 RECOMMENDED: Get persona context optimized for your use case.
+            
+Instead of loading everything or making 6+ calls, get exactly what you need in ONE call.
+
+SCOPES (pick one):
+• minimal     → Name, role, quick bio (~200 tokens) - for simple greetings
+• professional → Work, skills, projects, domains (~800 tokens) - for code/career help
+• personal    → Hobbies, interests, values, personality (~600 tokens) - for lifestyle/fun
+• learning    → Current learning, domains, curiosities (~400 tokens) - for study help
+• full        → Everything (~2000+ tokens) - when you truly need it all
+
+TOPIC FILTER (optional):
+Add topic="python" to get only Python-related items from the scope.
+Great for focused assistance: topic="cooking", topic="fitness", topic="sveltekit"
+
+EXAMPLES:
+• User asks for code help → get_context(scope="professional")
+• User asks about hobbies → get_context(scope="personal")  
+• User asks about Python → get_context(scope="professional", topic="python")
+• User says "hi" → get_context(scope="minimal")
+• Complex persona question → get_context(scope="full")
+
+Returns: {scope, token_estimate, context: {...filtered data...}}""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "scope": {
+                        "type": "string",
+                        "enum": ["minimal", "professional", "personal", "learning", "full"],
+                        "description": "Context depth: minimal | professional | personal | learning | full",
+                        "default": "minimal"
+                    },
+                    "topic": {
+                        "type": "string",
+                        "description": "Optional: Filter to items matching this topic (e.g., 'python', 'cooking')"
+                    },
+                    "include_inactive": {
+                        "type": "boolean",
+                        "description": "Include inactive hobbies, paused projects, etc. Default: false",
+                        "default": False
+                    }
+                },
+                "required": []
+            }
+        ),
+        
+        # === INDIVIDUAL READ TOOLS (7) - For specific data needs ===
         Tool(
             name="get_persona",
             description="""Get ALL persona data at once. Use for initial context gathering.
 Returns: profile, lifestyle, knowledge, preferences, projects, learning_log.
 
-TIP: Call this first to understand what data exists before making updates.
-Look at the structure to determine where new information should go.""",
+TIP: Consider using get_context(scope=...) instead for token efficiency.
+This tool is best when you truly need everything.""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ),
         Tool(
@@ -277,164 +533,30 @@ For complex operations (add/remove items), use persona_modify instead.""",
             name="persona_modify",
             description="""Add, update, or remove items from persona data.
 
-╔══════════════════════════════════════════════════════════════════╗
-║                    DECISION GUIDE: WHERE DOES IT GO?             ║
-╚══════════════════════════════════════════════════════════════════╝
+ENTITIES BY FILE:
+• profile: email, link, language, work_experience, work_highlight, education, education_highlight, career_aspiration
+• lifestyle: hobby, hobby_reference, hobby_specific, passion, curiosity, personality_trait, value, sleep, energy_peak
+• knowledge: domain, domain_reference, mental_tab, mental_tab_reference
+• projects: project, project_reference, project_tag, current_learning, top_of_mind
+• preferences: dislike
+• learning: learning_entry
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 PROFILE DATA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-profile.json structure:
-├── name, bio, location (use persona_update for these)
-├── contact:
-│   ├── emails[]: {address, purpose}
-│   └── links[]: {url, label}
-├── languages_spoken[]: {name, fluency}
-├── education[]: {institution, degree_level, field_of_study, years, highlights[]}
-├── work_experience[]: {role, company, type, period, highlights[]}
-└── career_aspirations[]: strings
+QUICK ROUTING:
+• "Add email" → ADD email {address, purpose}
+• "Add hobby" → ADD hobby {name, status: "active"}
+• "Stop doing X" → UPDATE hobby {name, status: "inactive"}
+• "Learning Rust" → ADD domain {name, level: "learning"}
+• "Add to matcha list" → UPDATE mental_tab_reference {title, ref_name, notes}
+• "New project" → ADD project {name, description}
+• "I hate X" → ADD dislike {dislike: "X"}
 
-⚡ ROUTING:
-• "Add my work email" → ADD email {address, purpose: "work"}
-• "Add LinkedIn" → ADD link {url, label: "LinkedIn"}
-• "I speak French now" → ADD language {name: "French", fluency: "basic"}
-• "Add job experience" → ADD work_experience {role, company, type, period}
-• "Add achievement at Honda" → ADD work_highlight {company: "Honda", highlight: "..."}
-• "I want to become X" → ADD career_aspiration {aspiration: "..."}
-• "Add my degree" → ADD education {institution, degree_level, field_of_study, ...}
-• "Add coursework topic" → ADD education_highlight {institution, highlight: "..."}
+NESTED ITEMS (include parent):
+• hobby_reference → {hobby_name, ref_name, notes}
+• domain_reference → {domain_name, ref_name, url, notes}
+• mental_tab_reference → {title, ref_name, notes}
+• project_reference → {project_name, ref_name, url}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 LIFESTYLE DATA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-lifestyle.json structure:
-├── hobbies[]:
-│   ├── name, skill_level, notes
-│   ├── specifics[]: sub-categories (strings)
-│   └── references[]: {name, url, notes} ← gear, tutorials, resources
-├── passions[]: strings (deep passions)
-├── curiosities[]: strings (things exploring)
-├── personality_traits[]: strings
-├── values[]: strings (core beliefs)
-└── wellness:
-    ├── sleep: {weekday: {bedtime, wakeup}, weekend: {bedtime, wakeup}}
-    └── energy_peaks[]: times when most productive
-
-⚡ ROUTING:
-• "I picked up Photography" → ADD hobby {name: "Photography"}
-• "I'm now intermediate at X" → UPDATE hobby {name: "X", skill_level: "intermediate"}
-• "I focus on street photography" → ADD hobby_specific {hobby_name, specific: "street"}
-• "Here's my camera gear" → ADD hobby_reference {hobby_name, ref_name: "gear", notes: "..."}
-• "Update my gear list" → UPDATE hobby_reference {hobby_name, ref_name: "gear", notes: "..."}
-• "I'm passionate about X" → ADD passion {passion: "X"}
-• "I'm curious about Y" → ADD curiosity {curiosity: "Y"}
-• "I value honesty" → ADD value {value: "honesty"}
-• "I'm introverted" → ADD personality_trait {trait: "introverted"}
-
-⚡ WELLNESS ROUTING:
-• "I go to bed at 11pm" → UPDATE sleep {day_type: "weekday", bedtime: "23:00"}
-• "I wake up at 9am" → UPDATE sleep {day_type: "weekday", wakeup: "09:00"}
-• "On weekends I sleep until 10" → UPDATE sleep {day_type: "weekend", wakeup: "10:00"}
-• "I'm most productive after coffee" → ADD energy_peak {peak: "after coffee"}
-• "Actually not productive at night" → REMOVE energy_peak {peak: "late night"}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧠 KNOWLEDGE DATA  
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-knowledge.json structure:
-├── domains[]:
-│   ├── name, level (learning/intermediate/advanced), notes
-│   └── references[]: {name, url, notes} ← docs, courses, resources
-└── mental_tabs[]:
-    ├── title: topic name (e.g., "Matcha Places")
-    ├── content: general notes about the topic
-    ├── tags[], status (open/exploring/resolved)
-    └── references[]: {name, url, notes} ← THE ACTUAL LISTS LIVE HERE
-        └── notes field = where specific items go!
-
-⚡ ROUTING FOR DOMAINS:
-• "I'm learning Rust" → ADD domain {name: "Rust", level: "learning"}
-• "I'm now advanced in Python" → UPDATE domain {name: "Python", level: "advanced"}
-• "Good Python resource" → ADD domain_reference {domain_name, ref_name, url, notes}
-• "Update my Python resources" → UPDATE domain_reference notes
-
-⚡ ROUTING FOR MENTAL TABS (important!):
-• "Add matcha spots: A, B, C" → UPDATE mental_tab_reference notes (append to list)
-• "New section for London spots" → ADD mental_tab_reference {title, ref_name: "london spots", notes}
-• "Rename topic to Coffee" → UPDATE mental_tab {title: "old", new_title: "Coffee"}
-• "Mark this as resolved" → UPDATE mental_tab {title, status: "resolved"}
-• "General thoughts on matcha" → UPDATE mental_tab content
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚀 PROJECTS DATA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-projects.json structure:
-├── projects[]:
-│   ├── name, description, status (planning/active/paused/completed), notes
-│   ├── tags[]: technologies/categories
-│   └── references[]: {name, url, notes} ← related links, docs
-├── current_learning[]: {topic, context, priority (high/medium/low)}
-└── top_of_mind[]: strings (current focus items)
-
-⚡ ROUTING:
-• "New project Solterra" → ADD project {name, description}
-• "Solterra is now active" → UPDATE project {name: "Solterra", status: "active"}
-• "Add React tag to Solterra" → ADD project_tag {project_name, tag: "React"}
-• "Solterra design doc" → ADD project_reference {project_name, ref_name, url}
-• "I'm learning Docker" → ADD current_learning {topic, context, priority}
-• "Focus on MCP server" → ADD top_of_mind {item: "MCP server"}
-• "Done with that task" → REMOVE top_of_mind {item: "..."}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📚 LEARNING LOG
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-learning_log.json: entries[] with timestamped learnings
-
-⚡ ROUTING:
-• "I just learned that X" → ADD learning_entry {topic, details, source, tags[]}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚙️ PREFERENCES DATA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-preferences.json structure:
-├── code_style, communication, learning_style, response_format, work_preferences
-└── dislikes[]: things the user specifically does NOT like (strings)
-
-⚡ ROUTING:
-• "I don't like X" → ADD dislike {dislike: "X"}
-• "I hate when Y happens" → ADD dislike {dislike: "Y"}
-• "Actually X is fine now" → REMOVE dislike {dislike: "X"}
-• Use dislikes to AVOID recommending or doing these things!
-
-╔══════════════════════════════════════════════════════════════════╗
-║                         ENTITY REFERENCE                          ║
-╚══════════════════════════════════════════════════════════════════╝
-
-PROFILE: email, link, language, work_experience, work_highlight, 
-         education, education_highlight, career_aspiration
-
-LIFESTYLE: hobby, hobby_reference, hobby_specific, 
-           passion, curiosity, personality_trait, value,
-           sleep, energy_peak
-
-KNOWLEDGE: domain, domain_reference, mental_tab, mental_tab_reference
-
-PROJECTS: project, project_reference, project_tag, 
-          current_learning, top_of_mind
-
-PREFERENCES: dislike, preference
-
-LEARNING: learning_entry
-
-╔══════════════════════════════════════════════════════════════════╗
-║                      FIELD NAME FLEXIBILITY                       ║
-╚══════════════════════════════════════════════════════════════════╝
-All accept multiple naming conventions:
-• name/title/hobby/activity/topic → identifier field
-• ref_name/name/reference_name → reference identifier  
-• notes/description/details → content field
-• address/email/email_address → email identifier
-• dislike/item/thing/what → dislike identifier""",
+FIELD FLEXIBILITY: name/title/topic, notes/description/details all work.""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -459,22 +581,15 @@ All accept multiple naming conventions:
             name="persona_batch",
             description="""Perform multiple persona modifications in one call.
 
-COMMON PATTERNS:
-1. Adding items to an existing list in a mental tab:
-   {"action": "update", "entity": "mental_tab_reference", 
-    "data": {"title": "Matcha Places", "ref_name": "good places in newcastle", 
-             "notes": "Bamboo Tea, Gong Cha, Hey Tea, NEW PLACE"}}
+FORMAT: {"operations": [{"action": "add", "entity": "...", "data": {...}}, ...]}
 
-2. Adding a new hobby with references:
-   [{"action": "add", "entity": "hobby", "data": {"name": "Cycling"}},
-    {"action": "add", "entity": "hobby_reference", 
-     "data": {"hobby_name": "Cycling", "ref_name": "gear", "notes": "Trek bike, helmet"}}]
+EXAMPLE - Add multiple work highlights:
+{"operations": [
+  {"action": "add", "entity": "work_highlight", "data": {"company": "Honda", "highlight": "Led API project"}},
+  {"action": "add", "entity": "work_highlight", "data": {"company": "Honda", "highlight": "Built dashboard"}}
+]}
 
-3. Updating project status and adding a note:
-   [{"action": "update", "entity": "project", 
-     "data": {"name": "Solterra", "status": "active", "notes": "Launched MVP!"}}]
-
-Each operation: {action, entity, data}. See persona_modify for full decision guide.""",
+Each operation has: action (add/update/remove), entity, data.""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -489,7 +604,7 @@ Each operation: {action, entity, data}. See persona_modify for full decision gui
                             },
                             "required": ["action", "entity", "data"]
                         },
-                        "description": "Array of modification operations"
+                        "description": "Array of {action, entity, data} operations"
                     }
                 },
                 "required": ["operations"]
@@ -638,9 +753,566 @@ def normalize_data(data: dict, entity: str) -> dict:
     
     return normalized
 
-# ════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
 # SMART CONTEXT CAPTURE - Intent Classification & Suggestion System
-# ════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# -----------------------------------------------------------------------------
+# Conversation Context - tracks recent mentions for pronoun resolution
+# -----------------------------------------------------------------------------
+
+class ConversationContext:
+    """
+    Track conversation state to improve entity resolution.
+    Helps resolve pronouns like 'it', 'that', 'this' to actual entities.
+    """
+    
+    def __init__(self):
+        self.last_mentioned = {
+            "project": None,
+            "skill": None,
+            "hobby": None,
+            "person": None,
+            "place": None
+        }
+        self.conversation_topic = None
+        self.recent_entities = []  # Last N entities mentioned
+    
+    def update_from_entities(self, entities: list):
+        """Update context based on detected entities"""
+        for entity in entities:
+            entity_type = entity.get('type', '')
+            entity_value = entity.get('value', '')
+            
+            if entity_type in self.last_mentioned:
+                self.last_mentioned[entity_type] = entity_value
+            
+            # Keep last 10 entities for reference
+            self.recent_entities.append({
+                "type": entity_type,
+                "value": entity_value
+            })
+            if len(self.recent_entities) > 10:
+                self.recent_entities.pop(0)
+    
+    def get_likely_referent(self, pronoun: str) -> str:
+        """
+        When user says 'it', what are they referring to?
+        Priority: project > skill > hobby
+        """
+        if self.last_mentioned['project']:
+            return self.last_mentioned['project']
+        elif self.last_mentioned['skill']:
+            return self.last_mentioned['skill']
+        elif self.last_mentioned['hobby']:
+            return self.last_mentioned['hobby']
+        return None
+    
+    def clear(self):
+        """Clear context for new conversation"""
+        self.last_mentioned = {k: None for k in self.last_mentioned}
+        self.recent_entities = []
+
+# Global conversation context (per-server instance)
+conversation_context = ConversationContext()
+
+
+# -----------------------------------------------------------------------------
+# Skill Level Hierarchy
+# -----------------------------------------------------------------------------
+
+SKILL_HIERARCHY = {
+    "beginner": 1,
+    "learning": 2, 
+    "intermediate": 3,
+    "advanced": 4,
+    "expert": 5
+}
+
+def determine_skill_level(entity: str, message: str, triggers: list) -> str:
+    """
+    Infer skill level based on evidence in message.
+    More conservative - one project doesn't make you advanced.
+    """
+    message_lower = message.lower()
+    
+    # Check for concrete outputs (strong signal)
+    output_verbs = ['built', 'created', 'deployed', 'shipped', 'developed', 'made', 'launched', 'published']
+    has_output = any(verb in message_lower for verb in output_verbs)
+    
+    # Check for duration/sustainability
+    duration_words = ['months', 'weeks', 'regularly', 'for years', 'for a while']
+    has_duration = any(word in message_lower for word in duration_words)
+    # Note: 'been' alone is too weak, need more context
+    
+    # Check for proficiency claims
+    proficiency_words = ['comfortable', 'proficient', 'good at', 'expert', 'master', 'fluent', 'solid', 'advanced']
+    claims_proficiency = any(word in message_lower for word in proficiency_words)
+    
+    # Check for starting language
+    starting_words = ['trying', 'exploring', 'just started', 'new to', 'picking up', 'getting into', 'diving into']
+    is_starting = any(word in message_lower for word in starting_words)
+    
+    # Conservative level determination
+    # Advanced requires: proficiency claim OR (output + duration + NOT starting language)
+    if claims_proficiency:
+        return "advanced"
+    elif has_output and has_duration and not is_starting:
+        return "advanced"
+    elif has_output and not is_starting:
+        return "intermediate"  # One project = intermediate, not advanced
+    elif has_output and is_starting:
+        return "learning"  # "diving into X and built something" = still learning
+    elif has_duration or 'been learning' in message_lower:
+        return "learning"
+    elif is_starting:
+        return "beginner"
+    else:
+        return "learning"
+
+
+# -----------------------------------------------------------------------------
+# Vague/Generic Names to Ignore - too ambiguous to capture
+# -----------------------------------------------------------------------------
+
+IGNORE_VAGUE_NAMES = {
+    # Pronouns and references
+    "it", "this", "that", "these", "those", "something", "stuff", "things",
+    # Generic descriptors
+    "small", "little", "quick", "simple", "basic", "cool", "nice", "new",
+    # Generic project terms
+    "tool", "app", "script", "project", "thing", "code", "program",
+    "side project", "small project", "little project", "quick project",
+    "cli tool", "web app", "small app", "test app", "demo app",
+    # Common fillers
+    "a lot", "some stuff", "various things", "other things",
+}
+
+
+# -----------------------------------------------------------------------------
+# Explicit State Change Detection - high-confidence patterns
+# -----------------------------------------------------------------------------
+
+EXPLICIT_STATE_PATTERNS = {
+    "completion": {
+        "phrases": ["finished", "completed", "done with", "wrapped up", "submitted", "handed in"],
+        "confidence_boost": 0.25,
+        "action": "mark_complete"
+    },
+    "start": {
+        "phrases": ["started", "began", "kicked off", "launched", "just began"],
+        "confidence_boost": 0.20,
+        "action": "mark_active"
+    },
+    "stop": {
+        "phrases": ["stopped", "quit", "gave up", "not doing anymore", "lost interest", "dropped"],
+        "confidence_boost": 0.20,
+        "action": "mark_inactive_or_remove"
+    },
+    "achievement": {
+        "phrases": ["accepted", "got accepted", "won", "awarded", "promoted", "hired", "got the job", "landed"],
+        "confidence_boost": 0.30,
+        "action": "add_achievement"
+    },
+    "location_change": {
+        "phrases": ["moved to", "relocated to", "living in", "based in now", "moving to"],
+        "confidence_boost": 0.25,
+        "action": "update_location"
+    }
+}
+
+def detect_explicit_state_changes(message: str) -> list:
+    """
+    Detect high-confidence state changes that warrant immediate action.
+    These should have >0.80 confidence automatically.
+    """
+    detected = []
+    message_lower = message.lower()
+    
+    for change_type, config in EXPLICIT_STATE_PATTERNS.items():
+        for phrase in config['phrases']:
+            if phrase in message_lower:
+                detected.append({
+                    "type": change_type,
+                    "phrase": phrase,
+                    "confidence_boost": config['confidence_boost'],
+                    "recommended_action": config['action']
+                })
+                break  # One match per category
+    
+    return detected
+
+
+# -----------------------------------------------------------------------------
+# Evidence Boost - multiple signals increase confidence
+# -----------------------------------------------------------------------------
+
+def calculate_evidence_boost(triggers: list, state_changes: list, has_duration: bool, sentiment_positive: bool) -> float:
+    """
+    Boost confidence when multiple signals support the same conclusion.
+    More conservative to avoid pushing everything to 1.0.
+    """
+    evidence_count = 0
+    
+    if len(triggers) > 0:
+        evidence_count += 1
+    if state_changes:
+        evidence_count += 1
+    if has_duration:
+        evidence_count += 1
+    if sentiment_positive:
+        evidence_count += 1
+    
+    # Conservative boost formula - cap at 0.15
+    if evidence_count <= 1:
+        return 0.0
+    else:
+        return min(0.05 * (evidence_count - 1), 0.15)
+
+
+# -----------------------------------------------------------------------------
+# Confidence Calculation - balanced sentiment with additive boosts
+# -----------------------------------------------------------------------------
+
+SENTIMENT_MULTIPLIERS = {
+    "sarcastic": 0.25,      # Heavy penalty
+    "very_negative": 0.50,  # Moderate penalty  
+    "venting": 0.60,
+    "negative": 0.70,
+    "hypothetical": 0.35,   # Strong penalty for hypotheticals
+    "uncertain": 0.80,
+    "questioning": 0.70,
+    "neutral": 0.90,
+    "declarative": 1.00,    # No change
+    "positive": 1.00,
+    "very_positive": 1.10   # Small boost
+}
+
+TRIGGER_STRENGTH_BOOSTS = {
+    "explicit": 0.10,      # "I finished", "I accepted" - reduced from 0.15
+    "strong": 0.06,        # "I've been learning" - reduced from 0.10
+    "moderate": 0.03,      # "working on" - reduced from 0.05
+    "weak": 0.00           # "might try"
+}
+
+def calculate_final_confidence_v2(
+    base_confidence: float,
+    sentiment_type: str,
+    trigger_strength: str,
+    evidence_boost: float,
+    entity_exists: bool,
+    recurrence: int = 0
+) -> float:
+    """
+    Revised confidence calculation with balanced sentiment impact.
+    
+    Formula:
+    final = base × sentiment_multiplier + trigger_boost + evidence_boost + existence_boost
+    Cap total additive boosts to prevent always hitting 1.0
+    """
+    score = base_confidence
+    
+    # 1. Sentiment multiplier (less harsh than before)
+    multiplier = SENTIMENT_MULTIPLIERS.get(sentiment_type, 0.85)
+    score *= multiplier
+    
+    # 2. Calculate all additive boosts but cap total
+    trigger_boost = TRIGGER_STRENGTH_BOOSTS.get(trigger_strength, 0.0)
+    existence_boost = 0.05 if entity_exists else 0.0
+    recurrence_boost = 0.08 * min(recurrence - 1, 3) if recurrence >= 2 else 0.0
+    
+    # Cap total additive boosts at 0.20 to prevent always hitting 1.0
+    total_boost = trigger_boost + evidence_boost + existence_boost + recurrence_boost
+    capped_boost = min(total_boost, 0.20)
+    
+    score += capped_boost
+    
+    # Final cap at 0.98 to never hit exactly 1.0
+    return min(max(score, 0.0), 0.98)
+
+
+# -----------------------------------------------------------------------------
+# Entity-Specific Confidence Thresholds
+# -----------------------------------------------------------------------------
+
+ENTITY_THRESHOLDS = {
+    "profile": {"auto": 0.88, "ask": 0.65},
+    "work_experience": {"auto": 0.85, "ask": 0.60},
+    "education": {"auto": 0.85, "ask": 0.60},
+    "project": {"auto": 0.82, "ask": 0.55},
+    "domain": {"auto": 0.80, "ask": 0.55},
+    "hobby": {"auto": 0.78, "ask": 0.50},
+    "hobby_reference": {"auto": 0.70, "ask": 0.45},
+    "preference": {"auto": 0.75, "ask": 0.55},
+    "dislike": {"auto": 0.75, "ask": 0.50},
+    "passion": {"auto": 0.72, "ask": 0.50},
+    "curiosity": {"auto": 0.70, "ask": 0.45},
+    "personality_trait": {"auto": 0.80, "ask": 0.55},
+}
+
+def get_action_from_confidence(confidence: float, entity_type: str, is_removal: bool = False) -> str:
+    """
+    Determine action based on confidence + entity type + operation type.
+    
+    Different thresholds for different operations:
+    - Removals: Always ask (even at 0.95) - too important
+    - Profile updates: High bar (0.85+) - core identity
+    - Hobby additions: Medium bar (0.70+) - less critical
+    """
+    # Removals always require confirmation
+    if is_removal:
+        return "ask_user" if confidence >= 0.50 else "ignore"
+    
+    thresholds = ENTITY_THRESHOLDS.get(entity_type, {"auto": 0.80, "ask": 0.50})
+    
+    if confidence >= thresholds["auto"]:
+        return "auto_apply"
+    elif confidence >= thresholds["ask"]:
+        return "ask_user"
+    else:
+        return "ignore"
+
+
+# -----------------------------------------------------------------------------
+# Suggestion Deduplication - merge multiple signals for same entity
+# -----------------------------------------------------------------------------
+
+def deduplicate_suggestions(suggestions: list) -> list:
+    """
+    When multiple suggestions target the same entity, keep the highest confidence one
+    and consolidate evidence.
+    """
+    if not suggestions:
+        return suggestions
+    
+    entity_map = {}
+    
+    for suggestion in suggestions:
+        # Create unique key from entity type + name
+        entity_name = suggestion.get('data', {}).get('name', '')
+        entity_key = (suggestion['entity'], entity_name.lower())
+        
+        if entity_key not in entity_map:
+            entity_map[entity_key] = suggestion.copy()
+            entity_map[entity_key]['evidence'] = [suggestion.get('reason', '')]
+        else:
+            existing = entity_map[entity_key]
+            
+            # Merge evidence
+            existing['evidence'].append(suggestion.get('reason', ''))
+            
+            # Keep higher skill level if applicable
+            if 'level' in suggestion.get('data', {}):
+                current_level = existing['data'].get('level', 'learning')
+                new_level = suggestion['data']['level']
+                
+                if SKILL_HIERARCHY.get(new_level, 0) > SKILL_HIERARCHY.get(current_level, 0):
+                    existing['data']['level'] = new_level
+            
+            # Boost confidence when multiple signals point to same entity
+            existing['confidence'] = min(
+                existing['confidence'] + 0.15,  # Boost per additional signal
+                1.0
+            )
+    
+    return list(entity_map.values())
+
+
+# -----------------------------------------------------------------------------
+# Pronoun Resolution - resolve 'it', 'that', 'this' to actual entities
+# -----------------------------------------------------------------------------
+
+PRONOUNS = ['it', 'that', 'this', 'them', 'they', 'one']
+
+def is_pronoun(text: str) -> bool:
+    """Check if text is a pronoun"""
+    return text.lower().strip() in PRONOUNS
+
+def resolve_pronoun_references(entities: list, message: str, context: ConversationContext) -> list:
+    """
+    Resolve pronouns (it, that, this) to actual entities from context.
+    
+    Example:
+    "deployed it to production" + recent_context: "working on Solterra"
+    → Resolve "it" to "Solterra"
+    """
+    resolved = []
+    
+    for entity in entities:
+        entity_value = entity.get('value', '').lower().strip()
+        
+        # Check if entity is just a pronoun
+        if is_pronoun(entity_value):
+            # Try to resolve from conversation context
+            referent = context.get_likely_referent(entity_value)
+            if referent:
+                entity = entity.copy()
+                entity['value'] = referent
+                entity['resolved_from_pronoun'] = True
+                entity['confidence'] = entity.get('confidence', 0.7) * 0.8  # Slight penalty
+            else:
+                # Can't resolve - skip this entity
+                continue
+        
+        # Check if entity contains pronoun + other words (e.g., "it to production")
+        elif any(pronoun in entity_value.split() for pronoun in PRONOUNS):
+            # Filter out the pronoun, keep the rest
+            words = [w for w in entity_value.split() if w.lower() not in PRONOUNS]
+            if len(words) >= 2:
+                entity = entity.copy()
+                entity['value'] = ' '.join(words)
+                entity['filtered_pronoun'] = True
+            else:
+                # Too short after filtering - skip
+                continue
+        
+        resolved.append(entity)
+    
+    return resolved
+
+
+# -----------------------------------------------------------------------------
+# Persona Cross-Reference - ADD vs UPDATE vs SKIP logic
+# -----------------------------------------------------------------------------
+
+def find_in_persona(persona: dict, entity_type: str, name: str) -> dict:
+    """Search persona for existing entity by type and name"""
+    if not name:
+        return None
+    
+    name_lower = name.lower()
+    
+    # Map entity types to persona paths
+    search_paths = {
+        "domain": ("knowledge", "domains"),
+        "hobby": ("lifestyle", "hobbies"),
+        "project": ("projects", "projects"),
+        "passion": ("lifestyle", "passions"),
+        "curiosity": ("lifestyle", "curiosities"),
+        "personality_trait": ("lifestyle", "personality_traits"),
+        "dislike": ("preferences", "dislikes"),
+    }
+    
+    if entity_type in search_paths:
+        section, key = search_paths[entity_type]
+        items = persona.get(section, {}).get(key, [])
+        
+        for item in items:
+            if isinstance(item, dict):
+                if item.get('name', '').lower() == name_lower:
+                    return item
+            elif isinstance(item, str):
+                if item.lower() == name_lower:
+                    return {"name": item}
+    
+    return None
+
+def cross_reference_persona(suggestion: dict, persona: dict) -> dict:
+    """
+    Check suggestion against existing persona to:
+    1. Convert ADD → UPDATE if entity exists
+    2. Boost confidence for updating existing data
+    3. Detect conflicts (downgrade from intermediate to beginner)
+    4. Skip if data unchanged
+    """
+    suggestion = suggestion.copy()
+    entity_type = suggestion['entity']
+    data = suggestion.get('data', {})
+    name = data.get('name', '')
+    
+    # Find existing entity
+    existing = find_in_persona(persona, entity_type, name)
+    
+    if existing:
+        # Entity exists - should be UPDATE, not ADD
+        if suggestion['action'] == 'add':
+            suggestion['action'] = 'update'
+            suggestion['confidence'] += 0.10  # Boost for updating existing
+            suggestion['reason'] = suggestion.get('reason', '') + " (updating existing entry)"
+        
+        # Check for skill level conflicts
+        if 'level' in data and 'level' in existing:
+            current = SKILL_HIERARCHY.get(existing['level'], 0)
+            proposed = SKILL_HIERARCHY.get(data['level'], 0)
+            
+            if proposed < current:
+                # Downgrade detected - reduce confidence, require confirmation
+                suggestion['confidence'] = min(suggestion['confidence'], 0.65)
+                suggestion['conflict'] = {
+                    "field": "level",
+                    "current": existing['level'],
+                    "proposed": data['level'],
+                    "requires_confirmation": True
+                }
+        
+        # Check if data is actually different
+        if is_same_data(existing, data):
+            suggestion['action'] = 'skip'
+            suggestion['confidence'] = 0.0
+            suggestion['reason'] = "Data unchanged from existing"
+    
+    else:
+        # New entity - ADD is correct
+        if suggestion['action'] == 'update':
+            suggestion['action'] = 'add'
+    
+    return suggestion
+
+def is_same_data(existing: dict, proposed: dict) -> bool:
+    """Check if proposed data is same as existing"""
+    for key, value in proposed.items():
+        if existing.get(key) != value:
+            return False
+    return True
+
+
+# -----------------------------------------------------------------------------
+# UX Consolidation - group suggestions for better prompts
+# -----------------------------------------------------------------------------
+
+def consolidate_suggestions_for_ux(suggestions: list) -> dict:
+    """
+    Group suggestions for better UX.
+    
+    Returns:
+    {
+        "auto_apply": [...],      # High confidence - just notify
+        "batch_confirm": [...],    # Medium confidence - ask once for all
+        "individual_confirm": [...] # Mixed confidence - ask individually
+    }
+    """
+    auto_apply = []
+    ask_user = []
+    
+    for s in suggestions:
+        action = get_action_from_confidence(
+            s['confidence'], 
+            s['entity'], 
+            s.get('action') == 'remove'
+        )
+        
+        if action == "auto_apply":
+            auto_apply.append(s)
+        elif action == "ask_user":
+            ask_user.append(s)
+        # ignore actions are not included
+    
+    # If 3+ updates in ask_user, batch them
+    if len(ask_user) >= 3:
+        return {
+            "auto_apply": auto_apply,
+            "batch_confirm": ask_user,
+            "individual_confirm": [],
+            "ui_hint": "batch_prompt"  # Show single confirmation dialog
+        }
+    else:
+        return {
+            "auto_apply": auto_apply,
+            "batch_confirm": [],
+            "individual_confirm": ask_user,
+            "ui_hint": "inline_prompts"  # Show individual confirmations
+        }
+
 
 # Trigger phrases that indicate persona-worthy content
 CAPTURE_TRIGGERS = {
@@ -747,6 +1419,9 @@ CAPTURE_TRIGGERS = {
         # Success
         "won", "got", "earned", "received", "landed", "nailed",
         "pulled off", "managed to", "succeeded in",
+        # Life events - job/education
+        "accepted", "got accepted", "hired", "got hired", "got the job",
+        "promoted", "got promoted", "graduated", "passed", "certified",
     ],
     "wellness": [
         # Sleep
@@ -836,11 +1511,9 @@ KNOWN_SKILLS = [
 ]
 
 
-# =============================================================================
-# SENTIMENT & STATEMENT QUALITY ANALYSIS
-# =============================================================================
-# This layer evaluates the QUALITY and INTENT of a statement, not just keywords.
-# It helps prevent false positives from venting, hypotheticals, and casual chat.
+# -----------------------------------------------------------------------------
+# Sentiment & Statement Quality Analysis
+# -----------------------------------------------------------------------------
 
 def analyze_statement_quality(message: str, context: str = "") -> dict:
     """
@@ -848,30 +1521,21 @@ def analyze_statement_quality(message: str, context: str = "") -> dict:
     a genuine personal declaration worth capturing.
     
     Returns:
-    {
-        "statement_type": str,  # declarative, hypothetical, venting, questioning, casual
-        "confidence_modifier": float,  # 0.0 - 1.0, multiplied with trigger confidence
-        "reasoning": str,  # Why this classification
-        "self_reference": bool,  # Does it reference self?
-        "temporal_anchor": str | None,  # past, present, future, or None
-    }
+        statement_type: declarative, hypothetical, venting, questioning, casual
+        confidence_modifier: 0.0-1.0 multiplied with trigger confidence
+        reasoning: Why this classification
+        self_reference: Does it reference self?
+        temporal_anchor: past, present, future, or None
     """
     
-    # -------------------------------------------------------------------------
-    # SELF-REFERENCE DETECTION
-    # -------------------------------------------------------------------------
-    # Personal statements about oneself are more valuable than generic statements
+    # Self-reference detection - personal statements are more valuable
     self_markers = [
         "i ", "i'm", "i've", "i'd", "i'll", "my ", "me ", "myself",
         "i am", "i have", "i was", "i will", "i would", "i could",
     ]
     has_self_reference = any(marker in message for marker in self_markers)
     
-    # -------------------------------------------------------------------------
-    # STATEMENT TYPE CLASSIFICATION
-    # -------------------------------------------------------------------------
-    
-    # 1. HYPOTHETICAL/SPECULATIVE markers (low confidence)
+    # Statement type markers
     hypothetical_markers = [
         "what if", "if i were", "if i was", "if only", "imagine if",
         "hypothetically", "in theory", "theoretically", "supposedly",
@@ -893,17 +1557,14 @@ def analyze_statement_quality(message: str, context: str = "") -> dict:
         "rant incoming", "mini rant", "sorry for the rant",
     ]
     
-    # 3. QUESTIONING/SEEKING ADVICE markers (context-dependent)
     questioning_markers = [
-        "?",  # Any question
-        "should i", "do you think i", "would you recommend",
+        "?", "should i", "do you think i", "would you recommend",
         "what do you think about", "any advice on", "any tips for",
         "how do i", "how should i", "how can i",
         "is it worth", "is it a good idea", "does it make sense",
         "am i wrong to", "am i crazy for", "is it just me",
     ]
     
-    # 4. CASUAL/FILLER markers (low signal)
     casual_markers = [
         "lol", "lmao", "haha", "hehe", "jk", "just kidding",
         "idk", "tbh", "ngl", "imo", "btw", "fwiw",
@@ -912,7 +1573,6 @@ def analyze_statement_quality(message: str, context: str = "") -> dict:
         "random thought", "random but", "off topic but",
     ]
     
-    # 5. DECLARATIVE/DEFINITIVE markers (high confidence)
     declarative_markers = [
         "i am", "i'm a", "i have been", "i've been", "i've always",
         "i always", "i never", "i definitely", "i absolutely",
@@ -924,7 +1584,7 @@ def analyze_statement_quality(message: str, context: str = "") -> dict:
         "for the past", "for years i've", "since i was",
     ]
     
-    # 6. TEMPORAL ANCHORING (affects permanence of statement)
+    # Temporal anchoring - affects permanence
     past_markers = [
         "used to", "back when", "when i was", "years ago", "last year",
         "previously", "before i", "in the past", "historically",
@@ -938,16 +1598,13 @@ def analyze_statement_quality(message: str, context: str = "") -> dict:
         "planning to", "hoping to", "want to eventually", "will be",
     ]
     
-    # -------------------------------------------------------------------------
-    # CLASSIFICATION LOGIC
-    # -------------------------------------------------------------------------
-    
+    # Classification logic
     statement_type = "neutral"
-    confidence_modifier = 0.5  # Default middle ground
+    confidence_modifier = 0.5
     reasoning = []
     temporal_anchor = None
     
-    # Check temporal anchoring
+    # Temporal anchoring
     if any(m in message for m in present_markers):
         temporal_anchor = "present"
         confidence_modifier += 0.1
@@ -958,10 +1615,9 @@ def analyze_statement_quality(message: str, context: str = "") -> dict:
         reasoning.append("past experience")
     elif any(m in message for m in future_markers):
         temporal_anchor = "future"
-        confidence_modifier += 0.0  # Aspirations are useful but less certain
         reasoning.append("future aspiration")
     
-    # Check for self-reference (required for high confidence)
+    # Self-reference check
     if has_self_reference:
         confidence_modifier += 0.15
         reasoning.append("self-referential")
@@ -969,25 +1625,13 @@ def analyze_statement_quality(message: str, context: str = "") -> dict:
         confidence_modifier -= 0.2
         reasoning.append("no self-reference")
     
-    # Classify statement type
-    # Check OVERRIDING patterns first (hypotheticals, venting, questions)
-    # These trump declarative markers because they change the intent
-    
-    # Hypotheticals override everything - "What if I am..." is still hypothetical
+    # Statement type classification (priority: hypothetical > venting > questioning > declarative)
     is_hypothetical = any(m in message for m in hypothetical_markers)
-    # Check if it STARTS with a hypothetical (stronger signal)
     starts_hypothetical = message.strip().startswith(("what if", "if i", "imagine if", "hypothetically"))
-    
-    # Venting markers
     is_venting = any(m in message for m in venting_markers)
-    
-    # Question markers
     is_questioning = any(m in message for m in questioning_markers)
-    
-    # Declarative markers
     is_declarative = any(m in message for m in declarative_markers)
     
-    # Classification priority: hypothetical > venting > questioning > declarative
     if is_hypothetical or starts_hypothetical:
         statement_type = "hypothetical"
         confidence_modifier -= 0.3
@@ -996,12 +1640,10 @@ def analyze_statement_quality(message: str, context: str = "") -> dict:
         statement_type = "venting"
         confidence_modifier -= 0.15
         reasoning.append("venting/emotional release")
-        # If venting but also declarative, it might still be a real preference
         if is_declarative:
             confidence_modifier += 0.1
             reasoning.append("but declarative tone")
     elif is_questioning:
-        # Questions CAN contain persona info if they're self-referential AND declarative
         if has_self_reference and is_declarative:
             statement_type = "question_with_statement"
             confidence_modifier += 0.0  # Neutral
@@ -1044,7 +1686,6 @@ def analyze_message_for_capture(message: str, context: str = "") -> dict:
     
     This prevents questions at the end from killing good persona statements earlier.
     """
-    import re
     
     # Split into sentences (handle ., !, ?, and multiple punctuation)
     sentences = re.split(r'(?<=[.!?])\s+', message.strip())
@@ -1109,33 +1750,11 @@ def analyze_message_for_capture(message: str, context: str = "") -> dict:
 
 def _analyze_single_message(message: str, context: str = "") -> dict:
     """
-    Core analysis for a single message/sentence.
+    Core analysis for a single message/sentence. Uses sentiment-aware analysis
+    to distinguish genuine personal statements from venting/hypotheticals.
     
-    Uses sentiment-aware analysis to determine if a message represents
-    a genuine personal statement vs venting, hypotheticals, or casual chat.
-    
-    Returns:
-    {
-        "should_capture": bool,
-        "confidence": float (0.0 - 1.0),
-        "suggestions": [
-            {
-                "action": "add" | "update" | "remove",
-                "entity": str,
-                "data": dict,
-                "reason": str,
-                "confidence": float
-            }
-        ],
-        "detected_triggers": [str],
-        "detected_entities": [str],
-        "sentiment": {
-            "statement_type": str,
-            "confidence_modifier": float,
-            "reasoning": str
-        },
-        "ignore_reason": str | None
-    }
+    Returns: {should_capture, confidence, suggestions[], detected_triggers[], 
+              detected_entities[], sentiment{}, ignore_reason}
     """
     message_lower = message.lower()
     full_context = f"{context}\n{message}".lower() if context else message_lower
@@ -1150,13 +1769,7 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
         "ignore_reason": None
     }
     
-    # =========================================================================
-    # STEP 0: SENTIMENT & STATEMENT QUALITY ANALYSIS
-    # =========================================================================
-    # This determines HOW confident we are in the statement itself,
-    # regardless of what triggers are matched. A declarative self-statement
-    # is worth more than a hypothetical or venting session.
-    
+    # Step 0: Sentiment & statement quality analysis
     sentiment = analyze_statement_quality(message_lower, full_context)
     result["sentiment"] = sentiment
     
@@ -1175,23 +1788,21 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
             if phrase in message_lower:
                 trigger_categories.append(category)
                 result["detected_triggers"].append(f"{category}: {phrase}")
-                break  # Only count each category once
+                break
     
-    # Step 2: Check for ignore patterns ONLY if no triggers found
-    # If the message has both a question AND persona info, prioritize persona info
+    # Check ignore patterns only if no triggers found
     matched_ignore = None
     for pattern in IGNORE_PATTERNS:
         if pattern in message_lower:
             matched_ignore = pattern
             break
     
-    # If we found ignore pattern but NO triggers, then ignore
     if matched_ignore and not trigger_categories:
         result["ignore_reason"] = f"Matched ignore pattern: '{matched_ignore}'"
         result["confidence"] = 0.1
         return result
     
-    # Step 3: Load current persona for overlap detection
+    # Load current persona for overlap detection
     persona = get_all_persona_data()
     existing_domains = [d.get("name", "").lower() for d in persona.get("knowledge", {}).get("domains", [])]
     existing_hobbies = [h.get("name", "").lower() for h in persona.get("lifestyle", {}).get("hobbies", [])]
@@ -1201,27 +1812,38 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
     existing_dislikes = [d.lower() for d in persona.get("preferences", {}).get("dislikes", [])]
     existing_traits = [t.lower() for t in persona.get("lifestyle", {}).get("personality_traits", [])]
     
-    # Step 4: Detect entities (skills, projects, etc.)
+    # Detect entities with word boundary matching (prevents "ember" from "September")
     detected_skills = []
     for skill in KNOWN_SKILLS:
-        if skill in message_lower:
+        pattern = r'\b' + re.escape(skill) + r'\b'
+        if re.search(pattern, message_lower, re.IGNORECASE):
             detected_skills.append(skill.title() if len(skill) > 3 else skill.upper())
             result["detected_entities"].append(f"skill: {skill}")
     
-    # Step 5: Generate suggestions based on triggers and entities
+    # Generate suggestions
     suggestions = []
+    state_changes = detect_explicit_state_changes(message_lower)
+    
+    # Evidence tracking
+    duration_words = ['months', 'weeks', 'regularly', 'for years', 'for a while', 'been']
+    has_duration = any(word in message_lower for word in duration_words)
+    sentiment_positive = sentiment["statement_type"] in ["declarative", "positive"] and sentiment["confidence_modifier"] >= 0.6
     
     # Learning triggers + skill detected = suggest adding domain
     if "learning" in trigger_categories and detected_skills:
         for skill in detected_skills:
             skill_lower = skill.lower()
+            
+            # Use smart skill level determination (Fix #8)
+            inferred_level = determine_skill_level(skill, message, result["detected_triggers"])
+            
             if skill_lower in existing_domains:
                 # Already exists - maybe update level?
                 if any(phrase in message_lower for phrase in ["getting better", "comfortable", "good at", "improving"]):
                     suggestions.append({
                         "action": "update",
                         "entity": "domain",
-                        "data": {"name": skill, "level": "intermediate"},
+                        "data": {"name": skill, "level": inferred_level},
                         "reason": f"Learning progress mentioned for existing skill: {skill}",
                         "confidence": 0.75
                     })
@@ -1229,7 +1851,7 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
                 suggestions.append({
                     "action": "add",
                     "entity": "domain",
-                    "data": {"name": skill, "level": "learning"},
+                    "data": {"name": skill, "level": inferred_level},  # Use smart skill level
                     "reason": f"New learning activity detected: {skill}",
                     "confidence": 0.8
                 })
@@ -1256,7 +1878,7 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
                     suggestions.append({
                         "action": "add",
                         "entity": "hobby",
-                        "data": {"name": hobby.title()},
+                        "data": {"name": hobby.title(), "status": "active"},
                         "reason": f"New hobby mentioned: {hobby}",
                         "confidence": 0.75
                     })
@@ -1289,7 +1911,7 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
                     "confidence": 0.8
                 })
     
-    # State change triggers (completed, finished, etc.)
+    # State change triggers (completed, finished, stopped, etc.)
     if "state_change" in trigger_categories:
         completion_phrases = ["finished", "completed", "done with", "wrapped up", "just finished"]
         if any(phrase in message_lower for phrase in completion_phrases):
@@ -1304,6 +1926,62 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
                         "reason": f"Explicit completion: {proj_name}",
                         "confidence": 0.95
                     })
+        
+        # Handle stop/quit phrases - suggest removal from hobbies/activities
+        stop_phrases = [
+            ("stopped playing", "after"),
+            ("stopped doing", "after"),
+            ("quit playing", "after"),
+            ("quit doing", "after"),
+            ("stopped", "after"),
+            ("quit", "after"),
+            ("gave up on", "after"),
+            ("gave up", "after"),
+            ("no longer doing", "after"),
+            ("not doing anymore", "before"),
+            ("dropped", "after"),
+            ("lost interest in", "after"),
+            ("taking a break from", "after"),
+        ]
+        
+        from datetime import datetime
+        current_date = datetime.now().strftime("%B %Y")
+        
+        for phrase, direction in stop_phrases:
+            if phrase in message_lower:
+                if direction == "after":
+                    after = message_lower.split(phrase, 1)[1].strip()
+                    activity = " ".join(after.split()[:4]).rstrip(".,!?")
+                else:
+                    before = message_lower.split(phrase, 1)[0].strip()
+                    activity = " ".join(before.split()[-4:]).rstrip(".,!?")
+                
+                if activity and len(activity) > 2:
+                    # Check if it matches an existing hobby - UPDATE with note instead of removing
+                    for hobby in persona.get("lifestyle", {}).get("hobbies", []):
+                        hobby_name = hobby.get("name", "") if isinstance(hobby, dict) else str(hobby)
+                        if hobby_name.lower() in activity or activity in hobby_name.lower():
+                            # Add note about stopping instead of removing
+                            note = f"Not actively doing this anymore (as of {current_date})"
+                            suggestions.append({
+                                "action": "update",
+                                "entity": "hobby",
+                                "data": {"name": hobby_name, "status": "inactive", "notes": note},
+                                "reason": f"User stopped: {phrase} {activity} - adding note instead of removing",
+                                "confidence": 0.88
+                            })
+                            break
+                    else:
+                        # Not in persona yet - still worth noting they stopped something
+                        note = f"Mentioned stopping this activity ({current_date})"
+                        suggestions.append({
+                            "action": "add",
+                            "entity": "hobby",
+                            "data": {"name": activity.title(), "status": "inactive", "notes": note},
+                            "reason": f"User mentioned stopping: {phrase} {activity}",
+                            "confidence": 0.75
+                        })
+                break  # Only match first stop phrase
     
     # Preference triggers
     if "preference" in trigger_categories:
@@ -1349,7 +2027,6 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
                     # Look backwards for noun phrase
                     before = message_lower.split(phrase, 1)[0].strip()
                     
-                    import re
                     # Common patterns to match
                     noun_patterns = [
                         r'(\w+\s+meetings?)',
@@ -1569,9 +2246,13 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
                 else:
                     project_name = " ".join(words[:3]).rstrip(".,!?")
                 
+                # Filter out vague/generic project names
                 if project_name and len(project_name) > 2:
-                    # Check if already exists
-                    if project_name.lower() not in existing_projects:
+                    is_vague = project_name.lower() in IGNORE_VAGUE_NAMES or any(
+                        vague in project_name.lower() for vague in IGNORE_VAGUE_NAMES
+                    )
+                    
+                    if not is_vague and project_name.lower() not in existing_projects:
                         suggestions.append({
                             "action": "add",
                             "entity": "project",
@@ -1580,11 +2261,59 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
                             "confidence": 0.7
                         })
                 break
+        
+        # Handle career achievements (accepted job, hired, promoted)
+        career_phrases = [
+            ("accepted", "after"),
+            ("got accepted", "after"),
+            ("hired for", "after"),
+            ("hired at", "after"),
+            ("got hired", "after"),
+            ("landed a job", "after"),
+            ("landed the job", "after"),
+            ("got the job at", "after"),
+            ("offered position", "after"),
+            ("promoted to", "after"),
+            ("got promoted", "after"),
+        ]
+        
+        for phrase, direction in career_phrases:
+            if phrase in message_lower:
+                after = message_lower.split(phrase, 1)[1].strip()
+                # Extract role and company
+                words = after.split()
+                
+                # Common patterns: "graduate role at Deloitte", "as SWE at Google"
+                role_words = []
+                company = None
+                
+                for i, word in enumerate(words[:8]):
+                    word_clean = word.rstrip(".,!?")
+                    if word_clean in ["at", "with", "for"]:
+                        company = " ".join(words[i+1:i+4]).rstrip(".,!?").title() if i+1 < len(words) else None
+                        break
+                    elif word_clean not in ["a", "an", "the", "as", "my"]:
+                        role_words.append(word_clean)
+                
+                role = " ".join(role_words[:3]).title() if role_words else "New Position"
+                
+                if role or company:
+                    work_entry = {"role": role} if role else {}
+                    if company:
+                        work_entry["company"] = company
+                    work_entry["status"] = "active"
+                    
+                    suggestions.append({
+                        "action": "add",
+                        "entity": "work_experience",
+                        "data": work_entry,
+                        "reason": f"Career achievement: {phrase} {role}{' at ' + company if company else ''}",
+                        "confidence": 0.90
+                    })
+                break
     
     # Wellness triggers - sleep and energy patterns
     if "wellness" in trigger_categories:
-        import re
-        
         # Sleep time detection
         sleep_patterns = [
             (r"(?:go to bed|sleep|bed(?:time)?)\s*(?:at|around|is)?\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)", "bedtime"),
@@ -1635,37 +2364,86 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
                     })
                 break
     
-    # =========================================================================
-    # FINAL CONFIDENCE CALCULATION
-    # =========================================================================
-    # Combine trigger-based confidence with sentiment quality modifier.
-    # This ensures that even if triggers match, low-quality statements
-    # (venting, hypotheticals, casual chat) don't get high confidence.
-    
-    sentiment_modifier = sentiment["confidence_modifier"]
-    
+    # Enhanced suggestion processing pipeline
     if suggestions:
+        # Resolve pronoun references
+        entity_list = [
+            {"type": "skill", "value": skill, "confidence": 0.8}
+            for skill in detected_skills
+        ]
+        resolved_entities = resolve_pronoun_references(entity_list, message, conversation_context)
+        
+        # Cross-reference with existing persona data
+        processed_suggestions = []
+        for suggestion in suggestions:
+            processed = cross_reference_persona(suggestion, persona)
+            if processed.get('action') != 'skip':
+                processed_suggestions.append(processed)
+        suggestions = processed_suggestions
+        
+        # Deduplicate suggestions by entity
+        suggestions = deduplicate_suggestions(suggestions)
+        
+        # Calculate evidence boost
+        evidence_boost = calculate_evidence_boost(
+            triggers=result["detected_triggers"],
+            state_changes=state_changes,
+            has_duration=has_duration,
+            sentiment_positive=sentiment_positive
+        )
+        
+        # Apply enhanced confidence formula
+        sentiment_type = sentiment["statement_type"]
+        trigger_strength = "explicit" if state_changes else ("strong" if len(result["detected_triggers"]) >= 2 else "moderate")
+        
+        for suggestion in suggestions:
+            entity_exists = suggestion.get('action') == 'update'
+            final_conf = calculate_final_confidence_v2(
+                base_confidence=suggestion.get('raw_confidence', suggestion['confidence']),
+                sentiment_type=sentiment_type,
+                trigger_strength=trigger_strength,
+                evidence_boost=evidence_boost,
+                entity_exists=entity_exists,
+                recurrence=0
+            )
+            
+            suggestion["raw_confidence"] = suggestion.get('raw_confidence', suggestion['confidence'])
+            suggestion["confidence"] = round(final_conf, 2)
+            
+            # Note: State change boost is already included in evidence_boost calculation
+            # No need for additional boost here - that was causing over-inflation
+        
+        # Determine action based on entity-specific thresholds
+        for suggestion in suggestions:
+            is_removal = suggestion.get('action') == 'remove'
+            action_type = get_action_from_confidence(
+                suggestion['confidence'],
+                suggestion['entity'],
+                is_removal
+            )
+            suggestion["action_required"] = action_type
+        
+        # Update conversation context for pronoun resolution
+        conversation_context.update_from_entities([
+            {"type": s["entity"], "value": s["data"].get("name", "")}
+            for s in suggestions if s["data"].get("name")
+        ])
+        
         result["suggestions"] = suggestions
+        result["state_changes_detected"] = [s["type"] for s in state_changes]
         
-        # Apply sentiment modifier to each suggestion's confidence
-        for suggestion in result["suggestions"]:
-            raw_conf = suggestion["confidence"]
-            adjusted_conf = raw_conf * sentiment_modifier
-            suggestion["confidence"] = round(adjusted_conf, 2)
-            suggestion["raw_confidence"] = raw_conf  # Keep original for debugging
-        
-        # Overall confidence is highest adjusted suggestion confidence
-        result["confidence"] = max(s["confidence"] for s in result["suggestions"])
-        
-        # Only capture if adjusted confidence is still meaningful
-        if result["confidence"] >= 0.4:
-            result["should_capture"] = True
+        if suggestions:
+            result["confidence"] = max(s["confidence"] for s in result["suggestions"])
+            result["should_capture"] = result["confidence"] >= 0.4
+            if not result["should_capture"]:
+                result["ignore_reason"] = "Confidence below threshold after processing"
         else:
-            result["should_capture"] = False
-            result["ignore_reason"] = f"Sentiment adjustment reduced confidence below threshold (modifier: {sentiment_modifier:.2f})"
+            result["confidence"] = 0.2
+            result["ignore_reason"] = "All suggestions filtered out during processing"
             
     elif trigger_categories:
         # Triggers detected but no concrete suggestions
+        sentiment_modifier = sentiment["confidence_modifier"]
         result["confidence"] = 0.3 * sentiment_modifier
         result["ignore_reason"] = "Triggers detected but no actionable entities found"
     else:
@@ -1811,20 +2589,45 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
     elif entity == "work_highlight":
         profile = load_json("profile.json")
         work = profile.get("work_experience", [])
-        idx, exp = find_in_array(work, data.get("company", ""), "company")
+        
+        # Support multiple field names for company lookup
+        company = get_field(data, "company", "work", "employer", "organization", default="")
+        if not company:
+            return "❌ Work highlight requires 'company' to identify which work experience"
+        
+        idx, exp = find_in_array(work, company, "company")
         if idx == -1:
-            return f"❌ Work experience at '{data.get('company')}' not found"
+            return f"❌ Work experience at '{company}' not found"
         
         highlights = exp.setdefault("highlights", [])
         if action == "add":
-            highlights.append(data.get("highlight", ""))
+            # Support single highlight or array of highlights
+            new_highlights = data.get("highlights", [])
+            if not new_highlights:
+                single = get_field(data, "highlight", "item", "achievement", default="")
+                if single:
+                    new_highlights = [single]
+            
+            if not new_highlights:
+                return "❌ Work highlight requires 'highlight' or 'highlights'"
+            
+            added = []
+            for h in new_highlights:
+                if h and h not in highlights:
+                    highlights.append(h)
+                    added.append(h)
+            
             save_json("profile.json", profile)
-            return f"✅ Added highlight to {data['company']}"
+            if len(added) == 1:
+                return f"✅ Added highlight to {company}: {added[0]}"
+            return f"✅ Added {len(added)} highlights to {company}"
+        
         elif action == "remove":
-            if data.get("highlight") in highlights:
-                highlights.remove(data["highlight"])
+            highlight = get_field(data, "highlight", "item", default="")
+            if highlight in highlights:
+                highlights.remove(highlight)
                 save_json("profile.json", profile)
-                return f"✅ Removed highlight from {data['company']}"
+                return f"✅ Removed highlight from {company}"
             return f"❌ Highlight not found"
     
     elif entity == "coursework":
@@ -1895,6 +2698,12 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         # Flexible field extraction - LLMs might call it "hobby", "name", "activity", etc.
         name = get_field(data, "name", "hobby", "hobby_name", "title", "activity")
         skill_level = get_field(data, "skill_level", "level", "proficiency", default="enthusiast")
+        status = get_field(data, "status", "state", "is_active", default="active")
+        # Normalize status values
+        if status in ["inactive", "stopped", "paused", "not_active", "false", False]:
+            status = "inactive"
+        else:
+            status = "active"
         notes = get_field(data, "notes", "description", "details", default="")
         
         if action == "add":
@@ -1905,24 +2714,30 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             hobbies.append({
                 "name": name,
                 "skill_level": skill_level,
+                "status": status,
                 "notes": notes,
                 "specifics": data.get("specifics", []),
                 "references": []
             })
             save_json("lifestyle.json", lifestyle)
-            return f"✅ Added hobby: {name}"
+            return f"✅ Added hobby: {name} (status: {status})"
         
         elif action == "update":
             idx, hobby = find_in_array(hobbies, name or "", "name")
             if idx == -1:
                 return f"❌ Hobby '{name}' not found"
-            if skill_level != "enthusiast" or data.get("skill_level"):  # Only update if explicitly provided
+            # Update skill_level if explicitly provided
+            if data.get("skill_level") or data.get("level") or data.get("proficiency"):
                 hobby["skill_level"] = skill_level
+            # Update status if explicitly provided
+            if data.get("status") or data.get("state") or data.get("is_active") is not None:
+                hobby["status"] = status
             if notes:
                 hobby["notes"] = notes
             hobby["last_updated"] = datetime.now().strftime("%Y-%m-%d")
             save_json("lifestyle.json", lifestyle)
-            return f"✅ Updated hobby: {name}"
+            status_info = f" (status: {hobby.get('status', 'active')})" if hobby.get("status") else ""
+            return f"✅ Updated hobby: {name}{status_info}"
         
         elif action == "remove":
             idx, _ = find_in_array(hobbies, name or "", "name")
@@ -2232,19 +3047,27 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
     elif entity == "top_of_mind":
         projects = load_json("projects.json")
         tom = projects.setdefault("top_of_mind", [])
-        item = get_field(data, "item", "topic", "thought", "subject", "name", default="")
+        item = get_field(data, "item", "topic", "thought", "subject", "name", "idea", default="")
+        note = data.get("note", "")
+        
+        # Helper to get the idea text from an item (handles both string and dict formats)
+        def get_idea_text(t):
+            return t.get("idea", "") if isinstance(t, dict) else t
         
         if action == "add":
             if not item:
-                return "❌ Top of mind requires 'item' or 'topic'"
-            if item in tom:
+                return "❌ Top of mind requires 'item', 'idea', or 'topic'"
+            # Check for existing (compare idea text)
+            existing = next((t for t in tom if get_idea_text(t).lower() == item.lower()), None)
+            if existing:
                 return f"ℹ️ '{item}' already top of mind"
-            tom.append(item)
+            # Store as dict with idea and optional note
+            tom.append({"idea": item, "note": note})
             save_json("projects.json", projects)
             return f"✅ Added to top of mind: {item}"
         
         elif action == "remove":
-            found = next((t for t in tom if t.lower() == item.lower()), None)
+            found = next((t for t in tom if get_idea_text(t).lower() == item.lower()), None)
             if not found:
                 return f"❌ '{item}' not in top of mind"
             tom.remove(found)
@@ -2670,8 +3493,16 @@ async def call_tool(name: str, arguments: dict):
     """Handle tool calls"""
     logger.info(f"call_tool: {name}")
     try:
-        # READ operations
-        if name == "get_persona":
+        # SMART CONTEXT (recommended first call)
+        if name == "get_context":
+            scope = arguments.get("scope", "minimal")
+            topic = arguments.get("topic")
+            include_inactive = arguments.get("include_inactive", False)
+            result = get_scoped_context(scope, topic, include_inactive)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        
+        # READ operations (individual files)
+        elif name == "get_persona":
             return [TextContent(type="text", text=json.dumps(get_all_persona_data(), indent=2))]
         
         elif name == "get_profile":
@@ -2726,9 +3557,21 @@ async def call_tool(name: str, arguments: dict):
             return [TextContent(type="text", text=result)]
         
         elif name == "persona_batch":
+            # Handle multiple input formats LLMs might use
             operations = arguments.get("operations", [])
-            results = []
             
+            # Fallback: if operations is empty, check if arguments itself is a list
+            if not operations and isinstance(arguments, list):
+                operations = arguments
+            
+            # Fallback: if single operation passed without array wrapper
+            if not operations and "action" in arguments and "entity" in arguments:
+                operations = [arguments]
+            
+            if not operations:
+                return [TextContent(type="text", text="❌ No operations provided. Format: {\"operations\": [{\"action\": \"add\", \"entity\": \"...\", \"data\": {...}}]}")]
+            
+            results = []
             for i, op in enumerate(operations):
                 action = op.get("action", "")
                 entity = op.get("entity", "")
@@ -2753,6 +3596,19 @@ async def call_tool(name: str, arguments: dict):
             
             analysis = analyze_message_for_capture(message, context)
             
+            # Generate UX grouping for better batched confirmations (Fix #12)
+            ux_grouping = consolidate_suggestions_for_ux(analysis.get("suggestions", []))
+            
+            # Determine overall action based on UX grouping
+            if ux_grouping["auto_apply"]:
+                overall_action = "auto_apply"
+            elif ux_grouping["batch_confirm"]:
+                overall_action = "batch_confirm"
+            elif ux_grouping["individual_confirm"]:
+                overall_action = "ask_user"
+            else:
+                overall_action = "ignore"
+            
             # Format response for LLM consumption
             response = {
                 "should_capture": analysis["should_capture"],
@@ -2763,25 +3619,31 @@ async def call_tool(name: str, arguments: dict):
                     "low"
                 ),
                 "suggestions": analysis["suggestions"],
+                "ux_grouping": ux_grouping,
                 "detected_triggers": analysis["detected_triggers"],
                 "detected_entities": analysis["detected_entities"],
-                "action_required": (
-                    "auto_apply" if analysis["confidence"] >= 0.8 else
-                    "ask_user" if analysis["confidence"] >= 0.5 else
-                    "ignore"
-                ),
-                "ignore_reason": analysis["ignore_reason"]
+                "state_changes": analysis.get("state_changes_detected", []),
+                "action_required": overall_action,
+                "ignore_reason": analysis.get("ignore_reason"),
+                "sentiment": analysis.get("sentiment", {})
             }
             
-            # Add helpful instructions for the LLM
-            if response["action_required"] == "auto_apply":
+            # Add helpful instructions for the LLM based on UX grouping
+            if overall_action == "auto_apply":
+                auto_count = len(ux_grouping["auto_apply"])
                 response["instruction"] = (
-                    "HIGH confidence. Apply these updates using persona_modify, "
-                    "then mention in your response: '✓ Updated your persona with...'"
+                    f"HIGH confidence ({auto_count} update{'s' if auto_count > 1 else ''}). "
+                    f"Apply using persona_modify, then mention: '✓ Updated your persona with...'"
                 )
-            elif response["action_required"] == "ask_user":
+            elif overall_action == "batch_confirm":
+                batch_count = len(ux_grouping["batch_confirm"])
                 response["instruction"] = (
-                    "MEDIUM confidence. Ask user for confirmation before applying: "
+                    f"MEDIUM confidence ({batch_count} updates). Ask user ONCE for all: "
+                    f"'I noticed a few things to add to your persona: [list]. Want me to add these?'"
+                )
+            elif overall_action == "ask_user":
+                response["instruction"] = (
+                    "MEDIUM confidence. Ask user for confirmation: "
                     "'Want me to add X to your persona?'"
                 )
             else:
