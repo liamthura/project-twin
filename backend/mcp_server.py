@@ -346,14 +346,26 @@ async def list_tools():
             name="get_context",
             description="""🚀 PRIMARY TOOL - Start here for any persona request.
 
-Returns user context with communication preferences. Choose scope by need:
-• minimal (default) → Identity + communication style
-• professional → Work, skills, projects
-• personal → Hobbies, values, personality
-• learning → Domains, current learning
-• full → Everything
+Returns user context with communication preferences. ALWAYS call this at the start of conversations.
 
-Optional: topic="python" filters to relevant items only.""",
+WHEN TO USE EACH SCOPE:
+• minimal (fastest) - Quick questions, greetings, small talk, code help
+  Example: "How do I fix this error?" → Use minimal to get communication style
+• professional - Career advice, project help, technical discussions
+  Example: "Help me design this API" → Use professional for skills + projects
+• personal - Life advice, hobby recommendations, wellness
+  Example: "What should I do this weekend?" → Use personal for hobbies + interests
+• learning - Learning roadmaps, skill development
+  Example: "How should I learn React?" → Use learning for current skills + goals
+• full - Complex questions needing complete context
+  Example: "Write my resume" → Use full to see everything
+
+PERFORMANCE: Start with minimal, upgrade if you need more context. Smaller scopes = faster + cheaper.
+
+TOPIC FILTER: Add topic="python" to get only Python-related items across all categories.
+Example: scope="professional", topic="react" → Only React projects, skills, learning
+
+COMMUNICATION: Result includes user's tone preferences and dislikes - apply these to all responses.""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -544,14 +556,15 @@ Each operation has: action (add/update/remove), entity, data.""",
         # === SMART CONTEXT CAPTURE ===
         Tool(
             name="suggest_persona_update",
-            description="""Analyze user message for persona-worthy info. Uses sentiment analysis.
+            description="""Call during conversation when user mentions achievements, learning, preferences, or life updates.
 
-Returns: {should_capture, confidence (0-1), suggestions: [{action, entity, data}]}
+Uses sentiment to detect: completions, new skills, preference statements, certifications.
+Example: "finished React course" → suggests skill add + certification
 
-Actions based on confidence:
-- ≥0.5: Apply via persona_modify, mention casually
-- 0.4-0.5: Ask user to confirm
-- <0.4: Ignore""",
+Returns: {should_capture, confidence, suggestions: [{action, entity, data}]}
+• ≥0.5: Apply via persona_modify, mention casually ("noted!")
+• 0.4-0.5: Ask confirmation
+• <0.4: Ignore""",
             inputSchema={
                 "type": "object",
                 "properties": {
