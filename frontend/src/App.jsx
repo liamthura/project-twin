@@ -2670,21 +2670,95 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
 
 // Preferences Editor
 function PreferencesEditor({ data, onChange }) {
+  const [expandedMoods, setExpandedMoods] = useState({});
+
   const updateCodeStyle = (field, value) =>
     onChange({
       ...data,
       code_style: { ...(data.code_style || {}), [field]: value },
     });
-  const updateCommunication = (field, value) =>
+
+  // Helper to get communication with migration from old format
+  const getComm = () => {
+    const comm = data.communication || {};
+    // Migrate old flat format to new nested format
+    if (comm.tone !== undefined && !comm.default) {
+      return {
+        default: {
+          tone: comm.tone || "",
+          detail_level: comm.detail_level || "",
+          locale: comm.locale || "British English",
+        },
+        mood_overrides: [],
+      };
+    }
+    return {
+      default: comm.default || {
+        tone: "",
+        detail_level: "",
+        locale: "British English",
+      },
+      mood_overrides: comm.mood_overrides || [],
+    };
+  };
+
+  const updateDefaultComm = (field, value) => {
+    const comm = getComm();
     onChange({
       ...data,
-      communication: { ...(data.communication || {}), [field]: value },
+      communication: {
+        ...comm,
+        default: { ...comm.default, [field]: value },
+      },
     });
+  };
+
+  const addMoodOverride = () => {
+    const comm = getComm();
+    const newOverrides = [
+      ...comm.mood_overrides,
+      { when_feeling: "", tone: "", detail_level: "", locale: "" },
+    ];
+    onChange({
+      ...data,
+      communication: { ...comm, mood_overrides: newOverrides },
+    });
+    // Auto-expand the new one
+    setExpandedMoods((prev) => ({ ...prev, [newOverrides.length - 1]: true }));
+  };
+
+  const updateMoodOverride = (index, field, value) => {
+    const comm = getComm();
+    const newOverrides = [...comm.mood_overrides];
+    newOverrides[index] = { ...newOverrides[index], [field]: value };
+    onChange({
+      ...data,
+      communication: { ...comm, mood_overrides: newOverrides },
+    });
+  };
+
+  const removeMoodOverride = (index) => {
+    const comm = getComm();
+    onChange({
+      ...data,
+      communication: {
+        ...comm,
+        mood_overrides: comm.mood_overrides.filter((_, i) => i !== index),
+      },
+    });
+  };
+
+  const toggleMood = (index) => {
+    setExpandedMoods((prev) => ({ ...prev, [index]: !prev[index] }));
+  };
+
   const updateLearning = (field, value) =>
     onChange({
       ...data,
       learning_style: { ...(data.learning_style || {}), [field]: value },
     });
+
+  const comm = getComm();
 
   return (
     <div className="space-y-6">
@@ -2732,32 +2806,182 @@ function PreferencesEditor({ data, onChange }) {
             How you prefer AI responses to be formatted
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
-          <div className="space-y-2">
-            <Label>Tone</Label>
-            <Input
-              value={data.communication?.tone || ""}
-              onChange={(e) => updateCommunication("tone", e.target.value)}
-              placeholder="e.g. friendly but professional"
-            />
+        <CardContent className="space-y-6">
+          {/* Default Communication Style */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium">Default Style</Label>
+              <Badge variant="secondary" className="text-xs">
+                Always active
+              </Badge>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3 p-4 border rounded-lg bg-muted/20">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Tone</Label>
+                <Input
+                  value={comm.default.tone || ""}
+                  onChange={(e) => updateDefaultComm("tone", e.target.value)}
+                  placeholder="e.g. friendly but professional"
+                  className="h-8"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">
+                  Detail Level
+                </Label>
+                <Input
+                  value={comm.default.detail_level || ""}
+                  onChange={(e) =>
+                    updateDefaultComm("detail_level", e.target.value)
+                  }
+                  placeholder="e.g. comprehensive"
+                  className="h-8"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Locale</Label>
+                <Input
+                  value={comm.default.locale || ""}
+                  onChange={(e) => updateDefaultComm("locale", e.target.value)}
+                  placeholder="e.g. British English"
+                  className="h-8"
+                />
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>Detail Level</Label>
-            <Input
-              value={data.communication?.detail_level || ""}
-              onChange={(e) =>
-                updateCommunication("detail_level", e.target.value)
-              }
-              placeholder="e.g. comprehensive"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Locale</Label>
-            <Input
-              value={data.communication?.locale || ""}
-              onChange={(e) => updateCommunication("locale", e.target.value)}
-              placeholder="e.g. British English"
-            />
+
+          {/* Mood Overrides */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm font-medium">
+                  When I'm feeling...
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Override defaults based on your mood or context
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={addMoodOverride}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add Mood
+              </Button>
+            </div>
+
+            {comm.mood_overrides.length > 0 ? (
+              <div className="space-y-2">
+                {comm.mood_overrides.map((mood, idx) => (
+                  <div
+                    key={idx}
+                    className={`border rounded-lg overflow-hidden transition-colors ${
+                      expandedMoods[idx] ? "ring-1 ring-primary/30" : ""
+                    }`}
+                  >
+                    <div
+                      className="flex items-center gap-2 p-3 bg-muted/30 hover:bg-muted/50 cursor-pointer"
+                      onClick={() => toggleMood(idx)}
+                    >
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform text-muted-foreground ${
+                          expandedMoods[idx] ? "" : "-rotate-90"
+                        }`}
+                      />
+                      <span className="flex-1 font-medium text-sm">
+                        {mood.when_feeling || "Untitled mood"}
+                      </span>
+                      {mood.tone && (
+                        <Badge variant="secondary" className="text-xs h-5">
+                          {mood.tone}
+                        </Badge>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeMoodOverride(idx);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {expandedMoods[idx] && (
+                      <div className="p-4 border-t bg-background/50 space-y-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs">When I'm feeling...</Label>
+                          <Input
+                            value={mood.when_feeling || ""}
+                            onChange={(e) =>
+                              updateMoodOverride(
+                                idx,
+                                "when_feeling",
+                                e.target.value
+                              )
+                            }
+                            placeholder="e.g. stressed, tired, excited, creative"
+                            className="h-8"
+                          />
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">
+                              Tone
+                            </Label>
+                            <Input
+                              value={mood.tone || ""}
+                              onChange={(e) =>
+                                updateMoodOverride(idx, "tone", e.target.value)
+                              }
+                              placeholder="e.g. gentle, encouraging"
+                              className="h-8"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">
+                              Detail Level
+                            </Label>
+                            <Input
+                              value={mood.detail_level || ""}
+                              onChange={(e) =>
+                                updateMoodOverride(
+                                  idx,
+                                  "detail_level",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="e.g. brief, just essentials"
+                              className="h-8"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">
+                              Locale
+                            </Label>
+                            <Input
+                              value={mood.locale || ""}
+                              onChange={(e) =>
+                                updateMoodOverride(
+                                  idx,
+                                  "locale",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Leave blank to use default"
+                              className="h-8"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 border rounded-lg bg-muted/20 text-muted-foreground text-sm">
+                No mood overrides yet. Add one to customize how AI responds
+                based on how you're feeling.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

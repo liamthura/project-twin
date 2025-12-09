@@ -67,19 +67,20 @@ def get_all_persona_data() -> dict:
 
 CONTEXT_SCOPES = {
     "minimal": {
-        "description": "Quick identity snapshot (~200 tokens)",
+        "description": "Quick identity snapshot (~250 tokens)",
         "fields": {
             "profile": ["name", "bio", "location", "current_role"],
-            "projects": ["top_of_mind"]
+            "projects": ["top_of_mind"],
+            "preferences": ["communication_default"]  # Just default tone/locale
         }
     },
     "professional": {
-        "description": "Work-relevant context (~800 tokens)",
+        "description": "Work-relevant context (~1000 tokens)",
         "fields": {
             "profile": ["name", "bio", "location", "current_role", "work_experience", "education", "career_aspirations"],
             "knowledge": ["domains"],
             "projects": ["projects", "current_learning", "top_of_mind"],
-            "preferences": ["code_style", "work_preferences"]
+            "preferences": ["code_style", "work_preferences", "communication", "dislikes"]
         }
     },
     "personal": {
@@ -91,11 +92,12 @@ CONTEXT_SCOPES = {
         }
     },
     "learning": {
-        "description": "Current learning focus (~400 tokens)",
+        "description": "Current learning focus (~500 tokens)",
         "fields": {
             "profile": ["name"],
             "knowledge": ["domains", "mental_tabs"],
             "projects": ["current_learning", "top_of_mind"],
+            "preferences": ["learning_style"],
             "learning_log": ["entries"]
         }
     },
@@ -140,7 +142,12 @@ def get_scoped_context(
                 
             result[file_key] = {}
             for field in fields:
-                if field in data:
+                # Special case: communication_default only returns the default part
+                if field == "communication_default":
+                    comm = data.get("communication", {})
+                    if isinstance(comm, dict) and "default" in comm:
+                        result[file_key]["communication"] = {"default": comm["default"]}
+                elif field in data:
                     result[file_key][field] = data[field]
     
     # Apply topic filter if provided
@@ -456,7 +463,9 @@ Don't add to content - that's for general topic notes only.""",
             name="get_preferences",
             description="""Get user preferences for AI interaction:
 ├── code_style: languages, frameworks, tools, conventions
-├── communication: tone, detail_level, locale, avoid[], preferences[]
+├── communication:
+│   ├── default: {tone, detail_level, locale} - baseline style
+│   └── mood_overrides[]: {mood, tone, detail_level} - situational adjustments
 ├── learning_style: preferred[], avoid[]
 ├── response_format: code_blocks, bullet_points, etc.
 ├── work_preferences: timezone, productivity_time, approach
@@ -465,7 +474,9 @@ Don't add to content - that's for general topic notes only.""",
 ⚡ ROUTING:
 • "I don't like X" → ADD dislike {dislike: "X"}
 • "Actually I'm okay with X now" → REMOVE dislike {dislike: "X"}
-• Use dislikes to understand what to AVOID in responses/recommendations.""",
+• "When I'm stressed, be more gentle" → ADD mood_override {mood: "stressed", tone: "gentle and supportive"}
+• "Change my default tone to casual" → UPDATE communication_default {tone: "casual"}
+• Use mood_overrides to adapt communication based on user's current state.""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ),
         Tool(
@@ -538,7 +549,7 @@ ENTITIES BY FILE:
 • lifestyle: hobby, hobby_reference, hobby_specific, passion, curiosity, personality_trait, value, sleep, energy_peak
 • knowledge: domain, domain_reference, mental_tab, mental_tab_reference
 • projects: project, project_reference, project_tag, current_learning, top_of_mind
-• preferences: dislike
+• preferences: dislike, communication_default, mood_override
 • learning: learning_entry
 
 QUICK ROUTING:
@@ -549,6 +560,8 @@ QUICK ROUTING:
 • "Add to matcha list" → UPDATE mental_tab_reference {title, ref_name, notes}
 • "New project" → ADD project {name, description}
 • "I hate X" → ADD dislike {dislike: "X"}
+• "When I'm tired, keep it brief" → ADD mood_override {mood: "tired", detail_level: "brief"}
+• "Default to friendly tone" → UPDATE communication_default {tone: "friendly"}
 
 NESTED ITEMS (include parent):
 • hobby_reference → {hobby_name, ref_name, notes}
@@ -1045,6 +1058,8 @@ ENTITY_THRESHOLDS = {
     "hobby_reference": {"auto": 0.70, "ask": 0.45},
     "preference": {"auto": 0.75, "ask": 0.55},
     "dislike": {"auto": 0.75, "ask": 0.50},
+    "communication_default": {"auto": 0.80, "ask": 0.55},
+    "mood_override": {"auto": 0.75, "ask": 0.50},
     "passion": {"auto": 0.72, "ask": 0.50},
     "curiosity": {"auto": 0.70, "ask": 0.45},
     "personality_trait": {"auto": 0.80, "ask": 0.55},
@@ -2897,6 +2912,89 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             dislikes.remove(found)
             save_json("preferences.json", preferences)
             return f"✅ Removed dislike: {item}"
+    
+    elif entity == "communication_default":
+        preferences = load_json("preferences.json")
+        comm = preferences.setdefault("communication", {})
+        default = comm.setdefault("default", {"tone": "", "detail_level": "", "locale": "British English"})
+        
+        if action == "update":
+            updated = []
+            if data.get("tone"):
+                default["tone"] = data["tone"]
+                updated.append(f"tone={data['tone']}")
+            if data.get("detail_level"):
+                default["detail_level"] = data["detail_level"]
+                updated.append(f"detail_level={data['detail_level']}")
+            if data.get("locale"):
+                default["locale"] = data["locale"]
+                updated.append(f"locale={data['locale']}")
+            
+            if not updated:
+                return "❌ communication_default update requires 'tone', 'detail_level', or 'locale'"
+            
+            save_json("preferences.json", preferences)
+            return f"✅ Updated default communication: {', '.join(updated)}"
+        else:
+            return f"❌ communication_default only supports 'update' action"
+    
+    elif entity == "mood_override":
+        preferences = load_json("preferences.json")
+        comm = preferences.setdefault("communication", {})
+        overrides = comm.setdefault("mood_overrides", [])
+        mood = get_field(data, "mood", "feeling", "state", "when", default="")
+        
+        if action == "add":
+            if not mood:
+                return "❌ mood_override requires 'mood' (e.g., 'stressed', 'tired', 'excited')"
+            
+            # Check if mood already exists
+            existing = next((o for o in overrides if o.get("mood", "").lower() == mood.lower()), None)
+            if existing:
+                # Update existing override
+                if data.get("tone"):
+                    existing["tone"] = data["tone"]
+                if data.get("detail_level"):
+                    existing["detail_level"] = data["detail_level"]
+                save_json("preferences.json", preferences)
+                return f"✅ Updated mood override for '{mood}'"
+            
+            # Add new override
+            override = {"mood": mood}
+            if data.get("tone"):
+                override["tone"] = data["tone"]
+            if data.get("detail_level"):
+                override["detail_level"] = data["detail_level"]
+            
+            if len(override) == 1:
+                return "❌ mood_override needs at least 'tone' or 'detail_level'"
+            
+            overrides.append(override)
+            save_json("preferences.json", preferences)
+            return f"✅ Added mood override: when {mood} → {override}"
+        
+        elif action == "remove":
+            if not mood:
+                return "❌ mood_override remove requires 'mood'"
+            found = next((o for o in overrides if o.get("mood", "").lower() == mood.lower()), None)
+            if not found:
+                return f"❌ No mood override for '{mood}'"
+            overrides.remove(found)
+            save_json("preferences.json", preferences)
+            return f"✅ Removed mood override for '{mood}'"
+        
+        elif action == "update":
+            if not mood:
+                return "❌ mood_override update requires 'mood'"
+            existing = next((o for o in overrides if o.get("mood", "").lower() == mood.lower()), None)
+            if not existing:
+                return f"❌ No mood override for '{mood}' to update"
+            if data.get("tone"):
+                existing["tone"] = data["tone"]
+            if data.get("detail_level"):
+                existing["detail_level"] = data["detail_level"]
+            save_json("preferences.json", preferences)
+            return f"✅ Updated mood override for '{mood}'"
     
     # === PROJECTS-BASED ENTITIES ===
     elif entity == "project":

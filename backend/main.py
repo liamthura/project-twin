@@ -82,9 +82,12 @@ DEFAULTS = {
             "tools": []
         },
         "communication": {
-            "tone": "",
-            "detail_level": "",
-            "locale": "British English"
+            "default": {
+                "tone": "",
+                "detail_level": "",
+                "locale": "British English"
+            },
+            "mood_overrides": []
         },
         "learning_style": {
             "preferred": [],
@@ -224,6 +227,22 @@ def read_json_file(file_type: str) -> Dict[str, Any]:
                 if file_type == "preferences":
                     if isinstance(data, dict):
                         data.setdefault("dislikes", [])
+                        # Migrate old flat communication structure to new nested structure
+                        if "communication" in data:
+                            comm = data["communication"]
+                            # Check if it's the old flat format (has "tone" at top level but no "default")
+                            if isinstance(comm, dict) and "tone" in comm and "default" not in comm:
+                                # Migrate to new nested format
+                                data["communication"] = {
+                                    "default": {
+                                        "tone": comm.get("tone", ""),
+                                        "detail_level": comm.get("detail_level", ""),
+                                        "locale": comm.get("locale", "British English")
+                                    },
+                                    "mood_overrides": []
+                                }
+                        else:
+                            data["communication"] = DEFAULTS["preferences"]["communication"]
                 if file_type == "lifestyle":
                     if isinstance(data, dict):
                         data.setdefault("wellness", {
