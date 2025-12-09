@@ -36,6 +36,8 @@ pip install -r requirements.txt
 
 ### 2. Connect to Claude Desktop
 
+#### macOS
+
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
@@ -48,6 +50,23 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   }
 }
 ```
+
+#### Windows
+
+Add to `%APPDATA%\Claude\claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "persona": {
+      "command": "C:\\path\\to\\project-twin\\backend\\venv\\Scripts\\python.exe",
+      "args": ["C:\\path\\to\\project-twin\\backend\\mcp_server.py"]
+    }
+  }
+}
+```
+
+> **Note**: Use double backslashes (`\\`) in the JSON paths, or forward slashes (`/`) which also work on Windows.
 
 Restart Claude Desktop. Your persona tools are now available! 🎉
 
