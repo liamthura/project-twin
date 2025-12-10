@@ -43,7 +43,7 @@ app.add_middleware(
 )
 
 # Valid file types
-VALID_FILES = ["profile", "knowledge", "preferences", "projects", "lifestyle", "learning_log"]
+VALID_FILES = ["profile", "knowledge", "preferences", "projects", "lifestyle", "circle", "learning_log"]
 
 # Default data structures
 DEFAULTS = {
@@ -108,6 +108,9 @@ DEFAULTS = {
             "energy_peaks": [],
             "stress_triggers": []
         }
+    },
+    "circle": {
+        "connections": []
     },
     "learning_log": {
         "entries": []

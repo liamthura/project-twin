@@ -30,10 +30,11 @@ logger.info(f"Data directory: {DATA_DIR}")
 # File mapping for different data types
 FILE_MAP = {
     "profile": "profile.json",
-    "lifestyle": "lifestyle.json", 
+    "lifestyle": "lifestyle.json",
     "knowledge": "knowledge.json",
     "preferences": "preferences.json",
     "projects": "projects.json",
+    "circle": "circle.json",
     "learning_log": "learning_log.json"
 }
 
@@ -67,42 +68,48 @@ def get_all_persona_data() -> dict:
 
 CONTEXT_SCOPES = {
     "minimal": {
-        "description": "Quick identity snapshot (~250 tokens)",
+        "description": "Quick identity snapshot",
         "fields": {
+            "preferences": ["code_style", "learning_style", "communication", "dislikes"],
             "profile": ["name", "bio", "location", "current_role"],
             "projects": ["top_of_mind"],
-            "preferences": ["communication_default"]  # Just default tone/locale
+            # "preferences": ["communication"]
         }
     },
     "professional": {
-        "description": "Work-relevant context (~1000 tokens)",
+        "description": "Work-relevant context",
         "fields": {
+            "preferences": ["code_style", "learning_style", "communication", "dislikes"],
             "profile": ["name", "bio", "location", "current_role", "work_experience", "education", "career_aspirations"],
             "knowledge": ["domains"],
             "projects": ["projects", "current_learning", "top_of_mind"],
-            "preferences": ["code_style", "work_preferences", "communication", "dislikes"]
+            # "preferences": ["code_style", "work_preferences", "communication", "dislikes"]
         }
     },
     "personal": {
-        "description": "Hobbies, interests, personality (~600 tokens)",
+        "description": "Hobbies, interests, personality, and tracked topics",
         "fields": {
+            "preferences": ["code_style", "learning_style", "communication", "dislikes"],
             "profile": ["name", "bio", "location"],
             "lifestyle": ["hobbies", "passions", "curiosities", "personality_traits", "values", "wellness"],
-            "preferences": ["communication", "dislikes"]
+            "knowledge": ["mental_tabs"],
+            "circle": ["connections"],
+            # "preferences": ["communication", "dislikes"]
         }
     },
     "learning": {
-        "description": "Current learning focus (~500 tokens)",
+        "description": "Current learning focus",
         "fields": {
-            "profile": ["name"],
+            "preferences": ["code_style", "learning_style", "communication", "dislikes"],
+            "profile": ["name", "current_role", "career_aspirations"],
             "knowledge": ["domains", "mental_tabs"],
             "projects": ["current_learning", "top_of_mind"],
-            "preferences": ["learning_style"],
+            # "preferences": ["learning_style"],
             "learning_log": ["entries"]
         }
     },
     "full": {
-        "description": "Complete persona (~2000+ tokens)",
+        "description": "Complete persona",
         "fields": "all"
     }
 }
@@ -344,28 +351,32 @@ async def list_tools():
         # === SMART CONTEXT TOOL (1) - Use this first! ===
         Tool(
             name="get_context",
-            description="""🚀 PRIMARY TOOL - Start here for any persona request.
+            description="""🚀 PRIMARY TOOL - CALL THIS FIRST at the start of ANY conversation.
 
-Returns user context with communication preferences. ALWAYS call this at the start of conversations.
+⚠️ CRITICAL: ALWAYS call this tool BEFORE responding to the user. All scopes return user PREFERENCES which tell you:
+- Communication style (tone, detail level, dislikes)
+- Code style preferences (if professional scope)
+- Learning style preferences (if professional scope)
+- Dislikes preferences (all scopes)
+
+These preferences are ESSENTIAL for providing responses the user actually wants. Apply them to ALL your responses.
 
 WHEN TO USE EACH SCOPE:
 • minimal (fastest) - Quick questions, greetings, small talk, code help
-  Example: "How do I fix this error?" → Use minimal to get communication style
+  Returns: name, bio, location, current_role, top_of_mind, communication preferences
 • professional - Career advice, project help, technical discussions
-  Example: "Help me design this API" → Use professional for skills + projects
+  Returns: profile, skills, projects, code_style, work_preferences, communication, dislikes
 • personal - Life advice, hobby recommendations, wellness
-  Example: "What should I do this weekend?" → Use personal for hobbies + interests
+  Returns: profile, hobbies, interests, personality, mental_tabs, connections, communication, dislikes
 • learning - Learning roadmaps, skill development
-  Example: "How should I learn React?" → Use learning for current skills + goals
+  Returns: profile, skills, mental_tabs, current learning, learning_style, learning_log
 • full - Complex questions needing complete context
-  Example: "Write my resume" → Use full to see everything
+  Returns: Everything (all files)
 
-PERFORMANCE: Start with minimal, upgrade if you need more context. Smaller scopes = faster + cheaper.
+PERFORMANCE: Start with minimal (includes preferences!), upgrade if you need more context.
 
 TOPIC FILTER: Add topic="python" to get only Python-related items across all categories.
-Example: scope="professional", topic="react" → Only React projects, skills, learning
-
-COMMUNICATION: Result includes user's tone preferences and dislikes - apply these to all responses.""",
+Example: scope="professional", topic="react" → Only React projects, skills, learning""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -427,6 +438,12 @@ Returns: profile, lifestyle, knowledge, preferences, projects, learning_log.""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ),
         Tool(
+            name="get_circle",
+            description="""Raw circle data for editing and deeper specific understanding. Use get_context first for general persona requests.
+        Contains: connections[] (people in user's life with name, relationship, traits, notes).""",
+            inputSchema={"type": "object", "properties": {}, "required": []}
+        ),
+        Tool(
             name="get_learning_log",
             description="""Raw learning log for editing and deeper specific understanding. Use get_context(scope='learning') first for general persona requests.
 
@@ -449,36 +466,38 @@ Contains: entries[] with enhanced structure for cross-LLM continuity:
         # cognitive load for LLMs and eliminates ambiguity about which tool to use.
         # persona_modify can handle both simple field updates and complex operations.
         # Kept commented for future reference in case dot-notation interface is needed again.
-        # Tool(
-        #     name="persona_update",
-        #     description="""Update a single field using dot-notation path.
-        # Use this for simple field updates when you know the exact path.
-        #
-        # Examples:
-        # - profile.location → "London, UK"
-        # - profile.bio → "Updated bio text"
-        # - profile.contact.github → "newusername"
-        # - lifestyle.hobbies.Gaming.notes → "Playing more lately"
-        # - knowledge.domains.Python.level → "advanced"
-        # - projects.projects.Solterra.status → "completed"
-        #
-        # For arrays, use item name as path segment.
-        # For complex operations (add/remove items), use persona_modify instead.""",
-        #     inputSchema={
-        #         "type": "object",
-        #         "properties": {
-        #             "path": {
-        #                 "type": "string",
-        #                 "description": "Dot-notation path to the field (e.g., 'profile.bio', 'lifestyle.hobbies.Gaming.skill_level')"
-        #             },
-        #             "value": {
-        #                 "type": "string",
-        #                 "description": "New value for the field"
-        #             }
-        #         },
-        #         "required": ["path", "value"]
-        #     }
-        # ),
+        Tool(
+            name="persona_update",
+            description="""Update a single field using dot-notation path.
+        Use this for simple field updates when you know the exact path.
+        
+        Examples:
+        - profile.location → "London, UK"
+        - profile.bio → "Updated bio text"
+        - profile.contact.github → "newusername"
+        - lifestyle.hobbies.Gaming.notes → "Playing more lately"
+        - knowledge.domains.Python.level → "advanced"
+        - projects.projects.Solterra.status → "completed"
+        - knowledge.mental_tabs.Restaurants.references.Sushi Place.notes → "Best omakase in town, make reservations 2 weeks ahead"
+
+        For arrays, use item name as path segment.
+        For deeply nested data (like references within mental tabs), chain the path with dots.
+        For complex operations (add/remove items), use persona_modify instead.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Dot-notation path to the field (e.g., 'profile.bio', 'lifestyle.hobbies.Gaming.skill_level')"
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "New value for the field"
+                    }
+                },
+                "required": ["path", "value"]
+            }
+        ),
         Tool(
             name="persona_modify",
             description="""Add, update, or remove items from persona data.
@@ -493,6 +512,7 @@ ENTITIES BY FILE:
 • lifestyle: hobby, hobby_reference, passion, curiosity, personality_trait, value
 • knowledge: domain, domain_reference, mental_tab, mental_tab_reference
 • projects: project, project_reference, project_highlight, current_learning, top_of_mind
+• circle: connection
 • preferences: dislike, communication_default, mood_override
 • learning_log: learning_entry
 
@@ -502,6 +522,8 @@ DATA EXAMPLES (always include identifier + fields to change):
 • UPDATE hobby: {"name": "Badminton", "status": "inactive", "notes": "stopped playing"}
 • ADD domain: {"name": "Rust", "level": "learning"}
 • UPDATE domain: {"name": "Python", "level": "advanced"}
+• ADD connection: {"name": "Jane Smith", "relationship": "Friend from university", "traits": ["creative", "ambitious"], "notes": "Met during CS degree, now works at Google"}
+• UPDATE connection: {"name": "Jane Smith", "relationship": "Close friend and mentor", "notes": "Started advising me on career"}
 • ADD top_of_mind: {"idea": "Build a blog", "note": "use SvelteKit"}
 • ADD dislike: {"dislike": "morning meetings"}
 • ADD mood_override: {"mood": "stressed", "tone": "calm", "detail_level": "brief"}
@@ -682,6 +704,7 @@ FIELD_ALIASES = {
     "mental_tab": ["name", "mental_tab", "topic", "title", "subject"],
     "learning_item": ["topic", "subject", "item", "name", "learning"],
     "top_of_mind": ["topic", "item", "subject", "thought", "name"],
+    "connection": ["name", "person", "contact", "connection_name"],
 }
 
 def normalize_data(data: dict, entity: str) -> dict:
@@ -724,6 +747,8 @@ def normalize_data(data: dict, entity: str) -> dict:
         name_aliases = FIELD_ALIASES.get("learning_item", ["topic"])
     elif entity == "top_of_mind":
         name_aliases = FIELD_ALIASES.get("top_of_mind", ["topic"])
+    elif entity == "connection":
+        name_aliases = FIELD_ALIASES.get("connection", FIELD_ALIASES["name"])
     else:
         name_aliases = FIELD_ALIASES["name"]
     
@@ -1183,6 +1208,7 @@ def find_in_persona(persona: dict, entity_type: str, name: str) -> dict:
         "curiosity": ("lifestyle", "curiosities"),
         "personality_trait": ("lifestyle", "personality_traits"),
         "dislike": ("preferences", "dislikes"),
+        "connection": ("circle", "connections"),
     }
     
     if entity_type in search_paths:
@@ -1322,17 +1348,37 @@ CAPTURE_TRIGGERS = {
         "switched to", "moved to", "transitioned to", "changed to",
         "migrated to", "moving away from", "switching from",
     ],
+    "insight": [
+        # LEARNING_LOG trigger - conceptual/soft-skill insights, not just technical
+        # Direct learning: "I learned that delegation requires accountability"
+        "i learned", "learned that", "i've learned", "key learning", "key takeaway",
+        "lesson learned", "lessons learned", "takeaway is", "what i learned",
+        # Realizations: "I realized that titles don't guarantee commitment"
+        "i realized", "realized that", "i've realized", "came to realize",
+        "i discovered", "discovered that", "found out that", "turned out that",
+        # Understanding: "Now I understand why planning matters"
+        "i now understand", "now i understand", "finally understand",
+        "makes sense now", "clicked for me", "aha moment", "breakthrough was",
+        # Facilitated insights: "This conversation helped me understand X"
+        "helped me understand", "helped me realize", "helped me see", "made me realize",
+        "made me understand", "got me thinking about", "made me think about",
+        # Reflections: "Looking back, I see the pattern"
+        "looking back", "in retrospect", "reflecting on", "thinking back",
+        "what i've noticed", "pattern i see", "what struck me", "what stands out",
+        # Key insights: "The key insight is to focus on what matters"
+        "key insight", "important lesson", "big realization", "what really matters",
+        # Perspective shifts: "This changed how I think about X"
+        "changed my perspective", "shifted my thinking", "reframed",
+        "new way of thinking", "paradigm shift",
+    ],
     "learning": [
-        # Active learning
+        # Technical skill acquisition (domains/hobbies)
         "learning", "studying", "getting into", "diving into", "exploring",
         "picked up", "been learning", "currently learning", "started learning",
         "teaching myself", "taught myself", "figured out", "understanding",
         # Progress
         "getting better at", "improving at", "improving my", "practicing",
         "making progress with", "getting the hang of", "finally getting",
-        # Discovery
-        "discovered", "found out about", "came across", "stumbled upon",
-        "realizing", "starting to understand",
     ],
     "skill_level": [
         # High proficiency
@@ -1425,6 +1471,32 @@ CAPTURE_TRIGGERS = {
         "after coffee", "after lunch", "in the morning", "at night",
         "late night", "early morning",
     ],
+    "relationship": [
+        # Meeting people
+        "met someone", "met a", "just met", "recently met", "got introduced to",
+        "introduced to", "ran into", "reconnected with", "catching up with",
+        # Working with people
+        "working with", "collaborated with", "collaborating with", "teamed up with",
+        "partnered with", "my colleague", "my coworker", "my teammate",
+        # Mentorship
+        "my mentor", "mentoring", "being mentored by", "learning from",
+        "mentor is", "mentored by", "my coach", "coaching me",
+        # Friendship
+        "my friend", "close friend", "good friend", "best friend", "friend from",
+        "became friends with", "friends with", "befriended",
+        # Professional relationships
+        "my manager", "my boss", "reports to me", "i manage", "direct report",
+        "work closely with", "working closely with",
+        # Romantic relationships
+        "my boyfriend", "my girlfriend", "my partner", "my spouse", "my husband", "my wife",
+        "significant other", "dating", "seeing someone", "in a relationship with",
+        # Pets (important relationships too!)
+        "my dog", "my cat", "my pet", "got a dog", "got a cat", "adopted a",
+        "my puppy", "my kitten", "rescue dog", "rescue cat",
+        # Describing relationships
+        "is a", "she's a", "he's a", "they're a", "who is",
+        "someone who", "person who",
+    ],
 }
 
 # Phrases that indicate NON-capture-worthy content
@@ -1500,6 +1572,27 @@ KNOWN_SKILLS = [
     # Testing
     "jest", "vitest", "cypress", "playwright", "selenium",
     "pytest", "unittest", "mocha", "chai",
+]
+
+# Soft skills and conceptual topics for insight detection
+# NOTE: This list is biased toward management/leadership since that's the creator's focus.
+# Insights about OTHER soft skills not listed here are still valuable and should be captured
+# when "insight" triggers fire - don't rely solely on keyword matching for soft skills.
+KNOWN_CONCEPTS = [
+    # Leadership & Management (persona-specific interest)
+    "leadership", "delegation", "accountability", "team management",
+    "project management", "event planning", "stakeholder management",
+    # Communication
+    "communication", "presentation", "negotiation", "feedback",
+    # Personal Development
+    "time management", "goal setting", "self-awareness", "emotional intelligence",
+    # Professional Skills
+    "problem solving", "critical thinking", "decision making",
+    "adaptability", "resilience", "creative thinking",
+    # Collaboration
+    "teamwork", "collaboration", "conflict resolution", "empathy",
+    # Methodologies (persona uses these)
+    "agile", "systems thinking", "design thinking", "iterative approach",
 ]
 
 
@@ -1617,10 +1710,20 @@ def analyze_statement_quality(message: str, context: str = "") -> dict:
         confidence_modifier -= 0.2
         reasoning.append("no self-reference")
     
-    # Statement type classification (priority: hypothetical > venting > questioning > declarative)
+    # Check for strong insight patterns first (these override venting classification)
+    insight_patterns = [
+        "i learned", "learned that", "i've learned", "key learning", "key takeaway",
+        "lesson learned", "i realized", "realized that", "i discovered", "key insight",
+        "helped me understand", "helped me realize", "helped me see", "made me realize",
+        "important lesson", "big realization", "aha moment", "breakthrough was",
+        "changed my perspective", "shifted my thinking", "now i understand"
+    ]
+    has_strong_insight = any(pattern in message for pattern in insight_patterns)
+
+    # Statement type classification (priority: insight > hypothetical > venting > questioning > declarative)
     is_hypothetical = any(m in message for m in hypothetical_markers)
     starts_hypothetical = message.strip().startswith(("what if", "if i", "imagine if", "hypothetically"))
-    is_venting = any(m in message for m in venting_markers)
+    is_venting = any(m in message for m in venting_markers) and not has_strong_insight  # Don't classify as venting if has insight
     is_questioning = any(m in message for m in questioning_markers)
     is_declarative = any(m in message for m in declarative_markers)
     
@@ -1632,9 +1735,13 @@ def analyze_statement_quality(message: str, context: str = "") -> dict:
         statement_type = "venting"
         confidence_modifier -= 0.15
         reasoning.append("venting/emotional release")
-        if is_declarative:
-            confidence_modifier += 0.1
-            reasoning.append("but declarative tone")
+        # Check if venting contains insights (e.g., "I'm frustrated BUT I learned...")
+        insight_connectors = ["but i learned", "but i realized", "but i discovered",
+                             "though i learned", "although i realized", "still learned"]
+        has_insight_in_vent = any(conn in message for conn in insight_connectors)
+        if has_insight_in_vent or is_declarative:
+            confidence_modifier += 0.15  # Boost more for insights within venting
+            reasoning.append("contains insight" if has_insight_in_vent else "declarative tone")
     elif is_questioning:
         if has_self_reference and is_declarative:
             statement_type = "question_with_statement"
@@ -1811,7 +1918,15 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
         if re.search(pattern, message_lower, re.IGNORECASE):
             detected_skills.append(skill.title() if len(skill) > 3 else skill.upper())
             result["detected_entities"].append(f"skill: {skill}")
-    
+
+    # Detect concepts (soft skills, methodologies) - helps tag learning_log entries
+    detected_concepts = []
+    for concept in KNOWN_CONCEPTS:
+        pattern = r'\b' + re.escape(concept) + r'\b'
+        if re.search(pattern, message_lower, re.IGNORECASE):
+            detected_concepts.append(concept.title())
+            result["detected_entities"].append(f"concept: {concept}")
+
     # Generate suggestions
     suggestions = []
     state_changes = detect_explicit_state_changes(message_lower)
@@ -1875,7 +1990,100 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
                         "confidence": 0.75
                     })
                 break
-    
+
+    # Insight triggers = suggest learning_log entry
+    if "insight" in trigger_categories:
+        # IMPROVED TOPIC EXTRACTION - Parse actual subject matter
+        topic = None
+
+        # Strategy 1: Look for "conversation/discussion about X" patterns
+        context_patterns = [
+            r"conversation about ([^.!?]{5,50})",
+            r"discussion about ([^.!?]{5,50})",
+            r"talking about ([^.!?]{5,50})",
+            r"helped me understand ([^.!?]{5,50})",
+        ]
+
+        for pattern in context_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                subject = match.group(1).strip()
+                # Clean up: remove common endings, capitalize properly
+                subject = subject.rstrip(" really helped me").rstrip(" and")
+                # Title case key words
+                words = subject.split()
+                topic_words = [w.capitalize() if len(w) > 3 else w for w in words[:6]]
+                topic = " ".join(topic_words).strip()
+                break
+
+        # Strategy 2: Look for "Key insight:" followed by subject
+        if not topic and "key insight:" in message_lower:
+            after_insight = message_lower.split("key insight:", 1)[1].strip()
+            # Extract first meaningful noun phrase (up to first verb or 8 words)
+            words = after_insight.split()[:8]
+            # Find the main concept (look for nouns, skip articles)
+            topic_words = [w for w in words if w not in ["the", "a", "an", "is", "are", "that"]][:5]
+            if topic_words:
+                topic = " ".join(topic_words).rstrip(".,!?").strip().capitalize()
+
+        # Strategy 3: Original extraction from learning phrases
+        if not topic:
+            insight_phrases = [
+                ("i learned", "that"), ("learned that", None),
+                ("i realized", "that"), ("realized that", None),
+                ("key learning", "is"), ("key takeaway", "is"),
+            ]
+            for phrase, connector in insight_phrases:
+                if phrase in message_lower:
+                    after_phrase = message_lower.split(phrase, 1)[1].strip()
+                    if connector and connector in after_phrase:
+                        topic_part = after_phrase.split(connector, 1)[1].strip()  # Take after connector
+                    else:
+                        topic_part = after_phrase
+                    # Extract key nouns/concepts (first 6 words, skip filler)
+                    words = topic_part.split()[:6]
+                    topic_words = [w for w in words if w not in ["the", "a", "an", "that", "this"]]
+                    if topic_words:
+                        topic = " ".join(topic_words).rstrip(".,!?").strip().capitalize()
+                        break
+
+        # Strategy 4: Use detected concepts/skills as topic
+        if not topic and (detected_concepts or detected_skills):
+            if detected_concepts:
+                topic = f"{detected_concepts[0]} Insight"
+            else:
+                topic = f"{detected_skills[0]} Learning"
+
+        # Strategy 5: Fallback based on trigger context
+        if not topic:
+            if "achievement" in trigger_categories:
+                topic = "Achievement Reflection"
+            elif "state_change" in trigger_categories:
+                topic = "Life Transition Insight"
+            else:
+                topic = "General Insight"
+
+        # Build enriched details with conversation context
+        details = message
+        if context and context.strip():
+            # Summarize context briefly (first 150 chars)
+            context_summary = context.strip()[:150]
+            if len(context.strip()) > 150:
+                context_summary += "..."
+            details = f"Context: {context_summary}\n\nInsight: {message}"
+
+        suggestions.append({
+            "action": "add",
+            "entity": "learning_entry",
+            "data": {
+                "topic": topic,
+                "details": details,  # Message with context summary
+                "tags": detected_concepts + detected_skills if detected_concepts or detected_skills else []
+            },
+            "reason": f"Conceptual insight detected: {trigger_categories}",
+            "confidence": 0.82  # High confidence for explicit learning statements
+        })
+
     # Skill level triggers = suggest updating domain level
     if "skill_level" in trigger_categories:
         for skill in detected_skills:
@@ -2177,7 +2385,87 @@ def _analyze_single_message(message: str, context: str = "") -> dict:
                         "confidence": 0.7
                     })
                 break
-    
+
+    # Relationship triggers - detect connections
+    if "relationship" in trigger_categories:
+        # Load existing connections to check for duplicates
+        existing_connections = [c.get("name", "").lower() for c in persona.get("circle", {}).get("connections", [])]
+
+        # Patterns to extract person's name and relationship type
+        relationship_patterns = [
+            # "my X Name" patterns
+            (r"my (friend|colleague|coworker|teammate|mentor|manager|boss|boyfriend|girlfriend|partner|spouse|husband|wife) (?:is )?([A-Z][a-z]+(?: [A-Z][a-z]+)*)", "after", 0.85),
+            # "met Name" patterns
+            (r"(?:met|just met|recently met) ([A-Z][a-z]+(?: [A-Z][a-z]+)*)", "person", 0.75),
+            # "working with Name" patterns
+            (r"working with ([A-Z][a-z]+(?: [A-Z][a-z]+)*)", "colleague", 0.80),
+            # "Name is my X" patterns
+            (r"([A-Z][a-z]+(?: [A-Z][a-z]+)*) is my (friend|colleague|mentor|manager|boss)", "reverse", 0.85),
+        ]
+
+        # Pet patterns (simpler - just detect type and name)
+        pet_patterns = [
+            (r"my (dog|cat|puppy|kitten|pet) (?:is )?(?:named |called )?([A-Z][a-z]+)", 0.80),
+            (r"(?:got|adopted) a (dog|cat|puppy|kitten) (?:named |called )?([A-Z][a-z]+)", 0.80),
+        ]
+
+        connection_found = False
+
+        # Try relationship patterns first
+        for pattern, rel_type, conf in relationship_patterns:
+            match = re.search(pattern, message)
+            if match:
+                if rel_type == "after":
+                    relationship_type = match.group(1).title()
+                    name = match.group(2)
+                elif rel_type == "person":
+                    name = match.group(1)
+                    relationship_type = "Acquaintance"  # Default, can be updated later
+                elif rel_type == "reverse":
+                    name = match.group(1)
+                    relationship_type = match.group(2).title()
+                else:
+                    continue
+
+                if name.lower() not in existing_connections:
+                    suggestions.append({
+                        "action": "add",
+                        "entity": "connection",
+                        "data": {
+                            "name": name,
+                            "relationship": relationship_type,
+                            "traits": [],
+                            "notes": ""
+                        },
+                        "reason": f"New connection mentioned: {name} ({relationship_type})",
+                        "confidence": conf
+                    })
+                    connection_found = True
+                    break
+
+        # Try pet patterns if no person found
+        if not connection_found:
+            for pattern, conf in pet_patterns:
+                match = re.search(pattern, message)
+                if match:
+                    pet_type = match.group(1).title()
+                    pet_name = match.group(2)
+
+                    if pet_name.lower() not in existing_connections:
+                        suggestions.append({
+                            "action": "add",
+                            "entity": "connection",
+                            "data": {
+                                "name": pet_name,
+                                "relationship": f"Pet ({pet_type})",
+                                "traits": [],
+                                "notes": ""
+                            },
+                            "reason": f"Pet mentioned: {pet_name} ({pet_type})",
+                            "confidence": conf
+                        })
+                        break
+
     # Goal triggers
     if "goal" in trigger_categories:
         goal_phrases = [
@@ -3579,6 +3867,57 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             return f"❌ Highlight not found"
     
     # === LEARNING LOG ===
+    elif entity == "connection":
+        circle = load_json("circle.json")
+        if "error" in circle:
+            circle = {"connections": []}
+        connections = circle.setdefault("connections", [])
+        name = get_field(data, "name", "person", "contact", "connection_name")
+        relationship = get_field(data, "relationship")
+        traits = data.get("traits", [])
+        notes = data.get("notes", "")
+
+        if action == "add":
+            if not name:
+                return "❌ Connection requires 'name'"
+            if any(c.get("name", "").lower() == name.lower() for c in connections):
+                return f"ℹ️ Connection '{name}' already exists"
+
+            new_connection = {"name": name}
+            if relationship:
+                new_connection["relationship"] = relationship
+            if traits:
+                new_connection["traits"] = traits if isinstance(traits, list) else [traits]
+            if notes:
+                new_connection["notes"] = notes
+
+            connections.append(new_connection)
+            save_json("circle.json", circle)
+            return f"✅ Added connection: {name}"
+
+        elif action == "update":
+            idx, connection = find_in_array(connections, name or "", "name")
+            if idx == -1:
+                return f"❌ Connection '{name}' not found"
+
+            if relationship:
+                connection["relationship"] = relationship
+            if "traits" in data:
+                connection["traits"] = traits if isinstance(traits, list) else [traits]
+            if "notes" in data:
+                connection["notes"] = notes
+
+            save_json("circle.json", circle)
+            return f"✅ Updated connection: {name}"
+
+        elif action == "remove":
+            idx, _ = find_in_array(connections, name or "", "name")
+            if idx == -1:
+                return f"❌ Connection '{name}' not found"
+            connections.pop(idx)
+            save_json("circle.json", circle)
+            return f"✅ Removed connection: {name}"
+
     elif entity == "learning_entry":
         log = load_json("learning_log.json")
         if "error" in log:
@@ -3674,7 +4013,10 @@ async def call_tool(name: str, arguments: dict):
         
         elif name == "get_projects":
             return [TextContent(type="text", text=json.dumps(load_json("projects.json"), indent=2))]
-        
+
+        elif name == "get_circle":
+            return [TextContent(type="text", text=json.dumps(load_json("circle.json"), indent=2))]
+
         elif name == "get_learning_log":
             return [TextContent(type="text", text=json.dumps(load_json("learning_log.json"), indent=2))]
 
@@ -3817,7 +4159,7 @@ async def call_tool(name: str, arguments: dict):
 
 async def main():
     """Main entry point using stdio transport"""
-    logger.info("Starting MCP server v2")
+    logger.info("Starting MCP server")
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
