@@ -502,6 +502,11 @@ Contains: entries[] with enhanced structure for cross-LLM continuity:
             name="persona_modify",
             description="""Add, update, or remove items from persona data.
 
+CRITICAL REQUIREMENT: The 'data' parameter MUST be a non-empty object containing:
+1. An identifier field (name/title/topic) - REQUIRED to identify which item
+2. At least one additional field to modify (status, level, notes, etc.)
+NEVER pass an empty data object like {}. If unsure what fields to include, ask the user first.
+
 WRITING STYLE: Keep text SHORT and SCANNABLE. Use bullet points where possible.
 • notes/descriptions: Brief, focused phrases. Use bullets for multiple points.
 • highlights: One achievement per entry, focus on the key point
@@ -575,7 +580,8 @@ KEY: For UPDATE/REMOVE, the 'name' field identifies WHICH item to modify.""",
                     },
                     "data": {
                         "type": "object",
-                        "description": "Must include identifier (name/title) + fields to set. Example: {\"name\": \"MyProject\", \"status\": \"active\"}"
+                        "description": "REQUIRED: Non-empty object with identifier (name/title/topic) + fields to modify. Example: {\"name\": \"MyProject\", \"status\": \"active\"}. NEVER pass empty {}.",
+                        "minProperties": 1
                     }
                 },
                 "required": ["action", "entity", "data"]

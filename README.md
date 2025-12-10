@@ -199,6 +199,14 @@ Code style, communication preferences, learning style, response format, dislikes
 
 Current projects, what you're learning, top-of-mind items
 
+### Learning Log
+
+Insights, realizations, and conceptual learnings captured across conversations:
+- Topic, details, tags
+- Conversation context (what led to the insight)
+- Unique IDs for tracking entries over time
+- Supports conceptual learning, soft skills, and reflections (not just technical skills)
+
 ---
 
 ## Example Persona Updates
@@ -222,9 +230,23 @@ When you ask Claude to analyze your messages, it uses:
 **Sentiment Analysis** — Distinguishes between:
 
 - Declarative statements ("I am a developer") → High confidence
+- Insights & reflections ("This conversation helped me understand X") → High confidence, captured to learning log
 - Hypotheticals ("Maybe I should try...") → Low confidence
-- Venting ("Ugh, TypeScript is killing me") → Usually ignored
+- Venting ("Ugh, TypeScript is killing me") → Usually ignored, unless it contains insights
 - Questions ("Should I learn Rust?") → Ignored unless contains real info
+
+**Insight Detection** — Automatically captures conceptual learning and soft-skill insights:
+
+- Direct learning: "I learned that delegation requires accountability"
+- Facilitated insights: "This helped me understand pricing psychology"
+- Realizations: "I realized that titles don't guarantee commitment"
+- Key takeaways: "Key insight: the free tier needs to demonstrate value"
+- Reflections: "Looking back, I see the pattern now"
+
+Insights are saved to your learning log with:
+- **Smart topic extraction** from conversation context ("conversation about X" → extracts X as topic)
+- **Conversation context summary** (includes what led to the insight)
+- **Auto-tagging** with detected concepts/skills
 
 **Sentence-Level Analysis** — If you send a long message with a question at the end, the earlier statements still get detected.
 
@@ -247,9 +269,10 @@ When you ask Claude to analyze your messages, it uses:
 | `get_knowledge`          | Skills and mental tabs                                                                         |
 | `get_preferences`        | Code style, communication, dislikes                                                            |
 | `get_projects`           | Current projects and learning goals                                                            |
+| `get_learning_log`       | Insights and conceptual learnings captured over time                                           |
 | `persona_modify`         | Add/update/remove items (flexible field aliases)                                               |
 | `persona_batch`          | Multiple modifications in one call                                                             |
-| `suggest_persona_update` | Analyze a message for potential updates                                                        |
+| `suggest_persona_update` | Analyze a message for potential updates (includes insight detection for learning log)          |
 
 ### Scoped Context (`get_context`)
 
@@ -300,20 +323,26 @@ Run multiple updates in a single call:
 
 ### Supported Entities
 
-| Entity             | Actions             | Key Fields                                                                |
-| ------------------ | ------------------- | ------------------------------------------------------------------------- |
-| `skill`            | add, update, remove | name, level                                                               |
-| `domain`           | add, update, remove | name, level, tags                                                         |
-| `project`          | add, update, remove | name, status, tags, description                                           |
-| `hobby`            | add, update, remove | name, skill_level, status (active/inactive), notes, specifics, references |
-| `work_experience`  | add, update, remove | role, company, type, period, highlights                                   |
-| `work_highlight`   | add, remove         | company, highlight (or highlights[])                                      |
-| `top_of_mind`      | add, remove         | item/idea, note                                                           |
-| `current_learning` | add, remove         | topic                                                                     |
-| `dislike`          | add, remove         | item                                                                      |
-| `value`            | add, remove         | value                                                                     |
-| `passion`          | add, remove         | passion                                                                   |
-| And more...        |                     |                                                                           |
+| Entity                | Actions             | Key Fields                                                                |
+| --------------------- | ------------------- | ------------------------------------------------------------------------- |
+| `skill`               | add, update, remove | name, level                                                               |
+| `domain`              | add, update, remove | name, level, tags                                                         |
+| `project`             | add, update, remove | name, status, tags, description                                           |
+| `hobby`               | add, update, remove | name, skill_level, status (active/inactive), notes, specifics, references |
+| `work_experience`     | add, update, remove | role, company, type, period, highlights                                   |
+| `work_highlight`      | add, remove         | company, highlight (or highlights[])                                      |
+| `project_highlight`   | add, remove         | project_name, highlight (or highlights[])                                 |
+| `hobby_reference`     | add, remove         | hobby_name, ref_name, url, notes                                          |
+| `domain_reference`    | add, remove         | domain_name, ref_name, url, notes                                         |
+| `project_reference`   | add, remove         | project_name, ref_name, url, notes                                        |
+| `mental_tab_reference`| add, remove         | title (mental tab), ref_name, url, notes                                  |
+| `top_of_mind`         | add, remove         | item/idea, note                                                           |
+| `current_learning`    | add, remove         | topic                                                                     |
+| `dislike`             | add, remove         | item                                                                      |
+| `value`               | add, remove         | value                                                                     |
+| `passion`             | add, remove         | passion                                                                   |
+| `learning_entry`      | add, remove         | topic, details, tags, source (optional)                                   |
+| And more...           |                     |                                                                           |
 
 ---
 
@@ -321,12 +350,16 @@ Run multiple updates in a single call:
 
 - [x] Core persona read/write
 - [x] Smart context capture with sentiment analysis
+- [x] Insight detection for learning log (conceptual learning, soft skills, reflections)
+- [x] Smart topic extraction from conversation context
+- [x] Distinction between venting and reflection
 - [x] Sentence-level analysis for compound messages
 - [x] Scoped context retrieval (minimal/professional/personal/learning/full)
 - [x] Topic-based filtering for focused context
 - [x] Batch operations for multiple updates
 - [x] Hobby status tracking (active/inactive)
 - [x] Flexible field aliases across all entities
+- [x] Learning log with unique IDs and conversation context
 - [ ] Better auto-triggering (waiting on MCP improvements)
 - [ ] Conversation history for pattern detection
 - [ ] Data versioning
