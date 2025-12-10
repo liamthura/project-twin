@@ -30,18 +30,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Import and register persona routes
-from persona_routes import router as persona_router
-app.include_router(persona_router)
-
 # CORS configuration for local development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://localhost:5173",
         "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -134,7 +128,11 @@ def get_file_path(file_type: str) -> Path:
 
 
 def read_json_file(file_type: str) -> Dict[str, Any]:
-    """Read a JSON file, returning default if it doesn't exist."""
+    """Read a JSON file, returning default if it doesn't exist.
+
+    Includes migration logic for legacy data formats. Current data (as of Dec 2025)
+    is already migrated, but this serves as safety net for backups/imports.
+    """
     filepath = get_file_path(file_type)
     if filepath.exists():
         try:
