@@ -103,3 +103,4 @@ coverage/
 .vercel
 .turbo
 persona_mcp/
+backend/archive/

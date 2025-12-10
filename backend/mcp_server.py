@@ -429,41 +429,56 @@ Returns: profile, lifestyle, knowledge, preferences, projects, learning_log.""",
         Tool(
             name="get_learning_log",
             description="""Raw learning log for editing and deeper specific understanding. Use get_context(scope='learning') first for general persona requests.
-        Contains: entries[] with {timestamp, topic, details, source, tags[]}.""",
+
+Contains: entries[] with enhanced structure for cross-LLM continuity:
+• topic: Main subject learned
+• details: What was learned (can be detailed)
+• source: LLM + context (e.g., "Claude Sonnet - Persona MCP development")
+• tags[]: Categorization tags
+• timestamp: ISO timestamp (auto-generated)
+• conversation_metadata: {conversation_id, conversation_url, llm_model} (optional)
+• key_decisions[]: Important decisions made (optional)
+• followup_items[]: Action items for future (optional)
+• related_entries[]: Links to related learning entries (optional)""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ),
-        
+
         # === WRITE TOOLS (3) ===
-        Tool(
-            name="persona_update",
-            description="""Update a single field using dot-notation path.
-Use this for simple field updates when you know the exact path.
-
-Examples:
-- profile.location → "London, UK"
-- profile.bio → "Updated bio text"
-- profile.contact.github → "newusername"  
-- lifestyle.hobbies.Gaming.notes → "Playing more lately"
-- knowledge.domains.Python.level → "advanced"
-- projects.projects.Solterra.status → "completed"
-
-For arrays, use item name as path segment.
-For complex operations (add/remove items), use persona_modify instead.""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Dot-notation path to the field (e.g., 'profile.bio', 'lifestyle.hobbies.Gaming.skill_level')"
-                    },
-                    "value": {
-                        "type": "string",
-                        "description": "New value for the field"
-                    }
-                },
-                "required": ["path", "value"]
-            }
-        ),
+        # NOTE: persona_update archived Dec 10 2025
+        # Reason: Redundant with persona_modify - consolidating to single tool pattern reduces
+        # cognitive load for LLMs and eliminates ambiguity about which tool to use.
+        # persona_modify can handle both simple field updates and complex operations.
+        # Kept commented for future reference in case dot-notation interface is needed again.
+        # Tool(
+        #     name="persona_update",
+        #     description="""Update a single field using dot-notation path.
+        # Use this for simple field updates when you know the exact path.
+        #
+        # Examples:
+        # - profile.location → "London, UK"
+        # - profile.bio → "Updated bio text"
+        # - profile.contact.github → "newusername"
+        # - lifestyle.hobbies.Gaming.notes → "Playing more lately"
+        # - knowledge.domains.Python.level → "advanced"
+        # - projects.projects.Solterra.status → "completed"
+        #
+        # For arrays, use item name as path segment.
+        # For complex operations (add/remove items), use persona_modify instead.""",
+        #     inputSchema={
+        #         "type": "object",
+        #         "properties": {
+        #             "path": {
+        #                 "type": "string",
+        #                 "description": "Dot-notation path to the field (e.g., 'profile.bio', 'lifestyle.hobbies.Gaming.skill_level')"
+        #             },
+        #             "value": {
+        #                 "type": "string",
+        #                 "description": "New value for the field"
+        #             }
+        #         },
+        #         "required": ["path", "value"]
+        #     }
+        # ),
         Tool(
             name="persona_modify",
             description="""Add, update, or remove items from persona data.
@@ -491,10 +506,33 @@ DATA EXAMPLES (always include identifier + fields to change):
 • ADD dislike: {"dislike": "morning meetings"}
 • ADD mood_override: {"mood": "stressed", "tone": "calm", "detail_level": "brief"}
 • UPDATE communication_default: {"tone": "friendly", "detail_level": "concise"}
-• ADD learning_entry: {"topic": "React Hooks", "details": "Learned useState and useEffect. Details: [what was learned]", "source": "Claude Sonnet - conversation about [context]", "tags": ["react", "frontend"]}
+• ADD learning_entry: Basic format:
+  {"topic": "React Hooks", "details": "Learned useState and useEffect...", "source": "Claude Sonnet - debugging session", "tags": ["react", "frontend"]}
 
-LEARNING_ENTRY SOURCE FORMAT: Include LLM name + conversation context
-Example sources: "Claude Sonnet - debugging React app", "GPT-4 - career advice chat", "Gemini - learning Python", "Manual entry"
+• ADD learning_entry: Enhanced format with conversation continuity:
+  {
+    "topic": "Persona Manager Development",
+    "details": "Consolidated architecture decisions...",
+    "source": "Claude Sonnet - Persona MCP scoped context development",
+    "tags": ["architecture", "MCP", "decisions"],
+    "conversation_metadata": {
+      "conversation_id": "chat_abc123",
+      "conversation_url": "https://claude.ai/chat/abc123",
+      "llm_model": "claude-sonnet-4"
+    },
+    "key_decisions": ["Consolidated 40 tools to 9", "Chose Tauri over Electron"],
+    "followup_items": ["Fix entity extraction bugs", "Expand trigger coverage"]
+  }
+
+LEARNING_ENTRY FIELDS:
+• topic (required): Main subject
+• details (required): What was learned
+• source (required): LLM + context - e.g., "Claude Sonnet - debugging React app", "GPT-4 - career advice"
+• tags[]: Categorization
+• conversation_metadata: {conversation_id, conversation_url, llm_model} - for tracing back to original conversation
+• key_decisions[]: Important decisions made during the conversation
+• followup_items[]: Action items or next steps identified
+• related_entries[]: IDs of related learning entries for linking context
 
 NESTED ITEMS (must include parent identifier):
 • Highlights: {"company"/"project_name": "X", "highlight": "Achievement text"}
@@ -3550,28 +3588,58 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         if action == "add":
             if not data.get("topic") or not data.get("details"):
                 return "❌ Learning entry requires 'topic' and 'details'"
-            entries.append({
+
+            # Generate unique entry ID for cross-referencing
+            import uuid
+            entry_id = f"learn_{datetime.now().strftime('%Y%m%d')}_{uuid.uuid4().hex[:6]}"
+
+            # Build entry with required and optional fields
+            entry = {
+                "id": entry_id,
                 "topic": data["topic"],
                 "details": data["details"],
                 "source": data.get("source", "conversation"),
                 "tags": data.get("tags", []),
                 "timestamp": datetime.now().isoformat()
-            })
+            }
+
+            # Add optional conversation continuity fields if provided
+            if data.get("conversation_metadata"):
+                entry["conversation_metadata"] = data["conversation_metadata"]
+            if data.get("key_decisions"):
+                entry["key_decisions"] = data["key_decisions"]
+            if data.get("followup_items"):
+                entry["followup_items"] = data["followup_items"]
+            if data.get("related_entries"):
+                entry["related_entries"] = data["related_entries"]
+
+            entries.append(entry)
             save_json("learning_log.json", log)
-            return f"✅ Logged learning: {data['topic']}"
+            return f"✅ Logged learning: {data['topic']} (id: {entry_id})"
 
         elif action == "update":
-            return "❌ Learning log entries are immutable (chronological record). Add a new entry instead to show progression."
+            # Allow updating followup_items to mark them as done
+            entry_id = data.get("id")
+            if entry_id and data.get("followup_items"):
+                for entry in entries:
+                    if entry.get("id") == entry_id:
+                        entry["followup_items"] = data["followup_items"]
+                        save_json("learning_log.json", log)
+                        return f"✅ Updated followup items for: {entry.get('topic', entry_id)}"
+                return f"❌ Entry not found: {entry_id}"
+            return "❌ Learning log entries are mostly immutable. You can only update followup_items by providing entry 'id'."
 
         elif action == "remove":
-            # Find by topic (most recent first)
+            # Find by topic (most recent first) or by id
             topic = data.get("topic", "")
+            entry_id = data.get("id", "")
             for i in range(len(entries) - 1, -1, -1):
-                if entries[i].get("topic", "").lower() == topic.lower():
-                    entries.pop(i)
+                if (entry_id and entries[i].get("id") == entry_id) or \
+                   (topic and entries[i].get("topic", "").lower() == topic.lower()):
+                    removed = entries.pop(i)
                     save_json("learning_log.json", log)
-                    return f"✅ Removed learning entry: {topic}"
-            return f"❌ Learning entry not found: {topic}"
+                    return f"✅ Removed learning entry: {removed.get('topic', entry_id)}"
+            return f"❌ Learning entry not found: {topic or entry_id}"
     
     return f"❌ Unknown entity type: {entity}"
 
@@ -3609,33 +3677,33 @@ async def call_tool(name: str, arguments: dict):
         
         elif name == "get_learning_log":
             return [TextContent(type="text", text=json.dumps(load_json("learning_log.json"), indent=2))]
-        
+
         # WRITE operations
-        elif name == "persona_update":
-            path = arguments.get("path", "")
-            value = arguments.get("value", "")
-            
-            # Parse the path to determine which file to update
-            parts = path.split(".")
-            if not parts:
-                return [TextContent(type="text", text="❌ Invalid path")]
-            
-            root = parts[0]
-            if root not in FILE_MAP:
-                return [TextContent(type="text", text=f"❌ Unknown root: {root}. Use: profile, lifestyle, knowledge, preferences, projects")]
-            
-            data = load_json(FILE_MAP[root])
-            remaining_path = ".".join(parts[1:])
-            
-            if remaining_path:
-                if set_nested_value(data, remaining_path, value):
-                    if save_json(FILE_MAP[root], data):
-                        return [TextContent(type="text", text=f"✅ Updated {path} = {value}")]
-                return [TextContent(type="text", text=f"❌ Failed to update {path}")]
-            else:
-                return [TextContent(type="text", text=f"❌ Path too short, need field to update")]
-        
-        elif name == "persona_modify":
+        # elif name == "persona_update":  # ARCHIVED: See tool definition comment above
+        #     path = arguments.get("path", "")
+        #     value = arguments.get("value", "")
+        #
+        #     # Parse the path to determine which file to update
+        #     parts = path.split(".")
+        #     if not parts:
+        #         return [TextContent(type="text", text="❌ Invalid path")]
+        #
+        #     root = parts[0]
+        #     if root not in FILE_MAP:
+        #         return [TextContent(type="text", text=f"❌ Unknown root: {root}. Use: profile, lifestyle, knowledge, preferences, projects")]
+        #
+        #     data = load_json(FILE_MAP[root])
+        #     remaining_path = ".".join(parts[1:])
+        #
+        #     if remaining_path:
+        #         if set_nested_value(data, remaining_path, value):
+        #             if save_json(FILE_MAP[root], data):
+        #                 return [TextContent(type="text", text=f"✅ Updated {path} = {value}")]
+        #         return [TextContent(type="text", text=f"❌ Failed to update {path}")]
+        #     else:
+        #         return [TextContent(type="text", text=f"❌ Path too short, need field to update")]
+
+        if name == "persona_modify":
             action = arguments.get("action", "")
             entity = arguments.get("entity", "")
             data = arguments.get("data", {})

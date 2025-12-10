@@ -254,6 +254,28 @@ def read_json_file(file_type: str) -> Dict[str, Any]:
                             "energy_peaks": [],
                             "stress_triggers": []
                         })
+                if file_type == "learning_log":
+                    # Migrate existing entries to enhanced schema with IDs
+                    entries = data.get("entries", [])
+                    if isinstance(entries, list):
+                        import uuid
+                        from datetime import datetime as dt
+                        for entry in entries:
+                            if isinstance(entry, dict):
+                                # Add ID if missing (for cross-referencing)
+                                if "id" not in entry:
+                                    # Generate ID from timestamp or index
+                                    ts = entry.get("timestamp", "")
+                                    if ts:
+                                        try:
+                                            date_part = ts[:10].replace("-", "")
+                                        except:
+                                            date_part = dt.now().strftime("%Y%m%d")
+                                    else:
+                                        date_part = dt.now().strftime("%Y%m%d")
+                                    entry["id"] = f"learn_{date_part}_{uuid.uuid4().hex[:6]}"
+                                # Ensure optional fields have proper defaults when accessed
+                                # (don't add empty fields to keep data clean)
                 return data
         except json.JSONDecodeError:
             return DEFAULTS.get(file_type, {})
