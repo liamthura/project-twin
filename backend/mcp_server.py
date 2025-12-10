@@ -479,6 +479,7 @@ ENTITIES BY FILE:
 • knowledge: domain, domain_reference, mental_tab, mental_tab_reference
 • projects: project, project_reference, project_highlight, current_learning, top_of_mind
 • preferences: dislike, communication_default, mood_override
+• learning_log: learning_entry
 
 DATA EXAMPLES (always include identifier + fields to change):
 • UPDATE project: {"name": "ProjectName", "status": "active", "notes": "new notes"}
@@ -490,6 +491,10 @@ DATA EXAMPLES (always include identifier + fields to change):
 • ADD dislike: {"dislike": "morning meetings"}
 • ADD mood_override: {"mood": "stressed", "tone": "calm", "detail_level": "brief"}
 • UPDATE communication_default: {"tone": "friendly", "detail_level": "concise"}
+• ADD learning_entry: {"topic": "React Hooks", "details": "Learned useState and useEffect. Details: [what was learned]", "source": "Claude Sonnet - conversation about [context]", "tags": ["react", "frontend"]}
+
+LEARNING_ENTRY SOURCE FORMAT: Include LLM name + conversation context
+Example sources: "Claude Sonnet - debugging React app", "GPT-4 - career advice chat", "Gemini - learning Python", "Manual entry"
 
 NESTED ITEMS (must include parent identifier):
 • Highlights: {"company"/"project_name": "X", "highlight": "Achievement text"}
@@ -3541,7 +3546,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         if "error" in log:
             log = {"entries": []}
         entries = log.setdefault("entries", [])
-        
+
         if action == "add":
             if not data.get("topic") or not data.get("details"):
                 return "❌ Learning entry requires 'topic' and 'details'"
@@ -3554,7 +3559,10 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             })
             save_json("learning_log.json", log)
             return f"✅ Logged learning: {data['topic']}"
-        
+
+        elif action == "update":
+            return "❌ Learning log entries are immutable (chronological record). Add a new entry instead to show progression."
+
         elif action == "remove":
             # Find by topic (most recent first)
             topic = data.get("topic", "")
@@ -3563,7 +3571,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                     entries.pop(i)
                     save_json("learning_log.json", log)
                     return f"✅ Removed learning entry: {topic}"
-            return f"❌ Learning entry not found"
+            return f"❌ Learning entry not found: {topic}"
     
     return f"❌ Unknown entity type: {entity}"
 
