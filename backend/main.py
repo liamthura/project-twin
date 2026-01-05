@@ -436,9 +436,46 @@ async def export_data():
     )
 
 
+def deep_merge(existing: dict, incoming: dict) -> dict:
+    """Deep merge two dicts. Arrays are concatenated (with dedup for objects with 'id')."""
+    result = existing.copy()
+    
+    for key, incoming_val in incoming.items():
+        if key not in result:
+            result[key] = incoming_val
+        elif isinstance(result[key], dict) and isinstance(incoming_val, dict):
+            result[key] = deep_merge(result[key], incoming_val)
+        elif isinstance(result[key], list) and isinstance(incoming_val, list):
+            # Merge arrays - dedupe by 'id' if objects have it
+            existing_list = result[key]
+            existing_ids = {item.get('id') for item in existing_list if isinstance(item, dict) and 'id' in item}
+            
+            for item in incoming_val:
+                if isinstance(item, dict) and 'id' in item:
+                    if item['id'] not in existing_ids:
+                        existing_list.append(item)
+                        existing_ids.add(item['id'])
+                elif item not in existing_list:  # Simple values - avoid duplicates
+                    existing_list.append(item)
+            result[key] = existing_list
+        else:
+            # Scalar values - incoming overwrites
+            result[key] = incoming_val
+    
+    return result
+
+
 @app.post("/api/import")
-async def import_data(file: UploadFile = File(...)):
-    """Import MyGist data from an uploaded zip file."""
+async def import_data(file: UploadFile = File(...), mode: str = "replace"):
+    """
+    Import MyGist data from an uploaded zip file.
+    
+    mode: "replace" (default) - replaces existing files
+          "merge" - merges with existing data (arrays concatenated, objects merged)
+    """
+    if mode not in ("replace", "merge"):
+        raise HTTPException(status_code=400, detail="Mode must be 'replace' or 'merge'")
+    
     if not file.filename.endswith('.zip'):
         raise HTTPException(status_code=400, detail="File must be a .zip archive")
     
@@ -451,7 +488,6 @@ async def import_data(file: UploadFile = File(...)):
             for name in zf.namelist():
                 if not name.endswith('.json'):
                     continue
-                # Prevent path traversal
                 if '..' in name or name.startswith('/'):
                     raise HTTPException(status_code=400, detail=f"Invalid filename: {name}")
             
@@ -460,18 +496,28 @@ async def import_data(file: UploadFile = File(...)):
             if DATA_DIR.exists() and any(DATA_DIR.glob("*.json")):
                 shutil.copytree(DATA_DIR, backup_dir)
             
-            # Ensure data dir exists
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             
-            # Extract only JSON files (skip metadata)
             imported_files = []
             for name in zf.namelist():
                 if name.endswith('.json') and not name.startswith('_'):
-                    zf.extract(name, DATA_DIR)
+                    file_path = DATA_DIR / name
+                    
+                    if mode == "merge" and file_path.exists():
+                        # Merge mode: combine with existing
+                        existing_data = json.loads(file_path.read_text())
+                        incoming_data = json.loads(zf.read(name))
+                        merged_data = deep_merge(existing_data, incoming_data)
+                        file_path.write_text(json.dumps(merged_data, indent=2))
+                    else:
+                        # Replace mode: overwrite
+                        zf.extract(name, DATA_DIR)
+                    
                     imported_files.append(name)
             
             return {
                 "status": "success",
+                "mode": mode,
                 "imported_files": imported_files,
                 "backup_created": str(backup_dir) if backup_dir.exists() else None
             }

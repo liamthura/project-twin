@@ -159,7 +159,8 @@ async function exportData() {
 }
 
 // Import data from zip file
-async function importData(file) {
+// mode: "replace" (default) or "merge"
+async function importData(file, mode = "replace") {
   const baseUrl = getApiBase();
   const token = getAuthToken();
 
@@ -171,7 +172,7 @@ async function importData(file) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${baseUrl}/import`, {
+  const response = await fetch(`${baseUrl}/import?mode=${mode}`, {
     method: "POST",
     headers,
     body: formData,

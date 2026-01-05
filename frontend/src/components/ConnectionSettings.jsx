@@ -43,6 +43,7 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
   const [showToken, setShowToken] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importMode, setImportMode] = useState("replace");
   const [backupResult, setBackupResult] = useState(null);
 
   useEffect(() => {
@@ -121,10 +122,12 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
     setImporting(true);
     setBackupResult(null);
     try {
-      const result = await importData(file);
+      const result = await importData(file, importMode);
       setBackupResult({
         success: true,
-        message: `Imported ${result.imported_files?.length || 0} files`,
+        message: `${importMode === "merge" ? "Merged" : "Imported"} ${
+          result.imported_files?.length || 0
+        } files`,
       });
     } catch (error) {
       setBackupResult({ success: false, message: error.message });
@@ -260,6 +263,19 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
                 onChange={handleImport}
                 className="hidden"
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">
+                Import mode:
+              </label>
+              <select
+                value={importMode}
+                onChange={(e) => setImportMode(e.target.value)}
+                className="text-xs bg-background border rounded px-2 py-1"
+              >
+                <option value="replace">Replace (overwrite)</option>
+                <option value="merge">Merge (combine data)</option>
+              </select>
             </div>
             {backupResult && (
               <div
