@@ -11,34 +11,70 @@ Usage:
 """
 
 import os
+import sys
 import secrets
 import logging
+import traceback
 from pathlib import Path
-from starlette.applications import Starlette
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import JSONResponse, FileResponse
-from starlette.routing import Mount, Route
-from starlette.staticfiles import StaticFiles
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
-# Setup logging
+# Setup logging FIRST
 logging.basicConfig(
     level=logging.DEBUG if os.getenv("DEBUG", "false").lower() == "true" else logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Import both apps
-# main.py is FastAPI (which is also ASGI-compatible)
-from main import app as fastapi_app
-from server import mcp, DATA_DIR
+# Log startup info
+logger.info("=" * 60)
+logger.info("MyGist App Starting...")
+logger.info(f"Python: {sys.version}")
+logger.info(f"Working directory: {os.getcwd()}")
+logger.info(f"Files in /app: {os.listdir('/app') if os.path.exists('/app') else 'N/A'}")
+logger.info("=" * 60)
 
-# Get MCP's Starlette app
-mcp_app = mcp.http_app()
+try:
+    from starlette.applications import Starlette
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse, FileResponse
+    from starlette.routing import Mount, Route
+    from starlette.staticfiles import StaticFiles
+    from dotenv import load_dotenv
+    logger.info("✅ Starlette imports successful")
+except Exception as e:
+    logger.error(f"❌ Failed to import Starlette: {e}")
+    traceback.print_exc()
+    raise
+
+# Load environment variables
+load_dotenv()
+
+try:
+    # Import both apps
+    # main.py is FastAPI (which is also ASGI-compatible)
+    from main import app as fastapi_app
+    logger.info("✅ FastAPI app imported")
+except Exception as e:
+    logger.error(f"❌ Failed to import main.py: {e}")
+    traceback.print_exc()
+    raise
+
+try:
+    from server import mcp, DATA_DIR
+    logger.info("✅ MCP server imported")
+except Exception as e:
+    logger.error(f"❌ Failed to import server.py: {e}")
+    traceback.print_exc()
+    raise
+
+try:
+    # Get MCP's Starlette app
+    mcp_app = mcp.http_app()
+    logger.info("✅ MCP HTTP app created")
+except Exception as e:
+    logger.error(f"❌ Failed to create MCP HTTP app: {e}")
+    traceback.print_exc()
+    raise
 
 # Frontend static files directory
 STATIC_DIR = Path(os.getenv("STATIC_DIR", Path(__file__).parent / "static"))
@@ -165,7 +201,13 @@ def create_combined_app():
 
 
 # Create app for uvicorn
-app = create_combined_app()
+try:
+    app = create_combined_app()
+    logger.info("✅ Combined app created successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to create combined app: {e}")
+    traceback.print_exc()
+    raise
 
 
 if __name__ == "__main__":
