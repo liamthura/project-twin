@@ -7,10 +7,15 @@ Reads and writes directly to the data directory.
 
 import json
 import os
+import zipfile
+import io
+import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -296,11 +301,24 @@ def write_json_file(file_type: str, data: Dict[str, Any]) -> None:
 
 @app.get("/")
 async def root():
-    """Health check endpoint."""
+    """Root endpoint with service info."""
     return {
         "status": "ok",
         "service": "MyGist API",
-        "data_dir": str(DATA_DIR.absolute())
+        "data_dir": str(DATA_DIR.absolute()),
+        "data_dir_exists": DATA_DIR.exists()
+    }
+
+
+@app.get("/health")
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint for container orchestration."""
+    return {
+        "status": "ok",
+        "service": "mygist",
+        "data_dir": str(DATA_DIR.absolute()),
+        "data_dir_exists": DATA_DIR.exists()
     }
 
 
@@ -358,6 +376,87 @@ async def reset_file(file_type: str):
         raise HTTPException(status_code=400, detail=f"No default for: {file_type}")
     write_json_file(file_type, DEFAULTS[file_type])
     return {"status": "reset", "file_type": file_type}
+
+
+# ============================================================================
+# Backup & Restore
+# ============================================================================
+
+@app.get("/api/export")
+async def export_data():
+    """Export all MyGist data as a downloadable zip file."""
+    if not DATA_DIR.exists():
+        raise HTTPException(status_code=404, detail="Data directory not found")
+    
+    # Create zip in memory
+    zip_buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        # Add all JSON files from DATA_DIR
+        for json_file in DATA_DIR.glob("*.json"):
+            zf.write(json_file, json_file.name)
+        
+        # Add metadata
+        metadata = {
+            "exported_at": datetime.now().isoformat(),
+            "version": "1.0.0",
+            "files": [f.name for f in DATA_DIR.glob("*.json")]
+        }
+        zf.writestr("_metadata.json", json.dumps(metadata, indent=2))
+    
+    zip_buffer.seek(0)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"mygist_backup_{timestamp}.zip"
+    
+    return Response(
+        content=zip_buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@app.post("/api/import")
+async def import_data(file: UploadFile = File(...)):
+    """Import MyGist data from an uploaded zip file."""
+    if not file.filename.endswith('.zip'):
+        raise HTTPException(status_code=400, detail="File must be a .zip archive")
+    
+    zip_data = await file.read()
+    
+    try:
+        zip_buffer = io.BytesIO(zip_data)
+        with zipfile.ZipFile(zip_buffer, 'r') as zf:
+            # Security check: only allow .json files
+            for name in zf.namelist():
+                if not name.endswith('.json'):
+                    continue
+                # Prevent path traversal
+                if '..' in name or name.startswith('/'):
+                    raise HTTPException(status_code=400, detail=f"Invalid filename: {name}")
+            
+            # Create backup of current data
+            backup_dir = DATA_DIR.parent / f"mygist_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            if DATA_DIR.exists() and any(DATA_DIR.glob("*.json")):
+                shutil.copytree(DATA_DIR, backup_dir)
+            
+            # Ensure data dir exists
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            
+            # Extract only JSON files (skip metadata)
+            imported_files = []
+            for name in zf.namelist():
+                if name.endswith('.json') and not name.startswith('_'):
+                    zf.extract(name, DATA_DIR)
+                    imported_files.append(name)
+            
+            return {
+                "status": "success",
+                "imported_files": imported_files,
+                "backup_created": str(backup_dir) if backup_dir.exists() else None
+            }
+            
+    except zipfile.BadZipFile:
+        raise HTTPException(status_code=400, detail="Invalid zip file")
 
 
 # ============================================================================
