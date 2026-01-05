@@ -68,10 +68,10 @@ except Exception as e:
     raise
 
 try:
-    # Get MCP's Starlette app with custom path
-    # Use "/" so when mounted at /mcp, the endpoint is /mcp (not /mcp/mcp)
-    mcp_app = mcp.http_app(path="/")
-    logger.info("✅ MCP HTTP app created")
+    # Get MCP's Starlette app with SSE transport
+    # SSE is more compatible with reverse proxies and supergateway
+    mcp_app = mcp.http_app(path="/", transport="sse")
+    logger.info("✅ MCP HTTP app created (SSE transport)")
 except Exception as e:
     logger.error(f"❌ Failed to create MCP HTTP app: {e}")
     traceback.print_exc()
