@@ -49,23 +49,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-
-// API Configuration
-const API_BASE = "/api";
-
-async function api(endpoint, options = {}) {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    ...options,
-  });
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
-  }
-  return response.json();
-}
+import {
+  ConnectionSettings,
+  ConnectionStatus,
+} from "@/components/ConnectionSettings";
+import { api } from "@/lib/api";
 
 // Debounce hook
 function useDebounce(callback, delay) {
@@ -5614,6 +5602,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
   const [isAutosaveEnabled, setIsAutosaveEnabled] = useState(true);
+  const [showConnectionSettings, setShowConnectionSettings] = useState(false);
   const { toast } = useToast();
 
   const [profile, setProfile] = useState({});
@@ -5768,22 +5757,31 @@ export default function App() {
             <CardTitle className="text-destructive">
               Connection Failed
             </CardTitle>
-            <CardDescription>
-              Could not connect to the backend server.
-            </CardDescription>
+            <CardDescription>{error}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Button onClick={loadAllData} className="w-full">
               <RefreshCw className="h-4 w-4 mr-2" />
               Retry Connection
             </Button>
-            <pre className="text-xs bg-muted p-3 rounded-md overflow-auto">
-              cd backend{"\n"}
-              pip install -r requirements.txt{"\n"}
-              python main.py
-            </pre>
+            <Button
+              onClick={() => setShowConnectionSettings(true)}
+              variant="outline"
+              className="w-full"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Configure Server
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              Connect to a remote server or run locally
+            </p>
           </CardContent>
         </Card>
+        <ConnectionSettings
+          isOpen={showConnectionSettings}
+          onClose={() => setShowConnectionSettings(false)}
+          onConnectionChange={loadAllData}
+        />
       </div>
     );
   }
@@ -5803,6 +5801,9 @@ export default function App() {
               </p>
             </div>
             <div className="flex items-center gap-2 text-sm">
+              <ConnectionStatus
+                onClick={() => setShowConnectionSettings(true)}
+              />
               {isConnected ? (
                 <Badge variant="outline" className="gap-1.5">
                   {isSaving ? (
@@ -5949,6 +5950,13 @@ export default function App() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Connection Settings Dialog */}
+      <ConnectionSettings
+        isOpen={showConnectionSettings}
+        onClose={() => setShowConnectionSettings(false)}
+        onConnectionChange={loadAllData}
+      />
 
       <Toaster />
     </div>

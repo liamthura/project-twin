@@ -1,0 +1,28 @@
+# =============================================================================
+# MyGist MCP Server - Docker Compose for Local Development
+# =============================================================================
+# Usage:
+#   docker compose up -d        # Start server
+#   docker compose logs -f      # View logs
+#   docker compose down         # Stop server
+
+services:
+  mygist:
+    build: .
+    container_name: mygist-mcp
+    ports:
+      - "8000:8000"
+    environment:
+      - MYGIST_API_TOKEN=${MYGIST_API_TOKEN:-dev-token-change-me}
+      - PERSONA_DATA_DIR=/app/data
+      - DEBUG=true
+    volumes:
+      # Mount persona data from parent directory
+      - ../mygist_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
