@@ -163,7 +163,7 @@ def create_combined_app():
     routes = [
         Route("/health", endpoint=health_handler, methods=["GET"]),
         Route("/healthz", endpoint=health_handler, methods=["GET"]),
-        Mount("/mcp", app=mcp_app),        # MCP server at /mcp
+        Mount("/mcp", app=mcp_app),        # MCP server at /mcp/*
     ]
     
     # Add static file serving if frontend is built
