@@ -33,7 +33,7 @@ import {
   getApiBase,
   exportData,
   importData,
-} from "@/lib/api";
+} from "@/lib/api.js";
 
 export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
   const [serverUrl, setServerUrl] = useState("");

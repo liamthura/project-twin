@@ -53,7 +53,7 @@ import {
   ConnectionSettings,
   ConnectionStatus,
 } from "@/components/ConnectionSettings";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api.js";
 
 // Debounce hook
 function useDebounce(callback, delay) {
