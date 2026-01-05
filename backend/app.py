@@ -33,7 +33,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import both apps
-from main import app as rest_app
+# main.py is FastAPI (which is also ASGI-compatible)
+from main import app as fastapi_app
 from server import mcp, DATA_DIR
 
 # Get MCP's Starlette app
@@ -121,42 +122,25 @@ async def spa_fallback(request):
 def create_combined_app():
     """Create the combined app with all routes."""
     
+    # Build routes list - order matters!
     routes = [
         Route("/health", endpoint=health_handler, methods=["GET"]),
         Route("/healthz", endpoint=health_handler, methods=["GET"]),
-        Mount("/api", app=rest_app),   # REST API
-        Mount("/mcp", app=mcp_app),    # MCP server
+        Mount("/mcp", app=mcp_app),        # MCP server at /mcp/*
     ]
     
-    # Add static files if directory exists
+    # Add static file serving if frontend is built
     if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
-        # Mount static assets (js, css, etc.)
+        # Static assets (vite puts JS/CSS here)
         if (STATIC_DIR / "assets").exists():
             routes.append(Mount("/assets", app=StaticFiles(directory=STATIC_DIR / "assets")))
-        
-        # Serve other static files (favicon, etc.)
-        routes.append(Mount("/static", app=StaticFiles(directory=STATIC_DIR)))
-        
-        # SPA fallback for all other routes (must be last)
-        routes.append(Route("/{path:path}", endpoint=spa_fallback, methods=["GET"]))
-        routes.insert(0, Route("/", endpoint=spa_fallback, methods=["GET"]))
-        
         logger.info(f"Serving frontend from: {STATIC_DIR}")
     else:
-        # No frontend, just show API info at root
-        async def api_info(request):
-            return JSONResponse({
-                "service": "MyGist",
-                "version": "2.0.0",
-                "endpoints": {
-                    "api": "/api/*",
-                    "mcp": "/mcp/*",
-                    "health": "/health"
-                },
-                "note": "Frontend not found. Set STATIC_DIR or build frontend."
-            })
-        routes.insert(0, Route("/", endpoint=api_info, methods=["GET"]))
         logger.warning(f"Frontend not found at: {STATIC_DIR}")
+    
+    # Mount FastAPI app - handles /api/* and / routes
+    # This must come after specific routes but will handle everything else
+    routes.append(Mount("/", app=fastapi_app))
     
     app = Starlette(routes=routes)
     

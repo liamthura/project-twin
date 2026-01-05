@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -24,6 +25,7 @@ load_dotenv()
 
 # Configuration
 DATA_DIR = Path(os.getenv("PERSONA_DATA_DIR", Path(__file__).parent.parent / "mygist_data"))
+STATIC_DIR = Path(os.getenv("STATIC_DIR", Path(__file__).parent / "static"))
 
 # Ensure data directory exists
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -457,6 +459,38 @@ async def import_data(file: UploadFile = File(...)):
             
     except zipfile.BadZipFile:
         raise HTTPException(status_code=400, detail="Invalid zip file")
+
+
+# ============================================================================
+# Static Files & SPA Fallback
+# ============================================================================
+
+# Mount static assets if they exist
+if STATIC_DIR.exists():
+    if (STATIC_DIR / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+
+
+# SPA catch-all route - must be defined last
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    """Serve SPA for any non-API routes."""
+    # Don't catch /api or /mcp routes
+    if full_path.startswith("api/") or full_path.startswith("mcp/"):
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    # Try to serve the static file first
+    static_file = STATIC_DIR / full_path
+    if static_file.exists() and static_file.is_file():
+        return FileResponse(static_file)
+    
+    # Fallback to index.html for SPA routing
+    index_file = STATIC_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    
+    # No frontend built
+    return {"error": "Frontend not found", "endpoints": {"/api/*": "REST API", "/health": "Health check"}}
 
 
 # ============================================================================
