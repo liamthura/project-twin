@@ -1,22 +1,24 @@
 """
-MyGist Backend (formerly Persona Manager)
+MyGist API + MCP Server
 
-FastAPI server that provides CRUD operations for persona JSON files.
-Reads and writes directly to the data directory.
+Single entry point serving:
+- REST API at /api/*
+- MCP server at /mcp
+- Health check at /health
 """
 
 import json
 import os
+import secrets
 import zipfile
 import io
 import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -25,30 +27,49 @@ load_dotenv()
 
 # Configuration
 DATA_DIR = Path(os.getenv("PERSONA_DATA_DIR", Path(__file__).parent.parent / "mygist_data"))
-STATIC_DIR = Path(os.getenv("STATIC_DIR", Path(__file__).parent / "static"))
-
-# Ensure data directory exists
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Initialize FastAPI
-app = FastAPI(
-    title="MyGist API",
-    description="API for managing your personal context data (Persona MCP)",
-    version="1.0.0"
-)
+# Import MCP server
+from server import mcp
 
-# CORS configuration - allow frontend domains
+# Create MCP HTTP app
+mcp_app = mcp.http_app(path="/mcp", transport="sse")
+
+# Initialize FastAPI
+app = FastAPI(title="MyGist API", version="1.0.0")
+
+# Mount MCP routes
+for route in mcp_app.routes:
+    app.routes.append(route)
+
+# Bearer auth middleware for /mcp routes
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if request.url.path.startswith("/mcp"):
+        token = os.getenv("MYGIST_API_TOKEN")
+        if token:
+            auth = request.headers.get("Authorization", "")
+            if not auth.startswith("Bearer ") or not secrets.compare_digest(auth[7:], token):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    return await call_next(request)
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://mygist.thuradev.qzz.io",  # Frontend domain
+        "https://mygist.thuradev.qzz.io",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Health check
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 # Valid file types
 VALID_FILES = ["profile", "knowledge", "preferences", "projects", "lifestyle", "circle", "learning_log"]
@@ -449,45 +470,6 @@ async def import_data(file: UploadFile = File(...)):
             
     except zipfile.BadZipFile:
         raise HTTPException(status_code=400, detail="Invalid zip file")
-
-
-# ============================================================================
-# Static Files & SPA Fallback
-# ============================================================================
-
-# Mount static assets if they exist
-if STATIC_DIR.exists():
-    if (STATIC_DIR / "assets").exists():
-        app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
-
-
-# SPA catch-all route - must be defined last
-@app.get("/{full_path:path}")
-async def serve_spa(full_path: str = ""):
-    """Serve SPA for any non-API routes (including root)."""
-    # Don't catch /api or /mcp routes
-    if full_path.startswith("api/") or full_path.startswith("mcp/"):
-        raise HTTPException(status_code=404, detail="Not found")
-    
-    # Handle root path - serve index.html
-    if not full_path or full_path == "":
-        index_file = STATIC_DIR / "index.html"
-        if index_file.exists():
-            return FileResponse(index_file)
-        return {"error": "Frontend not found", "endpoints": {"/api/*": "REST API", "/health": "Health check"}}
-    
-    # Try to serve the static file first
-    static_file = STATIC_DIR / full_path
-    if static_file.exists() and static_file.is_file():
-        return FileResponse(static_file)
-    
-    # Fallback to index.html for SPA routing
-    index_file = STATIC_DIR / "index.html"
-    if index_file.exists():
-        return FileResponse(index_file)
-    
-    # No frontend built
-    return {"error": "Frontend not found", "endpoints": {"/api/*": "REST API", "/health": "Health check"}}
 
 
 # ============================================================================

@@ -1,6 +1,4 @@
-# =============================================================================
-# MyGist MCP Server - Docker Compose for Local Development
-# =============================================================================
+# MyGist API - Docker Compose for Local Development
 # Usage:
 #   docker compose up -d        # Start server
 #   docker compose logs -f      # View logs
@@ -9,7 +7,7 @@
 services:
   mygist:
     build: .
-    container_name: mygist-mcp
+    container_name: mygist-api
     ports:
       - "8000:8000"
     environment:
