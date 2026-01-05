@@ -301,17 +301,6 @@ def write_json_file(file_type: str, data: Dict[str, Any]) -> None:
 # API Routes
 # ============================================================================
 
-@app.get("/")
-async def root():
-    """Root endpoint with service info."""
-    return {
-        "status": "ok",
-        "service": "MyGist API",
-        "data_dir": str(DATA_DIR.absolute()),
-        "data_dir_exists": DATA_DIR.exists()
-    }
-
-
 @app.get("/health")
 @app.get("/api/health")
 async def health_check():
@@ -473,11 +462,18 @@ if STATIC_DIR.exists():
 
 # SPA catch-all route - must be defined last
 @app.get("/{full_path:path}")
-async def serve_spa(full_path: str):
-    """Serve SPA for any non-API routes."""
+async def serve_spa(full_path: str = ""):
+    """Serve SPA for any non-API routes (including root)."""
     # Don't catch /api or /mcp routes
     if full_path.startswith("api/") or full_path.startswith("mcp/"):
         raise HTTPException(status_code=404, detail="Not found")
+    
+    # Handle root path - serve index.html
+    if not full_path or full_path == "":
+        index_file = STATIC_DIR / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+        return {"error": "Frontend not found", "endpoints": {"/api/*": "REST API", "/health": "Health check"}}
     
     # Try to serve the static file first
     static_file = STATIC_DIR / full_path
