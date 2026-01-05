@@ -68,8 +68,9 @@ except Exception as e:
     raise
 
 try:
-    # Get MCP's Starlette app
-    mcp_app = mcp.http_app()
+    # Get MCP's Starlette app with custom path
+    # Use "/" so when mounted at /mcp, the endpoint is /mcp (not /mcp/mcp)
+    mcp_app = mcp.http_app(path="/")
     logger.info("✅ MCP HTTP app created")
 except Exception as e:
     logger.error(f"❌ Failed to create MCP HTTP app: {e}")
@@ -162,7 +163,7 @@ def create_combined_app():
     routes = [
         Route("/health", endpoint=health_handler, methods=["GET"]),
         Route("/healthz", endpoint=health_handler, methods=["GET"]),
-        Mount("/mcp", app=mcp_app),        # MCP server at /mcp/*
+        Mount("/mcp", app=mcp_app),        # MCP server at /mcp
     ]
     
     # Add static file serving if frontend is built
