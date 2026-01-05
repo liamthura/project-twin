@@ -42,15 +42,23 @@ app = FastAPI(title="MyGist API", version="1.0.0")
 for route in mcp_app.routes:
     app.routes.append(route)
 
-# Bearer auth middleware for /mcp routes
+# Bearer auth middleware for /mcp and /api routes
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    if request.url.path.startswith("/mcp"):
+    path = request.url.path
+    
+    # Public routes (no auth required)
+    if path in ("/health", "/healthz"):
+        return await call_next(request)
+    
+    # Protected routes: /mcp/* and /api/*
+    if path.startswith("/mcp") or path.startswith("/api"):
         token = os.getenv("MYGIST_API_TOKEN")
         if token:
             auth = request.headers.get("Authorization", "")
             if not auth.startswith("Bearer ") or not secrets.compare_digest(auth[7:], token):
                 return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    
     return await call_next(request)
 
 # CORS
