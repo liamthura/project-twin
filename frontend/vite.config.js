@@ -8,6 +8,7 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    extensions: [".mjs", ".js", ".jsx", ".ts", ".tsx", ".json"],
   },
   // Environment variables exposed to client
   // VITE_API_URL - Backend API URL (optional, defaults to /api)
