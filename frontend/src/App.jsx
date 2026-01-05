@@ -2408,7 +2408,7 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
                           <div className="space-y-2">
                             <Label>Tags</Label>
                             <ArrayInput
-                              value={tab.tags || []}
+                              items={tab.tags || []}
                               onChange={(newTags) =>
                                 updateTab(originalIndex, "tags", newTags)
                               }
@@ -2611,7 +2611,7 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
             <div className="space-y-2">
               <Label htmlFor="tab-tags">Tags (Optional)</Label>
               <ArrayInput
-                value={newTabTags}
+                items={newTabTags}
                 onChange={setNewTabTags}
                 placeholder="Add tag..."
               />
@@ -3873,40 +3873,53 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                           <div className="space-y-2">
                             <Label>Highlights & Achievements</Label>
                             <div className="space-y-3">
-                              {(project.highlights || []).map((highlight, hIdx) => (
-                                <div
-                                  key={hIdx}
-                                  className="flex gap-2 items-start p-2 rounded border border-muted bg-muted/20"
-                                >
-                                  <Input
-                                    value={highlight || ""}
-                                    onChange={(e) => {
-                                      const updated = [...(data.projects || [])];
-                                      updated[originalIndex].highlights[hIdx] =
-                                        e.target.value;
-                                      onChange({ ...data, projects: updated });
-                                    }}
-                                    placeholder="e.g. Increased performance by 40%, Implemented CI/CD pipeline"
-                                    className="bg-background"
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const updated = [...(data.projects || [])];
-                                      updated[originalIndex].highlights = (
-                                        project.highlights || []
-                                      ).filter((_, i) => i !== hIdx);
-                                      onChange({ ...data, projects: updated });
-                                    }}
-                                    className="h-10 w-10 text-destructive flex-shrink-0"
+                              {(project.highlights || []).map(
+                                (highlight, hIdx) => (
+                                  <div
+                                    key={hIdx}
+                                    className="flex gap-2 items-start p-2 rounded border border-muted bg-muted/20"
                                   >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ))}
+                                    <Input
+                                      value={highlight || ""}
+                                      onChange={(e) => {
+                                        const updated = [
+                                          ...(data.projects || []),
+                                        ];
+                                        updated[originalIndex].highlights[
+                                          hIdx
+                                        ] = e.target.value;
+                                        onChange({
+                                          ...data,
+                                          projects: updated,
+                                        });
+                                      }}
+                                      placeholder="e.g. Increased performance by 40%, Implemented CI/CD pipeline"
+                                      className="bg-background"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const updated = [
+                                          ...(data.projects || []),
+                                        ];
+                                        updated[originalIndex].highlights = (
+                                          project.highlights || []
+                                        ).filter((_, i) => i !== hIdx);
+                                        onChange({
+                                          ...data,
+                                          projects: updated,
+                                        });
+                                      }}
+                                      className="h-10 w-10 text-destructive flex-shrink-0"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                )
+                              )}
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -5166,7 +5179,8 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
   const [expandedConnections, setExpandedConnections] = useState({});
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newConnectionName, setNewConnectionName] = useState("");
-  const [newConnectionRelationship, setNewConnectionRelationship] = useState("");
+  const [newConnectionRelationship, setNewConnectionRelationship] =
+    useState("");
 
   // Info modal state
   const [infoModal, setInfoModal] = useState({
@@ -5242,7 +5256,9 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
     if (onShowConfirmation) {
       onShowConfirmation(
         "Remove Connection",
-        `Remove "${connection?.name || "connection"}"? This action cannot be undone.`,
+        `Remove "${
+          connection?.name || "connection"
+        }"? This action cannot be undone.`,
         () => {
           onChange({
             ...data,
@@ -5259,15 +5275,19 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
   };
 
   // Filter connections
-  const filteredConnections = [...(data.connections || [])].filter((connection) => {
-    const searchLower = searchTerm.toLowerCase();
-    const matchesName = connection.name?.toLowerCase().includes(searchLower);
-    const matchesRelationship = connection.relationship?.toLowerCase().includes(searchLower);
-    const matchesTrait = (connection.traits || []).some((trait) =>
-      trait.toLowerCase().includes(searchLower)
-    );
-    return matchesName || matchesRelationship || matchesTrait;
-  });
+  const filteredConnections = [...(data.connections || [])].filter(
+    (connection) => {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesName = connection.name?.toLowerCase().includes(searchLower);
+      const matchesRelationship = connection.relationship
+        ?.toLowerCase()
+        .includes(searchLower);
+      const matchesTrait = (connection.traits || []).some((trait) =>
+        trait.toLowerCase().includes(searchLower)
+      );
+      return matchesName || matchesRelationship || matchesTrait;
+    }
+  );
 
   const hasActiveFilters = searchTerm;
 
@@ -5297,10 +5317,7 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
                 People who matter in your life and your relationships with them
               </CardDescription>
             </div>
-            <Button
-              onClick={() => setIsAddModalOpen(true)}
-              size="sm"
-            >
+            <Button onClick={() => setIsAddModalOpen(true)} size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Add Connection
             </Button>
@@ -5339,7 +5356,9 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
           {filteredConnections.length > 0 ? (
             <div className="space-y-2">
               {filteredConnections.map((connection, idx) => {
-                const originalIndex = (data.connections || []).indexOf(connection);
+                const originalIndex = (data.connections || []).indexOf(
+                  connection
+                );
                 const isExpanded = expandedConnections[originalIndex];
                 const hasTraits = (connection.traits || []).length > 0;
                 const hasNotes = !!connection.notes;
@@ -5445,7 +5464,11 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
                               <ArrayInput
                                 items={connection.traits || []}
                                 onChange={(items) =>
-                                  updateConnection(originalIndex, "traits", items)
+                                  updateConnection(
+                                    originalIndex,
+                                    "traits",
+                                    items
+                                  )
                                 }
                                 placeholder="Add trait..."
                               />
@@ -5529,7 +5552,10 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
             <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={addConnection} disabled={!newConnectionName.trim()}>
+            <Button
+              onClick={addConnection}
+              disabled={!newConnectionName.trim()}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Connection
             </Button>
@@ -5770,10 +5796,10 @@ export default function App() {
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
-                Persona Manager
+                MyGist
               </h1>
               <p className="text-muted-foreground mt-1">
-                Build your digital persona for personalised AI interactions
+                Your portable personal context for AI — stop repeating yourself
               </p>
             </div>
             <div className="flex items-center gap-2 text-sm">

@@ -1,20 +1,22 @@
-# Project Twin
+# MyGist
 
-A personal digital twin that stores who you are — your skills, preferences, projects, and quirks — so AI assistants can actually remember you across conversations.
+> _Formerly "Project Twin" / "Persona MCP"_
+
+Your portable personal context for AI — stop repeating yourself.
 
 ## Why This Exists
 
-Every time you start a new chat with Claude, GPT, or any AI, you're a stranger again. You have to re-explain your tech stack, your preferences, your ongoing projects. Project Twin solves this by giving AI access to a persistent "you" file.
+Every time you start a new chat with Claude, GPT, or any AI, you're a stranger again. You have to re-explain your tech stack, your preferences, your ongoing projects. MyGist solves this by giving AI access to a persistent "you" file.
 
 ## What's Inside
 
 ```
-project-twin/
+mygist/
 ├── backend/
 │   ├── mcp_server.py    # MCP server for Claude Desktop (or any LLM tool that supports MCP)
 │   └── main.py          # FastAPI server for the UI
 ├── frontend/            # React app to manually edit your persona
-└── persona_mcp/data/    # Your persona files (JSON)
+└── mygist_data/         # Your persona files (JSON)
     ├── profile.json     # Name, bio, work, education
     ├── lifestyle.json   # Hobbies, values, wellness, sleep schedule
     ├── knowledge.json   # Skills, domains, mental lists
@@ -43,9 +45,9 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "persona": {
-      "command": "/path/to/project-twin/backend/venv/bin/python",
-      "args": ["/path/to/project-twin/backend/mcp_server.py"]
+    "mygist": {
+      "command": "/path/to/mygist/backend/venv/bin/python",
+      "args": ["/path/to/mygist/backend/mcp_server.py"]
     }
   }
 }
@@ -58,9 +60,9 @@ Add to `%APPDATA%\Claude\claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "persona": {
-      "command": "C:\\path\\to\\project-twin\\backend\\venv\\Scripts\\python.exe",
-      "args": ["C:\\path\\to\\project-twin\\backend\\mcp_server.py"]
+    "mygist": {
+      "command": "C:\\path\\to\\mygist\\backend\\venv\\Scripts\\python.exe",
+      "args": ["C:\\path\\to\\mygist\\backend\\mcp_server.py"]
     }
   }
 }
@@ -202,6 +204,7 @@ Current projects, what you're learning, top-of-mind items
 ### Learning Log
 
 Insights, realizations, and conceptual learnings captured across conversations:
+
 - Topic, details, tags
 - Conversation context (what led to the insight)
 - Unique IDs for tracking entries over time
@@ -244,6 +247,7 @@ When you ask Claude to analyze your messages, it uses:
 - Reflections: "Looking back, I see the pattern now"
 
 Insights are saved to your learning log with:
+
 - **Smart topic extraction** from conversation context ("conversation about X" → extracts X as topic)
 - **Conversation context summary** (includes what led to the insight)
 - **Auto-tagging** with detected concepts/skills
@@ -323,26 +327,26 @@ Run multiple updates in a single call:
 
 ### Supported Entities
 
-| Entity                | Actions             | Key Fields                                                                |
-| --------------------- | ------------------- | ------------------------------------------------------------------------- |
-| `skill`               | add, update, remove | name, level                                                               |
-| `domain`              | add, update, remove | name, level, tags                                                         |
-| `project`             | add, update, remove | name, status, tags, description                                           |
-| `hobby`               | add, update, remove | name, skill_level, status (active/inactive), notes, specifics, references |
-| `work_experience`     | add, update, remove | role, company, type, period, highlights                                   |
-| `work_highlight`      | add, remove         | company, highlight (or highlights[])                                      |
-| `project_highlight`   | add, remove         | project_name, highlight (or highlights[])                                 |
-| `hobby_reference`     | add, remove         | hobby_name, ref_name, url, notes                                          |
-| `domain_reference`    | add, remove         | domain_name, ref_name, url, notes                                         |
-| `project_reference`   | add, remove         | project_name, ref_name, url, notes                                        |
-| `mental_tab_reference`| add, remove         | title (mental tab), ref_name, url, notes                                  |
-| `top_of_mind`         | add, remove         | item/idea, note                                                           |
-| `current_learning`    | add, remove         | topic                                                                     |
-| `dislike`             | add, remove         | item                                                                      |
-| `value`               | add, remove         | value                                                                     |
-| `passion`             | add, remove         | passion                                                                   |
-| `learning_entry`      | add, remove         | topic, details, tags, source (optional)                                   |
-| And more...           |                     |                                                                           |
+| Entity                 | Actions             | Key Fields                                                                |
+| ---------------------- | ------------------- | ------------------------------------------------------------------------- |
+| `skill`                | add, update, remove | name, level                                                               |
+| `domain`               | add, update, remove | name, level, tags                                                         |
+| `project`              | add, update, remove | name, status, tags, description                                           |
+| `hobby`                | add, update, remove | name, skill_level, status (active/inactive), notes, specifics, references |
+| `work_experience`      | add, update, remove | role, company, type, period, highlights                                   |
+| `work_highlight`       | add, remove         | company, highlight (or highlights[])                                      |
+| `project_highlight`    | add, remove         | project_name, highlight (or highlights[])                                 |
+| `hobby_reference`      | add, remove         | hobby_name, ref_name, url, notes                                          |
+| `domain_reference`     | add, remove         | domain_name, ref_name, url, notes                                         |
+| `project_reference`    | add, remove         | project_name, ref_name, url, notes                                        |
+| `mental_tab_reference` | add, remove         | title (mental tab), ref_name, url, notes                                  |
+| `top_of_mind`          | add, remove         | item/idea, note                                                           |
+| `current_learning`     | add, remove         | topic                                                                     |
+| `dislike`              | add, remove         | item                                                                      |
+| `value`                | add, remove         | value                                                                     |
+| `passion`              | add, remove         | passion                                                                   |
+| `learning_entry`       | add, remove         | topic, details, tags, source (optional)                                   |
+| And more...            |                     |                                                                           |
 
 ---
 

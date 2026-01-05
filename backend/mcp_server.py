@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-MCP Server for Persona Data (v2 - Consolidated)
+MyGist MCP Server (formerly Persona MCP)
+
+Your portable personal context for AI.
 Streamlined tools for reading and modifying persona data.
 """
 
@@ -24,7 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Data directory path
-DATA_DIR = Path(__file__).parent.parent / "persona_mcp" / "data"
+DATA_DIR = Path(__file__).parent.parent / "mygist_data"
 logger.info(f"Data directory: {DATA_DIR}")
 
 # File mapping for different data types
@@ -117,7 +119,9 @@ CONTEXT_SCOPES = {
 def get_scoped_context(
     scope: str = "minimal",
     topic: str = None,
-    include_inactive: bool = False
+    include_inactive: bool = False,
+    days: int = None,
+    limit: int = None
 ) -> dict:
     """
     Get persona context filtered by scope and optional topic.
@@ -126,6 +130,9 @@ def get_scoped_context(
         scope: minimal | professional | personal | learning | full
         topic: Optional keyword to filter relevant items (e.g., "python", "cooking")
         include_inactive: Whether to include inactive hobbies, paused projects, etc.
+        days: Limit learning_log entries to last N days. Default: 60 for learning scope unless topic-filtered.
+              Set to 0 or None to get all entries.
+        limit: Maximum number of learning_log entries to return (most recent first). Applied after days filter.
     
     Returns:
         Scoped context with token estimate
@@ -161,6 +168,17 @@ def get_scoped_context(
     if topic:
         result = _filter_by_topic(result, topic.lower())
     
+    # Apply time/limit filter to learning_log (default 60 days for learning scope unless topic-filtered)
+    if "learning_log" in result and not topic:
+        effective_days = days if days is not None else (60 if scope == "learning" else None)
+        if effective_days and effective_days > 0:
+            result = _filter_learning_log_by_time(result, effective_days, limit)
+        elif limit and limit > 0:
+            result = _filter_learning_log_by_time(result, None, limit)
+    elif "learning_log" in result and topic and limit and limit > 0:
+        # Topic-filtered but still apply limit if specified
+        result = _filter_learning_log_by_time(result, None, limit)
+    
     # Filter inactive items unless requested
     if not include_inactive:
         result = _filter_inactive(result)
@@ -177,9 +195,74 @@ def get_scoped_context(
         "context": result
     }
 
+def _filter_learning_log_by_time(data: dict, days: int = None, limit: int = None) -> dict:
+    """
+    Filter learning_log entries by time and/or count.
+    
+    Args:
+        data: Context data containing learning_log
+        days: Filter to last N days (None = no time filter)
+        limit: Max entries to return, most recent first (None = no limit)
+    
+    Entries without timestamps are included (fail-open for data integrity).
+    """
+    if "learning_log" not in data or "entries" not in data.get("learning_log", {}):
+        return data
+    
+    from datetime import datetime, timedelta
+    
+    all_entries = data["learning_log"]["entries"]
+    filtered_entries = []
+    filter_parts = []
+    
+    # Time filter
+    if days and days > 0:
+        cutoff = datetime.now() - timedelta(days=days)
+        for entry in all_entries:
+            timestamp = entry.get("timestamp")
+            if not timestamp:
+                # No timestamp = include (fail-open)
+                filtered_entries.append(entry)
+                continue
+            
+            try:
+                # Handle both formats: with/without Z suffix, with/without microseconds
+                ts = timestamp.replace("Z", "+00:00")
+                entry_date = datetime.fromisoformat(ts.split("+")[0])
+                
+                if entry_date >= cutoff:
+                    filtered_entries.append(entry)
+            except (ValueError, AttributeError):
+                # Parsing failed = include (fail-open)
+                filtered_entries.append(entry)
+        filter_parts.append(f"last {days} days")
+    else:
+        filtered_entries = list(all_entries)
+    
+    # Count limit (most recent first - entries are already sorted by timestamp desc)
+    if limit and limit > 0 and len(filtered_entries) > limit:
+        filtered_entries = filtered_entries[:limit]
+        filter_parts.append(f"limit {limit}")
+    
+    # Build filter description
+    if filter_parts:
+        filter_desc = " + ".join(filter_parts) + f" ({len(filtered_entries)}/{len(all_entries)} entries)"
+    else:
+        filter_desc = "no filter applied"
+    
+    result = dict(data)
+    result["learning_log"] = {
+        **data["learning_log"],
+        "entries": filtered_entries,
+        "_filter": filter_desc
+    }
+    return result
+
+
 def _filter_by_topic(data: dict, topic: str) -> dict:
-    """Filter context to items relevant to a specific topic."""
+    """Filter context to items relevant to a specific topic using keyword matching."""
     filtered = {}
+    keywords = _extract_keywords(topic)
     
     for key, section in data.items():
         if not isinstance(section, dict):
@@ -192,17 +275,17 @@ def _filter_by_topic(data: dict, topic: str) -> dict:
                 # Filter array items by topic relevance
                 filtered_items = []
                 for item in value:
-                    if _item_matches_topic(item, topic):
+                    if _item_matches_topic(item, keywords):
                         filtered_items.append(item)
                 if filtered_items:
                     filtered[key][field] = filtered_items
             elif isinstance(value, dict):
                 # Check if dict is topic-relevant
-                if _item_matches_topic(value, topic):
+                if _item_matches_topic(value, keywords):
                     filtered[key][field] = value
             elif isinstance(value, str):
                 # Include string fields if they mention topic
-                if topic in value.lower():
+                if _text_matches_keywords(value, keywords):
                     filtered[key][field] = value
                     
         # Remove empty sections
@@ -211,25 +294,126 @@ def _filter_by_topic(data: dict, topic: str) -> dict:
     
     return filtered
 
-def _item_matches_topic(item, topic: str) -> bool:
-    """Check if an item is relevant to the given topic."""
+
+# Keyword aliases for common terms
+KEYWORD_ALIASES = {
+    # JavaScript ecosystem
+    "js": ["javascript", "js"],
+    "javascript": ["javascript", "js"],
+    "ts": ["typescript", "ts"],
+    "typescript": ["typescript", "ts"],
+    "react": ["react", "reactjs"],
+    "vue": ["vue", "vuejs"],
+    "next": ["next", "nextjs", "next.js"],
+    "nuxt": ["nuxt", "nuxtjs"],
+    "node": ["node", "nodejs", "node.js"],
+    # Python ecosystem
+    "python": ["python", "py"],
+    "py": ["python", "py"],
+    "django": ["django", "dj"],
+    "fastapi": ["fastapi", "fast-api"],
+    # Other languages
+    "golang": ["go", "golang"],
+    "go": ["go", "golang"],
+    "csharp": ["c#", "csharp", "dotnet", ".net"],
+    "cpp": ["c++", "cpp"],
+    # DevOps
+    "k8s": ["kubernetes", "k8s"],
+    "kubernetes": ["kubernetes", "k8s"],
+    "aws": ["aws", "amazon"],
+    "gcp": ["gcp", "google cloud"],
+    # General
+    "ml": ["machine learning", "ml", "ai"],
+    "ai": ["artificial intelligence", "ai", "machine learning", "ml"],
+    "db": ["database", "db"],
+    "database": ["database", "db", "sql"],
+    "frontend": ["frontend", "front-end", "front end", "ui"],
+    "backend": ["backend", "back-end", "back end", "server"],
+    "fullstack": ["fullstack", "full-stack", "full stack"],
+}
+
+
+def _extract_keywords(topic: str) -> list:
+    """
+    Extract and expand keywords from topic query.
+    
+    'react frontend' → ['react', 'reactjs', 'frontend', 'front-end', ...]
+    """
+    # Tokenize: split on spaces, remove punctuation
+    raw_keywords = re.split(r'[\s,;]+', topic.lower().strip())
+    raw_keywords = [k.strip() for k in raw_keywords if k.strip()]
+    
+    # Expand with aliases only (no auto plural handling - causes false positives)
+    expanded = set()
+    for keyword in raw_keywords:
+        expanded.add(keyword)
+        # Add aliases if they exist
+        if keyword in KEYWORD_ALIASES:
+            expanded.update(KEYWORD_ALIASES[keyword])
+    
+    return list(expanded)
+
+
+def _text_matches_keywords(text: str, keywords: list, min_match: int = 1) -> bool:
+    """
+    Check if text matches any keywords.
+    Returns True if at least min_match keywords are found.
+    """
+    if not text or not keywords:
+        return False
+    
+    text_lower = text.lower()
+    matches = 0
+    
+    for keyword in keywords:
+        # Word boundary matching to avoid partial matches
+        # e.g., "go" shouldn't match "google" but should match "golang"
+        if len(keyword) <= 2:
+            # Short keywords need word boundaries
+            pattern = r'\b' + re.escape(keyword) + r'\b'
+            if re.search(pattern, text_lower):
+                matches += 1
+        else:
+            # Longer keywords can use substring match
+            if keyword in text_lower:
+                matches += 1
+    
+    return matches >= min_match
+
+
+def _item_matches_topic(item, keywords: list) -> bool:
+    """Check if an item is relevant to the given keywords."""
     if isinstance(item, str):
-        return topic in item.lower()
+        return _text_matches_keywords(item, keywords)
     elif isinstance(item, dict):
-        # Check common fields for topic match
-        searchable_fields = ["name", "title", "topic", "description", "notes", "content", "tags"]
+        # Priority fields (name/title match is stronger)
+        priority_fields = ["name", "title", "topic"]
+        searchable_fields = ["description", "notes", "content"]
+        
+        # Check priority fields first
+        for field in priority_fields:
+            value = item.get(field)
+            if isinstance(value, str) and _text_matches_keywords(value, keywords):
+                return True
+        
+        # Check tags (each tag is a potential match)
+        tags = item.get("tags", [])
+        if isinstance(tags, list):
+            for tag in tags:
+                if isinstance(tag, str) and _text_matches_keywords(tag, keywords):
+                    return True
+        
+        # Check other searchable fields
         for field in searchable_fields:
             value = item.get(field)
-            if isinstance(value, str) and topic in value.lower():
+            if isinstance(value, str) and _text_matches_keywords(value, keywords):
                 return True
-            elif isinstance(value, list):
-                for v in value:
-                    if isinstance(v, str) and topic in v.lower():
-                        return True
-        # Also check references
+        
+        # Check references
         for ref in item.get("references", []):
-            if _item_matches_topic(ref, topic):
+            if _item_matches_topic(ref, keywords):
                 return True
+    
     return False
 
 def _filter_inactive(data: dict) -> dict:
@@ -342,271 +526,219 @@ def find_in_array(array: list, identifier: str, id_field: str = "name") -> tuple
     return (-1, None)
 
 # Initialize MCP server
-server = Server("persona-mcp")
+server = Server("mygist")
 
 @server.list_tools()
 async def list_tools():
-    """List available MCP tools - consolidated to 10 tools"""
+    """List available MCP tools - consolidated to 6 tools"""
     return [
-        # === SMART CONTEXT TOOL (1) - Use this first! ===
+        # === READ TOOLS ===
         Tool(
             name="get_context",
-            description="""🚀 PRIMARY TOOL - CALL THIS FIRST at the start of ANY conversation.
+            description="""Retrieve scoped persona context. Call this FIRST at conversation start.
 
-⚠️ CRITICAL: ALWAYS call this tool BEFORE responding to the user. All scopes return user PREFERENCES which tell you:
-- Communication style (tone, detail level, dislikes)
-- Code style preferences (if professional scope)
-- Learning style preferences (if professional scope)
-- Dislikes preferences (all scopes)
+WHEN TO USE:
+- Start of any conversation (always)
+- When you need user preferences to tailor responses
 
-These preferences are ESSENTIAL for providing responses the user actually wants. Apply them to ALL your responses.
+SCOPES:
+- minimal: Quick questions, greetings, code help. Returns: name, bio, top_of_mind, preferences
+- professional: Career, projects, technical. Returns: profile, skills, projects, code_style
+- personal: Life advice, hobbies, wellness. Returns: hobbies, personality, connections
+- learning: Skill development, roadmaps. Returns: skills, learning_log (last 60 days), learning_style
+- full: Complex questions. Returns: everything
 
-WHEN TO USE EACH SCOPE:
-• minimal (fastest) - Quick questions, greetings, small talk, code help
-  Returns: name, bio, location, current_role, top_of_mind, communication preferences
-• professional - Career advice, project help, technical discussions
-  Returns: profile, skills, projects, code_style, work_preferences, communication, dislikes
-• personal - Life advice, hobby recommendations, wellness
-  Returns: profile, hobbies, interests, personality, mental_tabs, connections, communication, dislikes
-• learning - Learning roadmaps, skill development
-  Returns: profile, skills, mental_tabs, current learning, learning_style, learning_log
-• full - Complex questions needing complete context
-  Returns: Everything (all files)
+EXAMPLES:
+- {scope: "minimal"} → Fast context with preferences
+- {scope: "professional", topic: "react"} → Only React-related projects/skills
+- {scope: "learning"} → Learning context with last 60 days of entries
+- {scope: "learning", topic: "leadership"} → ALL leadership entries (no time limit)
+- {scope: "learning", days: 30} → Last 30 days only
+- {scope: "learning", limit: 10} → Last 10 entries only
+- {scope: "learning", days: 60, limit: 20} → Last 60 days, max 20 entries
 
-PERFORMANCE: Start with minimal (includes preferences!), upgrade if you need more context.
-
-TOPIC FILTER: Add topic="python" to get only Python-related items across all categories.
-Example: scope="professional", topic="react" → Only React projects, skills, learning""",
+Returns: Filtered persona data based on scope + user preferences (tone, detail_level, dislikes)""",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "scope": {
                         "type": "string",
                         "enum": ["minimal", "professional", "personal", "learning", "full"],
-                        "description": "Context depth: minimal | professional | personal | learning | full",
+                        "description": "Context depth",
                         "default": "minimal"
                     },
                     "topic": {
                         "type": "string",
-                        "description": "Optional: Filter to items matching this topic (e.g., 'python', 'cooking')"
+                        "description": "Filter to items matching this topic. When used with learning scope, returns ALL matching entries (no time limit unless limit is set)"
                     },
                     "include_inactive": {
                         "type": "boolean",
-                        "description": "Include inactive hobbies, paused projects, etc. Default: false",
+                        "description": "Include inactive/paused items",
                         "default": False
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Limit learning_log to last N days. Default: 60 for learning scope (unless topic-filtered). Set to 0 for all entries."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max learning_log entries to return (most recent first). Applied after days filter."
                     }
                 },
                 "required": []
             }
         ),
         
-        # === INDIVIDUAL READ TOOLS (7) - For specific data needs ===
         Tool(
-            name="get_persona",
-            description="""All persona data. Use get_context for scoped retrieval.
-Returns: profile, lifestyle, knowledge, preferences, projects, learning_log.""",
-            inputSchema={"type": "object", "properties": {}, "required": []}
-        ),
-        Tool(
-            name="get_profile",
-            description="""Raw profile data for editing and deeper specific understanding. Use get_context first for general persona requests.
-        Contains: name, bio, contact, languages, education[], work_experience[], career_aspirations[].""",
-            inputSchema={"type": "object", "properties": {}, "required": []}
-        ),
-        Tool(
-            name="get_lifestyle",
-            description="""Raw lifestyle data for editing and deeper specific understanding. Use get_context(scope='personal') first for general persona requests.
-        Contains: hobbies[], passions[], curiosities[], personality_traits[], values[], wellness.""",
-            inputSchema={"type": "object", "properties": {}, "required": []}
-        ),
-        Tool(
-            name="get_knowledge",
-            description="""Raw knowledge data for editing and deeper specific understanding. Use get_context(scope='professional') first for general persona requests.
-        Contains: domains[] (skills with levels), mental_tabs[] (tracked topics with references).""",
-            inputSchema={"type": "object", "properties": {}, "required": []}
-        ),
-        Tool(
-            name="get_preferences",
-            description="""Raw preferences data for editing and deeper specific understanding. Use get_context(scope='minimal') first for general persona requests.
-        Contains: code_style, communication (default + mood_overrides), learning_style, dislikes[].""",
-            inputSchema={"type": "object", "properties": {}, "required": []}
-        ),
-        Tool(
-            name="get_projects",
-            description="""Raw projects data for editing and deeper specific understanding. Use get_context(scope='professional') first for general persona requests.
-        Contains: projects[], current_learning[], top_of_mind[].""",
-            inputSchema={"type": "object", "properties": {}, "required": []}
-        ),
-        Tool(
-            name="get_circle",
-            description="""Raw circle data for editing and deeper specific understanding. Use get_context first for general persona requests.
-        Contains: connections[] (people in user's life with name, relationship, traits, notes).""",
-            inputSchema={"type": "object", "properties": {}, "required": []}
-        ),
-        Tool(
-            name="get_learning_log",
-            description="""Raw learning log for editing and deeper specific understanding. Use get_context(scope='learning') first for general persona requests.
+            name="get_raw",
+            description="""Retrieve raw JSON file data. Use for editing or deep inspection.
 
-Contains: entries[] with enhanced structure for cross-LLM continuity:
-• topic: Main subject learned
-• details: What was learned (can be detailed)
-• source: LLM + context (e.g., "Claude Sonnet - Persona MCP development")
-• tags[]: Categorization tags
-• timestamp: ISO timestamp (auto-generated)
-• conversation_metadata: {conversation_id, conversation_url, llm_model} (optional)
-• key_decisions[]: Important decisions made (optional)
-• followup_items[]: Action items for future (optional)
-• related_entries[]: Links to related learning entries (optional)""",
-            inputSchema={"type": "object", "properties": {}, "required": []}
-        ),
+WHEN TO USE:
+- Before modifying data (to see current state)
+- When get_context doesn't have enough detail
 
-        # === WRITE TOOLS (3) ===
-        # NOTE: persona_update archived Dec 10 2025
-        # Reason: Redundant with persona_modify - consolidating to single tool pattern reduces
-        # cognitive load for LLMs and eliminates ambiguity about which tool to use.
-        # persona_modify can handle both simple field updates and complex operations.
-        # Kept commented for future reference in case dot-notation interface is needed again.
-        Tool(
-            name="persona_update",
-            description="""Update a single field using dot-notation path.
-        Use this for simple field updates when you know the exact path.
-        
-        Examples:
-        - profile.location → "London, UK"
-        - profile.bio → "Updated bio text"
-        - profile.contact.github → "newusername"
-        - lifestyle.hobbies.Gaming.notes → "Playing more lately"
-        - knowledge.domains.Python.level → "advanced"
-        - projects.projects.Solterra.status → "completed"
-        - knowledge.mental_tabs.Restaurants.references.Sushi Place.notes → "Best omakase in town, make reservations 2 weeks ahead"
+FILES:
+- all: Complete persona (all files)
+- profile: name, bio, contact, work_experience[], education[]
+- lifestyle: hobbies[], passions[], curiosities[], values[]
+- knowledge: domains[] (skills), mental_tabs[]
+- preferences: code_style, communication, learning_style, dislikes[]
+- projects: projects[], current_learning[], top_of_mind[]
+- circle: connections[]
+- learning_log: entries[]
 
-        For arrays, use item name as path segment.
-        For deeply nested data (like references within mental tabs), chain the path with dots.
-        For complex operations (add/remove items), use persona_modify instead.""",
+EXAMPLES:
+- {file: "profile"} → Profile data only
+- {file: "all"} → Everything
+
+Returns: Raw JSON for the specified file(s)""",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "path": {
+                    "file": {
                         "type": "string",
-                        "description": "Dot-notation path to the field (e.g., 'profile.bio', 'lifestyle.hobbies.Gaming.skill_level')"
-                    },
-                    "value": {
-                        "type": "string",
-                        "description": "New value for the field"
+                        "enum": ["all", "profile", "lifestyle", "knowledge", "preferences", "projects", "circle", "learning_log"],
+                        "description": "File to retrieve",
+                        "default": "all"
                     }
                 },
-                "required": ["path", "value"]
+                "required": []
             }
         ),
+
+        Tool(
+            name="get_schema",
+            description="""Discover valid entity types and their fields. Call before persona_modify if unsure.
+
+WHEN TO USE:
+- Unsure what entity type to use
+- Need to know required vs optional fields
+- Want valid enum values for a field
+
+PARAMETERS:
+- file: Scope to specific file (profile, lifestyle, knowledge, etc.)
+- entity: Get schema for specific entity type
+
+EXAMPLES:
+- {} → All entities grouped by file
+- {file: "projects"} → All entities in projects file (project, project_reference, etc.)
+- {entity: "hobby"} → Hobby schema with fields, valid values, example
+
+Returns: {file, entities} or {entity, file, schema}""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file": {
+                        "type": "string",
+                        "enum": ["profile", "lifestyle", "knowledge", "preferences", "projects", "circle", "learning_log"],
+                        "description": "Scope to entities in a specific file"
+                    },
+                    "entity": {
+                        "type": "string",
+                        "description": "Specific entity to get schema for (e.g., 'hobby', 'project')"
+                    }
+                },
+                "required": []
+            }
+        ),
+
+        # === WRITE TOOLS ===
+        # NOTE: persona_update archived Dec 10 2025 - see below for commented code
         Tool(
             name="persona_modify",
-            description="""Add, update, or remove items from persona data.
+            description="""Add, update, or remove a single item from persona data.
 
-CRITICAL REQUIREMENT: The 'data' parameter MUST be a non-empty object containing:
-1. An identifier field (name/title/topic) - REQUIRED to identify which item
-2. At least one additional field to modify (status, level, notes, etc.)
-NEVER pass an empty data object like {}. If unsure what fields to include, ask the user first.
+PARAMETERS:
+- action (required): "add" | "update" | "remove"
+- entity (required): Entity type (see get_schema for valid types)
+- data (required): Object with identifier + fields. NEVER pass empty {}.
 
-WRITING STYLE: Keep text SHORT and SCANNABLE. Use bullet points where possible.
-• notes/descriptions: Brief, focused phrases. Use bullets for multiple points.
-• highlights: One achievement per entry, focus on the key point
-• Exception: learning_log can be more detailed but stay focused
+DATA REQUIREMENTS:
+- Always include identifier: name, title, topic, or address (depends on entity)
+- For update/remove: identifier matches existing item
+- For add: identifier + any optional fields
 
-ENTITIES BY FILE:
-• profile: email, link, language, work_experience, work_highlight, education, career_aspiration
-• lifestyle: hobby, hobby_reference, passion, curiosity, personality_trait, value
-• knowledge: domain, domain_reference, mental_tab, mental_tab_reference
-• projects: project, project_reference, project_highlight, current_learning, top_of_mind
-• circle: connection
-• preferences: dislike, communication_default, mood_override
-• learning_log: learning_entry
+EXAMPLES:
+- ADD hobby: {action: "add", entity: "hobby", data: {name: "Photography", skill_level: "beginner"}}
+- UPDATE project: {action: "update", entity: "project", data: {name: "MyApp", status: "completed"}}
+- REMOVE domain: {action: "remove", entity: "domain", data: {name: "PHP"}}
+- ADD learning_entry: {action: "add", entity: "learning_entry", data: {topic: "React Hooks", details: "...", source: "Claude - debugging", tags: ["react"]}}
 
-DATA EXAMPLES (always include identifier + fields to change):
-• UPDATE project: {"name": "ProjectName", "status": "active", "notes": "new notes"}
-• ADD hobby: {"name": "Photography", "skill_level": "beginner", "status": "active"}
-• UPDATE hobby: {"name": "Badminton", "status": "inactive", "notes": "stopped playing"}
-• ADD domain: {"name": "Rust", "level": "learning"}
-• UPDATE domain: {"name": "Python", "level": "advanced"}
-• ADD connection: {"name": "Jane Smith", "relationship": "Friend from university", "traits": ["creative", "ambitious"], "notes": "Met during CS degree, now works at Google"}
-• UPDATE connection: {"name": "Jane Smith", "relationship": "Close friend and mentor", "notes": "Started advising me on career"}
-• ADD top_of_mind: {"idea": "Build a blog", "note": "use SvelteKit"}
-• ADD dislike: {"dislike": "morning meetings"}
-• ADD mood_override: {"mood": "stressed", "tone": "calm", "detail_level": "brief"}
-• UPDATE communication_default: {"tone": "friendly", "detail_level": "concise"}
-• ADD learning_entry: Basic format:
-  {"topic": "React Hooks", "details": "Learned useState and useEffect...", "source": "Claude Sonnet - debugging session", "tags": ["react", "frontend"]}
+NESTED ITEMS (include parent identifier):
+- work_highlight: {company: "Acme", highlight: "Led migration"}
+- project_reference: {project_name: "MyApp", ref_name: "Docs", url: "https://..."}
 
-• ADD learning_entry: Enhanced format with conversation continuity:
-  {
-    "topic": "Persona Manager Development",
-    "details": "Consolidated architecture decisions...",
-    "source": "Claude Sonnet - Persona MCP scoped context development",
-    "tags": ["architecture", "MCP", "decisions"],
-    "conversation_metadata": {
-      "conversation_id": "chat_abc123",
-      "conversation_url": "https://claude.ai/chat/abc123",
-      "llm_model": "claude-sonnet-4"
-    },
-    "key_decisions": ["Consolidated 40 tools to 9", "Chose Tauri over Electron"],
-    "followup_items": ["Fix entity extraction bugs", "Expand trigger coverage"]
-  }
+Use get_schema to discover valid entity types, required fields, and enum values.
 
-LEARNING_ENTRY FIELDS:
-• topic (required): Main subject
-• details (required): What was learned
-• source (required): LLM + context - e.g., "Claude Sonnet - debugging React app", "GPT-4 - career advice"
-• tags[]: Categorization
-• conversation_metadata: {conversation_id, conversation_url, llm_model} - for tracing back to original conversation
-• key_decisions[]: Important decisions made during the conversation
-• followup_items[]: Action items or next steps identified
-• related_entries[]: IDs of related learning entries for linking context
-
-NESTED ITEMS (must include parent identifier):
-• Highlights: {"company"/"project_name": "X", "highlight": "Achievement text"}
-• References: {"hobby_name"/"domain_name"/"project_name"/"title": "X", "ref_name": "Y", "url": "https://..."}
-
-KEY: For UPDATE/REMOVE, the 'name' field identifies WHICH item to modify.""",
+Returns: Success/error message""",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "action": {
                         "type": "string",
                         "enum": ["add", "update", "remove"],
-                        "description": "add = create new, update = modify existing, remove = delete"
+                        "description": "add | update | remove"
                     },
                     "entity": {
                         "type": "string",
-                        "description": "Entity type: project, hobby, domain, dislike, mood_override, etc."
+                        "description": "Entity type (use get_schema to discover valid types)"
                     },
                     "data": {
                         "type": "object",
-                        "description": "REQUIRED: Non-empty object with identifier (name/title/topic) + fields to modify. Example: {\"name\": \"MyProject\", \"status\": \"active\"}. NEVER pass empty {}.",
+                        "description": "Identifier + fields to modify",
                         "minProperties": 1
                     }
                 },
                 "required": ["action", "entity", "data"]
             }
         ),
+        
         Tool(
             name="persona_batch",
             description="""Perform multiple persona modifications in one call.
 
-FORMAT: {"operations": [{"action": "add", "entity": "...", "data": {...}}, ...]}
+WHEN TO USE:
+- Adding multiple items at once (e.g., several highlights)
+- Updating related items together
+
+PARAMETERS:
+- operations (required): Array of {action, entity, data} objects
 
 EXAMPLES:
-Add multiple work highlights:
-{"operations": [
-  {"action": "add", "entity": "work_highlight", "data": {"company": "Honda", "highlight": "Led API project"}},
-  {"action": "add", "entity": "work_highlight", "data": {"company": "Honda", "highlight": "Built dashboard"}}
-]}
+- Multiple highlights:
+  {operations: [
+    {action: "add", entity: "work_highlight", data: {company: "Acme", highlight: "Led API"}},
+    {action: "add", entity: "work_highlight", data: {company: "Acme", highlight: "Built dashboard"}}
+  ]}
+- Mixed operations:
+  {operations: [
+    {action: "update", entity: "project", data: {name: "MyApp", status: "completed"}},
+    {action: "add", entity: "project_highlight", data: {project_name: "MyApp", highlight: "Launched v1"}}
+  ]}
 
-Add multiple project highlights:
-{"operations": [
-  {"action": "add", "entity": "project_highlight", "data": {"project_name": "MyApp", "highlight": "Increased performance by 40%"}},
-  {"action": "add", "entity": "project_highlight", "data": {"project_name": "MyApp", "highlight": "Implemented CI/CD pipeline"}}
-]}
+Use get_schema to discover valid entity types and fields.
 
-Each operation has: action (add/update/remove), entity, data.""",
+Returns: Numbered list of results for each operation""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -621,34 +753,62 @@ Each operation has: action (add/update/remove), entity, data.""",
                             },
                             "required": ["action", "entity", "data"]
                         },
-                        "description": "Array of {action, entity, data} operations"
+                        "description": "Array of modification operations"
                     }
                 },
                 "required": ["operations"]
             }
         ),
-        # === SMART CONTEXT CAPTURE ===
+        
+        # === SMART CAPTURE ===
         Tool(
             name="suggest_persona_update",
-            description="""Call during conversation when user mentions achievements, learning, preferences, or life updates.
+            description="""Analyze user message for potential persona updates. Call during conversation.
 
-Uses sentiment to detect: completions, new skills, preference statements, certifications.
-Example: "finished React course" → suggests skill add + certification
+WHEN TO USE:
+- User mentions achievements, completions, new skills
+- User expresses preferences or dislikes
+- User shares life updates (job, hobby, learning)
 
-Returns: {should_capture, confidence, suggestions: [{action, entity, data}]}
-• ≥0.5: Apply via persona_modify, mention casually ("noted!")
-• 0.4-0.5: Ask confirmation
-• <0.4: Ignore""",
+EXAMPLES:
+- "I finished the React course" → suggests: add domain "React", add learning_entry
+- "I hate morning meetings" → suggests: add dislike
+
+CONFIDENCE HANDLING:
+- >= 0.5: Apply via persona_modify, mention casually
+- 0.4-0.5: Ask user for confirmation
+- < 0.4: Ignore, respond normally
+
+Returns: {should_capture, confidence, suggestions: [{action, entity, data}], instruction}""",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "message": {"type": "string", "description": "User message to analyze"},
-                    "context": {"type": "string", "description": "Optional conversation context"}
+                    "context": {"type": "string", "description": "Conversation context"}
                 },
                 "required": ["message"]
             }
         )
     ]
+
+
+# NOTE: persona_update archived Dec 10 2025
+# Reason: Redundant with persona_modify - consolidating to single tool pattern reduces
+# cognitive load for LLMs and eliminates ambiguity about which tool to use.
+# Kept commented for future reference in case dot-notation interface is needed again.
+# 
+# Tool(
+#     name="persona_update",
+#     description="""Update a single field using dot-notation path.""",
+#     inputSchema={
+#         "type": "object",
+#         "properties": {
+#             "path": {"type": "string", "description": "Dot-notation path"},
+#             "value": {"type": "string", "description": "New value"}
+#         },
+#         "required": ["path", "value"]
+#     }
+# )
 
 
 @server.list_prompts()
@@ -3020,6 +3180,12 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 hobby["status"] = status
             if notes:
                 hobby["notes"] = notes
+            # Update specifics array if provided
+            if "specifics" in data:
+                hobby["specifics"] = data["specifics"]
+            # Update references array if provided
+            if "references" in data:
+                hobby["references"] = data["references"]
             hobby["last_updated"] = datetime.now().strftime("%Y-%m-%d")
             save_json("lifestyle.json", lifestyle)
             status_info = f" (status: {hobby.get('status', 'active')})" if hobby.get("status") else ""
@@ -3988,6 +4154,252 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
     
     return f"❌ Unknown entity type: {entity}"
 
+
+# -----------------------------------------------------------------------------
+# Entity Schema - For LLM discovery before calling persona_modify
+# -----------------------------------------------------------------------------
+
+ENTITY_SCHEMA = {
+    "profile": {
+        "email": {
+            "actions": ["add", "update", "remove"],
+            "required": ["address"],
+            "optional": ["label"],
+            "example": {"address": "work@example.com", "label": "Work"}
+        },
+        "link": {
+            "actions": ["add", "update", "remove"],
+            "required": ["url"],
+            "optional": ["label"],
+            "example": {"url": "https://github.com/username", "label": "GitHub"}
+        },
+        "language": {
+            "actions": ["add", "update", "remove"],
+            "required": ["name"],
+            "optional": ["proficiency"],
+            "valid_values": {"proficiency": ["native", "fluent", "conversational", "basic"]},
+            "example": {"name": "Japanese", "proficiency": "conversational"}
+        },
+        "work_experience": {
+            "actions": ["add", "update", "remove"],
+            "required": ["company"],
+            "optional": ["role", "period", "type", "location", "description", "highlights"],
+            "example": {"company": "TechCorp", "role": "Software Engineer", "period": "2023-present", "type": "full-time"}
+        },
+        "work_highlight": {
+            "actions": ["add", "remove"],
+            "required": ["company", "highlight"],
+            "optional": [],
+            "note": "Adds highlight to existing work_experience",
+            "example": {"company": "TechCorp", "highlight": "Led migration to microservices"}
+        },
+        "education": {
+            "actions": ["add", "update", "remove"],
+            "required": ["institution"],
+            "optional": ["degree", "field", "period", "highlights"],
+            "example": {"institution": "MIT", "degree": "BSc", "field": "Computer Science", "period": "2018-2022"}
+        },
+        "career_aspiration": {
+            "actions": ["add", "remove"],
+            "required": ["aspiration"],
+            "optional": [],
+            "example": {"aspiration": "Become a tech lead within 3 years"}
+        }
+    },
+    "lifestyle": {
+        "hobby": {
+            "actions": ["add", "update", "remove"],
+            "required": ["name"],
+            "optional": ["skill_level", "status", "notes", "specifics", "references"],
+            "valid_values": {"skill_level": ["beginner", "learning", "intermediate", "advanced", "expert"], "status": ["active", "inactive", "paused"]},
+            "example": {"name": "Photography", "skill_level": "intermediate", "status": "active", "specifics": ["landscape", "street"]}
+        },
+        "hobby_reference": {
+            "actions": ["add", "update", "remove"],
+            "required": ["hobby_name", "ref_name"],
+            "optional": ["url", "notes"],
+            "note": "Adds reference/resource to existing hobby",
+            "example": {"hobby_name": "Photography", "ref_name": "Peter McKinnon", "url": "https://youtube.com/...", "notes": "Great tutorials"}
+        },
+        "passion": {
+            "actions": ["add", "remove"],
+            "required": ["name"],
+            "optional": [],
+            "example": {"name": "Sustainable technology"}
+        },
+        "curiosity": {
+            "actions": ["add", "remove"],
+            "required": ["topic"],
+            "optional": [],
+            "example": {"topic": "How do neural networks actually learn?"}
+        },
+        "personality_trait": {
+            "actions": ["add", "remove"],
+            "required": ["trait"],
+            "optional": [],
+            "example": {"trait": "Detail-oriented"}
+        },
+        "value": {
+            "actions": ["add", "remove"],
+            "required": ["value"],
+            "optional": [],
+            "example": {"value": "Continuous learning"}
+        }
+    },
+    "knowledge": {
+        "domain": {
+            "actions": ["add", "update", "remove"],
+            "required": ["name"],
+            "optional": ["level", "notes", "references"],
+            "valid_values": {"level": ["beginner", "learning", "intermediate", "advanced", "expert"]},
+            "example": {"name": "Python", "level": "advanced", "notes": "Main backend language"}
+        },
+        "domain_reference": {
+            "actions": ["add", "update", "remove"],
+            "required": ["domain_name", "ref_name"],
+            "optional": ["url", "notes"],
+            "note": "Adds reference/resource to existing domain",
+            "example": {"domain_name": "Python", "ref_name": "FastAPI Docs", "url": "https://fastapi.tiangolo.com"}
+        },
+        "mental_tab": {
+            "actions": ["add", "update", "remove"],
+            "required": ["name"],
+            "optional": ["notes", "references"],
+            "note": "Topics you're actively tracking (restaurants, movies, etc.)",
+            "example": {"name": "Restaurants to try", "notes": "Curating list for 2026"}
+        },
+        "mental_tab_reference": {
+            "actions": ["add", "update", "remove"],
+            "required": ["title", "ref_name"],
+            "optional": ["url", "notes"],
+            "note": "Adds item to existing mental_tab",
+            "example": {"title": "Restaurants to try", "ref_name": "Sushi Nakazawa", "notes": "Omakase, need reservations"}
+        }
+    },
+    "projects": {
+        "project": {
+            "actions": ["add", "update", "remove"],
+            "required": ["name"],
+            "optional": ["description", "status", "tags", "notes", "highlights", "references"],
+            "valid_values": {"status": ["active", "paused", "completed", "archived", "idea"]},
+            "example": {"name": "MyGist", "description": "Portable personal context for AI", "status": "active", "tags": ["python", "mcp"]}
+        },
+        "project_reference": {
+            "actions": ["add", "update", "remove"],
+            "required": ["project_name", "ref_name"],
+            "optional": ["url", "notes"],
+            "example": {"project_name": "MyGist", "ref_name": "MCP Spec", "url": "https://modelcontextprotocol.io"}
+        },
+        "project_highlight": {
+            "actions": ["add", "remove"],
+            "required": ["project_name", "highlight"],
+            "optional": [],
+            "example": {"project_name": "MyGist", "highlight": "Reduced tool count from 40 to 6"}
+        },
+        "current_learning": {
+            "actions": ["add", "update", "remove"],
+            "required": ["topic"],
+            "optional": ["notes", "status", "resources"],
+            "valid_values": {"status": ["active", "paused", "completed"]},
+            "example": {"topic": "Rust", "notes": "Following Rustlings", "status": "active"}
+        },
+        "top_of_mind": {
+            "actions": ["add", "update", "remove"],
+            "required": ["topic"],
+            "optional": ["note"],
+            "note": "Can also use 'idea' as field name",
+            "example": {"topic": "Build a CLI for persona", "note": "Use Rust for practice"}
+        }
+    },
+    "circle": {
+        "connection": {
+            "actions": ["add", "update", "remove"],
+            "required": ["name"],
+            "optional": ["relationship", "traits", "notes", "contact"],
+            "example": {"name": "Jane Smith", "relationship": "Mentor from work", "traits": ["insightful", "patient"], "notes": "Weekly 1:1s"}
+        }
+    },
+    "preferences": {
+        "dislike": {
+            "actions": ["add", "remove"],
+            "required": ["dislike"],
+            "optional": [],
+            "example": {"dislike": "Long meetings without agendas"}
+        },
+        "communication_default": {
+            "actions": ["update"],
+            "required": [],
+            "optional": ["tone", "detail_level", "locale"],
+            "valid_values": {"tone": ["casual", "professional", "friendly", "formal"], "detail_level": ["brief", "concise", "detailed", "comprehensive"]},
+            "note": "Updates default communication style",
+            "example": {"tone": "friendly", "detail_level": "concise"}
+        },
+        "mood_override": {
+            "actions": ["add", "update", "remove"],
+            "required": ["mood"],
+            "optional": ["tone", "detail_level"],
+            "note": "Context-specific communication overrides",
+            "example": {"mood": "stressed", "tone": "calm", "detail_level": "brief"}
+        }
+    },
+    "learning_log": {
+        "learning_entry": {
+            "actions": ["add", "remove"],
+            "required": ["topic", "details", "source"],
+            "optional": ["tags", "conversation_metadata", "key_decisions", "followup_items", "related_entries"],
+            "note": "Captures insights and learnings from conversations. source format: 'LLM - context'",
+            "example": {
+                "topic": "MCP Architecture",
+                "details": "Learned about scoped context for efficient token usage",
+                "source": "Claude Sonnet - debugging session",
+                "tags": ["mcp", "architecture"],
+                "key_decisions": ["Use 5 scopes: minimal, professional, personal, learning, full"]
+            }
+        }
+    }
+}
+
+def get_entity_schema(entity: str = None, file: str = None) -> dict:
+    """
+    Get schema for entity types.
+    
+    Args:
+        entity: Specific entity name (e.g., 'hobby', 'project')
+        file: Scope to entities in a specific file (e.g., 'projects', 'lifestyle')
+    
+    Priority: entity > file > all
+    """
+    # If specific entity requested, find it
+    if entity:
+        entity_lower = entity.lower()
+        for file_name, entities in ENTITY_SCHEMA.items():
+            if entity_lower in entities:
+                return {
+                    "entity": entity_lower,
+                    "file": file_name,
+                    "schema": entities[entity_lower]
+                }
+        return {"error": f"Unknown entity: {entity}. Use get_schema() or get_schema(file='...') to see valid entities."}
+    
+    # If file scope requested, return entities for that file
+    if file:
+        file_lower = file.lower()
+        if file_lower in ENTITY_SCHEMA:
+            return {
+                "file": file_lower,
+                "entities": ENTITY_SCHEMA[file_lower],
+                "entity_names": list(ENTITY_SCHEMA[file_lower].keys())
+            }
+        return {"error": f"Unknown file: {file}. Valid files: {', '.join(ENTITY_SCHEMA.keys())}"}
+    
+    # Return all schemas grouped by file
+    return {
+        "description": "Valid entity types for persona_modify, grouped by file",
+        "files": list(ENTITY_SCHEMA.keys()),
+        "entities": ENTITY_SCHEMA
+    }
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict):
     """Handle tool calls"""
@@ -3998,33 +4410,27 @@ async def call_tool(name: str, arguments: dict):
             scope = arguments.get("scope", "minimal")
             topic = arguments.get("topic")
             include_inactive = arguments.get("include_inactive", False)
-            result = get_scoped_context(scope, topic, include_inactive)
+            days = arguments.get("days")
+            limit = arguments.get("limit")
+            result = get_scoped_context(scope, topic, include_inactive, days, limit)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         
-        # READ operations (individual files)
-        elif name == "get_persona":
-            return [TextContent(type="text", text=json.dumps(get_all_persona_data(), indent=2))]
-        
-        elif name == "get_profile":
-            return [TextContent(type="text", text=json.dumps(load_json("profile.json"), indent=2))]
-        
-        elif name == "get_lifestyle":
-            return [TextContent(type="text", text=json.dumps(load_json("lifestyle.json"), indent=2))]
-        
-        elif name == "get_knowledge":
-            return [TextContent(type="text", text=json.dumps(load_json("knowledge.json"), indent=2))]
-        
-        elif name == "get_preferences":
-            return [TextContent(type="text", text=json.dumps(load_json("preferences.json"), indent=2))]
-        
-        elif name == "get_projects":
-            return [TextContent(type="text", text=json.dumps(load_json("projects.json"), indent=2))]
+        # RAW DATA ACCESS (consolidated from individual get_* tools)
+        elif name == "get_raw":
+            file = arguments.get("file", "all")
+            if file == "all":
+                return [TextContent(type="text", text=json.dumps(get_all_persona_data(), indent=2))]
+            elif file in FILE_MAP:
+                return [TextContent(type="text", text=json.dumps(load_json(FILE_MAP[file]), indent=2))]
+            else:
+                return [TextContent(type="text", text=f"❌ Unknown file: {file}. Valid: all, profile, lifestyle, knowledge, preferences, projects, circle, learning_log")]
 
-        elif name == "get_circle":
-            return [TextContent(type="text", text=json.dumps(load_json("circle.json"), indent=2))]
-
-        elif name == "get_learning_log":
-            return [TextContent(type="text", text=json.dumps(load_json("learning_log.json"), indent=2))]
+        # SCHEMA DISCOVERY
+        elif name == "get_schema":
+            entity = arguments.get("entity")
+            file = arguments.get("file")
+            result = get_entity_schema(entity=entity, file=file)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         # WRITE operations
         # elif name == "persona_update":  # ARCHIVED: See tool definition comment above

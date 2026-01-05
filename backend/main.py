@@ -1,5 +1,5 @@
 """
-Persona Manager Backend
+MyGist Backend (formerly Persona Manager)
 
 FastAPI server that provides CRUD operations for persona JSON files.
 Reads and writes directly to the data directory.
@@ -18,15 +18,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuration
-DATA_DIR = Path(os.getenv("PERSONA_DATA_DIR", "./data"))
+DATA_DIR = Path(os.getenv("PERSONA_DATA_DIR", Path(__file__).parent.parent / "mygist_data"))
 
 # Ensure data directory exists
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Initialize FastAPI
 app = FastAPI(
-    title="Persona Manager API",
-    description="API for managing personal persona data files",
+    title="MyGist API",
+    description="API for managing your personal context data (Persona MCP)",
     version="1.0.0"
 )
 
@@ -299,7 +299,7 @@ async def root():
     """Health check endpoint."""
     return {
         "status": "ok",
-        "service": "Persona Manager API",
+        "service": "MyGist API",
         "data_dir": str(DATA_DIR.absolute())
     }
 
@@ -370,7 +370,7 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "127.0.0.1")
     
-    print(f"Starting Persona Manager API...")
+    print(f"Starting MyGist API...")
     print(f"Data directory: {DATA_DIR.absolute()}")
     print(f"Server: http://{host}:{port}")
     

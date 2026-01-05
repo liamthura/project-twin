@@ -102,5 +102,5 @@ coverage/
 *.pid.lock
 .vercel
 .turbo
-persona_mcp/
+mygist_data/
 backend/archive/
