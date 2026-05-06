@@ -10,6 +10,7 @@ Single entry point serving:
 import json
 import os
 import secrets
+import sys
 import zipfile
 import io
 import shutil
@@ -26,21 +27,39 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuration
-DATA_DIR = Path(os.getenv("PERSONA_DATA_DIR", Path(__file__).parent.parent / "mygist_data"))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+def resolve_data_dir() -> Path:
+    base_dir = Path(__file__).parent
+    env_dir = os.getenv("PERSONA_DATA_DIR")
+    if env_dir:
+        candidate = Path(env_dir).expanduser()
+        if not candidate.is_absolute():
+            candidate = (base_dir / candidate).resolve()
+    else:
+        candidate = base_dir.parent / "mygist_data"
+    return candidate
+
+
+DATA_DIR = resolve_data_dir()
+try:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+except OSError as exc:
+    print(f"Warning: could not create data directory {DATA_DIR}: {exc}", file=sys.stderr)
 
 # Import MCP server
 from server import mcp
 
 # Create MCP HTTP app
-mcp_app = mcp.http_app(path="/mcp", transport="sse")
+mcp_app = mcp.http_app(path="/", transport="http")
 
 # Initialize FastAPI
-app = FastAPI(title="MyGist API", version="1.0.0")
+app = FastAPI(title="MyGist API", version="1.0.0", lifespan=mcp_app.lifespan)
 
-# Mount MCP routes
-for route in mcp_app.routes:
-    app.routes.append(route)
+# # Mount MCP routes
+# for route in mcp_app.routes:
+#     app.routes.append(route)
+
+# Mount MCP app at /mcp
+app.mount("/mcp", mcp_app)
 
 # Bearer auth middleware for /mcp and /api routes
 @app.middleware("http")
@@ -68,6 +87,9 @@ app.add_middleware(
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "https://mygist.thuradev.qzz.io",
+        "http://localhost:1120",
+        "http://chat.orb.local"
+        "http://147.79.18.20",
     ],
     allow_credentials=True,
     allow_methods=["*"],

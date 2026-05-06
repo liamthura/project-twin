@@ -294,7 +294,7 @@ def _filter_by_topic(data: dict, topic: str) -> dict:
     
     return filtered
 
-
+# TODO: Find a way to let AI decide for keyword aliases matching rather than hard-coding, isntead give LLM-friendly instruction
 # Keyword aliases for common terms
 KEYWORD_ALIASES = {
     # JavaScript ecosystem

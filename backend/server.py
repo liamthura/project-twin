@@ -23,19 +23,19 @@ import sys
 import re
 import secrets
 import logging
-import zipfile
-import io
-import shutil
+# import zipfile
+# import io
+# import shutil
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, Literal
 import uuid
 
 from fastmcp import FastMCP
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
-from starlette.routing import Route
+# from starlette.middleware.base import BaseHTTPMiddleware
+# from starlette.requests import Request
+# from starlette.responses import JSONResponse, Response
+# from starlette.routing import Route
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -49,8 +49,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Data directory path - configurable via env var
-DATA_DIR = Path(os.getenv("PERSONA_DATA_DIR", Path(__file__).parent.parent / "mygist_data"))
+# Data directory path - resolve env var relative to repo root for robustness
+def resolve_data_dir() -> Path:
+    base_dir = Path(__file__).parent
+    env_dir = os.getenv("PERSONA_DATA_DIR")
+    if env_dir:
+        candidate = Path(env_dir).expanduser()
+        if not candidate.is_absolute():
+            candidate = (base_dir / candidate).resolve()
+    else:
+        candidate = base_dir.parent / "mygist_data"
+    return candidate
+
+
+DATA_DIR = resolve_data_dir()
+try:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+except OSError as exc:
+    logger.warning(f"Could not create data directory {DATA_DIR}: {exc}")
 logger.info(f"Data directory: {DATA_DIR}")
 
 # File mapping for different data types
@@ -282,7 +298,7 @@ def calculate_final_confidence_v2(
     entity_exists: bool,
     recurrence: int = 0
 ) -> float:
-    """Revised confidence calculation with balanced sentiment impact."""
+    """Confidence calculation with balanced sentiment impact."""
     score = base_confidence
     
     # Sentiment multiplier
@@ -405,6 +421,10 @@ def resolve_pronoun_references(entities: list, message: str, context: Conversati
     
     return resolved
 
+# -----------------------------------------------------------------------------
+# PERSONA CROSS-REFERENCE HELPERS - ADD VS UPDATE VS SKIP LOGIC
+# -----------------------------------------------------------------------------
+
 
 def find_in_persona(persona: dict, entity_type: str, name: str) -> dict:
     """Search persona for existing entity by type and name"""
@@ -440,7 +460,13 @@ def find_in_persona(persona: dict, entity_type: str, name: str) -> dict:
 
 
 def cross_reference_persona(suggestion: dict, persona: dict) -> dict:
-    """Check suggestion against existing persona for ADD vs UPDATE."""
+    """
+    Check suggestion against existing persona to:
+    1. Convert ADD → UPDATE if entity exists
+    2. Boost confidence for updating existing data
+    3. Detect conflicts (downgrade from intermediate to beginner)
+    4. Skip if data unchanged
+    """
     suggestion = suggestion.copy()
     entity_type = suggestion['entity']
     data = suggestion.get('data', {})
@@ -485,9 +511,20 @@ def is_same_data(existing: dict, proposed: dict) -> bool:
             return False
     return True
 
+# -----------------------------------------------------------------------------
+# UX CONSOLIDATION - GROUP SUGGESTIONS FOR BETTER PROMPTS
+# -----------------------------------------------------------------------------
 
 def consolidate_suggestions_for_ux(suggestions: list) -> dict:
-    """Group suggestions for better UX."""
+    """
+    Group suggestions for better UX.
+    Returns:
+    {
+        "auto_apply": [...],      # High confidence - just notify
+        "batch_confirm": [...],    # Medium confidence - ask once for all
+        "individual_confirm": [...] # Mixed confidence - ask individually
+    }
+    """
     auto_apply = []
     ask_user = []
     
@@ -522,61 +559,61 @@ def consolidate_suggestions_for_ux(suggestions: list) -> dict:
 # =============================================================================
 # BEARER TOKEN AUTHENTICATION MIDDLEWARE
 # =============================================================================
-
-class BearerAuthMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware that validates Bearer token on all requests.
-    Skips authentication for health check endpoints.
-    """
+# TODO: commented out here
+# class BearerAuthMiddleware(BaseHTTPMiddleware):
+#     """
+#     Middleware that validates Bearer token on all requests.
+#     Skips authentication for health check endpoints.
+#     """
     
-    SKIP_AUTH_PATHS = frozenset({"/", "/health", "/healthz"})
+#     SKIP_AUTH_PATHS = frozenset({"/", "/health", "/healthz"})
     
-    def __init__(self, app, token: str | None = None):
-        super().__init__(app)
-        self.token = token
-        self._auth_enabled = bool(token)
+#     def __init__(self, app, token: str | None = None):
+#         super().__init__(app)
+#         self.token = token
+#         self._auth_enabled = bool(token)
         
-        if not self._auth_enabled:
-            logger.warning(
-                "⚠️  MYGIST_API_TOKEN not set - authentication disabled! "
-                "Set this env var in production."
-            )
+#         if not self._auth_enabled:
+#             logger.warning(
+#                 "⚠️  MYGIST_API_TOKEN not set - authentication disabled! "
+#                 "Set this env var in production."
+#             )
     
-    async def dispatch(self, request: Request, call_next) -> Response:
-        # Skip auth for health endpoints
-        if request.url.path in self.SKIP_AUTH_PATHS:
-            return await call_next(request)
+#     async def dispatch(self, request: Request, call_next) -> Response:
+#         # Skip auth for health endpoints
+#         if request.url.path in self.SKIP_AUTH_PATHS:
+#             return await call_next(request)
         
-        # Skip auth if no token configured (dev mode)
-        if not self._auth_enabled:
-            return await call_next(request)
+#         # Skip auth if no token configured (dev mode)
+#         if not self._auth_enabled:
+#             return await call_next(request)
         
-        # Extract and validate Authorization header
-        auth_header = request.headers.get("Authorization", "")
+#         # Extract and validate Authorization header
+#         auth_header = request.headers.get("Authorization", "")
         
-        if not auth_header:
-            logger.warning(f"Missing Authorization header from {request.client.host}")
-            return JSONResponse(
-                status_code=401,
-                content={"error": "Unauthorized", "message": "Missing Authorization header"}
-            )
+#         if not auth_header:
+#             logger.warning(f"Missing Authorization header from {request.client.host}")
+#             return JSONResponse(
+#                 status_code=401,
+#                 content={"error": "Unauthorized", "message": "Missing Authorization header"}
+#             )
         
-        parts = auth_header.split(" ", 1)
-        if len(parts) != 2 or parts[0].lower() != "bearer":
-            return JSONResponse(
-                status_code=401,
-                content={"error": "Unauthorized", "message": "Invalid Authorization header format. Use: Bearer <token>"}
-            )
+#         parts = auth_header.split(" ", 1)
+#         if len(parts) != 2 or parts[0].lower() != "bearer":
+#             return JSONResponse(
+#                 status_code=401,
+#                 content={"error": "Unauthorized", "message": "Invalid Authorization header format. Use: Bearer <token>"}
+#             )
         
-        # Timing-safe comparison
-        if not secrets.compare_digest(parts[1], self.token):
-            logger.warning(f"Invalid token from {request.client.host}")
-            return JSONResponse(
-                status_code=401,
-                content={"error": "Unauthorized", "message": "Invalid bearer token"}
-            )
+#         # Timing-safe comparison
+#         if not secrets.compare_digest(parts[1], self.token):
+#             logger.warning(f"Invalid token from {request.client.host}")
+#             return JSONResponse(
+#                 status_code=401,
+#                 content={"error": "Unauthorized", "message": "Invalid bearer token"}
+#             )
         
-        return await call_next(request)
+#         return await call_next(request)
 
 
 # =============================================================================
@@ -820,6 +857,7 @@ def _filter_learning_log_by_time(data: dict, days: int = None, limit: int = None
     }
     return result
 
+# TODO: Find a way to let AI decide for keyword aliases matching rather than hard-coding, isntead give LLM-friendly instruction
 # Keyword aliases for topic filtering
 KEYWORD_ALIASES = {
     "js": ["javascript", "js"],
@@ -2691,21 +2729,29 @@ def get_context(
     days: Optional[int] = None,
     limit: Optional[int] = None
 ) -> str:
-    """Retrieve scoped persona context. Call this FIRST at conversation start.
+    """
+    Retrieve scoped persona context. Call this FIRST at conversation start.
+
+    WHEN TO USE:
+        - Start of any conversation (always)
+        - When you need user preferences to tailor responses
 
     SCOPES:
-    - minimal: Quick questions, greetings, code help. Returns: name, bio, top_of_mind, preferences
-    - professional: Career, projects, technical. Returns: profile, skills, projects, code_style
-    - personal: Life advice, hobbies, wellness. Returns: hobbies, personality, connections
-    - learning: Skill development, roadmaps. Returns: skills, learning_log (last 60 days)
-    - full: Complex questions. Returns: everything
+        - minimal: Quick questions, greetings, code help. Returns: name, bio, top_of_mind, preferences
+        - professional: Career, projects, technical. Returns: profile, skills, projects, code_style
+        - personal: Life advice, hobbies, wellness. Returns: hobbies, personality, connections
+        - learning: Skill development, roadmaps. Returns: skills, learning_log (last 60 days)
+        - full: Complex questions. Returns: everything
 
-    Args:
+    ARGS:
         scope: Context depth
         topic: Filter to items matching this topic (e.g., "react", "cooking")
         include_inactive: Include inactive/paused items
         days: Limit learning_log to last N days
         limit: Max learning_log entries to return
+
+    RETURNS: 
+        Filtered persona data based on scope + user preferences (tone, detail_level, dislikes)
     """
     result = get_scoped_context(scope, topic, include_inactive, days, limit)
     return json.dumps(result, indent=2)
@@ -2715,20 +2761,28 @@ def get_context(
 def get_raw(
     file: Literal["all", "profile", "lifestyle", "knowledge", "preferences", "projects", "circle", "learning_log"] = "all"
 ) -> str:
-    """Retrieve raw JSON file data. Use for editing or deep inspection.
+    """
+    Retrieve raw JSON file data. Use for editing or deep inspection.
+
+    WHEN TO USE:
+        - Before modifying data (to see current state)
+        - When get_context doesn't have enough detail
 
     FILES:
-    - all: Complete persona (all files)
-    - profile: name, bio, contact, work_experience[], education[]
-    - lifestyle: hobbies[], passions[], curiosities[], values[]
-    - knowledge: domains[] (skills), mental_tabs[]
-    - preferences: code_style, communication, learning_style, dislikes[]
-    - projects: projects[], current_learning[], top_of_mind[]
-    - circle: connections[]
-    - learning_log: entries[]
+        - all: Complete persona (all files)
+        - profile: name, bio, contact, work_experience[], education[]
+        - lifestyle: hobbies[], passions[], curiosities[], values[]
+        - knowledge: domains[] (skills), mental_tabs[]
+        - preferences: code_style, communication, learning_style, dislikes[]
+        - projects: projects[], current_learning[], top_of_mind[]
+        - circle: connections[]
+        - learning_log: entries[]
 
-    Args:
+    ARGS:
         file: File to retrieve
+
+    RETURNS: 
+        Raw JSON for the specified file(s)
     """
     if file == "all":
         return json.dumps(get_all_persona_data(), indent=2)
@@ -2743,11 +2797,18 @@ def get_schema(
     file: Optional[str] = None,
     entity: Optional[str] = None
 ) -> str:
-    """Discover valid entity types and their fields. Call before persona_modify if unsure.
-
-    Args:
+    """
+    Discover valid entity types and their fields. Call before persona_modify if unsure.
+    WHEN TO USE:
+        - Unsure what entity type to use
+        - Need to know required vs optional fields
+        - Want valid enum values for a field
+    ARGS:
         file: Scope to entities in a specific file (profile, lifestyle, knowledge, etc.)
         entity: Get schema for specific entity type (e.g., 'hobby', 'project')
+
+    RETURNS: 
+        {file, entities} or {entity, file, schema}
     """
     result = get_entity_schema(entity=entity, file=file)
     return json.dumps(result, indent=2)
@@ -2760,17 +2821,30 @@ def persona_modify(
     data: dict
 ) -> str:
     """Add, update, or remove a single item from persona data.
+    If unsure, use get_schema to discover valid entity types, required fields, and enum values.
 
     Args:
         action: "add" | "update" | "remove"
         entity: Entity type (use get_schema to discover valid types)
         data: Object with identifier + fields. Always include: name, title, topic, or address
 
-    Examples:
-    - ADD hobby: {action: "add", entity: "hobby", data: {name: "Photography", skill_level: "beginner"}}
-    - UPDATE project: {action: "update", entity: "project", data: {name: "MyApp", status: "completed"}}
-    - REMOVE domain: {action: "remove", entity: "domain", data: {name: "PHP"}}
-    - ADD learning_entry: {action: "add", entity: "learning_entry", data: {topic: "React Hooks", details: "...", source: "Claude"}}
+    DATA REQUIREMENTS:
+        - Always include identifier: name, title, topic, or address (depends on entity)
+        - For update/remove: identifier matches existing item
+        - For add: identifier + any optional fields
+
+    EXAMPLES:
+        - ADD hobby: {action: "add", entity: "hobby", data: {name: "Photography", skill_level: "beginner"}}
+        - UPDATE project: {action: "update", entity: "project", data: {name: "MyApp", status: "completed"}}
+        - REMOVE domain: {action: "remove", entity: "domain", data: {name: "PHP"}}
+        - ADD learning_entry: {action: "add", entity: "learning_entry", data: {topic: "React Hooks", details: "...", source: "Claude"}}
+
+    NESTED ITEMS (include parent identifier):
+        - work_highlight: {company: "Acme", highlight: "Led migration"}
+        - project_reference: {project_name: "MyApp", ref_name: "Docs", url: "https://..."}
+
+    RETURN: 
+        Success/error message
     """
     return execute_modify(action, entity, data)
 
@@ -2778,15 +2852,34 @@ def persona_modify(
 @mcp.tool()
 def persona_batch(operations: list) -> str:
     """Perform multiple persona modifications in one call.
+    If unsure, use get_schema to discover valid entity types and fields.
+    
+    WHEN TO USE:
+        - Adding multiple items at once (e.g., several highlights)
+        - Updating related items together
 
-    Args:
-        operations: Array of {action, entity, data} objects
+    ARGS:
+        operations (required): Array of {action, entity, data} objects
 
-    Example:
-    {operations: [
-        {action: "add", entity: "work_highlight", data: {company: "Acme", highlight: "Led API"}},
-        {action: "update", entity: "project", data: {name: "MyApp", status: "completed"}}
-    ]}
+    EXAMPLES:
+        {operations: [
+            {action: "add", entity: "work_highlight", data: {company: "Acme", highlight: "Led API"}},
+            {action: "update", entity: "project", data: {name: "MyApp", status: "completed"}}
+        ]}
+
+        - Multiple highlights:
+        {operations: [
+            {action: "add", entity: "work_highlight", data: {company: "Acme", highlight: "Led API"}},
+            {action: "add", entity: "work_highlight", data: {company: "Acme", highlight: "Built dashboard"}}
+        ]}
+        - Mixed operations:
+        {operations: [
+            {action: "update", entity: "project", data: {name: "MyApp", status: "completed"}},
+            {action: "add", entity: "project_highlight", data: {project_name: "MyApp", highlight: "Launched v1"}}
+        ]}
+
+    RETURN:
+        Numbered list of results for each operation
     """
     if not operations:
         return "❌ No operations provided"
@@ -2806,38 +2899,41 @@ def persona_batch(operations: list) -> str:
 def suggest_persona_update(message: str, context: str = "") -> str:
     """Analyze user message for potential persona updates. Call proactively during conversation.
 
-    When to call:
-    - User mentions achievements, completions, new skills
-    - User expresses preferences, dislikes, opinions
-    - User shares life updates (job, hobby, learning progress)
-    - User reflects on insights or lessons learned
+    WHEN TO USE:
+        - User mentions achievements, completions, new skills
+        - User expresses preferences, dislikes, opinions
+        - User shares life updates (job, hobby, learning progress)
+        - User reflects on insights or lessons learned
 
-    Args:
+    ARGS:
         message: User message to analyze
         context: Optional conversation context for ambiguity resolution
 
-    Response includes:
-    - confidence: 0.0-1.0 score based on statement quality
-    - suggestions: Ready-to-apply persona_modify operations
-    - statement_signals: Evidence markers (self_referential, present_tense, etc.)
-    - action_required: "auto_apply" | "ask_user" | "ignore"
+    RESPONSE INCLUDES:
+        - confidence: 0.0-1.0 score based on statement quality
+        - suggestions: Ready-to-apply persona_modify operations
+        - statement_signals: Evidence markers (self_referential, present_tense, etc.)
+        - action_required: "auto_apply" | "ask_user" | "ignore"
     
-    Decision guidance:
-    - >= 0.8: High confidence. Apply via persona_modify, mention: "✓ Updated your persona..."
-    - 0.5-0.8: Medium confidence. Ask: "Should I add X to your persona?"
-    - < 0.5: Low confidence. Respond normally, no persona mention.
+    DECISION GUIDANCE:
+        - >= 0.8: High confidence. Apply via persona_modify, mention: "✓ Updated your persona..."
+        - 0.5-0.8: Medium confidence. Ask: "Should I add X to your persona?"
+        - < 0.5: Low confidence. Respond normally, no persona mention.
     
-    Confidence boosters (use your judgment to adjust):
-    - Self-referential ("I", "my") statements: +trust
-    - Present tense declarations: +trust
-    - Explicit state changes ("finished", "started"): +trust
-    - Concrete outputs ("built", "deployed"): +trust
-    - Duration indicators ("for months"): +trust
+    CONFIDENCE BOOSTERS (use your judgment and conversation context to adjust):
+        - Self-referential ("I", "my") statements: +trust
+        - Present tense declarations: +trust
+        - Explicit state changes ("finished", "started"): +trust
+        - Concrete outputs ("built", "deployed"): +trust
+        - Duration indicators ("for months"): +trust
     
-    Confidence reducers:
-    - Hypotheticals ("what if", "maybe"): -trust
-    - Questions/requests for help: -trust
-    - Casual venting: -trust
+    CONFIDENCE REDUCERS (use your judgment and conversation context to adjust):
+        - Hypotheticals ("what if", "maybe"): -trust
+        - Questions/requests for help: -trust
+        - Casual venting: -trust
+
+    RETURNS:
+        {should_capture, confidence, suggestions: [{action, entity, data}], instruction}
     """
     if not message:
         return json.dumps({
@@ -2875,150 +2971,150 @@ def suggest_persona_update(message: str, context: str = "") -> str:
     return json.dumps(response, indent=2)
 
 
-# =============================================================================
-# HEALTH CHECK ENDPOINTS & APP SETUP
-# =============================================================================
+# # =============================================================================
+# # HEALTH CHECK ENDPOINTS & APP SETUP
+# # =============================================================================
 
-async def health_check(request):
-    """Health check endpoint for container orchestration."""
-    return JSONResponse({
-        "status": "ok",
-        "service": "mygist",
-        "data_dir": str(DATA_DIR),
-        "data_dir_exists": DATA_DIR.exists()
-    })
+# async def health_check(request):
+#     """Health check endpoint for container orchestration."""
+#     return JSONResponse({
+#         "status": "ok",
+#         "service": "mygist",
+#         "data_dir": str(DATA_DIR),
+#         "data_dir_exists": DATA_DIR.exists()
+#     })
 
-async def root_handler(request):
-    """Root endpoint with service info."""
-    return JSONResponse({
-        "service": "MyGist MCP Server",
-        "version": "2.0.0",
-        "description": "Your portable personal context for AI",
-        "transport": "FastMCP with SSE/Streamable HTTP",
-        "endpoints": {
-            "health": "/health",
-            "mcp": "/mcp"
-        }
-    })
+# async def root_handler(request):
+#     """Root endpoint with service info."""
+#     return JSONResponse({
+#         "service": "MyGist MCP Server",
+#         "version": "2.0.0",
+#         "description": "Your portable personal context for AI",
+#         "transport": "FastMCP with SSE/Streamable HTTP",
+#         "endpoints": {
+#             "health": "/health",
+#             "mcp": "/mcp"
+#         }
+#     })
 
 
-async def export_data(request):
-    """Export all MyGist data as a downloadable zip file."""
-    if not DATA_DIR.exists():
-        return JSONResponse({"error": "Data directory not found"}, status_code=404)
+# async def export_data(request):
+#     """Export all MyGist data as a downloadable zip file."""
+#     if not DATA_DIR.exists():
+#         return JSONResponse({"error": "Data directory not found"}, status_code=404)
     
-    # Create zip in memory
-    zip_buffer = io.BytesIO()
+#     # Create zip in memory
+#     zip_buffer = io.BytesIO()
     
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-        # Add all JSON files from DATA_DIR
-        for json_file in DATA_DIR.glob("*.json"):
-            zf.write(json_file, json_file.name)
+#     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+#         # Add all JSON files from DATA_DIR
+#         for json_file in DATA_DIR.glob("*.json"):
+#             zf.write(json_file, json_file.name)
         
-        # Add metadata
-        metadata = {
-            "exported_at": datetime.now().isoformat(),
-            "version": "2.0.0",
-            "files": [f.name for f in DATA_DIR.glob("*.json")]
-        }
-        zf.writestr("_metadata.json", json.dumps(metadata, indent=2))
+#         # Add metadata
+#         metadata = {
+#             "exported_at": datetime.now().isoformat(),
+#             "version": "2.0.0",
+#             "files": [f.name for f in DATA_DIR.glob("*.json")]
+#         }
+#         zf.writestr("_metadata.json", json.dumps(metadata, indent=2))
     
-    zip_buffer.seek(0)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"mygist_backup_{timestamp}.zip"
+#     zip_buffer.seek(0)
+#     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+#     filename = f"mygist_backup_{timestamp}.zip"
     
-    return Response(
-        content=zip_buffer.getvalue(),
-        media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
+#     return Response(
+#         content=zip_buffer.getvalue(),
+#         media_type="application/zip",
+#         headers={"Content-Disposition": f"attachment; filename={filename}"}
+#     )
 
 
-async def import_data(request):
-    """Import MyGist data from an uploaded zip file."""
-    content_type = request.headers.get("content-type", "")
+# async def import_data(request):
+#     """Import MyGist data from an uploaded zip file."""
+#     content_type = request.headers.get("content-type", "")
     
-    if "multipart/form-data" in content_type:
-        # Handle form upload
-        form = await request.form()
-        upload = form.get("file")
-        if not upload:
-            return JSONResponse({"error": "No file uploaded"}, status_code=400)
-        zip_data = await upload.read()
-    else:
-        # Handle raw body upload
-        zip_data = await request.body()
+#     if "multipart/form-data" in content_type:
+#         # Handle form upload
+#         form = await request.form()
+#         upload = form.get("file")
+#         if not upload:
+#             return JSONResponse({"error": "No file uploaded"}, status_code=400)
+#         zip_data = await upload.read()
+#     else:
+#         # Handle raw body upload
+#         zip_data = await request.body()
     
-    if not zip_data:
-        return JSONResponse({"error": "No data received"}, status_code=400)
+#     if not zip_data:
+#         return JSONResponse({"error": "No data received"}, status_code=400)
     
-    # Validate it's a zip file
-    try:
-        zip_buffer = io.BytesIO(zip_data)
-        with zipfile.ZipFile(zip_buffer, 'r') as zf:
-            # Security check: only allow .json files
-            for name in zf.namelist():
-                if not name.endswith('.json'):
-                    continue
-                # Prevent path traversal
-                if '..' in name or name.startswith('/'):
-                    return JSONResponse({"error": f"Invalid filename: {name}"}, status_code=400)
+#     # Validate it's a zip file
+#     try:
+#         zip_buffer = io.BytesIO(zip_data)
+#         with zipfile.ZipFile(zip_buffer, 'r') as zf:
+#             # Security check: only allow .json files
+#             for name in zf.namelist():
+#                 if not name.endswith('.json'):
+#                     continue
+#                 # Prevent path traversal
+#                 if '..' in name or name.startswith('/'):
+#                     return JSONResponse({"error": f"Invalid filename: {name}"}, status_code=400)
             
-            # Create backup of current data
-            backup_dir = DATA_DIR.parent / f"mygist_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            if DATA_DIR.exists():
-                shutil.copytree(DATA_DIR, backup_dir)
-                logger.info(f"Created backup at: {backup_dir}")
+#             # Create backup of current data
+#             backup_dir = DATA_DIR.parent / f"mygist_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+#             if DATA_DIR.exists():
+#                 shutil.copytree(DATA_DIR, backup_dir)
+#                 logger.info(f"Created backup at: {backup_dir}")
             
-            # Ensure data dir exists
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
+#             # Ensure data dir exists
+#             DATA_DIR.mkdir(parents=True, exist_ok=True)
             
-            # Extract only JSON files
-            imported_files = []
-            for name in zf.namelist():
-                if name.endswith('.json') and not name.startswith('_'):
-                    zf.extract(name, DATA_DIR)
-                    imported_files.append(name)
-                    logger.info(f"Imported: {name}")
+#             # Extract only JSON files
+#             imported_files = []
+#             for name in zf.namelist():
+#                 if name.endswith('.json') and not name.startswith('_'):
+#                     zf.extract(name, DATA_DIR)
+#                     imported_files.append(name)
+#                     logger.info(f"Imported: {name}")
             
-            return JSONResponse({
-                "status": "success",
-                "imported_files": imported_files,
-                "backup_created": str(backup_dir) if backup_dir.exists() else None
-            })
+#             return JSONResponse({
+#                 "status": "success",
+#                 "imported_files": imported_files,
+#                 "backup_created": str(backup_dir) if backup_dir.exists() else None
+#             })
             
-    except zipfile.BadZipFile:
-        return JSONResponse({"error": "Invalid zip file"}, status_code=400)
-    except Exception as e:
-        logger.error(f"Import failed: {e}")
-        return JSONResponse({"error": f"Import failed: {str(e)}"}, status_code=500)
+#     except zipfile.BadZipFile:
+#         return JSONResponse({"error": "Invalid zip file"}, status_code=400)
+#     except Exception as e:
+#         logger.error(f"Import failed: {e}")
+#         return JSONResponse({"error": f"Import failed: {str(e)}"}, status_code=500)
 
 
-def create_app():
-    """Create the production app with auth middleware."""
-    # Get the underlying Starlette app from FastMCP
-    starlette_app = mcp.http_app()
+# def create_app():
+#     """Create the production app with auth middleware."""
+#     # Get the underlying Starlette app from FastMCP
+#     starlette_app = mcp.http_app()
     
-    # Add custom routes for health checks and data management
-    starlette_app.routes.insert(0, Route("/", endpoint=root_handler, methods=["GET"]))
-    starlette_app.routes.insert(1, Route("/health", endpoint=health_check, methods=["GET"]))
-    starlette_app.routes.insert(2, Route("/healthz", endpoint=health_check, methods=["GET"]))
-    starlette_app.routes.insert(3, Route("/export", endpoint=export_data, methods=["GET"]))
-    starlette_app.routes.insert(4, Route("/import", endpoint=import_data, methods=["POST"]))
+#     # Add custom routes for health checks and data management
+#     starlette_app.routes.insert(0, Route("/", endpoint=root_handler, methods=["GET"]))
+#     starlette_app.routes.insert(1, Route("/health", endpoint=health_check, methods=["GET"]))
+#     starlette_app.routes.insert(2, Route("/healthz", endpoint=health_check, methods=["GET"]))
+#     starlette_app.routes.insert(3, Route("/export", endpoint=export_data, methods=["GET"]))
+#     starlette_app.routes.insert(4, Route("/import", endpoint=import_data, methods=["POST"]))
     
-    # Add Bearer auth middleware
-    api_token = os.getenv("MYGIST_API_TOKEN")
-    starlette_app.add_middleware(BearerAuthMiddleware, token=api_token)
+#     # Add Bearer auth middleware
+#     api_token = os.getenv("MYGIST_API_TOKEN")
+#     starlette_app.add_middleware(BearerAuthMiddleware, token=api_token)
     
-    logger.info(f"MyGist MCP Server initialized")
-    logger.info(f"Data directory: {DATA_DIR}")
-    logger.info(f"Auth enabled: {bool(api_token)}")
+#     logger.info(f"MyGist MCP Server initialized")
+#     logger.info(f"Data directory: {DATA_DIR}")
+#     logger.info(f"Auth enabled: {bool(api_token)}")
     
-    return starlette_app
+#     return starlette_app
 
 
-# Create app for uvicorn
-app = create_app()
+# # Create app for uvicorn
+# app = create_app()
 
 
 # =============================================================================
@@ -3028,12 +3124,12 @@ app = create_app()
 if __name__ == "__main__":
     import sys
     
-    # Check if running in HTTP mode
-    if "--http" in sys.argv or os.getenv("MCP_TRANSPORT") == "http":
-        import uvicorn
-        port = int(os.getenv("PORT", "8000"))
-        host = os.getenv("HOST", "0.0.0.0")
-        uvicorn.run(app, host=host, port=port)
-    else:
-        # Default: stdio transport for local MCP clients
-        mcp.run()
+    # # Check if running in HTTP mode
+    # if "--http" in sys.argv or os.getenv("MCP_TRANSPORT") == "http":
+    #     import uvicorn
+    #     port = int(os.getenv("PORT", "8000"))
+    #     host = os.getenv("HOST", "0.0.0.0")
+    #     uvicorn.run(app, host=host, port=port)
+    # else:
+    #     # Default: stdio transport for local MCP clients
+    mcp.run()
