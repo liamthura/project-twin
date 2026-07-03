@@ -48,18 +48,14 @@ except OSError as exc:
 # Import MCP server
 from server import mcp
 
-# Create MCP HTTP app
-mcp_app = mcp.http_app(path="/", transport="http")
+# Create MCP HTTP app. Default path is "/mcp" - FastMCP registers this as an
+# exact route internally, so mounting the whole app at "/" below lets "/mcp"
+# resolve directly (no trailing-slash redirect, unlike mounting at "/mcp" with
+# an internal path of "/", which required a "/mcp/" -> would 307 on "/mcp").
+mcp_app = mcp.http_app()
 
 # Initialize FastAPI
 app = FastAPI(title="MyGist API", version="1.0.0", lifespan=mcp_app.lifespan)
-
-# # Mount MCP routes
-# for route in mcp_app.routes:
-#     app.routes.append(route)
-
-# Mount MCP app at /mcp
-app.mount("/mcp", mcp_app)
 
 # Bearer auth middleware for /mcp and /api routes
 @app.middleware("http")
@@ -546,6 +542,15 @@ async def import_data(file: UploadFile = File(...), mode: str = "replace"):
             
     except zipfile.BadZipFile:
         raise HTTPException(status_code=400, detail="Invalid zip file")
+
+
+# ============================================================================
+# Mount MCP app
+# ============================================================================
+# Mounted at root (not "/mcp") and registered last so the /api and /health
+# routes above take precedence - the MCP app itself already owns the exact
+# "/mcp" route internally.
+app.mount("/", mcp_app)
 
 
 # ============================================================================

@@ -13,8 +13,9 @@ Every time you start a new chat with Claude, GPT, or any AI, you're a stranger a
 ```
 mygist/
 ├── backend/
-│   ├── mcp_server.py    # MCP server for Claude Desktop (or any LLM tool that supports MCP)
-│   └── main.py          # FastAPI server for the UI
+│   ├── main.py          # Single entry point: REST API (/api), MCP server (/mcp), health check (/health)
+│   ├── server.py        # MCP tool definitions and persona logic (imported by main.py)
+│   └── archive/         # Retired server implementations, kept for reference
 ├── frontend/            # React app to manually edit your persona
 └── mygist_data/         # Your persona files (JSON)
     ├── profile.json     # Name, bio, work, education
@@ -36,49 +37,54 @@ python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Connect to Claude Desktop
+### 2. Run the Server
 
-#### macOS
+```bash
+cd backend && uvicorn main:app --reload
+```
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+This starts a single process serving the REST API (`/api/*`), the MCP endpoint (`/mcp`), and a health check (`/health`) all together.
+
+### 3. Connect to Claude Desktop
+
+MyGist's MCP server runs over HTTP, so Claude Desktop connects to it by URL rather than launching a local script.
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
   "mcpServers": {
     "mygist": {
-      "command": "/path/to/mygist/backend/venv/bin/python",
-      "args": ["/path/to/mygist/backend/mcp_server.py"]
+      "url": "http://127.0.0.1:8000/mcp"
     }
   }
 }
 ```
 
-#### Windows
-
-Add to `%APPDATA%\Claude\claude_desktop_config.json`:
+If `MYGIST_API_TOKEN` is set (required once you deploy this beyond your own machine), pass it as a header:
 
 ```json
 {
   "mcpServers": {
     "mygist": {
-      "command": "C:\\path\\to\\mygist\\backend\\venv\\Scripts\\python.exe",
-      "args": ["C:\\path\\to\\mygist\\backend\\mcp_server.py"]
+      "url": "http://127.0.0.1:8000/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN"
+      }
     }
   }
 }
 ```
 
-> **Note**: Use double backslashes (`\\`) in the JSON paths, or forward slashes (`/`) which also work on Windows.
+For a deployed instance, swap in your public URL (e.g. `https://mygist.thuradev.qzz.io/mcp`) instead of `127.0.0.1`.
+
+> **Note**: The exact config keys for remote/HTTP MCP servers can vary by client version — check your client's current docs if this doesn't match what you see.
 
 Restart Claude Desktop. Your persona tools are now available! 🎉
 
-### 3. (Optional) Run the UI
+### 4. (Optional) Run the Frontend UI
 
 ```bash
-# Backend
-cd backend && uvicorn main:app --reload
-
-# Frontend
 cd frontend && npm install && npm run dev
 ```
 
