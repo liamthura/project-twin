@@ -39,6 +39,36 @@ def test_scope_touches_exactly_its_files(as_user, monkeypatch, scope):
     assert loaded_filetypes == _expected_filetypes(scope)
 
 
+from sections import SECTION_REGISTRY
+
+
+def test_resolve_scope_fields_matches_legacy_scopes():
+    # _resolve_scope_fields must reproduce the exact {file: fields} the old
+    # CONTEXT_SCOPES table encoded, for every named scope.
+    for scope in ["minimal", "professional", "personal", "learning"]:
+        legacy = {
+            spec.key: spec.context_fields[scope]
+            for spec in SECTION_REGISTRY.values()
+            if scope in spec.context_fields
+        }
+        assert server._resolve_scope_fields(scope) == legacy
+
+
+def test_resolve_scope_fields_full_is_all():
+    assert server._resolve_scope_fields("full") == "all"
+
+
+def test_resolve_scope_fields_preserves_legacy_key_order():
+    expected = {
+        "minimal": ["preferences", "profile", "projects"],
+        "professional": ["preferences", "profile", "knowledge", "projects"],
+        "personal": ["preferences", "profile", "lifestyle", "knowledge", "circle"],
+        "learning": ["preferences", "profile", "knowledge", "projects", "learning_log"],
+    }
+    for scope, keys in expected.items():
+        assert list(server._resolve_scope_fields(scope).keys()) == keys
+
+
 def test_token_estimate_reflects_returned_payload(as_user):
     store.save("profile", {**store.DEFAULTS["profile"], "name": "A", "bio": "x"*400})
     raw = server.get_context.fn(scope="full")          # exact string the caller receives

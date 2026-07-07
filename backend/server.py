@@ -39,6 +39,7 @@ from fastmcp import FastMCP
 from dotenv import load_dotenv
 
 import persona_store
+import sections
 from persona_store import FILE_MAP, DEFAULTS, generate_entity_id, get_all as get_all_persona_data
 
 # Load environment variables
@@ -720,11 +721,30 @@ CONTEXT_SCOPES = {
     }
 }
 
-def _files_for_scope(scope_config) -> list[str]:
-    """Return the persona file keys a scope actually needs. The ``full`` scope
-    (fields == "all") needs every file; other scopes only need the keys their
-    field map references."""
-    fields = scope_config["fields"]
+# Canonical file order for context output — reproduces the historical
+# CONTEXT_SCOPES key order exactly (preferences first, then the rest).
+_CONTEXT_FILE_ORDER = ("preferences", "profile", "lifestyle", "knowledge", "circle", "projects", "learning_log")
+
+
+def _resolve_scope_fields(scope: str):
+    """Resolve a scope name to its {file_key: [fields]} selection, or "all" for
+    the full scope. Keys are emitted in _CONTEXT_FILE_ORDER so context output
+    byte-matches the pre-registry behavior."""
+    if scope == "full":
+        return "all"
+    matched = {
+        spec.key: spec.context_fields[scope]
+        for spec in sections.SECTION_REGISTRY.values()
+        if scope in spec.context_fields
+    }
+    ordered_keys = [k for k in _CONTEXT_FILE_ORDER if k in matched]
+    ordered_keys += [k for k in matched if k not in _CONTEXT_FILE_ORDER]  # any future section
+    return {k: matched[k] for k in ordered_keys}
+
+def _files_for_scope(fields) -> list[str]:
+    """Return the persona file keys a scope actually needs. ``fields`` is the
+    resolved selection from _resolve_scope_fields: the string "all" needs every
+    file; a {file: fields} dict needs only its keys."""
     if fields == "all":
         return list(persona_store.VALID_FILES)
     return list(fields.keys())
@@ -737,23 +757,23 @@ def get_scoped_context(
     limit: int = None
 ) -> dict:
     """Get persona context filtered by scope and optional topic."""
-    if scope not in CONTEXT_SCOPES:
-        return {"error": f"Unknown scope '{scope}'. Valid: {list(CONTEXT_SCOPES.keys())}"}
+    if scope not in sections.SCOPES:
+        return {"error": f"Unknown scope '{scope}'. Valid: {list(sections.SCOPES.keys())}"}
 
-    scope_config = CONTEXT_SCOPES[scope]
-    needed = _files_for_scope(scope_config)
+    fields = _resolve_scope_fields(scope)
+    needed = _files_for_scope(fields)
     all_data = {ft: load_json(FILE_MAP[ft]) for ft in needed}
     result = {}
-    
-    if scope_config["fields"] == "all":
+
+    if fields == "all":
         result = all_data
     else:
-        for file_key, fields in scope_config["fields"].items():
+        for file_key, field_list in fields.items():
             data = all_data.get(file_key, {})
             if not data or "error" in data:
                 continue
             result[file_key] = {}
-            for field in fields:
+            for field in field_list:
                 if field == "communication_default":
                     comm = data.get("communication", {})
                     if isinstance(comm, dict) and "default" in comm:
@@ -778,7 +798,7 @@ def get_scoped_context(
     
     payload = {
         "scope": scope,
-        "scope_description": scope_config["description"],
+        "scope_description": sections.SCOPES[scope],
         "topic_filter": topic,
         "token_estimate": 0,
         "context": result
