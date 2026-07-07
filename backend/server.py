@@ -31,12 +31,6 @@ from datetime import datetime, timedelta
 from typing import Optional, Literal
 import uuid
 
-
-def generate_entity_id(prefix: str) -> str:
-    """Stable, machine-readable ID for a persona entity, e.g. 'hobby_3f9a21c4'."""
-    return f"{prefix}_{uuid.uuid4().hex[:8]}"
-
-
 from fastmcp import FastMCP
 # from starlette.middleware.base import BaseHTTPMiddleware
 # from starlette.requests import Request
@@ -45,7 +39,7 @@ from fastmcp import FastMCP
 from dotenv import load_dotenv
 
 import persona_store
-from persona_store import FILE_MAP, DEFAULTS, get_all as get_all_persona_data
+from persona_store import FILE_MAP, DEFAULTS, generate_entity_id, get_all as get_all_persona_data
 
 # Load environment variables
 load_dotenv()
@@ -687,7 +681,7 @@ CONTEXT_SCOPES = {
         "description": "Quick identity snapshot",
         "fields": {
             "preferences": ["code_style", "learning_style", "communication", "dislikes"],
-            "profile": ["name", "bio", "location", "current_role"],
+            "profile": ["name", "preferred_name", "bio", "location", "current_role"],
             "projects": ["top_of_mind"],
         }
     },
@@ -695,7 +689,7 @@ CONTEXT_SCOPES = {
         "description": "Work-relevant context",
         "fields": {
             "preferences": ["code_style", "learning_style", "communication", "dislikes"],
-            "profile": ["name", "bio", "location", "current_role", "work_experience", "education", "career_aspirations"],
+            "profile": ["name", "preferred_name", "bio", "location", "current_role", "work_experience", "education", "career_aspirations"],
             "knowledge": ["domains"],
             "projects": ["projects", "current_learning", "top_of_mind"],
         }
@@ -704,7 +698,7 @@ CONTEXT_SCOPES = {
         "description": "Hobbies, interests, personality, and tracked topics",
         "fields": {
             "preferences": ["code_style", "learning_style", "communication", "dislikes"],
-            "profile": ["name", "bio", "location"],
+            "profile": ["name", "preferred_name", "bio", "location"],
             "lifestyle": ["hobbies", "passions", "curiosities", "personality_traits", "values", "wellness"],
             "knowledge": ["mental_tabs"],
             "circle": ["connections"],
@@ -714,7 +708,7 @@ CONTEXT_SCOPES = {
         "description": "Current learning focus",
         "fields": {
             "preferences": ["code_style", "learning_style", "communication", "dislikes"],
-            "profile": ["name", "current_role", "career_aspirations"],
+            "profile": ["name", "preferred_name", "current_role", "career_aspirations"],
             "knowledge": ["domains", "mental_tabs"],
             "projects": ["current_learning", "top_of_mind"],
             "learning_log": ["entries"]

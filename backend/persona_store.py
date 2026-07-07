@@ -6,12 +6,61 @@ callers already expect.
 """
 
 import json
+import uuid
 
 import db
 
 VALID_FILES = ["profile", "knowledge", "preferences", "projects", "lifestyle", "circle", "learning_log"]
 
 FILE_MAP = {name: f"{name}.json" for name in VALID_FILES}
+
+# Object-list entities that carry a stable, machine-readable `id`, keyed by
+# file type -> list of (list_key, id_prefix). IDs are assigned on save (see
+# _assign_ids), so entities created via the MCP tools AND via the frontend's
+# direct PUT both get one. learning_log is intentionally excluded -- its
+# entries use their own learn_<date>_<hex6> id assigned at creation.
+ID_LISTS = {
+    "profile": [
+        ("work_experience", "work"),
+        ("education", "education"),
+        ("languages_spoken", "language"),
+        ("goals_and_careers", "goal"),
+    ],
+    "knowledge": [
+        ("domains", "domain"),
+        ("mental_tabs", "tab"),
+    ],
+    "projects": [
+        ("projects", "project"),
+        ("current_learning", "learning"),
+        ("top_of_mind", "top"),
+    ],
+    "lifestyle": [
+        ("hobbies", "hobby"),
+    ],
+    "circle": [
+        ("connections", "connection"),
+    ],
+}
+
+
+def generate_entity_id(prefix: str) -> str:
+    """Stable, machine-readable ID for a persona entity, e.g. 'hobby_3f9a21c4'."""
+    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+
+
+def _assign_ids(file_type: str, data: dict) -> dict:
+    """Give every object in a designated list a stable `id` if it lacks one.
+    Uses setdefault, so existing IDs are never rewritten."""
+    if not isinstance(data, dict):
+        return data
+    for list_key, prefix in ID_LISTS.get(file_type, []):
+        items = data.get(list_key)
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict):
+                    item.setdefault("id", generate_entity_id(prefix))
+    return data
 
 # Default data structures (ported verbatim from main.py's DEFAULTS)
 DEFAULTS = {
@@ -249,6 +298,7 @@ def load(file_type: str) -> dict:
 
 def save(file_type: str, data: dict) -> bool:
     """Save (upsert) one persona file for the current user."""
+    _assign_ids(file_type, data)
     user_id = db.current_user_id.get()
     with db.get_pool().connection() as conn:
         conn.execute(
