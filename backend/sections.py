@@ -25,6 +25,16 @@ SCOPES = {
 }
 
 
+# Fields included in EVERY resolved scope (global and section). This is exactly
+# the preferences slice every global scope carried before it was factored out.
+ALWAYS_ON = {"preferences": ["code_style", "learning_style", "communication", "dislikes"]}
+
+
+def all_scope_names() -> list[str]:
+    """Every valid scope token: the global scope names plus one per section."""
+    return list(SCOPES.keys()) + list(SECTION_REGISTRY.keys())
+
+
 SECTION_REGISTRY = {
     "profile": SectionSpec(
         key="profile",
@@ -72,15 +82,7 @@ SECTION_REGISTRY = {
             "dislikes": [],
         },
         id_lists=(),
-        context_fields={
-            # NOTE: identical across all four non-full scopes — this becomes the
-            # ALWAYS_ON bundle in Task 6. For now transcribe it faithfully so the
-            # migration stays behavior-neutral and parity holds.
-            "minimal": ["code_style", "learning_style", "communication", "dislikes"],
-            "professional": ["code_style", "learning_style", "communication", "dislikes"],
-            "personal": ["code_style", "learning_style", "communication", "dislikes"],
-            "learning": ["code_style", "learning_style", "communication", "dislikes"],
-        },
+        context_fields={},
     ),
     "projects": SectionSpec(
         key="projects",

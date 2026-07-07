@@ -682,19 +682,35 @@ def get_field(data: dict, *field_names, default=None):
 _CONTEXT_FILE_ORDER = ("preferences", "profile", "lifestyle", "knowledge", "circle", "projects", "learning_log")
 
 
+def _merge_fields(target: dict, addition: dict) -> None:
+    """Union a {file: [fields]} addition into target in place, preserving order
+    and de-duplicating."""
+    for file_key, field_list in addition.items():
+        existing = target.setdefault(file_key, [])
+        for f in field_list:
+            if f not in existing:
+                existing.append(f)
+
+
 def _resolve_scope_fields(scope: str):
-    """Resolve a scope name to its {file_key: [fields]} selection, or "all" for
-    the full scope. Keys are emitted in _CONTEXT_FILE_ORDER so context output
-    byte-matches the pre-registry behavior."""
+    """Resolve one scope token to its {file_key: [fields]} selection, or "all"
+    for the full scope. Accepts a global scope name or a section key; the
+    ALWAYS_ON bundle is folded into every non-full result. Keys are emitted in
+    _CONTEXT_FILE_ORDER so context output byte-matches the legacy key order."""
     if scope == "full":
         return "all"
-    matched = {
-        spec.key: spec.context_fields[scope]
-        for spec in sections.SECTION_REGISTRY.values()
-        if scope in spec.context_fields
-    }
+    matched: dict = {}
+    _merge_fields(matched, sections.ALWAYS_ON)  # always-on first so its field order wins
+    if scope in sections.SECTION_REGISTRY and scope not in sections.SCOPES:
+        # Section scope: the whole section, all its default fields.
+        _merge_fields(matched, {scope: list(sections.SECTION_REGISTRY[scope].default.keys())})
+    else:
+        # Global scope: each section's declared fields for this scope.
+        for spec in sections.SECTION_REGISTRY.values():
+            if scope in spec.context_fields:
+                _merge_fields(matched, {spec.key: list(spec.context_fields[scope])})
     ordered_keys = [k for k in _CONTEXT_FILE_ORDER if k in matched]
-    ordered_keys += [k for k in matched if k not in _CONTEXT_FILE_ORDER]  # any future section
+    ordered_keys += [k for k in matched if k not in _CONTEXT_FILE_ORDER]
     return {k: matched[k] for k in ordered_keys}
 
 def _files_for_scope(fields) -> list[str]:
@@ -713,8 +729,8 @@ def get_scoped_context(
     limit: int = None
 ) -> dict:
     """Get persona context filtered by scope and optional topic."""
-    if scope not in sections.SCOPES:
-        return {"error": f"Unknown scope '{scope}'. Valid: {list(sections.SCOPES.keys())}"}
+    if scope not in sections.all_scope_names():
+        return {"error": f"Unknown scope '{scope}'. Valid: {sections.all_scope_names()}"}
 
     fields = _resolve_scope_fields(scope)
     needed = _files_for_scope(fields)
@@ -754,7 +770,7 @@ def get_scoped_context(
     
     payload = {
         "scope": scope,
-        "scope_description": sections.SCOPES[scope],
+        "scope_description": sections.SCOPES.get(scope, f"{scope} section only"),
         "topic_filter": topic,
         "token_estimate": 0,
         "context": result

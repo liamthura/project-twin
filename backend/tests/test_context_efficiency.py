@@ -50,13 +50,18 @@ def test_scope_touches_exactly_its_files(as_user, monkeypatch, scope):
 
 def test_resolve_scope_fields_matches_legacy_scopes():
     # _resolve_scope_fields must reproduce the exact {file: fields} the old
-    # CONTEXT_SCOPES table encoded, for every named scope.
+    # CONTEXT_SCOPES table encoded, for every named scope, once ALWAYS_ON
+    # (the preferences bundle, factored out of the registry) is folded back in.
+    from sections import ALWAYS_ON
     for scope in ["minimal", "professional", "personal", "learning"]:
         legacy = {
-            spec.key: spec.context_fields[scope]
+            spec.key: list(spec.context_fields[scope])
             for spec in SECTION_REGISTRY.values()
             if scope in spec.context_fields
         }
+        for fk, fl in ALWAYS_ON.items():
+            legacy.setdefault(fk, [])
+            legacy[fk] = legacy[fk] + [f for f in fl if f not in legacy[fk]]
         assert server._resolve_scope_fields(scope) == legacy
 
 
