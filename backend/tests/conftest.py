@@ -14,6 +14,8 @@ def clean_database(monkeypatch):
 
     import db as db_module
 
+    if db_module._pool is not None:
+        db_module._pool.close()  # release the prior test's pool threads
     db_module._pool = None  # force a fresh pool bound to the test database
 
     conn = psycopg.connect(TEST_DATABASE_URL)
@@ -25,3 +27,7 @@ def clean_database(monkeypatch):
 
     db_module.ensure_schema()
     yield
+
+    if db_module._pool is not None:
+        db_module._pool.close()  # close this test's pool so no threads linger
+        db_module._pool = None
