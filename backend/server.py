@@ -40,7 +40,7 @@ from dotenv import load_dotenv
 
 import persona_store
 import sections
-from persona_store import FILE_MAP, DEFAULTS, generate_entity_id, get_all as get_all_persona_data
+from persona_store import FILE_MAP, generate_entity_id, get_all as get_all_persona_data
 
 # Load environment variables
 load_dotenv()
@@ -54,8 +54,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Persona data is now stored in Postgres, scoped to the current request's user.
-# FILE_MAP / DEFAULTS / get_all_persona_data come from persona_store (imported
-# above); load_json / save_json below are thin delegators onto it.
+# FILE_MAP / get_all_persona_data come from persona_store (imported above);
+# load_json / save_json below are thin delegators onto it.
 
 
 # =============================================================================
@@ -676,50 +676,6 @@ def get_field(data: dict, *field_names, default=None):
 # =============================================================================
 # SCOPED CONTEXT SYSTEM
 # =============================================================================
-
-CONTEXT_SCOPES = {
-    "minimal": {
-        "description": "Quick identity snapshot",
-        "fields": {
-            "preferences": ["code_style", "learning_style", "communication", "dislikes"],
-            "profile": ["name", "preferred_name", "bio", "location", "current_role"],
-            "projects": ["top_of_mind"],
-        }
-    },
-    "professional": {
-        "description": "Work-relevant context",
-        "fields": {
-            "preferences": ["code_style", "learning_style", "communication", "dislikes"],
-            "profile": ["name", "preferred_name", "bio", "location", "current_role", "work_experience", "education", "career_aspirations"],
-            "knowledge": ["domains"],
-            "projects": ["projects", "current_learning", "top_of_mind"],
-        }
-    },
-    "personal": {
-        "description": "Hobbies, interests, personality, and tracked topics",
-        "fields": {
-            "preferences": ["code_style", "learning_style", "communication", "dislikes"],
-            "profile": ["name", "preferred_name", "bio", "location"],
-            "lifestyle": ["hobbies", "passions", "curiosities", "personality_traits", "values", "wellness"],
-            "knowledge": ["mental_tabs"],
-            "circle": ["connections"],
-        }
-    },
-    "learning": {
-        "description": "Current learning focus",
-        "fields": {
-            "preferences": ["code_style", "learning_style", "communication", "dislikes"],
-            "profile": ["name", "preferred_name", "current_role", "career_aspirations"],
-            "knowledge": ["domains", "mental_tabs"],
-            "projects": ["current_learning", "top_of_mind"],
-            "learning_log": ["entries"]
-        }
-    },
-    "full": {
-        "description": "Complete persona",
-        "fields": "all"
-    }
-}
 
 # Canonical file order for context output — reproduces the historical
 # CONTEXT_SCOPES key order exactly (preferences first, then the rest).

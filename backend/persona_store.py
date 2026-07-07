@@ -16,35 +16,6 @@ VALID_FILES = list(sections.SECTION_REGISTRY)
 
 FILE_MAP = {name: f"{name}.json" for name in VALID_FILES}
 
-# Object-list entities that carry a stable, machine-readable `id`, keyed by
-# file type -> list of (list_key, id_prefix). IDs are assigned on save (see
-# _assign_ids), so entities created via the MCP tools AND via the frontend's
-# direct PUT both get one. learning_log is intentionally excluded -- its
-# entries use their own learn_<date>_<hex6> id assigned at creation.
-ID_LISTS = {
-    "profile": [
-        ("work_experience", "work"),
-        ("education", "education"),
-        ("languages_spoken", "language"),
-        ("goals_and_careers", "goal"),
-    ],
-    "knowledge": [
-        ("domains", "domain"),
-        ("mental_tabs", "tab"),
-    ],
-    "projects": [
-        ("projects", "project"),
-        ("current_learning", "learning"),
-        ("top_of_mind", "top"),
-    ],
-    "lifestyle": [
-        ("hobbies", "hobby"),
-    ],
-    "circle": [
-        ("connections", "connection"),
-    ],
-}
-
 
 def generate_entity_id(prefix: str) -> str:
     """Stable, machine-readable ID for a persona entity, e.g. 'hobby_3f9a21c4'."""
@@ -67,78 +38,6 @@ def _assign_ids(file_type: str, data: dict) -> dict:
                 if isinstance(item, dict):
                     item.setdefault("id", generate_entity_id(prefix))
     return data
-
-# Default data structures (ported verbatim from main.py's DEFAULTS)
-DEFAULTS = {
-    "profile": {
-        "name": "",
-        "preferred_name": "",
-        "current_role": "",
-        "organisation": "",
-        "location": "",
-        "nationality": "",
-        "languages_spoken": [],
-        "bio": "",
-        "work_experience": [],
-        "career_aspirations": [],
-        "education": [],
-        "goals_and_careers": [],
-        "contact": {
-            "emails": [],
-            "links": []
-        }
-    },
-    "knowledge": {
-        "domains": [],
-        "mental_tabs": []
-    },
-    "preferences": {
-        "code_style": {
-            "preferred_languages": [],
-            "frameworks": [],
-            "tools": []
-        },
-        "communication": {
-            "default": {
-                "tone": "",
-                "detail_level": "",
-                "locale": "British English"
-            },
-            "mood_overrides": []
-        },
-        "learning_style": {
-            "preferred": [],
-            "avoid": []
-        },
-        "dislikes": []
-    },
-    "projects": {
-            "projects": [],
-        "current_learning": [],
-        "top_of_mind": []
-    },
-    "lifestyle": {
-        "hobbies": [],
-        "passions": [],
-        "curiosities": [],
-        "personality_traits": [],
-        "values": [],
-        "wellness": {
-            "sleep": {
-                "weekday": {"bedtime": "", "wakeup": ""},
-                "weekend": {"bedtime": "", "wakeup": ""}
-            },
-            "energy_peaks": [],
-            "stress_triggers": []
-        }
-    },
-    "circle": {
-        "connections": []
-    },
-    "learning_log": {
-        "entries": []
-    }
-}
 
 
 def _normalize(file_type: str, data: dict) -> dict:
@@ -251,7 +150,9 @@ def _normalize(file_type: str, data: dict) -> dict:
                         "mood_overrides": []
                     }
             else:
-                data["communication"] = DEFAULTS["preferences"]["communication"]
+                data["communication"] = copy.deepcopy(
+                    sections.SECTION_REGISTRY["preferences"].default["communication"]
+                )
     if file_type == "lifestyle":
         if isinstance(data, dict):
             data.setdefault("wellness", {

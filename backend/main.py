@@ -7,6 +7,7 @@ Single entry point serving:
 - Health check at /health
 """
 
+import copy
 import json
 import os
 import secrets
@@ -29,7 +30,8 @@ load_dotenv()
 # Persona data + auth now live in Postgres (see db.py / persona_store.py).
 import db
 import persona_store
-from persona_store import VALID_FILES, DEFAULTS
+import sections
+from persona_store import VALID_FILES
 
 # Aliases keep every existing route body -- read_json_file(file_type) /
 # write_json_file(file_type, data) -- byte-for-byte unchanged.
@@ -191,9 +193,9 @@ async def update_all_files(updates: Dict[str, Dict[str, Any]]):
 @app.post("/api/reset/{file_type}")
 async def reset_file(file_type: str):
     """Reset a file to its default state."""
-    if file_type not in DEFAULTS:
+    if file_type not in sections.SECTION_REGISTRY:
         raise HTTPException(status_code=400, detail=f"No default for: {file_type}")
-    write_json_file(file_type, DEFAULTS[file_type])
+    write_json_file(file_type, copy.deepcopy(sections.SECTION_REGISTRY[file_type].default))
     return {"status": "reset", "file_type": file_type}
 
 

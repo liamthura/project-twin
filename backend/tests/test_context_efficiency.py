@@ -2,6 +2,7 @@ import json
 import pytest
 import server
 import persona_store as store
+from sections import SECTION_REGISTRY
 
 get_context = server.get_context.fn
 
@@ -9,16 +10,24 @@ ALL_SCOPES = ("minimal", "professional", "personal", "learning", "full")
 
 
 def _seed():
-    store.save("profile", {**store.DEFAULTS["profile"], "name": "A", "preferred_name": "B"})
-    store.save("projects", {**store.DEFAULTS["projects"], "top_of_mind": [{"topic": "x"}]})
+    store.save("profile", {**SECTION_REGISTRY["profile"].default, "name": "A", "preferred_name": "B"})
+    store.save("projects", {**SECTION_REGISTRY["projects"].default, "top_of_mind": [{"topic": "x"}]})
+
+
+_EXPECTED_FILES_BY_SCOPE = {
+    "minimal": {"preferences", "profile", "projects"},
+    "professional": {"preferences", "profile", "knowledge", "projects"},
+    "personal": {"preferences", "profile", "lifestyle", "knowledge", "circle"},
+    "learning": {"preferences", "profile", "knowledge", "projects", "learning_log"},
+}
 
 
 def _expected_filetypes(scope: str) -> set[str]:
-    """Bare file-type names a scope should load, derived from config."""
-    fields = server.CONTEXT_SCOPES[scope]["fields"]
-    if fields == "all":
+    """Bare file-type names a scope should load. Hardcoded (NOT derived from the
+    code under test) so this characterization test can catch scope->file drift."""
+    if scope == "full":
         return set(store.VALID_FILES)
-    return set(fields.keys())
+    return _EXPECTED_FILES_BY_SCOPE[scope]
 
 
 def test_scopes_return_stable_shape(as_user):
@@ -37,9 +46,6 @@ def test_scope_touches_exactly_its_files(as_user, monkeypatch, scope):
     get_context(scope=scope)
     loaded_filetypes = {fn[:-5] if fn.endswith(".json") else fn for fn in loaded}
     assert loaded_filetypes == _expected_filetypes(scope)
-
-
-from sections import SECTION_REGISTRY
 
 
 def test_resolve_scope_fields_matches_legacy_scopes():
@@ -70,7 +76,7 @@ def test_resolve_scope_fields_preserves_legacy_key_order():
 
 
 def test_token_estimate_reflects_returned_payload(as_user):
-    store.save("profile", {**store.DEFAULTS["profile"], "name": "A", "bio": "x"*400})
+    store.save("profile", {**SECTION_REGISTRY["profile"].default, "name": "A", "bio": "x"*400})
     raw = server.get_context.fn(scope="full")          # exact string the caller receives
     est = json.loads(raw)["token_estimate"]
     actual = len(raw) // 4

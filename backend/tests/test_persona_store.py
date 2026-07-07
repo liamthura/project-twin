@@ -1,16 +1,17 @@
 import db
 import persona_store as store
+from sections import SECTION_REGISTRY
 
 # `as_user` fixture is provided by tests/conftest.py
 
 
 def test_load_unknown_file_returns_default(as_user):
     data = store.load("profile")
-    assert data == store.DEFAULTS["profile"]
+    assert data == SECTION_REGISTRY["profile"].default
 
 
 def test_save_then_load_round_trips(as_user):
-    store.save("profile", {**store.DEFAULTS["profile"], "name": "Alice"})
+    store.save("profile", {**SECTION_REGISTRY["profile"].default, "name": "Alice"})
     assert store.load("profile")["name"] == "Alice"
 
 
@@ -24,11 +25,11 @@ def test_data_is_isolated_per_user():
         ).fetchone()
 
     token_a = db.current_user_id.set(str(row_a["id"]))
-    store.save("profile", {**store.DEFAULTS["profile"], "name": "Alice"})
+    store.save("profile", {**SECTION_REGISTRY["profile"].default, "name": "Alice"})
     db.current_user_id.reset(token_a)
 
     token_b = db.current_user_id.set(str(row_b["id"]))
-    store.save("profile", {**store.DEFAULTS["profile"], "name": "Bob"})
+    store.save("profile", {**SECTION_REGISTRY["profile"].default, "name": "Bob"})
     assert store.load("profile")["name"] == "Bob"
     db.current_user_id.reset(token_b)
 
