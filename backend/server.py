@@ -2236,104 +2236,261 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
 # ENTITY SCHEMA - For LLM discovery
 # =============================================================================
 
+# Each entity carries an `identifier`: the field in `data` used to match an
+# existing item on update/remove. Nested entities also carry a `parent`: the
+# parent item's identifier field, which must be present in `data` too.
+# Both are verified against execute_modify's actual matching logic.
 ENTITY_SCHEMA = {
     "profile": {
-        "email": {"actions": ["add", "update", "remove"], "required": ["address"], "optional": ["label"]},
-        "link": {"actions": ["add", "update", "remove"], "required": ["url"], "optional": ["label"]},
+        "email": {"actions": ["add", "update", "remove"], "required": ["address"], "optional": ["label"],
+                 "identifier": "address"},
+        "link": {"actions": ["add", "remove"], "required": ["url", "label"], "optional": [],
+                "identifier": "label"},
         "language": {"actions": ["add", "update", "remove"], "required": ["name"], "optional": ["proficiency"],
-                    "valid_values": {"proficiency": ["native", "fluent", "conversational", "basic"]}},
+                    "valid_values": {"proficiency": ["native", "fluent", "conversational", "basic"]},
+                    "identifier": "name"},
         "work_experience": {"actions": ["add", "update", "remove"], "required": ["company"],
-                           "optional": ["role", "period", "type", "location", "description", "highlights"]},
-        "work_highlight": {"actions": ["add", "remove"], "required": ["company", "highlight"], "optional": []},
+                           "optional": ["role", "period", "type", "location", "description", "highlights"],
+                           "identifier": "company"},
+        "work_highlight": {"actions": ["add", "remove"], "required": ["company", "highlight"], "optional": [],
+                          "identifier": "highlight", "parent": "company"},
         "education": {"actions": ["add", "update", "remove"], "required": ["institution"],
-                     "optional": ["degree", "field", "period", "highlights", "coursework", "clubs"]},
-        "education_highlight": {"actions": ["add", "remove"], "required": ["institution", "highlight"], "optional": []},
-        "coursework": {"actions": ["add", "remove"], "required": ["institution", "course"], "optional": []},
-        "coursework_topic": {"actions": ["add", "remove"], "required": ["institution", "course"], "optional": []},
-        "career_aspiration": {"actions": ["add", "remove"], "required": ["aspiration"], "optional": []}
+                     "optional": ["degree", "field", "period", "highlights", "coursework", "clubs"],
+                     "identifier": "institution"},
+        "education_highlight": {"actions": ["add", "remove"], "required": ["institution", "highlight"], "optional": [],
+                               "identifier": "highlight", "parent": "institution"},
+        "coursework": {"actions": ["add", "remove"], "required": ["institution", "course"], "optional": [],
+                      "identifier": "course", "parent": "institution"},
+        "coursework_topic": {"actions": ["add", "remove"], "required": ["institution", "course"], "optional": [],
+                            "identifier": "course", "parent": "institution"},
+        "career_aspiration": {"actions": ["add", "remove"], "required": ["aspiration"], "optional": [],
+                             "identifier": "aspiration"}
     },
     "lifestyle": {
         "hobby": {"actions": ["add", "update", "remove"], "required": ["name"],
                  "optional": ["skill_level", "status", "notes", "specifics", "references"],
                  "valid_values": {"skill_level": ["beginner", "learning", "intermediate", "advanced", "expert"],
-                                 "status": ["active", "inactive", "paused"]}},
+                                 "status": ["active", "inactive", "paused"]},
+                 "identifier": "name"},
         "hobby_reference": {"actions": ["add", "update", "remove"], "required": ["hobby_name", "ref_name"],
-                           "optional": ["url", "notes"]},
-        "hobby_specific": {"actions": ["add", "remove"], "required": ["hobby_name", "specific"], "optional": []},
-        "passion": {"actions": ["add", "remove"], "required": ["name"], "optional": []},
-        "curiosity": {"actions": ["add", "remove"], "required": ["topic"], "optional": []},
-        "personality_trait": {"actions": ["add", "remove"], "required": ["trait"], "optional": []},
-        "value": {"actions": ["add", "remove"], "required": ["value"], "optional": []},
+                           "optional": ["url", "notes"], "identifier": "ref_name", "parent": "hobby_name"},
+        "hobby_specific": {"actions": ["add", "remove"], "required": ["hobby_name", "specific"], "optional": [],
+                          "identifier": "specific", "parent": "hobby_name"},
+        "passion": {"actions": ["add", "remove"], "required": ["name"], "optional": [], "identifier": "name"},
+        "curiosity": {"actions": ["add", "remove"], "required": ["topic"], "optional": [], "identifier": "topic"},
+        "personality_trait": {"actions": ["add", "remove"], "required": ["trait"], "optional": [],
+                             "identifier": "trait"},
+        "value": {"actions": ["add", "remove"], "required": ["value"], "optional": [], "identifier": "value"},
         "sleep": {"actions": ["update"], "required": ["day_type"], "optional": ["bedtime", "wakeup"],
-                 "valid_values": {"day_type": ["weekday", "weekend"]}},
-        "energy_peak": {"actions": ["add", "remove"], "required": ["peak"], "optional": []}
+                 "valid_values": {"day_type": ["weekday", "weekend"]}, "identifier": "day_type"},
+        "energy_peak": {"actions": ["add", "remove"], "required": ["peak"], "optional": [], "identifier": "peak"}
     },
     "knowledge": {
         "domain": {"actions": ["add", "update", "remove"], "required": ["name"],
                   "optional": ["level", "notes", "references"],
-                  "valid_values": {"level": ["beginner", "learning", "intermediate", "advanced", "expert"]}},
+                  "valid_values": {"level": ["beginner", "learning", "intermediate", "advanced", "expert"]},
+                  "identifier": "name"},
         "domain_reference": {"actions": ["add", "update", "remove"], "required": ["domain_name", "ref_name"],
-                            "optional": ["url", "notes"]},
+                            "optional": ["url", "notes"], "identifier": "ref_name", "parent": "domain_name"},
         "knowledge": {"actions": ["add", "update", "remove"], "required": ["name"],
                      "optional": ["category", "level", "notes", "references"],
-                     "description": "Generic knowledge entry with category support"},
+                     "description": "Generic knowledge entry with category support", "identifier": "name"},
         "mental_tab": {"actions": ["add", "update", "remove"], "required": ["title"],
                       "optional": ["notes", "tags", "status", "references"],
-                      "valid_values": {"status": ["open", "closed", "archived"]}},
+                      "valid_values": {"status": ["open", "closed", "archived"]}, "identifier": "title"},
         "mental_tab_reference": {"actions": ["add", "update", "remove"], "required": ["title", "ref_name"],
-                                "optional": ["url", "notes"]}
+                                "optional": ["url", "notes"], "identifier": "ref_name", "parent": "title"}
     },
     "projects": {
         "project": {"actions": ["add", "update", "remove"], "required": ["name"],
                    "optional": ["description", "status", "tags", "notes", "highlights", "references"],
-                   "valid_values": {"status": ["active", "paused", "completed", "archived", "idea"]}},
-        "project_tag": {"actions": ["add", "remove"], "required": ["project_name", "tag"], "optional": []},
+                   "valid_values": {"status": ["active", "paused", "completed", "archived", "idea"]},
+                   "identifier": "name"},
+        "project_tag": {"actions": ["add", "remove"], "required": ["project_name", "tag"], "optional": [],
+                       "identifier": "tag", "parent": "project_name"},
         "project_reference": {"actions": ["add", "update", "remove"], "required": ["project_name", "ref_name"],
-                             "optional": ["url", "notes"]},
-        "project_highlight": {"actions": ["add", "remove"], "required": ["project_name", "highlight"], "optional": []},
+                             "optional": ["url", "notes"], "identifier": "ref_name", "parent": "project_name"},
+        "project_highlight": {"actions": ["add", "remove"], "required": ["project_name", "highlight"], "optional": [],
+                             "identifier": "highlight", "parent": "project_name"},
         "current_learning": {"actions": ["add", "update", "remove"], "required": ["topic"],
                             "optional": ["context", "priority"],
-                            "valid_values": {"priority": ["low", "medium", "high"]}},
-        "top_of_mind": {"actions": ["add", "remove"], "required": ["item"], "optional": ["note"]}
+                            "valid_values": {"priority": ["low", "medium", "high"]}, "identifier": "topic"},
+        "top_of_mind": {"actions": ["add", "remove"], "required": ["item"], "optional": ["note"],
+                       "identifier": "item"}
     },
     "circle": {
         "connection": {"actions": ["add", "update", "remove"], "required": ["name"],
-                      "optional": ["relationship", "traits", "notes", "contact"]}
+                      "optional": ["relationship", "traits", "notes", "contact"], "identifier": "name"}
     },
     "preferences": {
-        "dislike": {"actions": ["add", "remove"], "required": ["dislike"], "optional": []},
+        "dislike": {"actions": ["add", "remove"], "required": ["dislike"], "optional": [], "identifier": "dislike"},
         "preference": {"actions": ["add", "update", "remove"], "required": ["key"],
                       "optional": ["category", "value"],
-                      "description": "Generic key-value preference with category support"},
+                      "description": "Generic key-value preference with category support", "identifier": "key"},
         "communication_default": {"actions": ["update"], "required": [],
-                                 "optional": ["tone", "detail_level", "locale"]},
+                                 "optional": ["tone", "detail_level", "locale"], "identifier": None,
+                                 "description": "Update-only singleton for default communication style"},
         "mood_override": {"actions": ["add", "update", "remove"], "required": ["mood"],
-                         "optional": ["tone", "detail_level"]}
+                         "optional": ["tone", "detail_level"], "identifier": "mood"}
     },
     "learning_log": {
-        "learning_entry": {"actions": ["add", "update", "remove"], "required": ["topic", "details"],
-                          "optional": ["source", "tags", "conversation_metadata", "key_decisions", "followup_items"]}
+        # `update` is intentionally NOT advertised: execute_modify's update path
+        # requires an entry `id` + `followup_items` (not `topic`), which conflicts
+        # with the ids_automatic guidance. That id-based partial update is deferred
+        # to the dedicated learning-log editing work (Phase 3). add/remove are
+        # accurate here (remove matches by `topic`).
+        "learning_entry": {"actions": ["add", "remove"], "required": ["topic", "details"],
+                          "optional": ["source", "tags", "conversation_metadata", "key_decisions", "followup_items"],
+                          "identifier": "topic"}
     }
 }
 
+# Usage instructions embedded in every get_schema digest so the LLM sees them up front.
+_SCHEMA_USAGE = {
+    "workflow": (
+        "Use persona_modify(action, entity, data) for one change, "
+        "persona_batch([...]) for many. Call get_schema(entity='<name>') for one "
+        "entity's full fields, enum values, and copy-paste examples."
+    ),
+    "identifying": (
+        "For update/remove, include the entity's `identifier` field (shown per "
+        "entity) matching an existing item."
+    ),
+    "ids_automatic": (
+        "Never send an `id` field — stable ids are assigned automatically on save. "
+        "Reference entities by their identifier (name/topic/title/etc.)."
+    ),
+    "nested": (
+        "Entities with a `parent` also need the parent's identifier in `data`, "
+        "e.g. project_highlight needs {project_name, highlight}."
+    ),
+}
+
+
+def _digest_entry(entity: str, spec: dict) -> dict:
+    """Lean per-entity digest line: identifier, required, actions (+ parent/purpose)."""
+    line = {"entity": entity, "identifier": spec.get("identifier")}
+    if spec.get("parent"):
+        line["parent"] = spec["parent"]
+    line["required"] = spec.get("required", [])
+    line["actions"] = spec.get("actions", [])
+    if spec.get("description"):
+        line["purpose"] = spec["description"]
+    return line
+
+
+def _digest(files: list[str]) -> dict:
+    """Build the lean digest for the given file names."""
+    return {
+        # copy so a caller mutating the result can't corrupt the module constant
+        "usage": dict(_SCHEMA_USAGE),
+        "files": {
+            f: [_digest_entry(name, spec) for name, spec in ENTITY_SCHEMA[f].items()]
+            for f in files
+        },
+    }
+
+
+def _sample_value(field: str, valid_values: dict) -> str:
+    """A minimal but valid sample value for an example field."""
+    if field in valid_values:
+        return valid_values[field][0]
+    return f"<{field}>"
+
+
+def _add_sample_optional(data: dict, spec: dict) -> None:
+    """Add one sample optional field (preferring one with enum values) to `data`."""
+    valid_values = spec.get("valid_values", {})
+    optional = spec.get("optional", [])
+    chosen = next((o for o in optional if o in valid_values), None)
+    if chosen is None and optional:
+        chosen = optional[0]
+    if chosen and chosen not in data:
+        data[chosen] = _sample_value(chosen, valid_values)
+
+
+def _example_data(spec: dict, mode: str) -> dict:
+    """Build a data payload for an example.
+
+    add    -> all required fields + one sample optional (a complete, valid payload).
+    update -> parent + identifier (to locate) + one sample optional (to change).
+    remove -> parent + identifier only (all that matching needs).
+    """
+    valid_values = spec.get("valid_values", {})
+    data = {}
+    if mode == "add":
+        for field in spec.get("required", []):
+            data[field] = _sample_value(field, valid_values)
+        _add_sample_optional(data, spec)
+        return data
+    # update / remove: locate by parent + identifier
+    if spec.get("parent"):
+        data[spec["parent"]] = _sample_value(spec["parent"], valid_values)
+    identifier = spec.get("identifier")
+    if identifier:
+        data[identifier] = _sample_value(identifier, valid_values)
+    if mode == "update":
+        _add_sample_optional(data, spec)
+    return data
+
+
+def _build_examples(entity: str, spec: dict) -> dict:
+    """Copy-paste persona_modify examples, one per supported action."""
+    actions = spec.get("actions", [])
+    examples = {}
+    for action in ("add", "update", "remove"):
+        if action not in actions:
+            continue
+        data = _example_data(spec, action)
+        if not data:
+            # Never emit a malformed empty-data example. Fall back to the first
+            # required field (not reachable today, but guards future entities).
+            required = spec.get("required", [])
+            if required:
+                data = {required[0]: _sample_value(required[0], spec.get("valid_values", {}))}
+            else:
+                continue
+        examples[action] = {"action": action, "entity": entity, "data": data}
+    return examples
+
+
 def get_entity_schema(entity: str = None, file: str = None) -> dict:
-    """Get schema for entity types."""
+    """Get schema for entity types.
+
+    - entity="X": full detail for one entity, with identifier and worked examples.
+    - file="X": lean digest scoped to one file (usage block + its entities).
+    - no args: lean digest of all files (usage block + per-file entity lines).
+    """
     if entity:
         entity_lower = entity.lower()
         for file_name, entities in ENTITY_SCHEMA.items():
             if entity_lower in entities:
-                return {"entity": entity_lower, "file": file_name, "schema": entities[entity_lower]}
-        return {"error": f"Unknown entity: {entity}. Use get_schema() to see valid entities."}
-    
+                spec = entities[entity_lower]
+                detail = {"entity": entity_lower, "file": file_name,
+                          "identifier": spec.get("identifier")}
+                if spec.get("parent"):
+                    detail["parent"] = spec["parent"]
+                detail["actions"] = spec.get("actions", [])
+                detail["required"] = spec.get("required", [])
+                detail["optional"] = spec.get("optional", [])
+                if spec.get("valid_values"):
+                    detail["valid_values"] = spec["valid_values"]
+                if spec.get("description"):
+                    detail["purpose"] = spec["description"]
+                detail["examples"] = _build_examples(entity_lower, spec)
+                return detail
+        valid = sorted(e for ents in ENTITY_SCHEMA.values() for e in ents)
+        return {"error": f"Unknown entity: {entity}. Use get_schema() to see valid entities.",
+                "valid_entities": valid}
+
     if file:
         file_lower = file.lower()
         if file_lower in ENTITY_SCHEMA:
-            return {"file": file_lower, "entities": ENTITY_SCHEMA[file_lower],
-                   "entity_names": list(ENTITY_SCHEMA[file_lower].keys())}
-        return {"error": f"Unknown file: {file}. Valid files: {', '.join(ENTITY_SCHEMA.keys())}"}
-    
-    return {"description": "Valid entity types for persona_modify",
-           "files": list(ENTITY_SCHEMA.keys()), "entities": ENTITY_SCHEMA}
+            return _digest([file_lower])
+        return {"error": f"Unknown file: {file}. Valid files: {', '.join(ENTITY_SCHEMA.keys())}",
+                "valid_files": list(ENTITY_SCHEMA.keys())}
+
+    return _digest(list(ENTITY_SCHEMA.keys()))
 
 
 # =============================================================================
@@ -2813,17 +2970,27 @@ def get_schema(
     entity: Optional[str] = None
 ) -> str:
     """
-    Discover valid entity types and their fields. Call before persona_modify if unsure.
-    WHEN TO USE:
-        - Unsure what entity type to use
-        - Need to know required vs optional fields
-        - Want valid enum values for a field
-    ARGS:
-        file: Scope to entities in a specific file (profile, lifestyle, knowledge, etc.)
-        entity: Get schema for specific entity type (e.g., 'hobby', 'project')
+    Discover valid entity types for persona_modify. Digest first, then drill down.
 
-    RETURNS: 
-        {file, entities} or {entity, file, schema}
+    BEHAVIOR:
+        - No args → lean DIGEST: a `usage` block (workflow + how to identify items
+          + ids are automatic + nested rules) plus `files`, each listing its
+          entities with their `identifier`, `required` fields and `actions`.
+        - entity="X" → FULL detail for one entity: identifier, parent (if nested),
+          actions, required, optional, valid_values, plus copy-paste `examples`
+          (add / update / remove as supported).
+        - file="X" → the same lean digest scoped to that one file.
+
+    The `identifier` is the field in `data` that matches an existing item on
+    update/remove. Nested entities also expose a `parent` field that must be in
+    `data`. Never send an `id` — ids are assigned automatically.
+
+    ARGS:
+        file: Scope digest to one file (profile, lifestyle, knowledge, etc.)
+        entity: Full detail + examples for one entity (e.g., 'hobby', 'project')
+
+    RETURNS:
+        {usage, files} digest, or {entity, file, identifier, ..., examples} detail
     """
     result = get_entity_schema(entity=entity, file=file)
     return json.dumps(result, indent=2)
