@@ -30,6 +30,8 @@ import {
   saveConfig,
   clearConfig,
   testConnection,
+  registerAccount,
+  whoami,
   getApiBase,
   exportData,
   importData,
@@ -45,6 +47,9 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
   const [importing, setImporting] = useState(false);
   const [importMode, setImportMode] = useState("replace");
   const [backupResult, setBackupResult] = useState(null);
+  const [mode, setMode] = useState("connect"); // "connect" | "register"
+  const [username, setUsername] = useState("");
+  const [connectedAs, setConnectedAs] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -53,6 +58,9 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
       setToken(config?.token || "");
       setTestResult(null);
       setBackupResult(null);
+      setMode("connect");
+      setUsername("");
+      setConnectedAs(null);
     }
   }, [isOpen]);
 
@@ -64,18 +72,52 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
 
     setTesting(true);
     setTestResult(null);
+    setConnectedAs(null);
 
     try {
-      const result = await testConnection(serverUrl, token);
-      setTestResult({
-        success: true,
-        message: `Connected! Data dir: ${result.data_dir_exists ? "✓" : "✗"}`,
-      });
+      await testConnection(serverUrl, token);
+      // Reachable -- now confirm the token identifies a user.
+      try {
+        const me = await whoami(serverUrl, token);
+        setConnectedAs(me.username);
+        setTestResult({ success: true, message: `Connected as ${me.username}` });
+      } catch {
+        setTestResult({
+          success: true,
+          message: "Server reachable, but token is missing or invalid.",
+        });
+      }
     } catch (error) {
       setTestResult({
         success: false,
         message: error.message,
       });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    if (!serverUrl || !username) {
+      setTestResult({
+        success: false,
+        message: "Server URL and username are required",
+      });
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const { token: newToken } = await registerAccount(serverUrl, username);
+      setToken(newToken);
+      setMode("connect");
+      setTestResult({
+        success: true,
+        message:
+          "Account created — token filled in below. Save it, it won't be shown again.",
+      });
+    } catch (err) {
+      setTestResult({ success: false, message: err.message });
     } finally {
       setTesting(false);
     }
@@ -177,7 +219,7 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
               <Input
                 id="token"
                 type={showToken ? "text" : "password"}
-                placeholder="Your MYGIST_API_TOKEN"
+                placeholder="Your access token"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 className="flex-1"
@@ -190,10 +232,63 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
                 {showToken ? "Hide" : "Show"}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Required if your server has authentication enabled
-            </p>
+            {mode === "connect" ? (
+              <p className="text-xs text-muted-foreground">
+                Don&apos;t have a token?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("register");
+                    setTestResult(null);
+                  }}
+                  className="underline hover:text-foreground"
+                >
+                  Create an account
+                </button>
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Registering issues a token — save it, it won&apos;t be shown again.
+              </p>
+            )}
           </div>
+
+          {/* Create account (register mode) */}
+          {mode === "register" && (
+            <div className="space-y-2">
+              <Label htmlFor="username">New account username</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="username"
+                  placeholder="pick a username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleRegister}
+                  disabled={testing || !serverUrl || !username}
+                >
+                  {testing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Create account"
+                  )}
+                </Button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("connect");
+                  setTestResult(null);
+                }}
+                className="text-xs text-muted-foreground underline hover:text-foreground"
+              >
+                Back to sign in
+              </button>
+            </div>
+          )}
 
           {/* Test Result */}
           {testResult && (
@@ -222,6 +317,11 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
               <strong>Mode:</strong>{" "}
               {import.meta.env.DEV ? "Development (proxied)" : "Production"}
             </p>
+            {connectedAs && (
+              <p>
+                <strong>Signed in as:</strong> {connectedAs}
+              </p>
+            )}
           </div>
 
           {/* Backup & Restore */}

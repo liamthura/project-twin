@@ -113,6 +113,36 @@ async function testConnection(serverUrl, token) {
   return response.json();
 }
 
+// Register a new account (token-only auth). `serverUrl` is the full API base
+// including the /api prefix, matching the Server URL field / getApiBase().
+async function registerAccount(serverUrl, username) {
+  const url = serverUrl.endsWith("/") ? serverUrl.slice(0, -1) : serverUrl;
+  const res = await fetch(`${url}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Registration failed");
+  }
+  return res.json(); // { user_id, username, token }
+}
+
+// Identify the caller. With explicit (serverUrl, token) it checks those form
+// values directly (used before Save); otherwise it uses the saved config.
+async function whoami(serverUrl, token) {
+  if (serverUrl) {
+    const url = serverUrl.endsWith("/") ? serverUrl.slice(0, -1) : serverUrl;
+    const res = await fetch(`${url}/auth/whoami`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error(`whoami failed: ${res.status}`);
+    return res.json();
+  }
+  return api("/auth/whoami");
+}
+
 // Check if connected
 function isConfigured() {
   const config = getConfig();
@@ -194,6 +224,8 @@ export {
   getApiBase,
   getAuthToken,
   testConnection,
+  registerAccount,
+  whoami,
   isConfigured,
   exportData,
   importData,
