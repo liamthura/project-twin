@@ -28,7 +28,7 @@ import logging
 # import shutil
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Literal
+from typing import Optional, Literal, Union, List
 import uuid
 
 from fastmcp import FastMCP
@@ -713,6 +713,22 @@ def _resolve_scope_fields(scope: str):
     ordered_keys += [k for k in matched if k not in _CONTEXT_FILE_ORDER]
     return {k: matched[k] for k in ordered_keys}
 
+def _resolve_scope_fields_multi(scopes):
+    """Resolve one scope (str) or several (list) into a single {file: [fields]}
+    selection, or "all" if any token is the full scope. Unknown tokens raise
+    ValueError so the caller can surface a friendly error."""
+    tokens = [scopes] if isinstance(scopes, str) else list(scopes)
+    valid = set(sections.all_scope_names())
+    merged: dict = {}
+    for tok in tokens:
+        if tok not in valid:
+            raise ValueError(tok)
+        resolved = _resolve_scope_fields(tok)
+        if resolved == "all":
+            return "all"
+        _merge_fields(merged, resolved)
+    return merged
+
 def _files_for_scope(fields) -> list[str]:
     """Return the persona file keys a scope actually needs. ``fields`` is the
     resolved selection from _resolve_scope_fields: the string "all" needs every
@@ -722,17 +738,19 @@ def _files_for_scope(fields) -> list[str]:
     return list(fields.keys())
 
 def get_scoped_context(
-    scope: str = "minimal",
+    scope="minimal",
     topic: str = None,
     include_inactive: bool = False,
     days: int = None,
     limit: int = None
 ) -> dict:
-    """Get persona context filtered by scope and optional topic."""
-    if scope not in sections.all_scope_names():
+    """Get persona context filtered by scope(s) and optional topic. `scope` is a
+    global scope name, a section key, or a list mixing them (unioned)."""
+    try:
+        fields = _resolve_scope_fields_multi(scope)
+    except ValueError:
         return {"error": f"Unknown scope '{scope}'. Valid: {sections.all_scope_names()}"}
 
-    fields = _resolve_scope_fields(scope)
     needed = _files_for_scope(fields)
     all_data = {ft: load_json(FILE_MAP[ft]) for ft in needed}
     result = {}
@@ -757,7 +775,8 @@ def get_scoped_context(
         result = _filter_by_topic(result, topic.lower())
     
     if "learning_log" in result and not topic:
-        effective_days = days if days is not None else (60 if scope == "learning" else None)
+        is_learning = scope == "learning" or (not isinstance(scope, str) and "learning" in scope)
+        effective_days = days if days is not None else (60 if is_learning else None)
         if effective_days and effective_days > 0:
             result = _filter_learning_log_by_time(result, effective_days, limit)
         elif limit and limit > 0:
@@ -768,9 +787,15 @@ def get_scoped_context(
     if not include_inactive:
         result = _filter_inactive(result)
     
+    scope_label = scope if isinstance(scope, str) else ",".join(scope)
+    scope_desc = (
+        sections.SCOPES.get(scope, f"{scope} section only")
+        if isinstance(scope, str)
+        else "Combined scopes"
+    )
     payload = {
-        "scope": scope,
-        "scope_description": sections.SCOPES.get(scope, f"{scope} section only"),
+        "scope": scope_label,
+        "scope_description": scope_desc,
         "topic_filter": topic,
         "token_estimate": 0,
         "context": result
@@ -2885,7 +2910,7 @@ Always call get_context at the start of conversations to personalize responses."
 
 @mcp.tool()
 def get_context(
-    scope: Literal["minimal", "professional", "personal", "learning", "full"] = "minimal",
+    scope: Union[str, List[str]] = "minimal",
     topic: Optional[str] = None,
     include_inactive: bool = False,
     days: Optional[int] = None,
@@ -2898,21 +2923,27 @@ def get_context(
         - Start of any conversation (always)
         - When you need user preferences to tailor responses
 
-    SCOPES:
+    SCOPES (global):
         - minimal: Quick questions, greetings, code help. Returns: name, bio, top_of_mind, preferences
         - professional: Career, projects, technical. Returns: profile, skills, projects, code_style
         - personal: Life advice, hobbies, wellness. Returns: hobbies, personality, connections
         - learning: Skill development, roadmaps. Returns: skills, learning_log (last 60 days)
         - full: Complex questions. Returns: everything
 
+    SECTION SCOPES: profile | knowledge | preferences | projects | lifestyle | circle | learning_log
+        - A section scope returns that whole section plus your always-on
+          preferences (tone, detail_level, dislikes, learning_style).
+
+    MULTIPLE: pass a list to union scopes, e.g. ["lifestyle", "circle"].
+
     ARGS:
-        scope: Context depth
+        scope: a global scope name, a section key, or a list of them
         topic: Filter to items matching this topic (e.g., "react", "cooking")
         include_inactive: Include inactive/paused items
         days: Limit learning_log to last N days
         limit: Max learning_log entries to return
 
-    RETURNS: 
+    RETURNS:
         Filtered persona data based on scope + user preferences (tone, detail_level, dislikes)
     """
     result = get_scoped_context(scope, topic, include_inactive, days, limit)
