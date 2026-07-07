@@ -43,8 +43,10 @@ SECTION_REGISTRY = {
         context_fields={
             "minimal": ["name", "preferred_name", "bio", "location", "current_role"],
             "professional": ["name", "preferred_name", "bio", "location", "current_role",
+                             "organisation", "nationality", "languages_spoken",
                              "work_experience", "education", "career_aspirations"],
-            "personal": ["name", "preferred_name", "bio", "location"],
+            "personal": ["name", "preferred_name", "bio", "location",
+                         "nationality", "languages_spoken", "goals_and_careers"],
             "learning": ["name", "preferred_name", "current_role", "career_aspirations"],
         },
     ),
