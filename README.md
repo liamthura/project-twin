@@ -17,13 +17,17 @@ mygist/
 │   ├── server.py        # MCP tool definitions and persona logic (imported by main.py)
 │   └── archive/         # Retired server implementations, kept for reference
 ├── frontend/            # React app to manually edit your persona
-└── mygist_data/         # Your persona files (JSON)
-    ├── profile.json     # Name, bio, work, education
+└── mygist_data/         # Legacy JSON persona files — migration source only
+    ├── profile.json     # (data now lives in Postgres, scoped per user)
     ├── lifestyle.json   # Hobbies, values, wellness, sleep schedule
     ├── knowledge.json   # Skills, domains, mental lists
     ├── preferences.json # Code style, communication, dislikes
     └── projects.json    # Current projects, learning goals
 ```
+
+Persona data is stored in Postgres (Neon in production), one JSONB blob per
+`(user, file type)`. `mygist_data/` is kept only as the source for the one-off
+migration (`backend/scripts/migrate_json_to_postgres.py`).
 
 ---
 
@@ -31,37 +35,78 @@ mygist/
 
 ### 1. Setup
 
+MyGist is multi-user and stores persona data in Postgres, scoped per user by a
+bearer token. You need a `DATABASE_URL` — a managed [Neon](https://neon.tech)
+project (free tier) in production, or a local Postgres for development.
+
 ```bash
 cd backend
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Create `backend/.env` (see `.env.example`):
+
+```
+# Neon pooled connection string in prod, or a local Postgres for development
+DATABASE_URL=postgresql://user:pass@host/dbname
+```
+
+On a Neon project, enable `pgvector` once — it's unused today but avoids a
+future migration when embedding-search is added:
+
+```sql
+create extension if not exists vector;
+```
+
+Prefer a throwaway local database for development and tests:
+
+```bash
+cd backend && docker compose up -d test-db
+# then use DATABASE_URL=postgresql://mygist:mygist@localhost:5433/mygist_test
+```
+
 ### 2. Run the Server
 
 ```bash
-cd backend && uvicorn main:app --reload
+cd backend && DATABASE_URL="<your database>" uvicorn main:app --reload
 ```
 
-This starts a single process serving the REST API (`/api/*`), the MCP endpoint (`/mcp`), and a health check (`/health`) all together.
+This starts a single process serving the REST API (`/api/*`), the MCP endpoint
+(`/mcp`), and a health check (`/health`). On startup it ensures the `users` and
+`persona_data` tables exist.
 
-### 3. Connect to Claude Desktop
+### 3. Get a token
 
-MyGist's MCP server runs over HTTP, so Claude Desktop connects to it by URL rather than launching a local script.
+Auth is token-only — a token *is* the credential (no passwords). Register a
+username to receive one, exactly once:
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
-
-```json
-{
-  "mcpServers": {
-    "mygist": {
-      "url": "http://127.0.0.1:8000/mcp"
-    }
-  }
-}
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/register \
+  -H "Content-Type: application/json" -d '{"username": "you"}'
+# -> {"user_id": "...", "username": "you", "token": "..."}
 ```
 
-If `MYGIST_API_TOKEN` is set (required once you deploy this beyond your own machine), pass it as a header:
+…or use the frontend's **Create an account** button (Server Connection dialog).
+Save the token — it isn't shown again. Rotate later with
+`POST /api/auth/rotate`. Every read and write is scoped to the user behind the
+token.
+
+Already have JSON persona files under `mygist_data/`? Import them into your new
+account in one pass (this also backfills stable entity IDs):
+
+```bash
+cd backend && DATABASE_URL="<your database>" \
+  python scripts/migrate_json_to_postgres.py --username you
+```
+
+### 4. Connect to Claude Desktop
+
+MyGist's MCP server runs over HTTP, so Claude Desktop connects to it by URL
+rather than launching a local script. Pass your token as a Bearer header.
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
+or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
@@ -82,7 +127,7 @@ For a deployed instance, swap in your public URL (e.g. `https://mygist.thuradev.
 
 Restart Claude Desktop. Your persona tools are now available! 🎉
 
-### 4. (Optional) Run the Frontend UI
+### 5. (Optional) Run the Frontend UI
 
 ```bash
 cd frontend && npm install && npm run dev
