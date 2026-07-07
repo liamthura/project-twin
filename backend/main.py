@@ -111,6 +111,37 @@ async def health_check():
     return {"status": "ok", "service": "mygist"}
 
 
+# ============================================================================
+# Auth: self-serve token registration, whoami, rotate
+# ============================================================================
+
+class RegisterRequest(BaseModel):
+    username: str
+
+
+@app.post("/api/auth/register")
+async def register(body: RegisterRequest):
+    username = body.username.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="username is required")
+    try:
+        user_id, token = db.create_user(username)
+    except db.DuplicateUsernameError:
+        raise HTTPException(status_code=409, detail="username already taken")
+    return {"user_id": user_id, "username": username, "token": token}
+
+
+@app.get("/api/auth/whoami")
+async def whoami(request: Request):
+    return {"user_id": db.current_user_id.get(), "username": request.state.username}
+
+
+@app.post("/api/auth/rotate")
+async def rotate(request: Request):
+    new_token = db.rotate_token(db.current_user_id.get())
+    return {"token": new_token}
+
+
 @app.get("/api/files")
 async def list_files():
     """List persona file types and whether the current user has data for them."""

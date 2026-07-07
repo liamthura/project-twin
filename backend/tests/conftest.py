@@ -7,6 +7,10 @@ TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql://mygist:mygist@localhost:5433/mygist_test"
 )
 
+# Set before any test module runs `import main`, which calls db.ensure_schema()
+# at import time and would otherwise KeyError on a missing DATABASE_URL.
+os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
+
 
 @pytest.fixture(autouse=True)
 def clean_database(monkeypatch):
