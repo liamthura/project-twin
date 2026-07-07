@@ -26,24 +26,15 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Configuration
-def resolve_data_dir() -> Path:
-    base_dir = Path(__file__).parent
-    env_dir = os.getenv("PERSONA_DATA_DIR")
-    if env_dir:
-        candidate = Path(env_dir).expanduser()
-        if not candidate.is_absolute():
-            candidate = (base_dir / candidate).resolve()
-    else:
-        candidate = base_dir.parent / "mygist_data"
-    return candidate
+# Persona data + auth now live in Postgres (see db.py / persona_store.py).
+import db
+import persona_store
+from persona_store import VALID_FILES, DEFAULTS
 
-
-DATA_DIR = resolve_data_dir()
-try:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-except OSError as exc:
-    print(f"Warning: could not create data directory {DATA_DIR}: {exc}", file=sys.stderr)
+# Aliases keep every existing route body -- read_json_file(file_type) /
+# write_json_file(file_type, data) -- byte-for-byte unchanged.
+read_json_file = persona_store.load
+write_json_file = persona_store.save
 
 # Import MCP server
 from server import mcp
@@ -57,23 +48,30 @@ mcp_app = mcp.http_app()
 # Initialize FastAPI
 app = FastAPI(title="MyGist API", version="1.0.0", lifespan=mcp_app.lifespan)
 
+# Ensure the users / persona_data tables exist before serving requests.
+db.ensure_schema()
+
 # Bearer auth middleware for /mcp and /api routes
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
-    
+
     # Public routes (no auth required)
-    if path in ("/health", "/healthz"):
+    if path in ("/health", "/healthz", "/api/health", "/api/auth/register"):
         return await call_next(request)
-    
-    # Protected routes: /mcp/* and /api/*
+
+    # Protected routes: /mcp/* and /api/* -- resolve the bearer token to a user
+    # and scope the request to them via the current_user_id contextvar.
     if path.startswith("/mcp") or path.startswith("/api"):
-        token = os.getenv("MYGIST_API_TOKEN")
-        if token:
-            auth = request.headers.get("Authorization", "")
-            if not auth.startswith("Bearer ") or not secrets.compare_digest(auth[7:], token):
-                return JSONResponse({"error": "Unauthorized"}, status_code=401)
-    
+        auth = request.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        user = db.resolve_token(auth[7:])
+        if not user:
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        db.current_user_id.set(user["id"])
+        request.state.username = user["username"]
+
     return await call_next(request)
 
 # CORS
@@ -97,252 +95,9 @@ app.add_middleware(
 async def health():
     return {"status": "ok"}
 
-# Valid file types
-VALID_FILES = ["profile", "knowledge", "preferences", "projects", "lifestyle", "circle", "learning_log"]
-
-# Default data structures
-DEFAULTS = {
-    "profile": {
-        "name": "",
-        "preferred_name": "",
-        "current_role": "",
-        "organisation": "",
-        "location": "",
-        "nationality": "",
-        "languages_spoken": [],
-        "bio": "",
-        "work_experience": [],
-        "career_aspirations": [],
-        "education": [],
-        "goals_and_careers": [],
-        "contact": {
-            "emails": [],
-            "links": []
-        }
-    },
-    "knowledge": {
-        "domains": [],
-        "mental_tabs": []
-    },
-    "preferences": {
-        "code_style": {
-            "preferred_languages": [],
-            "frameworks": [],
-            "tools": []
-        },
-        "communication": {
-            "default": {
-                "tone": "",
-                "detail_level": "",
-                "locale": "British English"
-            },
-            "mood_overrides": []
-        },
-        "learning_style": {
-            "preferred": [],
-            "avoid": []
-        },
-        "dislikes": []
-    },
-    "projects": {
-            "projects": [],
-        "current_learning": [],
-        "top_of_mind": []
-    },
-    "lifestyle": {
-        "hobbies": [],
-        "passions": [],
-        "curiosities": [],
-        "personality_traits": [],
-        "values": [],
-        "wellness": {
-            "sleep": {
-                "weekday": {"bedtime": "", "wakeup": ""},
-                "weekend": {"bedtime": "", "wakeup": ""}
-            },
-            "energy_peaks": [],
-            "stress_triggers": []
-        }
-    },
-    "circle": {
-        "connections": []
-    },
-    "learning_log": {
-        "entries": []
-    }
-}
-
-
 class FileUpdate(BaseModel):
     """Request body for updating a file."""
     data: Dict[str, Any]
-
-
-def get_file_path(file_type: str) -> Path:
-    """Get the full path for a file type."""
-    if file_type not in VALID_FILES:
-        raise HTTPException(status_code=400, detail=f"Invalid file type: {file_type}")
-    return DATA_DIR / f"{file_type}.json"
-
-
-def read_json_file(file_type: str) -> Dict[str, Any]:
-    """Read a JSON file, returning default if it doesn't exist.
-
-    Includes migration logic for legacy data formats. Current data (as of Dec 2025)
-    is already migrated, but this serves as safety net for backups/imports.
-    """
-    filepath = get_file_path(file_type)
-    if filepath.exists():
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                # Normalize legacy profile language entries (strings -> objects with fluency)
-                if file_type == "profile":
-                    languages = data.get("languages_spoken", [])
-                    if languages and isinstance(languages[0], str):
-                        data["languages_spoken"] = [
-                            {"name": lang, "fluency": "conversational"}
-                            for lang in languages
-                        ]
-                    
-                    # Migrate education from object to array if needed
-                    education = data.get("education", {})
-                    if isinstance(education, dict) and education:
-                        # Old format was a single education object
-                        data["education"] = [{
-                            "institution": education.get("university", ""),
-                            "degree_level": education.get("degree_level", ""),
-                            "field_of_study": education.get("major", ""),
-                            "start_year": "",
-                            "end_year": education.get("graduation_year", ""),
-                            "status": "completed",
-                            "coursework": education.get("coursework", []),
-                            "clubs": education.get("clubs", []),
-                            "highlights": [],
-                        }]
-                    elif isinstance(education, list):
-                        # Ensure all education entries have highlights field
-                        for edu in education:
-                            if isinstance(edu, dict):
-                                edu.setdefault("highlights", [])
-                    else:
-                        data["education"] = []
-                    
-                    # Ensure goals_and_careers is at profile level
-                    if isinstance(education, dict) and education.get("goals_and_careers"):
-                        data.setdefault("goals_and_careers", education["goals_and_careers"])
-                    data.setdefault("goals_and_careers", [])
-                    
-                    contact = data.get("contact", {})
-                    # Convert single email string -> emails array
-                    if isinstance(contact, dict):
-                        email_value = contact.get("email")
-                        if email_value and not contact.get("emails"):
-                            contact["emails"] = [{
-                                "address": email_value,
-                                "purpose": "primary"
-                            }]
-                            contact.pop("email", None)
-
-                        # Ensure emails list exists
-                        contact.setdefault("emails", [])
-
-                        # Normalize links if stored as list of strings
-                        links = contact.get("links", [])
-                        if links and isinstance(links, list) and links and isinstance(links[0], str):
-                            contact["links"] = [
-                                {"label": f"Link {i+1}", "url": url}
-                                for i, url in enumerate(links)
-                            ]
-
-                        contact.setdefault("links", [])
-                        data["contact"] = contact
-                if file_type == "projects":
-                    projects = data.get("projects", [])
-                    if isinstance(projects, list):
-                        for project in projects:
-                            if isinstance(project, dict):
-                                # migrate legacy tech_stack -> tags
-                                if "tags" not in project and "tech_stack" in project:
-                                    project["tags"] = project.get("tech_stack", [])
-                                    project.pop("tech_stack", None)
-                                project.setdefault("tags", [])
-                                project.setdefault("references", [])
-                                project.setdefault("notes", "")
-                                project.setdefault("highlights", [])
-                if file_type == "knowledge":
-                    domains = data.get("domains", [])
-                    if isinstance(domains, list):
-                        for domain in domains:
-                            if isinstance(domain, dict):
-                                domain.setdefault("references", [])
-                    mental_tabs = data.get("mental_tabs", [])
-                    if isinstance(mental_tabs, list):
-                        for tab in mental_tabs:
-                            if isinstance(tab, dict):
-                                tab.setdefault("references", [])
-                if file_type == "preferences":
-                    if isinstance(data, dict):
-                        data.setdefault("dislikes", [])
-                        # Migrate old flat communication structure to new nested structure
-                        if "communication" in data:
-                            comm = data["communication"]
-                            # Check if it's the old flat format (has "tone" at top level but no "default")
-                            if isinstance(comm, dict) and "tone" in comm and "default" not in comm:
-                                # Migrate to new nested format
-                                data["communication"] = {
-                                    "default": {
-                                        "tone": comm.get("tone", ""),
-                                        "detail_level": comm.get("detail_level", ""),
-                                        "locale": comm.get("locale", "British English")
-                                    },
-                                    "mood_overrides": []
-                                }
-                        else:
-                            data["communication"] = DEFAULTS["preferences"]["communication"]
-                if file_type == "lifestyle":
-                    if isinstance(data, dict):
-                        data.setdefault("wellness", {
-                            "sleep": {
-                                "weekday": {"bedtime": "", "wakeup": ""},
-                                "weekend": {"bedtime": "", "wakeup": ""}
-                            },
-                            "energy_peaks": [],
-                            "stress_triggers": []
-                        })
-                if file_type == "learning_log":
-                    # Migrate existing entries to enhanced schema with IDs
-                    entries = data.get("entries", [])
-                    if isinstance(entries, list):
-                        import uuid
-                        from datetime import datetime as dt
-                        for entry in entries:
-                            if isinstance(entry, dict):
-                                # Add ID if missing (for cross-referencing)
-                                if "id" not in entry:
-                                    # Generate ID from timestamp or index
-                                    ts = entry.get("timestamp", "")
-                                    if ts:
-                                        try:
-                                            date_part = ts[:10].replace("-", "")
-                                        except:
-                                            date_part = dt.now().strftime("%Y%m%d")
-                                    else:
-                                        date_part = dt.now().strftime("%Y%m%d")
-                                    entry["id"] = f"learn_{date_part}_{uuid.uuid4().hex[:6]}"
-                                # Ensure optional fields have proper defaults when accessed
-                                # (don't add empty fields to keep data clean)
-                return data
-        except json.JSONDecodeError:
-            return DEFAULTS.get(file_type, {})
-    return DEFAULTS.get(file_type, {})
-
-
-def write_json_file(file_type: str, data: Dict[str, Any]) -> None:
-    """Write data to a JSON file."""
-    filepath = get_file_path(file_type)
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
 
 
 # ============================================================================
@@ -353,25 +108,19 @@ def write_json_file(file_type: str, data: Dict[str, Any]) -> None:
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint for container orchestration."""
-    return {
-        "status": "ok",
-        "service": "mygist",
-        "data_dir": str(DATA_DIR.absolute()),
-        "data_dir_exists": DATA_DIR.exists()
-    }
+    return {"status": "ok", "service": "mygist"}
 
 
 @app.get("/api/files")
 async def list_files():
-    """List all available persona files and their status."""
-    files = {}
-    for file_type in VALID_FILES:
-        filepath = get_file_path(file_type)
-        files[file_type] = {
-            "exists": filepath.exists(),
-            "path": str(filepath)
-        }
-    return {"files": files, "data_dir": str(DATA_DIR.absolute())}
+    """List persona file types and whether the current user has data for them."""
+    user_id = db.current_user_id.get()
+    with db.get_pool().connection() as conn:
+        rows = conn.execute(
+            "select file_type from persona_data where user_id = %s", (user_id,)
+        ).fetchall()
+    existing = {row["file_type"] for row in rows}
+    return {"files": {ft: {"exists": ft in existing} for ft in VALID_FILES}}
 
 
 @app.get("/api/files/{file_type}")
@@ -564,7 +313,7 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")
     
     print(f"Starting MyGist API...")
-    print(f"Data directory: {DATA_DIR.absolute()}")
+    print(f"Database: {'configured' if os.getenv('DATABASE_URL') else 'MISSING DATABASE_URL'}")
     print(f"Server: http://{host}:{port}")
     
     uvicorn.run(app, host=host, port=port)
