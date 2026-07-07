@@ -27,7 +27,7 @@ import logging
 # import io
 # import shutil
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Literal
 import uuid
 
@@ -789,49 +789,83 @@ def get_scoped_context(
     payload["token_estimate"] = len(json.dumps(payload, ensure_ascii=False)) // 4
     return payload
 
-def _filter_learning_log_by_time(data: dict, days: int = None, limit: int = None) -> dict:
-    """Filter learning_log entries by time and/or count."""
-    if "learning_log" not in data or "entries" not in data.get("learning_log", {}):
+def _parse_learning_ts(timestamp) -> datetime:
+    """Parse a learning_log timestamp into a timezone-aware UTC datetime.
+
+    Handles both ``Z``-suffixed UTC (``2025-12-09T19:56:00Z``) and naive
+    microsecond ISO (``2026-03-21T03:32:26.410768``) formats. Naive values are
+    assumed to be UTC. A missing or unparseable timestamp fails *closed*: it is
+    treated as the minimum datetime so such entries sort LAST and never jump the
+    recency window.
+    """
+    if not isinstance(timestamp, str) or not timestamp.strip():
+        return datetime.min.replace(tzinfo=timezone.utc)
+    try:
+        s = timestamp.strip()
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+    except (ValueError, TypeError):
+        return datetime.min.replace(tzinfo=timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _filter_learning_log_by_time(data: dict, days: Optional[int] = None, limit: Optional[int] = None) -> dict:
+    """Filter learning_log entries by time and/or count, newest-first.
+
+    Accepts either the wrapped shape ``{"learning_log": {"entries": [...]}}``
+    (as passed by ``get_scoped_context``) or a bare blob ``{"entries": [...]}``.
+    Entries are sorted newest-first by parsed timestamp; ``days`` applies a
+    UTC recency window and ``limit`` keeps the NEWEST N. Entries with a
+    missing/unparseable timestamp sort last and are dropped by any date window.
+    """
+    if (
+        isinstance(data.get("learning_log"), dict)
+        and "entries" in data["learning_log"]
+    ):
+        blob = data["learning_log"]
+        wrapped = True
+    elif "entries" in data:
+        blob = data
+        wrapped = False
+    else:
         return data
-    
-    all_entries = data["learning_log"]["entries"]
-    filtered_entries = []
+
+    all_entries = blob["entries"]
     filter_parts = []
-    
+
+    # Pair each entry with its parsed timestamp and sort newest-first. Sorting
+    # by the key alone (not the tuple) avoids comparing the entry dicts on ties.
+    parsed = [(_parse_learning_ts(e.get("timestamp")), e) for e in all_entries]
+    parsed.sort(key=lambda pair: pair[0], reverse=True)
+
     if days and days > 0:
-        cutoff = datetime.now() - timedelta(days=days)
-        for entry in all_entries:
-            timestamp = entry.get("timestamp")
-            if not timestamp:
-                filtered_entries.append(entry)
-                continue
-            try:
-                ts = timestamp.replace("Z", "+00:00")
-                entry_date = datetime.fromisoformat(ts.split("+")[0])
-                if entry_date >= cutoff:
-                    filtered_entries.append(entry)
-            except (ValueError, AttributeError):
-                filtered_entries.append(entry)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        parsed = [pair for pair in parsed if pair[0] >= cutoff]
         filter_parts.append(f"last {days} days")
-    else:
-        filtered_entries = list(all_entries)
-    
-    if limit and limit > 0 and len(filtered_entries) > limit:
-        filtered_entries = filtered_entries[:limit]
-        filter_parts.append(f"limit {limit}")
-    
+
+    if limit and limit > 0 and len(parsed) > limit:
+        parsed = parsed[:limit]
+        filter_parts.append(f"newest {limit}")
+
+    filtered_entries = [entry for _, entry in parsed]
+
     if filter_parts:
-        filter_desc = " + ".join(filter_parts) + f" ({len(filtered_entries)}/{len(all_entries)} entries)"
+        filter_desc = (
+            " + ".join(filter_parts)
+            + f" ({len(filtered_entries)}/{len(all_entries)} entries, newest first)"
+        )
     else:
-        filter_desc = "no filter applied"
-    
-    result = dict(data)
-    result["learning_log"] = {
-        **data["learning_log"],
-        "entries": filtered_entries,
-        "_filter": filter_desc
-    }
-    return result
+        filter_desc = "no filter applied (newest first)"
+
+    new_blob = {**blob, "entries": filtered_entries, "_filter": filter_desc}
+    if wrapped:
+        result = dict(data)
+        result["learning_log"] = new_blob
+        return result
+    return new_blob
 
 # TODO: Find a way to let AI decide for keyword aliases matching rather than hard-coding, isntead give LLM-friendly instruction
 # Keyword aliases for topic filtering
