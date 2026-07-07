@@ -203,34 +203,29 @@ async def reset_file(file_type: str):
 
 @app.get("/api/export")
 async def export_data():
-    """Export all MyGist data as a downloadable zip file."""
-    if not DATA_DIR.exists():
-        raise HTTPException(status_code=404, detail="Data directory not found")
-    
-    # Create zip in memory
+    """Export the current user's MyGist data as a downloadable zip file."""
     zip_buffer = io.BytesIO()
-    
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-        # Add all JSON files from DATA_DIR
-        for json_file in DATA_DIR.glob("*.json"):
-            zf.write(json_file, json_file.name)
-        
-        # Add metadata
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        file_names = []
+        for file_type in VALID_FILES:
+            data = persona_store.load(file_type)
+            name = f"{file_type}.json"
+            zf.writestr(name, json.dumps(data, indent=2))
+            file_names.append(name)
         metadata = {
             "exported_at": datetime.now().isoformat(),
-            "version": "1.0.0",
-            "files": [f.name for f in DATA_DIR.glob("*.json")]
+            "version": "2.0.0",
+            "files": file_names,
         }
         zf.writestr("_metadata.json", json.dumps(metadata, indent=2))
-    
+
     zip_buffer.seek(0)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"mygist_backup_{timestamp}.zip"
-    
     return Response(
         content=zip_buffer.getvalue(),
         media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
@@ -266,60 +261,42 @@ def deep_merge(existing: dict, incoming: dict) -> dict:
 @app.post("/api/import")
 async def import_data(file: UploadFile = File(...), mode: str = "replace"):
     """
-    Import MyGist data from an uploaded zip file.
-    
-    mode: "replace" (default) - replaces existing files
+    Import the current user's MyGist data from an uploaded zip file.
+
+    mode: "replace" (default) - overwrites each file type
           "merge" - merges with existing data (arrays concatenated, objects merged)
     """
     if mode not in ("replace", "merge"):
         raise HTTPException(status_code=400, detail="Mode must be 'replace' or 'merge'")
-    
-    if not file.filename.endswith('.zip'):
+    if not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="File must be a .zip archive")
-    
+
     zip_data = await file.read()
-    
     try:
         zip_buffer = io.BytesIO(zip_data)
-        with zipfile.ZipFile(zip_buffer, 'r') as zf:
-            # Security check: only allow .json files
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            # Security check: reject path-traversal names
             for name in zf.namelist():
-                if not name.endswith('.json'):
+                if not name.endswith(".json"):
                     continue
-                if '..' in name or name.startswith('/'):
+                if ".." in name or name.startswith("/"):
                     raise HTTPException(status_code=400, detail=f"Invalid filename: {name}")
-            
-            # Create backup of current data
-            backup_dir = DATA_DIR.parent / f"mygist_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            if DATA_DIR.exists() and any(DATA_DIR.glob("*.json")):
-                shutil.copytree(DATA_DIR, backup_dir)
-            
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
-            
+
             imported_files = []
             for name in zf.namelist():
-                if name.endswith('.json') and not name.startswith('_'):
-                    file_path = DATA_DIR / name
-                    
-                    if mode == "merge" and file_path.exists():
-                        # Merge mode: combine with existing
-                        existing_data = json.loads(file_path.read_text())
-                        incoming_data = json.loads(zf.read(name))
-                        merged_data = deep_merge(existing_data, incoming_data)
-                        file_path.write_text(json.dumps(merged_data, indent=2))
-                    else:
-                        # Replace mode: overwrite
-                        zf.extract(name, DATA_DIR)
-                    
-                    imported_files.append(name)
-            
-            return {
-                "status": "success",
-                "mode": mode,
-                "imported_files": imported_files,
-                "backup_created": str(backup_dir) if backup_dir.exists() else None
-            }
-            
+                if not (name.endswith(".json") and not name.startswith("_")):
+                    continue
+                file_type = name[:-5]
+                if file_type not in VALID_FILES:
+                    continue
+                incoming_data = json.loads(zf.read(name))
+                if mode == "merge":
+                    existing_data = persona_store.load(file_type)
+                    incoming_data = deep_merge(existing_data, incoming_data)
+                persona_store.save(file_type, incoming_data)
+                imported_files.append(name)
+
+            return {"status": "success", "mode": mode, "imported_files": imported_files}
     except zipfile.BadZipFile:
         raise HTTPException(status_code=400, detail="Invalid zip file")
 
