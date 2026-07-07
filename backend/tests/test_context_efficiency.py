@@ -49,9 +49,10 @@ def test_scope_touches_exactly_its_files(as_user, monkeypatch, scope):
 
 
 def test_resolve_scope_fields_matches_legacy_scopes():
-    # _resolve_scope_fields must reproduce the exact {file: fields} the old
-    # CONTEXT_SCOPES table encoded, for every named scope, once ALWAYS_ON
-    # (the preferences bundle, factored out of the registry) is folded back in.
+    # _resolve_scope_fields must reproduce each global scope's {file: fields}
+    # by merging the registry's per-section context_fields for that scope
+    # with the ALWAYS_ON bundle (the preferences fields present on every
+    # scope), in the same canonical order the registry defines.
     from sections import ALWAYS_ON
     for scope in ["minimal", "professional", "personal", "learning"]:
         legacy = {

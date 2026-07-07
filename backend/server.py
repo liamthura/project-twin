@@ -738,7 +738,7 @@ def _files_for_scope(fields) -> list[str]:
     return list(fields.keys())
 
 def get_scoped_context(
-    scope="minimal",
+    scope: Union[str, List[str]] = "minimal",
     topic: str = None,
     include_inactive: bool = False,
     days: int = None,
@@ -748,8 +748,8 @@ def get_scoped_context(
     global scope name, a section key, or a list mixing them (unioned)."""
     try:
         fields = _resolve_scope_fields_multi(scope)
-    except ValueError:
-        return {"error": f"Unknown scope '{scope}'. Valid: {sections.all_scope_names()}"}
+    except ValueError as e:
+        return {"error": f"Unknown scope '{e.args[0]}'. Valid: {sections.all_scope_names()}"}
 
     needed = _files_for_scope(fields)
     all_data = {ft: load_json(FILE_MAP[ft]) for ft in needed}
