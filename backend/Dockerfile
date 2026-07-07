@@ -1,6 +1,6 @@
 # MyGist API Server
 # Build:  docker build -t mygist-api .
-# Run:    docker run -p 8000:8000 -e MYGIST_API_TOKEN=<token> -v ./data:/app/data mygist-api
+# Run:    docker run -p 8000:8000 -e DATABASE_URL=<postgres-url> mygist-api
 
 FROM python:3.11-slim
 
@@ -11,10 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY main.py server.py ./
-
-RUN mkdir -p /app/data
-ENV PERSONA_DATA_DIR=/app/data
+# Copy the whole backend (exclusions in .dockerignore: .env, venv, tests, ...).
+# Using COPY . . so new modules (db.py, persona_store.py, ...) are always included.
+COPY . .
 
 EXPOSE 8000
 
