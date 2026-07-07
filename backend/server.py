@@ -720,6 +720,15 @@ CONTEXT_SCOPES = {
     }
 }
 
+def _files_for_scope(scope_config) -> list[str]:
+    """Return the persona file keys a scope actually needs. The ``full`` scope
+    (fields == "all") needs every file; other scopes only need the keys their
+    field map references."""
+    fields = scope_config["fields"]
+    if fields == "all":
+        return list(persona_store.VALID_FILES)
+    return list(fields.keys())
+
 def get_scoped_context(
     scope: str = "minimal",
     topic: str = None,
@@ -730,9 +739,10 @@ def get_scoped_context(
     """Get persona context filtered by scope and optional topic."""
     if scope not in CONTEXT_SCOPES:
         return {"error": f"Unknown scope '{scope}'. Valid: {list(CONTEXT_SCOPES.keys())}"}
-    
+
     scope_config = CONTEXT_SCOPES[scope]
-    all_data = get_all_persona_data()
+    needed = _files_for_scope(scope_config)
+    all_data = {ft: load_json(FILE_MAP[ft]) for ft in needed}
     result = {}
     
     if scope_config["fields"] == "all":
