@@ -1,18 +1,7 @@
-import pytest
-
 import db
 import persona_store as store
 
-
-@pytest.fixture
-def as_user():
-    with db.get_pool().connection() as conn:
-        row = conn.execute(
-            "insert into users (username, token_hash) values ('u1', 'x') returning id"
-        ).fetchone()
-    token = db.current_user_id.set(str(row["id"]))
-    yield
-    db.current_user_id.reset(token)
+# `as_user` fixture is provided by tests/conftest.py
 
 
 def test_load_unknown_file_returns_default(as_user):

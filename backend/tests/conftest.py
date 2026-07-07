@@ -31,3 +31,17 @@ def clean_database(monkeypatch):
     if db_module._pool is not None:
         db_module._pool.close()  # close this test's pool so no threads linger
         db_module._pool = None
+
+
+@pytest.fixture
+def as_user():
+    """Register a throwaway user and bind current_user_id to it for the test."""
+    import db
+
+    with db.get_pool().connection() as conn:
+        row = conn.execute(
+            "insert into users (username, token_hash) values ('u1', 'x') returning id"
+        ).fetchone()
+    token = db.current_user_id.set(str(row["id"]))
+    yield
+    db.current_user_id.reset(token)

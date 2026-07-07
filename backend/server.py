@@ -31,6 +31,12 @@ from datetime import datetime, timedelta
 from typing import Optional, Literal
 import uuid
 
+
+def generate_entity_id(prefix: str) -> str:
+    """Stable, machine-readable ID for a persona entity, e.g. 'hobby_3f9a21c4'."""
+    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+
+
 from fastmcp import FastMCP
 # from starlette.middleware.base import BaseHTTPMiddleware
 # from starlette.requests import Request
@@ -1282,8 +1288,8 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             if any(h.get("name", "").lower() == name.lower() for h in hobbies):
                 return f"ℹ️ Hobby '{name}' already exists"
             hobbies.append({
-                "name": name, "skill_level": skill_level, "status": status,
-                "notes": notes, "specifics": data.get("specifics", []), "references": []
+                "id": generate_entity_id("hobby"), "name": name, "skill_level": skill_level,
+                "status": status, "notes": notes, "specifics": data.get("specifics", []), "references": []
             })
             save_json("lifestyle.json", lifestyle)
             return f"✅ Added hobby: {name} (status: {status})"
@@ -1405,7 +1411,10 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return "❌ Domain requires 'name' or 'domain'"
             if any(d.get("name", "").lower() == name.lower() for d in domains):
                 return f"ℹ️ Domain '{name}' already exists"
-            domains.append({"name": name, "level": level, "notes": notes, "references": data.get("references", [])})
+            domains.append({
+                "id": generate_entity_id("domain"), "name": name, "level": level,
+                "notes": notes, "references": data.get("references", [])
+            })
             save_json("knowledge.json", knowledge)
             return f"✅ Added domain: {name}"
         elif action == "update":
@@ -1484,8 +1493,8 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             if any(p.get("name", "").lower() == name.lower() for p in project_list):
                 return f"ℹ️ Project '{name}' already exists"
             project_list.append({
-                "name": name, "description": description, "status": status,
-                "tags": data.get("tags", []), "references": data.get("references", []),
+                "id": generate_entity_id("project"), "name": name, "description": description,
+                "status": status, "tags": data.get("tags", []), "references": data.get("references", []),
                 "highlights": data.get("highlights", []), "notes": notes,
                 "added_date": datetime.now().strftime("%Y-%m-%d")
             })
@@ -1605,7 +1614,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return "❌ Connection requires 'name'"
             if any(c.get("name", "").lower() == name.lower() for c in connections):
                 return f"ℹ️ Connection '{name}' already exists"
-            new_connection = {"name": name}
+            new_connection = {"id": generate_entity_id("connection"), "name": name}
             if relationship:
                 new_connection["relationship"] = relationship
             if traits:
