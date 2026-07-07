@@ -1,23 +1,26 @@
-# Multi-User MongoDB + Token Auth Implementation Plan
+# Multi-User Neon/Postgres + Token Auth Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Turn MyGist from a single-tenant, file-backed, single-shared-token server into a multi-user server backed by MongoDB, where each person registers with just a username and receives a token (no password) that scopes every read/write to their own persona data.
+**Goal:** Turn MyGist from a single-tenant, file-backed, single-shared-token server into a multi-user server backed by Neon (managed Postgres), where each person registers with just a username and receives a token (no password) that scopes every read/write to their own persona data — and where every persona entity carries a stable ID so a future embedding-search feature (via `pgvector`, native to Postgres/Neon) can be bolted on without another data migration.
 
-**Architecture:** Introduce two new backend modules — `db.py` (Mongo connection, `users` collection, token hashing, and a `contextvar` holding the current request's `user_id`) and `persona_store.py` (Mongo-backed replacement for the current file-based `load_json`/`save_json`, including the legacy data-normalization logic that already lives in `main.py`). `main.py`'s auth middleware resolves the bearer token to a user once per request and sets the contextvar; `server.py`'s MCP tools and `main.py`'s REST routes both read persona data through the same `persona_store` functions, which look up `current_user_id` internally — so almost none of the ~130 existing call sites inside `server.py`'s 3000-line tool implementation need to change. Registration is self-serve and token-only: `POST /api/auth/register {username}` creates the user and returns a token once.
+**Architecture:** Two new backend modules — `db.py` (Postgres connection pool, `users` table, token hashing, and a `contextvar` holding the current request's `user_id`) and `persona_store.py` (Postgres-backed replacement for the current file-based `load_json`/`save_json`, storing each persona file as a JSONB blob keyed by `(user_id, file_type)` — same "load whole blob / save whole blob" shape the 3000 lines of existing tool logic already assume). `main.py`'s auth middleware resolves the bearer token to a user once per request and sets the contextvar; `server.py`'s MCP tools and `main.py`'s REST routes both read persona data through the same `persona_store` functions, which look up `current_user_id` internally — so almost none of the ~130 existing call sites inside `server.py` need to change. Registration is self-serve and token-only: `POST /api/auth/register {username}` creates the user and returns a token once. Separately, every place `server.py` creates a new domain/hobby/project/connection entry gets a stable `id` field (matching the pattern `learning_log` entries already use), so entities are addressable independent of their (renameable) `name` — the one thing that would be expensive to retrofit once embeddings reference them.
 
-**Tech Stack:** MongoDB (local via Docker for dev), `pymongo` (sync driver, matching the codebase's existing sync I/O style), `mongomock` + `pytest` for unit tests (no real Mongo needed for those), existing FastAPI + FastMCP stack unchanged otherwise.
+**Tech Stack:** Neon (managed serverless Postgres, free tier), `psycopg` (v3, sync driver — matches the codebase's existing sync I/O style) with `psycopg_pool` for connection pooling, a local `pgvector/pgvector:pg16` Docker container for fast offline tests, `pytest` for the test suite, existing FastAPI + FastMCP stack unchanged otherwise.
+
+**Why Neon over the alternatives considered:** MongoDB's vector search (`$vectorSearch`) is Atlas-only — self-hosted community Mongo can't run it. Appwrite's databases have no vector search at all, and its auth model requires exchanging tokens for sessions rather than a simple long-lived bearer token, so it wouldn't have replaced the custom auth layer anyway. Postgres has `pgvector` — a mature, first-party-documented extension on Neon (`CREATE EXTENSION vector;`) — giving native vector columns and ANN indexes in the same database as the relational data, with a free tier (0.5 GB storage, 100 CU-hours/month, autosuspend-to-$0 after 5 minutes idle) that comfortably covers this project's scale. The one trade-off: Neon is cloud-only (no self-host escape hatch), a different trust boundary than the fully self-hosted app today — accepted deliberately for this project.
 
 **Key facts this plan relies on (verified against the current code):**
 - Only 6 MCP tools are registered: `get_context`, `get_raw`, `get_schema`, `persona_modify`, `persona_batch`, `suggest_persona_update` (`backend/server.py:2724-2899`). Everything else in that file is internal helpers reached from these 6 entry points.
 - `server.py`'s `load_json`/`save_json` (`backend/server.py:623-638`) are called 39 / 89 times respectively, always with a `"<type>.json"`-style filename. We keep that exact call signature so none of those call sites change.
 - `main.py` has its own **duplicate** implementation (`read_json_file`/`write_json_file`/`get_file_path`, `main.py:181-345`) using bare `"<type>"` names (no `.json` suffix), plus important legacy-data-normalization logic in `read_json_file` (`main.py:196-334`) that must be preserved.
 - `conversation_context` (`server.py:139`, a process-global `ConversationContext()`) is defined but **never actually passed to `resolve_pronoun_references`** anywhere in the file — it's dead code today. Out of scope for this plan; do not touch it.
+- Entities without a stable ID today, confirmed by inspecting `mygist_data/*.json`: `knowledge.domains` (skills — identified only by `name`), `lifestyle.hobbies` (only by `name`), `projects.projects` (only by `name`), `circle.connections` (only by `name`). `learning_log` entries already have one (`learn_<date>_<hex6>`, generated at `server.py:1684`). This plan brings the other four up to the same standard.
 - The frontend (`frontend/src/components/ConnectionSettings.jsx`, `frontend/src/lib/api.js`) already stores `{serverUrl, token}` in `localStorage` and sends `Authorization: Bearer <token>` on every request — the "enter your token" UX already exists and needs no rework, only a "create account" addition.
 
 ---
 
-### Task 0: Local MongoDB + dependencies
+### Task 0: Neon project + local test database + dependencies
 
 **Files:**
 - Modify: `backend/docker-compose.yml`
@@ -25,19 +28,31 @@
 - Create: `backend/requirements-dev.txt`
 - Modify: `backend/.env.example`
 
-**Step 1: Add a `mongo` service to docker-compose for local dev**
+**Step 1: Create the Neon project**
 
-Edit `backend/docker-compose.yml` to add a Mongo service and wire the app to it:
+In the Neon console: create a project (free tier), note the pooled connection string (`...-pooler...neon.tech`) for the app and the direct connection string for the migration script. Run once, in the Neon SQL editor or via `psql "<connection-string>"`:
+
+```sql
+create extension if not exists vector;
+```
+
+This just makes `pgvector` available for later — no vector columns are created in this plan, only the extension is enabled so there's no future migration step needed to turn it on.
+
+**Step 2: Local test database via Docker**
+
+Edit `backend/docker-compose.yml` — replace the single `mygist` service block with:
 
 ```yaml
 services:
-  mongo:
-    image: mongo:7
-    container_name: mygist-mongo
+  test-db:
+    image: pgvector/pgvector:pg16
+    container_name: mygist-test-db
     ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=mygist
+      - POSTGRES_PASSWORD=mygist
+      - POSTGRES_DB=mygist_test
     restart: unless-stopped
 
   mygist:
@@ -46,11 +61,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - MONGODB_URI=mongodb://mongo:27017
-      - MONGODB_DB_NAME=mygist
+      - DATABASE_URL=${DATABASE_URL}
       - DEBUG=true
-    depends_on:
-      - mongo
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -58,30 +70,25 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
-
-volumes:
-  mongo_data:
 ```
 
-Note this drops `MYGIST_API_TOKEN` and `PERSONA_DATA_DIR` — both are replaced by the Mongo-backed auth/data model built in this plan.
+`test-db` is a throwaway local Postgres purely for the test suite (fast, free, no Neon credentials needed to run tests). `mygist` in dev/prod points `DATABASE_URL` at the real Neon connection string.
 
-**Step 2: Add `pymongo` to runtime deps**
+**Step 3: Add dependencies**
 
 Append to `backend/requirements.txt`:
 
 ```
-# MongoDB driver
-pymongo>=4.6.0
+# Postgres driver
+psycopg[binary]>=3.1.0
+psycopg-pool>=3.2.0
 ```
-
-**Step 3: Add a dev-only requirements file for tests**
 
 Create `backend/requirements-dev.txt`:
 
 ```
 -r requirements.txt
 pytest>=7.4.0
-mongomock>=4.1.2
 httpx>=0.25.0
 ```
 
@@ -90,36 +97,36 @@ httpx>=0.25.0
 Replace the `MYGIST_API_TOKEN` / `PERSONA_DATA_DIR` section in `backend/.env.example` with:
 
 ```
-# REQUIRED - MongoDB connection
-MONGODB_URI=mongodb://localhost:27017
-MONGODB_DB_NAME=mygist
+# REQUIRED - Postgres connection string (Neon pooled connection string in prod;
+# postgresql://mygist:mygist@localhost:5433/mygist_test for local tests)
+DATABASE_URL=
 ```
 
-**Step 5: Bring Mongo up locally and verify**
+**Step 5: Bring the local test DB up and verify**
 
-Run: `cd backend && docker compose up -d mongo`
-Expected: container `mygist-mongo` running; `docker compose ps` shows `healthy`/`running`.
+Run: `cd backend && docker compose up -d test-db`
+Expected: container `mygist-test-db` healthy/running.
 
-Run: `mongosh mongodb://localhost:27017 --eval "db.runCommand({ping: 1})"`
-Expected: `{ ok: 1 }`
+Run: `psql postgresql://mygist:mygist@localhost:5433/mygist_test -c "select 1;"`
+Expected: `1` returned.
 
-**Step 6: Install dev deps in the venv**
+**Step 6: Install dev deps**
 
 Run: `cd backend && source venv/bin/activate && pip install -r requirements-dev.txt`
-Expected: installs cleanly, no errors.
+Expected: installs cleanly.
 
 **Step 7: Commit**
 
 ```bash
 git add backend/docker-compose.yml backend/requirements.txt backend/requirements-dev.txt backend/.env.example
-git commit -m "chore: add MongoDB service and dependencies for multi-user backend"
+git commit -m "chore: add Neon/Postgres dependencies and local test database"
 ```
 
 ---
 
 ### Task 1: De-risk — verify a contextvar set in FastAPI middleware is visible inside FastMCP tool calls
 
-This is the load-bearing assumption of the whole plan: setting a `contextvar` once per request (in middleware) should be readable from inside the 6 MCP tool functions without threading a parameter through every internal call. Prove it before refactoring 3000 lines on top of it.
+This is the load-bearing assumption of the whole plan (independent of which database is behind it): setting a `contextvar` once per request (in middleware) should be readable from inside the 6 MCP tool functions without threading a parameter through every internal call. Prove it before refactoring on top of it.
 
 **Files:**
 - Create (temporary, deleted at end of task): `backend/_contextvar_probe.py`
@@ -156,7 +163,7 @@ probe_var.set(request.headers.get("X-Probe", "NONE"))
 
 Run: `cd backend && source venv/bin/activate && uvicorn main:app --port 8000 &`
 
-Use an MCP client (or `curl` against the MCP HTTP transport, or simplest: a quick Python script using `fastmcp.Client`) to call the `_probe` tool twice, in two separate HTTP requests, with `X-Probe: alice` and `X-Probe: bob` respectively.
+Use an MCP client (or a quick Python script using `fastmcp.Client`) to call the `_probe` tool twice, in two separate HTTP requests, with `X-Probe: alice` and `X-Probe: bob` respectively.
 
 Expected: first call returns `"alice"`, second returns `"bob"` — proving the value set in FastAPI middleware for a given request is visible inside that same request's MCP tool call, and that two different requests don't leak into each other.
 
@@ -173,30 +180,56 @@ git checkout -- backend/main.py backend/server.py
 
 ---
 
-### Task 2: `db.py` — Mongo connection, user registry, token auth primitives
+### Task 2: `db.py` — Postgres connection, user registry, token auth primitives
 
 **Files:**
 - Create: `backend/db.py`
 - Create: `backend/tests/test_db.py`
 - Create: `backend/tests/__init__.py` (empty)
+- Create: `backend/tests/conftest.py`
 
-**Step 1: Write the failing tests**
+**Step 1: Shared test fixture for a clean database per test**
+
+Create `backend/tests/conftest.py`:
+
+```python
+import os
+
+import psycopg
+import pytest
+
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL", "postgresql://mygist:mygist@localhost:5433/mygist_test"
+)
+
+
+@pytest.fixture(autouse=True)
+def clean_database(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
+
+    import db as db_module
+
+    db_module._pool = None  # force a fresh pool bound to the test database
+
+    conn = psycopg.connect(TEST_DATABASE_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute("drop table if exists persona_data;")
+        cur.execute("drop table if exists users;")
+    conn.close()
+
+    db_module.ensure_schema()
+    yield
+```
+
+**Step 2: Write the failing tests**
 
 Create `backend/tests/test_db.py`:
 
 ```python
-import mongomock
 import pytest
 
 import db
-
-
-@pytest.fixture(autouse=True)
-def fake_mongo(monkeypatch):
-    client = mongomock.MongoClient()
-    monkeypatch.setattr(db, "_client", client)
-    db.ensure_indexes()
-    yield client
 
 
 def test_create_user_returns_id_and_token():
@@ -215,7 +248,7 @@ def test_resolve_token_finds_matching_user():
     user_id, token = db.create_user("alice")
     user = db.resolve_token(token)
     assert user is not None
-    assert str(user["_id"]) == user_id
+    assert user["id"] == user_id
     assert user["username"] == "alice"
 
 
@@ -233,19 +266,19 @@ def test_rotate_token_invalidates_old_token():
     new_token = db.rotate_token(user_id)
     assert db.resolve_token(old_token) is None
     user = db.resolve_token(new_token)
-    assert str(user["_id"]) == user_id
+    assert user["id"] == user_id
 ```
 
-**Step 2: Run tests to verify they fail**
+**Step 3: Run tests to verify they fail**
 
 Run: `cd backend && source venv/bin/activate && pytest tests/test_db.py -v`
-Expected: `ModuleNotFoundError: No module named 'db'` (or collection error) — `db.py` doesn't exist yet.
+Expected: `ModuleNotFoundError: No module named 'db'` — `db.py` doesn't exist yet.
 
-**Step 3: Implement `backend/db.py`**
+**Step 4: Implement `backend/db.py`**
 
 ```python
 """
-MongoDB connection, user registry, and token-based auth primitives.
+Postgres connection, user registry, and token-based auth primitives.
 
 Auth model: a token IS the credential (no password). Registering with a
 username generates a token; the plaintext token is returned exactly once
@@ -256,13 +289,13 @@ import hashlib
 import os
 import secrets
 from contextvars import ContextVar
-from datetime import datetime, timezone
 from typing import Optional
 
-from pymongo import ASCENDING, MongoClient
-from pymongo.errors import DuplicateKeyError
+import psycopg
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
-_client: Optional[MongoClient] = None
+_pool: Optional[ConnectionPool] = None
 
 # Set once per request by main.py's auth middleware; read by persona_store.py
 # (and, transitively, by server.py's MCP tools) to scope data to the caller.
@@ -273,26 +306,34 @@ class DuplicateUsernameError(Exception):
     pass
 
 
-def get_client() -> MongoClient:
-    global _client
-    if _client is None:
-        uri = os.environ.get("MONGODB_URI", "mongodb://localhost:27017")
-        _client = MongoClient(uri)
-    return _client
+def get_pool() -> ConnectionPool:
+    global _pool
+    if _pool is None:
+        dsn = os.environ["DATABASE_URL"]
+        _pool = ConnectionPool(dsn, min_size=1, max_size=10, kwargs={"row_factory": dict_row})
+    return _pool
 
 
-def get_db():
-    db_name = os.getenv("MONGODB_DB_NAME", "mygist")
-    return get_client()[db_name]
-
-
-def ensure_indexes() -> None:
-    db = get_db()
-    db.users.create_index("username", unique=True)
-    db.users.create_index("token_hash", unique=True)
-    db.persona_data.create_index(
-        [("user_id", ASCENDING), ("file_type", ASCENDING)], unique=True
-    )
+def ensure_schema() -> None:
+    with get_pool().connection() as conn:
+        conn.execute("""
+            create table if not exists users (
+                id uuid primary key default gen_random_uuid(),
+                username text unique not null,
+                token_hash text unique not null,
+                created_at timestamptz not null default now(),
+                last_seen_at timestamptz
+            );
+        """)
+        conn.execute("""
+            create table if not exists persona_data (
+                user_id uuid not null references users(id),
+                file_type text not null,
+                data jsonb not null,
+                updated_at timestamptz not null default now(),
+                primary key (user_id, file_type)
+            );
+        """)
 
 
 def hash_token(token: str) -> str:
@@ -302,57 +343,54 @@ def hash_token(token: str) -> str:
 def create_user(username: str) -> tuple[str, str]:
     """Create a user with a fresh token. Returns (user_id, plaintext_token)."""
     token = secrets.token_urlsafe(32)
-    doc = {
-        "username": username,
-        "token_hash": hash_token(token),
-        "created_at": datetime.now(timezone.utc),
-        "last_seen_at": None,
-    }
     try:
-        result = get_db().users.insert_one(doc)
-    except DuplicateKeyError:
+        with get_pool().connection() as conn:
+            row = conn.execute(
+                "insert into users (username, token_hash) values (%s, %s) returning id",
+                (username, hash_token(token)),
+            ).fetchone()
+    except psycopg.errors.UniqueViolation:
         raise DuplicateUsernameError(username)
-    return str(result.inserted_id), token
+    return str(row["id"]), token
 
 
 def resolve_token(token: str) -> Optional[dict]:
     """Look up the user for a bearer token, touching last_seen_at. None if invalid."""
-    users = get_db().users
-    user = users.find_one({"token_hash": hash_token(token)})
+    with get_pool().connection() as conn:
+        user = conn.execute(
+            "update users set last_seen_at = now() where token_hash = %s returning id, username",
+            (hash_token(token),),
+        ).fetchone()
     if user:
-        users.update_one(
-            {"_id": user["_id"]},
-            {"$set": {"last_seen_at": datetime.now(timezone.utc)}},
-        )
+        user["id"] = str(user["id"])
     return user
 
 
-def rotate_token(user_id) -> str:
+def rotate_token(user_id: str) -> str:
     """Issue a new token for an existing user, invalidating the old one."""
-    from bson import ObjectId
-
     token = secrets.token_urlsafe(32)
-    get_db().users.update_one(
-        {"_id": ObjectId(user_id)}, {"$set": {"token_hash": hash_token(token)}}
-    )
+    with get_pool().connection() as conn:
+        conn.execute(
+            "update users set token_hash = %s where id = %s", (hash_token(token), user_id)
+        )
     return token
 ```
 
-**Step 4: Run tests to verify they pass**
+**Step 5: Run tests to verify they pass**
 
 Run: `pytest tests/test_db.py -v`
 Expected: all 6 tests PASS.
 
-**Step 5: Commit**
+**Step 6: Commit**
 
 ```bash
 git add backend/db.py backend/tests/
-git commit -m "feat: add Mongo-backed user registry and token auth"
+git commit -m "feat: add Postgres-backed user registry and token auth"
 ```
 
 ---
 
-### Task 3: `persona_store.py` — Mongo-backed persona data layer
+### Task 3: `persona_store.py` — Postgres-backed persona data layer
 
 This replaces the storage guts of both `server.py`'s `load_json`/`save_json` and `main.py`'s `read_json_file`/`write_json_file`, unifying the two duplicate implementations into one. It reads `db.current_user_id` internally, so callers don't pass a user around.
 
@@ -365,24 +403,20 @@ This replaces the storage guts of both `server.py`'s `load_json`/`save_json` and
 Create `backend/tests/test_persona_store.py`:
 
 ```python
-import mongomock
-import pytest
-
 import db
 import persona_store as store
 
 
-@pytest.fixture(autouse=True)
-def fake_mongo(monkeypatch):
-    client = mongomock.MongoClient()
-    monkeypatch.setattr(db, "_client", client)
-    db.ensure_indexes()
-    yield client
-
-
 @pytest.fixture
 def as_user():
-    token = db.current_user_id.set("user-1")
+    import psycopg
+
+    with psycopg.connect(db.os.environ["DATABASE_URL"]) as conn:
+        row = conn.execute(
+            "insert into users (username, token_hash) values ('u1', 'x') returning id"
+        ).fetchone()
+        conn.commit()
+    token = db.current_user_id.set(str(row["id"]))
     yield
     db.current_user_id.reset(token)
 
@@ -397,17 +431,28 @@ def test_save_then_load_round_trips(as_user):
     assert store.load("profile")["name"] == "Alice"
 
 
-def test_data_is_isolated_per_user(monkeypatch):
-    token_a = db.current_user_id.set("user-a")
+def test_data_is_isolated_per_user():
+    import psycopg
+
+    with psycopg.connect(db.os.environ["DATABASE_URL"]) as conn:
+        row_a = conn.execute(
+            "insert into users (username, token_hash) values ('a', 'ta') returning id"
+        ).fetchone()
+        row_b = conn.execute(
+            "insert into users (username, token_hash) values ('b', 'tb') returning id"
+        ).fetchone()
+        conn.commit()
+
+    token_a = db.current_user_id.set(str(row_a["id"]))
     store.save("profile", {**store.DEFAULTS["profile"], "name": "Alice"})
     db.current_user_id.reset(token_a)
 
-    token_b = db.current_user_id.set("user-b")
+    token_b = db.current_user_id.set(str(row_b["id"]))
     store.save("profile", {**store.DEFAULTS["profile"], "name": "Bob"})
     assert store.load("profile")["name"] == "Bob"
     db.current_user_id.reset(token_b)
 
-    token_a2 = db.current_user_id.set("user-a")
+    token_a2 = db.current_user_id.set(str(row_a["id"]))
     assert store.load("profile")["name"] == "Alice"
     db.current_user_id.reset(token_a2)
 
@@ -417,6 +462,8 @@ def test_get_all_returns_every_file_type(as_user):
     assert set(all_data.keys()) == set(store.VALID_FILES)
 ```
 
+Add `import pytest` at the top alongside the others.
+
 **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/test_persona_store.py -v`
@@ -424,16 +471,17 @@ Expected: `ModuleNotFoundError: No module named 'persona_store'`.
 
 **Step 3: Implement `backend/persona_store.py`**
 
-Move `VALID_FILES` and `DEFAULTS` here verbatim from `backend/main.py:100-173` (the canonical copy — `server.py`'s `FILE_MAP` derives from the same set of types). Move the legacy-normalization logic verbatim from `backend/main.py:196-334` (the big `if file_type == "profile": ...` / `"projects"` / `"knowledge"` / `"preferences"` / `"lifestyle"` / `"learning_log"` block) into `_normalize()` below — copy that block's body as-is, it doesn't need to change.
+Move `VALID_FILES` and `DEFAULTS` here verbatim from `backend/main.py:100-173` (the canonical copy). Move the legacy-normalization logic verbatim from `backend/main.py:196-334` (the big `if file_type == "profile": ...` / `"projects"` / `"knowledge"` / `"preferences"` / `"lifestyle"` / `"learning_log"` block) into `_normalize()` below — copy that block's body as-is, it doesn't need to change, it just operates on `data` instead of a locally-scoped variable read from disk.
 
 ```python
 """
-Mongo-backed persona data store, scoped to the current request's user via
+Postgres-backed persona data store, scoped to the current request's user via
 db.current_user_id. Replaces the old per-file-on-disk storage in main.py and
 server.py; keeps the same "load whole blob / save whole blob" shape those
 callers already expect.
 """
 
+import json
 from datetime import datetime, timezone
 
 import db
@@ -464,20 +512,29 @@ def load(file_type: str) -> dict:
     if file_type not in VALID_FILES:
         return {"error": f"{file_type} not found"}
     user_id = db.current_user_id.get()
-    doc = db.get_db().persona_data.find_one({"user_id": user_id, "file_type": file_type})
-    if doc is None:
+    with db.get_pool().connection() as conn:
+        row = conn.execute(
+            "select data from persona_data where user_id = %s and file_type = %s",
+            (user_id, file_type),
+        ).fetchone()
+    if row is None:
         return DEFAULTS.get(file_type, {})
-    return _normalize(file_type, doc["data"])
+    return _normalize(file_type, row["data"])
 
 
 def save(file_type: str, data: dict) -> bool:
     """Save (upsert) one persona file for the current user."""
     user_id = db.current_user_id.get()
-    db.get_db().persona_data.update_one(
-        {"user_id": user_id, "file_type": file_type},
-        {"$set": {"data": data, "updated_at": datetime.now(timezone.utc)}},
-        upsert=True,
-    )
+    with db.get_pool().connection() as conn:
+        conn.execute(
+            """
+            insert into persona_data (user_id, file_type, data, updated_at)
+            values (%s, %s, %s, now())
+            on conflict (user_id, file_type)
+            do update set data = excluded.data, updated_at = now()
+            """,
+            (user_id, file_type, json.dumps(data)),
+        )
     return True
 
 
@@ -491,6 +548,8 @@ def reset(file_type: str) -> bool:
     return save(file_type, DEFAULTS[file_type])
 ```
 
+Note: `psycopg`'s `dict_row` factory returns JSONB columns already decoded into Python dicts, so `row["data"]` is a dict, not a string — no `json.loads` needed on read. `json.dumps(data)` on write lets `psycopg` adapt it to `jsonb` directly.
+
 **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/test_persona_store.py -v`
@@ -500,7 +559,139 @@ Expected: all 4 tests PASS, including `test_data_is_isolated_per_user` (the one 
 
 ```bash
 git add backend/persona_store.py backend/tests/test_persona_store.py
-git commit -m "feat: add Mongo-backed persona_store, unifying main.py/server.py data access"
+git commit -m "feat: add Postgres-backed persona_store, unifying main.py/server.py data access"
+```
+
+---
+
+### Task 3.5: Stable IDs on every persona entity (future-proofing for embedding search)
+
+`learning_log` entries already get an `id` (`learn_<date>_<hex6>`, generated at `server.py:1684`). `knowledge.domains`, `lifestyle.hobbies`, `projects.projects`, and `circle.connections` don't — they're only addressable by `name`. Before an embedding-search feature can reference "this specific skill" or "this specific hobby" independent of what it's called today, every entity needs a stable, machine-readable ID assigned at creation time. This task does that; it does **not** add any embedding/vector columns yet — that's explicitly deferred until the search feature is actually built (YAGNI), it would just be expensive to retrofit IDs after the fact once something else references them.
+
+**Files:**
+- Modify: `backend/server.py`
+
+**Step 1: Add a shared ID generator**
+
+Near the top of `backend/server.py`, alongside the existing `import uuid` (`server.py:32`), add:
+
+```python
+def generate_entity_id(prefix: str) -> str:
+    """Stable, machine-readable ID for a persona entity, e.g. 'hobby_3f9a21c4'."""
+    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+```
+
+**Step 2: Assign an ID when a domain (skill) is added**
+
+At `server.py:1444`, inside the `domain` "add" branch:
+
+```python
+# Before:
+domains.append({"name": name, "level": level, "notes": notes, "references": data.get("references", [])})
+
+# After:
+domains.append({
+    "id": generate_entity_id("domain"), "name": name, "level": level,
+    "notes": notes, "references": data.get("references", [])
+})
+```
+
+**Step 3: Assign an ID when a hobby is added**
+
+At `server.py:1320-1323`, inside the `hobby` "add" branch:
+
+```python
+# Before:
+hobbies.append({
+    "name": name, "skill_level": skill_level, "status": status,
+    "notes": notes, "specifics": data.get("specifics", []), "references": []
+})
+
+# After:
+hobbies.append({
+    "id": generate_entity_id("hobby"), "name": name, "skill_level": skill_level,
+    "status": status, "notes": notes, "specifics": data.get("specifics", []), "references": []
+})
+```
+
+**Step 4: Assign an ID when a project is added**
+
+At `server.py:1522-1527`, inside the `project` "add" branch:
+
+```python
+# Before:
+project_list.append({
+    "name": name, "description": description, "status": status,
+    "tags": data.get("tags", []), "references": data.get("references", []),
+    "highlights": data.get("highlights", []), "notes": notes,
+    "added_date": datetime.now().strftime("%Y-%m-%d")
+})
+
+# After:
+project_list.append({
+    "id": generate_entity_id("project"), "name": name, "description": description,
+    "status": status, "tags": data.get("tags", []), "references": data.get("references", []),
+    "highlights": data.get("highlights", []), "notes": notes,
+    "added_date": datetime.now().strftime("%Y-%m-%d")
+})
+```
+
+**Step 5: Assign an ID when a connection is added**
+
+At `server.py:1644`, inside the `connection` "add" branch:
+
+```python
+# Before:
+new_connection = {"name": name}
+
+# After:
+new_connection = {"id": generate_entity_id("connection"), "name": name}
+```
+
+**Step 6: Write a test that a fresh entity of each type gets an ID**
+
+Create `backend/tests/test_entity_ids.py`:
+
+```python
+import server
+
+
+def test_new_domain_gets_an_id(as_user):
+    server.persona_modify(action="add", entity="domain", data={"name": "Rust", "level": "learning"})
+    domains = server.load_json("knowledge.json")["domains"]
+    assert domains[-1]["id"].startswith("domain_")
+
+
+def test_new_hobby_gets_an_id(as_user):
+    server.persona_modify(action="add", entity="hobby", data={"name": "Chess"})
+    hobbies = server.load_json("lifestyle.json")["hobbies"]
+    assert hobbies[-1]["id"].startswith("hobby_")
+
+
+def test_new_project_gets_an_id(as_user):
+    server.persona_modify(action="add", entity="project", data={"name": "Blog", "description": "A blog"})
+    projects = server.load_json("projects.json")["projects"]
+    assert projects[-1]["id"].startswith("project_")
+
+
+def test_new_connection_gets_an_id(as_user):
+    server.persona_modify(action="add", entity="connection", data={"name": "Sam"})
+    connections = server.load_json("circle.json")["connections"]
+    assert connections[-1]["id"].startswith("connection_")
+```
+
+Reuse the `as_user` fixture pattern from `tests/test_persona_store.py` (extract it into `conftest.py` if it's needed in more than one test file — small DRY cleanup, not required to ship this task).
+
+**Step 7: Run tests to verify they pass**
+
+Run: `pytest tests/test_entity_ids.py -v`
+Expected: all 4 PASS.
+
+**Step 8: Commit**
+
+```bash
+git add backend/server.py backend/tests/test_entity_ids.py
+git commit -m "feat: assign stable IDs to domains, hobbies, projects, and connections on creation"
 ```
 
 ---
@@ -549,13 +740,13 @@ Every other call site in `server.py` (39 `load_json(...)` calls, 89 `save_json(.
 Run: `grep -n "DATA_DIR" backend/server.py`
 Expected: no output (only the commented-out archive block below line 2980 may still mention it inside `#` comments — leave those, they're already dead/commented code, not executed).
 
-**Step 4: Run the contextvar probe pattern for real (manual smoke test)**
+**Step 4: Confirm the app still imports and starts**
 
-Run: `cd backend && source venv/bin/activate && MONGODB_URI=mongodb://localhost:27017 uvicorn main:app --port 8000 --reload &`
+Run: `cd backend && source venv/bin/activate && DATABASE_URL=postgresql://mygist:mygist@localhost:5433/mygist_test uvicorn main:app --port 8000 --reload &`
 
-(main.py isn't wired to Mongo auth yet — Task 5 — so for this step just confirm the app **imports and starts without error**, proving `server.py`'s new imports resolve.)
+(main.py isn't wired to Postgres auth yet — Task 5 — so for this step just confirm the app **imports and starts without error**, proving `server.py`'s new imports resolve.)
 
-Expected: server starts, logs `Data directory: ...` line removed/absent, no `ImportError`/`AttributeError` on startup.
+Expected: server starts, no `ImportError`/`AttributeError` on startup.
 
 **Step 5: Commit**
 
@@ -566,7 +757,7 @@ git commit -m "refactor: point server.py's load_json/save_json at persona_store"
 
 ---
 
-### Task 5: Wire `main.py`'s auth middleware and REST routes to Mongo
+### Task 5: Wire `main.py`'s auth middleware and REST routes to Postgres
 
 **Files:**
 - Modify: `backend/main.py`
@@ -610,7 +801,7 @@ async def auth_middleware(request: Request, call_next):
         user = db.resolve_token(auth[7:])
         if not user:
             return JSONResponse({"error": "Unauthorized"}, status_code=401)
-        db.current_user_id.set(str(user["_id"]))
+        db.current_user_id.set(user["id"])
         request.state.username = user["username"]
 
     return await call_next(request)
@@ -618,7 +809,7 @@ async def auth_middleware(request: Request, call_next):
 
 **Step 4: Fix the two routes that referenced `DATA_DIR` directly**
 
-`/health` (`main.py:352-361`) and `/api/files` (`main.py:364-374`) printed filesystem paths — replace with Mongo-appropriate info:
+`/health` (`main.py:352-361`) and `/api/files` (`main.py:364-374`) printed filesystem paths — replace with Postgres-appropriate info:
 
 ```python
 @app.get("/health")
@@ -631,30 +822,25 @@ async def health_check():
 async def list_files():
     """List persona file types and whether the current user has data for them."""
     user_id = db.current_user_id.get()
-    existing = {
-        doc["file_type"]
-        for doc in db.get_db().persona_data.find({"user_id": user_id}, {"file_type": 1})
-    }
+    with db.get_pool().connection() as conn:
+        rows = conn.execute(
+            "select file_type from persona_data where user_id = %s", (user_id,)
+        ).fetchall()
+    existing = {row["file_type"] for row in rows}
     return {"files": {ft: {"exists": ft in existing} for ft in VALID_FILES}}
 ```
 
-**Step 5: Call `db.ensure_indexes()` at startup**
+**Step 5: Call `db.ensure_schema()` at startup**
 
 Right after `app = FastAPI(...)`, add:
 
 ```python
-db.ensure_indexes()
+db.ensure_schema()
 ```
 
-**Step 6: Manual smoke test — register, then hit an authed route**
+**Step 6: Manual smoke test — hit a protected route with no token**
 
-Run: `cd backend && MONGODB_URI=mongodb://localhost:27017 uvicorn main:app --port 8000 --reload &`
-
-Run:
-```bash
-curl -s -X POST localhost:8000/api/auth/register -H 'Content-Type: application/json' -d '{"username":"alice"}'
-```
-Expected: 404 for now (endpoint added in Task 6) — confirms this task is done and the next one is needed. Instead, verify auth is wired by hitting a protected route with no token:
+Run: `cd backend && DATABASE_URL=postgresql://mygist:mygist@localhost:5433/mygist_test uvicorn main:app --port 8000 --reload &`
 
 Run: `curl -s -o /dev/null -w '%{http_code}\n' localhost:8000/api/files`
 Expected: `401`
@@ -663,7 +849,7 @@ Expected: `401`
 
 ```bash
 git add backend/main.py
-git commit -m "refactor: replace static-token auth middleware with Mongo user lookup"
+git commit -m "refactor: replace static-token auth middleware with Postgres user lookup"
 ```
 
 ---
@@ -679,20 +865,9 @@ git commit -m "refactor: replace static-token auth middleware with Mongo user lo
 Create `backend/tests/test_auth_routes.py`:
 
 ```python
-import mongomock
-import pytest
 from fastapi.testclient import TestClient
 
-import db
 import main
-
-
-@pytest.fixture(autouse=True)
-def fake_mongo(monkeypatch):
-    client = mongomock.MongoClient()
-    monkeypatch.setattr(db, "_client", client)
-    db.ensure_indexes()
-    yield client
 
 
 @pytest.fixture
@@ -738,6 +913,8 @@ def test_rotate_issues_a_new_token_and_invalidates_the_old_one(client):
     new = client.get("/api/auth/whoami", headers={"Authorization": f"Bearer {new_token}"})
     assert new.status_code == 200
 ```
+
+Add `import pytest` at the top.
 
 **Step 2: Run tests to verify they fail**
 
@@ -790,7 +967,7 @@ git commit -m "feat: add self-serve token registration, whoami, and rotate endpo
 
 ---
 
-### Task 7: Export / import against Mongo
+### Task 7: Export / import against Postgres
 
 **Files:**
 - Modify: `backend/main.py`
@@ -827,7 +1004,7 @@ async def export_data():
     )
 ```
 
-**Step 2: Rewrite `/api/import`** (`main.py:486-544`) to upsert into Mongo. Keep the existing `deep_merge` helper (`main.py:452-478`) unchanged — only where data comes from/goes to changes:
+**Step 2: Rewrite `/api/import`** (`main.py:486-544`) to upsert into Postgres. Keep the existing `deep_merge` helper (`main.py:452-478`) unchanged — only where data comes from/goes to changes:
 
 ```python
 @app.post("/api/import")
@@ -878,26 +1055,30 @@ Expected: `{"status": "success", ...}` listing all 7 file types.
 
 ```bash
 git add backend/main.py
-git commit -m "refactor: export/import against Mongo instead of the filesystem"
+git commit -m "refactor: export/import against Postgres instead of the filesystem"
 ```
 
 ---
 
-### Task 8: Migration script — bring your existing `mygist_data/*.json` into Mongo
+### Task 8: Migration script — bring your existing `mygist_data/*.json` into Neon, backfilling entity IDs
 
 **Files:**
-- Create: `backend/scripts/migrate_json_to_mongo.py`
+- Create: `backend/scripts/migrate_json_to_postgres.py`
+
+This is also where existing domain/hobby/project/connection entries (created before Task 3.5) get their missing `id` fields backfilled — one pass over the data, done once.
 
 **Step 1: Write the script**
 
 ```python
 #!/usr/bin/env python3
 """
-One-off: load existing mygist_data/*.json files into Mongo under a
-newly-registered user account.
+One-off: load existing mygist_data/*.json files into Neon/Postgres under a
+newly-registered user account, backfilling stable entity IDs as it goes.
 
 Usage:
-    python scripts/migrate_json_to_mongo.py --username <you> [--data-dir ../../mygist_data]
+    python scripts/migrate_json_to_postgres.py --username <you> [--data-dir ../../mygist_data]
+
+Requires DATABASE_URL to point at the target (real Neon) database.
 """
 import argparse
 import json
@@ -908,6 +1089,22 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import db
 import persona_store
+from server import generate_entity_id
+
+ENTITY_LISTS_NEEDING_IDS = {
+    "knowledge": [("domains", "domain")],
+    "lifestyle": [("hobbies", "hobby")],
+    "projects": [("projects", "project")],
+    "circle": [("connections", "connection")],
+}
+
+
+def backfill_ids(file_type: str, data: dict) -> dict:
+    for list_key, prefix in ENTITY_LISTS_NEEDING_IDS.get(file_type, []):
+        for item in data.get(list_key, []):
+            if isinstance(item, dict):
+                item.setdefault("id", generate_entity_id(prefix))
+    return data
 
 
 def main():
@@ -916,7 +1113,7 @@ def main():
     parser.add_argument("--data-dir", default=str(Path(__file__).parent.parent.parent / "mygist_data"))
     args = parser.parse_args()
 
-    db.ensure_indexes()
+    db.ensure_schema()
     user_id, token = db.create_user(args.username)
 
     reset_token = db.current_user_id.set(user_id)
@@ -927,6 +1124,7 @@ def main():
         if not path.exists():
             continue
         data = json.loads(path.read_text())
+        data = backfill_ids(file_type, data)
         persona_store.save(file_type, data)
         migrated.append(file_type)
     db.current_user_id.reset(reset_token)
@@ -940,26 +1138,26 @@ if __name__ == "__main__":
     main()
 ```
 
-**Step 2: Run it against your real data**
+**Step 2: Run it against your real data, pointed at Neon**
 
-Run: `cd backend && source venv/bin/activate && MONGODB_URI=mongodb://localhost:27017 python scripts/migrate_json_to_mongo.py --username <your-name>`
+Run: `cd backend && source venv/bin/activate && DATABASE_URL="<your Neon connection string>" python scripts/migrate_json_to_postgres.py --username <your-name>`
 Expected: prints `Migrated: profile, knowledge, preferences, projects, lifestyle, circle, learning_log` and a token.
 
 Save that token — it's what replaces your old `MYGIST_API_TOKEN` in Claude Desktop's config and in the frontend's connection settings.
 
-**Step 3: Verify via the API**
+**Step 3: Verify via the API and confirm entity IDs landed**
 
-Run: `curl -s localhost:8000/api/all -H "Authorization: Bearer <token-from-above>" | jq '.data.profile.name'`
-Expected: your actual name from the old `mygist_data/profile.json`.
+Run: `curl -s localhost:8000/api/all -H "Authorization: Bearer <token-from-above>" | jq '.data.profile.name, .data.knowledge.domains[0].id'`
+Expected: your actual name, and a `domain_<hex8>`-shaped ID on the first skill.
 
 **Step 4: Commit**
 
 ```bash
-git add backend/scripts/migrate_json_to_mongo.py
-git commit -m "feat: add script to migrate existing JSON persona data into Mongo"
+git add backend/scripts/migrate_json_to_postgres.py
+git commit -m "feat: add script to migrate existing JSON persona data into Neon, backfilling entity IDs"
 ```
 
-(Do not commit `mygist_data/` deletion in this task — leave the old files in place as a safety net until you've confirmed the Mongo-backed server works end-to-end.)
+(Do not delete `mygist_data/` in this task — leave the old files in place as a safety net until you've confirmed the Postgres-backed server works end-to-end.)
 
 ---
 
@@ -973,20 +1171,10 @@ This is the test that actually validates "multi-user" — everything above is pl
 **Step 1: Write the test**
 
 ```python
-import mongomock
 import pytest
 from fastapi.testclient import TestClient
 
-import db
 import main
-
-
-@pytest.fixture(autouse=True)
-def fake_mongo(monkeypatch):
-    client = mongomock.MongoClient()
-    monkeypatch.setattr(db, "_client", client)
-    db.ensure_indexes()
-    yield client
 
 
 @pytest.fixture
@@ -1016,13 +1204,12 @@ def test_two_users_have_completely_isolated_persona_data(client):
     assert resp_b.json()["data"]["name"] == "Bob"
 
 
-def test_a_users_token_cannot_read_another_users_data_even_by_guessing_user_id(client):
+def test_a_users_token_cannot_read_another_users_data(client):
     token_a = client.post("/api/auth/register", json={"username": "alice"}).json()["token"]
     client.post("/api/auth/register", json={"username": "bob"}).json()["token"]
 
     # There is no endpoint that takes a user_id from the client at all --
-    # identity comes only from the bearer token. Confirm whoami reflects
-    # the token owner regardless of what's asked for.
+    # identity comes only from the bearer token.
     resp = client.get("/api/auth/whoami", headers={"Authorization": f"Bearer {token_a}"})
     assert resp.json()["username"] == "alice"
 ```
@@ -1035,7 +1222,7 @@ Expected: both PASS.
 **Step 3: Run the full test suite**
 
 Run: `pytest -v`
-Expected: all tests across `test_db.py`, `test_persona_store.py`, `test_auth_routes.py`, `test_multi_user_isolation.py` PASS.
+Expected: all tests across `test_db.py`, `test_persona_store.py`, `test_entity_ids.py`, `test_auth_routes.py`, `test_multi_user_isolation.py` PASS.
 
 **Step 4: Commit**
 
@@ -1131,24 +1318,25 @@ git commit -m "feat: add self-serve account registration and whoami display to f
 
 **Files:**
 - Modify: `README.md`
-- Modify: `backend/.env.example` (already done in Task 0 — just double check it's consistent)
 
 **Step 1: Update `README.md`**
 
-Replace the "Connect to Claude Desktop" section's token guidance and the Quick Start section to reflect: (a) MongoDB is now required (`MONGODB_URI`), (b) tokens come from `POST /api/auth/register {username}` or the frontend's "Create account" flow, not a single `MYGIST_API_TOKEN` env var. Remove references to `PERSONA_DATA_DIR`.
+Replace the "Connect to Claude Desktop" section's token guidance and the Quick Start section to reflect: (a) Neon/Postgres is now required (`DATABASE_URL`), (b) tokens come from `POST /api/auth/register {username}` or the frontend's "Create account" flow, not a single `MYGIST_API_TOKEN` env var. Remove references to `PERSONA_DATA_DIR`.
 
 **Step 2: Commit**
 
 ```bash
-git add README.md backend/.env.example
-git commit -m "docs: update README for multi-user Mongo-backed auth"
+git add README.md
+git commit -m "docs: update README for multi-user Neon/Postgres-backed auth"
 ```
 
 ---
 
 ## What's explicitly out of scope (call these out, don't silently build them)
 
-- **Admin UI/endpoint for listing or deleting users** — not needed at "a handful of users" scale; can be done directly via `mongosh` if ever needed.
+- **Building the actual embedding-search feature** — this plan only enables the extension (`create extension vector;`) and assigns entities stable IDs (Task 3.5). No `embedding` column, no ANN index, no similarity-search endpoint yet. When that feature is actually built: add a sibling table, e.g. `persona_embeddings(id, user_id, file_type, entity_id, embedding vector(1536), updated_at)` with an `hnsw` index on `embedding`, populated by walking `persona_data` blobs and embedding each entity's text by its now-stable `id`. Fully additive — no migration of what this plan builds.
+- **Admin UI/endpoint for listing or deleting users** — not needed at "a handful of users" scale; can be done directly via `psql` if ever needed.
 - **Rate limiting / brute-force protection on `/api/auth/register` or token guessing** — tokens are 256 bits of entropy from `secrets.token_urlsafe(32)`, effectively unguessable; add rate limiting only if this becomes internet-facing at real scale.
 - **Fixing the dead `ConversationContext` global** — confirmed unused (nothing calls `resolve_pronoun_references`), so it isn't a multi-user leak today. Leave it alone.
 - **Token expiry** — tokens are long-lived by design (like API keys); `POST /api/auth/rotate` covers the "I think mine leaked" case.
+- **Neon Local (branch-per-dev-session Docker proxy)** — Neon offers this, but it requires a Neon API key/project ID just to run locally and is really aimed at branch-per-PR CI workflows. For a solo project, a plain local `pgvector/pgvector` container for tests plus a direct `DATABASE_URL` to the real Neon project for interactive dev is simpler. Revisit if this ever grows a CI pipeline.
