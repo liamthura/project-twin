@@ -776,16 +776,18 @@ def get_scoped_context(
     if not include_inactive:
         result = _filter_inactive(result)
     
-    json_str = json.dumps(result, ensure_ascii=False)
-    token_estimate = len(json_str) // 4
-    
-    return {
+    payload = {
         "scope": scope,
         "scope_description": scope_config["description"],
         "topic_filter": topic,
-        "token_estimate": token_estimate,
+        "token_estimate": 0,
         "context": result
     }
+    # Estimate against the full wrapper (the actual payload the caller receives),
+    # not just the inner context. The few chars the final estimate value itself
+    # adds are absorbed by the //4 heuristic.
+    payload["token_estimate"] = len(json.dumps(payload, ensure_ascii=False)) // 4
+    return payload
 
 def _filter_learning_log_by_time(data: dict, days: int = None, limit: int = None) -> dict:
     """Filter learning_log entries by time and/or count."""
@@ -2731,7 +2733,9 @@ def get_context(
         Filtered persona data based on scope + user preferences (tone, detail_level, dislikes)
     """
     result = get_scoped_context(scope, topic, include_inactive, days, limit)
-    return json.dumps(result, indent=2)
+    # Compact serialization keeps the returned string consistent with the
+    # token_estimate computed in get_scoped_context, and shrinks the payload.
+    return json.dumps(result, ensure_ascii=False)
 
 
 @mcp.tool()
