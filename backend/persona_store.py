@@ -5,12 +5,14 @@ server.py; keeps the same "load whole blob / save whole blob" shape those
 callers already expect.
 """
 
+import copy
 import json
 import uuid
 
 import db
+import sections
 
-VALID_FILES = ["profile", "knowledge", "preferences", "projects", "lifestyle", "circle", "learning_log"]
+VALID_FILES = list(sections.SECTION_REGISTRY)
 
 FILE_MAP = {name: f"{name}.json" for name in VALID_FILES}
 
@@ -51,10 +53,14 @@ def generate_entity_id(prefix: str) -> str:
 
 def _assign_ids(file_type: str, data: dict) -> dict:
     """Give every object in a designated list a stable `id` if it lacks one.
-    Uses setdefault, so existing IDs are never rewritten."""
+    Uses setdefault, so existing IDs are never rewritten. The id-carrying lists
+    come from the section registry."""
     if not isinstance(data, dict):
         return data
-    for list_key, prefix in ID_LISTS.get(file_type, []):
+    spec = sections.SECTION_REGISTRY.get(file_type)
+    if spec is None:
+        return data
+    for list_key, prefix in spec.id_lists:
         items = data.get(list_key)
         if isinstance(items, list):
             for item in items:
@@ -292,7 +298,8 @@ def load(file_type: str) -> dict:
             (user_id, file_type),
         ).fetchone()
     if row is None:
-        return DEFAULTS.get(file_type, {})
+        spec = sections.SECTION_REGISTRY.get(file_type)
+        return copy.deepcopy(spec.default) if spec else {}
     return _normalize(file_type, row["data"])
 
 
@@ -320,4 +327,4 @@ def get_all() -> dict:
 
 def reset(file_type: str) -> bool:
     """Reset one file to its default."""
-    return save(file_type, DEFAULTS[file_type])
+    return save(file_type, copy.deepcopy(sections.SECTION_REGISTRY[file_type].default))
