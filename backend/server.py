@@ -38,6 +38,9 @@ from fastmcp import FastMCP
 # from starlette.routing import Route
 from dotenv import load_dotenv
 
+import persona_store
+from persona_store import FILE_MAP, DEFAULTS, get_all as get_all_persona_data
+
 # Load environment variables
 load_dotenv()
 
@@ -49,36 +52,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Data directory path - resolve env var relative to repo root for robustness
-def resolve_data_dir() -> Path:
-    base_dir = Path(__file__).parent
-    env_dir = os.getenv("PERSONA_DATA_DIR")
-    if env_dir:
-        candidate = Path(env_dir).expanduser()
-        if not candidate.is_absolute():
-            candidate = (base_dir / candidate).resolve()
-    else:
-        candidate = base_dir.parent / "mygist_data"
-    return candidate
-
-
-DATA_DIR = resolve_data_dir()
-try:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-except OSError as exc:
-    logger.warning(f"Could not create data directory {DATA_DIR}: {exc}")
-logger.info(f"Data directory: {DATA_DIR}")
-
-# File mapping for different data types
-FILE_MAP = {
-    "profile": "profile.json",
-    "lifestyle": "lifestyle.json",
-    "knowledge": "knowledge.json",
-    "preferences": "preferences.json",
-    "projects": "projects.json",
-    "circle": "circle.json",
-    "learning_log": "learning_log.json"
-}
+# Persona data is now stored in Postgres, scoped to the current request's user.
+# FILE_MAP / DEFAULTS / get_all_persona_data come from persona_store (imported
+# above); load_json / save_json below are thin delegators onto it.
 
 
 # =============================================================================
@@ -621,27 +597,15 @@ def consolidate_suggestions_for_ux(suggestions: list) -> dict:
 # =============================================================================
 
 def load_json(filename: str) -> dict:
-    """Load JSON data from file"""
-    path = DATA_DIR / filename
-    if not path.exists():
-        return {"error": f"{filename} not found"}
-    with open(path, "r") as f:
-        return json.load(f)
+    """Load JSON data for the current user. `filename` is the historical
+    "<type>.json" form used throughout this file; persona_store works in
+    bare type names."""
+    file_type = filename[:-5] if filename.endswith(".json") else filename
+    return persona_store.load(file_type)
 
 def save_json(filename: str, data: dict) -> bool:
-    """Save JSON data to file"""
-    path = DATA_DIR / filename
-    try:
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2)
-        return True
-    except Exception as e:
-        logger.error(f"Error saving {filename}: {str(e)}")
-        return False
-
-def get_all_persona_data() -> dict:
-    """Get all persona data"""
-    return {key: load_json(filename) for key, filename in FILE_MAP.items()}
+    file_type = filename[:-5] if filename.endswith(".json") else filename
+    return persona_store.save(file_type, data)
 
 def get_nested_value(data: dict, path: str):
     """Get a value from nested dict using dot notation path"""
