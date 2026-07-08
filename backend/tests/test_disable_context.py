@@ -36,3 +36,10 @@ def test_always_on_section_never_omitted_even_if_in_disabled_blob(as_user):
     ss.set_disabled_sections(["profile"])  # bypasses API validation on purpose
     ctx = json.loads(server.get_context.fn(scope="full"))["context"]
     assert "profile" in ctx
+
+
+def test_list_scope_naming_disabled_section_errors(as_user):
+    ss.set_disabled_sections(["circle"])
+    out = json.loads(server.get_context.fn(scope=["lifestyle", "circle"]))
+    assert "error" in out
+    assert "circle" in out["error"]
