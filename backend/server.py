@@ -2491,10 +2491,20 @@ def get_entity_schema(entity: str = None, file: str = None) -> dict:
     - file="X": lean digest scoped to one file (usage block + its entities).
     - no args: lean digest of all files (usage block + per-file entity lines).
     """
+    try:
+        enabled = settings_store.enabled_sections()
+    except LookupError:
+        # No per-request user bound (e.g. an internal/test call made outside
+        # the auth middleware) -- fail open to every section rather than
+        # crash, since there is no user whose disabled set could apply.
+        enabled = set(ENTITY_SCHEMA.keys())
+
     if entity:
         entity_lower = entity.lower()
         for file_name, entities in ENTITY_SCHEMA.items():
             if entity_lower in entities:
+                if file_name not in enabled:
+                    return {"error": f"Section '{file_name}' is disabled; enable it in settings."}
                 spec = entities[entity_lower]
                 detail = {"entity": entity_lower, "file": file_name,
                           "identifier": spec.get("identifier")}
@@ -2515,12 +2525,14 @@ def get_entity_schema(entity: str = None, file: str = None) -> dict:
 
     if file:
         file_lower = file.lower()
+        if file_lower in ENTITY_SCHEMA and file_lower not in enabled:
+            return {"error": f"Section '{file_lower}' is disabled."}
         if file_lower in ENTITY_SCHEMA:
             return _digest([file_lower])
         return {"error": f"Unknown file: {file}. Valid files: {', '.join(ENTITY_SCHEMA.keys())}",
                 "valid_files": list(ENTITY_SCHEMA.keys())}
 
-    return _digest(list(ENTITY_SCHEMA.keys()))
+    return _digest([f for f in ENTITY_SCHEMA if f in enabled])
 
 
 # =============================================================================
@@ -2992,10 +3004,14 @@ def get_raw(
     RETURNS: 
         Raw JSON for the specified file(s)
     """
+    enabled = settings_store.enabled_sections()
     if file == "all":
-        return json.dumps(get_all_persona_data(), indent=2)
-    elif file in FILE_MAP:
+        data = get_all_persona_data()
+        return json.dumps({k: v for k, v in data.items() if k in enabled}, indent=2)
+    elif file in FILE_MAP and file in enabled:
         return json.dumps(load_json(FILE_MAP[file]), indent=2)
+    elif file in FILE_MAP:  # exists but disabled
+        return f"❌ Section '{file}' is disabled. Enable it in settings."
     else:
         return f"❌ Unknown file: {file}. Valid: all, {', '.join(persona_store.VALID_FILES)}"
 
