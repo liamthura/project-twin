@@ -2954,7 +2954,7 @@ def get_context(
 
 @mcp.tool()
 def get_raw(
-    file: Literal["all", "profile", "lifestyle", "knowledge", "preferences", "projects", "circle", "learning_log"] = "all"
+    file: str = "all"
 ) -> str:
     """
     Retrieve raw JSON file data. Use for editing or deep inspection.
@@ -2984,7 +2984,7 @@ def get_raw(
     elif file in FILE_MAP:
         return json.dumps(load_json(FILE_MAP[file]), indent=2)
     else:
-        return f"❌ Unknown file: {file}"
+        return f"❌ Unknown file: {file}. Valid: all, {', '.join(persona_store.VALID_FILES)}"
 
 
 @mcp.tool()
