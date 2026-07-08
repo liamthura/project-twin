@@ -29,3 +29,23 @@ def test_settings_blob_is_invisible_to_persona_get_all(as_user):
     ss.set_disabled_sections(["circle"])
     # get_all iterates the registry (VALID_FILES); _settings must not appear.
     assert ss.SETTINGS_KEY not in store.get_all()
+
+
+def test_enabled_sections_all_by_default(as_user):
+    import sections
+    assert ss.enabled_sections() == set(sections.SECTION_REGISTRY)
+
+
+def test_enabled_sections_drops_disabled(as_user):
+    ss.set_disabled_sections(["circle"])
+    assert "circle" not in ss.enabled_sections()
+    assert "knowledge" in ss.enabled_sections()
+
+
+def test_enabled_sections_force_includes_always_on(as_user):
+    import sections
+    # a hand-crafted blob disabling a core section must have no effect
+    ss.set_disabled_sections(["profile", "circle"])
+    enabled = ss.enabled_sections()
+    assert sections.ALWAYS_ON_SECTIONS <= enabled
+    assert "circle" not in enabled

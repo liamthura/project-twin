@@ -8,6 +8,7 @@ db.current_user_id.
 import json
 
 import db
+import sections
 
 SETTINGS_KEY = "_settings"
 
@@ -36,11 +37,19 @@ def set_settings(blob: dict) -> None:
         )
 
 
-def get_disabled_sections() -> set:
+def get_disabled_sections() -> set[str]:
     return set(get_settings().get("disabled_sections", []))
 
 
-def set_disabled_sections(keys) -> None:
+def set_disabled_sections(keys: list[str]) -> None:
     blob = get_settings()
     blob["disabled_sections"] = list(keys)
     set_settings(blob)
+
+
+def enabled_sections() -> set:
+    """Registry sections visible to the current user: all minus their disabled
+    set, with always-on sections force-included (a stale/hand-edited blob can
+    never hide a core section)."""
+    disabled = get_disabled_sections() - sections.ALWAYS_ON_SECTIONS
+    return set(sections.SECTION_REGISTRY) - disabled

@@ -35,6 +35,16 @@ def all_scope_names() -> list[str]:
     return list(SCOPES.keys()) + list(SECTION_REGISTRY.keys())
 
 
+# Sections that can never be disabled by a user (always loaded / always visible).
+# Distinct from ALWAYS_ON (the always-included preferences *field* bundle above).
+ALWAYS_ON_SECTIONS = frozenset({"profile", "preferences", "learning_log"})
+
+
+def toggleable_sections() -> set:
+    """Registry sections a user may enable/disable (everything not always-on)."""
+    return set(SECTION_REGISTRY) - ALWAYS_ON_SECTIONS
+
+
 SECTION_REGISTRY = {
     "profile": SectionSpec(
         key="profile",
