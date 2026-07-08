@@ -31,6 +31,7 @@ load_dotenv()
 import db
 import persona_store
 import sections
+import settings_store
 from persona_store import VALID_FILES
 
 # Aliases keep every existing route body -- read_json_file(file_type) /
@@ -168,6 +169,33 @@ async def update_file(file_type: str, update: FileUpdate):
     """Update a specific persona file."""
     write_json_file(file_type, update.data)
     return {"status": "saved", "file_type": file_type}
+
+
+class SettingsUpdate(BaseModel):
+    disabled_sections: list[str]
+
+
+@app.get("/api/settings")
+async def get_settings():
+    return {
+        "disabled_sections": sorted(settings_store.get_disabled_sections()),
+        "toggleable": sorted(sections.toggleable_sections()),
+        "always_on": sorted(sections.ALWAYS_ON_SECTIONS),
+    }
+
+
+@app.put("/api/settings")
+async def update_settings(update: SettingsUpdate):
+    requested = set(update.disabled_sections)
+    invalid = requested - sections.toggleable_sections()
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot disable: {sorted(invalid)}. "
+                   f"Toggleable: {sorted(sections.toggleable_sections())}",
+        )
+    settings_store.set_disabled_sections(sorted(requested))
+    return {"status": "saved", "disabled_sections": sorted(requested)}
 
 
 @app.get("/api/all")
