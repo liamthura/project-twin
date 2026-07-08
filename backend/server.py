@@ -2491,13 +2491,7 @@ def get_entity_schema(entity: str = None, file: str = None) -> dict:
     - file="X": lean digest scoped to one file (usage block + its entities).
     - no args: lean digest of all files (usage block + per-file entity lines).
     """
-    try:
-        enabled = settings_store.enabled_sections()
-    except LookupError:
-        # No per-request user bound (e.g. an internal/test call made outside
-        # the auth middleware) -- fail open to every section rather than
-        # crash, since there is no user whose disabled set could apply.
-        enabled = set(ENTITY_SCHEMA.keys())
+    enabled = settings_store.enabled_sections()
 
     if entity:
         entity_lower = entity.lower()

@@ -1,9 +1,18 @@
 """Tests for the smarter get_schema MCP tool: lean digest + drill-down."""
 import json
 
+import pytest
+
 import server
 
 get_schema = server.get_schema.fn
+
+
+@pytest.fixture(autouse=True)
+def _bind_user(as_user):
+    # get_schema now consults settings_store.enabled_sections(), which needs
+    # a per-request user; bind one for every test in this file.
+    pass
 
 
 def _call(**kwargs):
