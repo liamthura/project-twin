@@ -5831,7 +5831,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container max-w-4xl py-8 px-4">
+      <div className="container max-w-5xl py-8 px-4">
         {/* Header */}
         <header className="mb-8">
           <div className="flex items-start justify-between flex-wrap gap-4">
@@ -5867,45 +5867,51 @@ export default function App() {
         </header>
 
         {/* Tabs */}
-        <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="w-full justify-start">
-            <TabsTrigger value="profile" className="gap-2">
+        <Tabs
+          defaultValue="profile"
+          orientation="vertical"
+          className="flex flex-col gap-6 md:flex-row"
+        >
+          <TabsList className="w-full flex-wrap md:sticky md:top-8 md:h-fit md:w-48 md:flex-col md:flex-nowrap md:items-stretch md:justify-start md:self-start">
+            <TabsTrigger value="profile" className="gap-2 md:w-full md:justify-start">
               <User className="h-4 w-4" />
-              <span className="hidden sm:inline">Profile</span>
+              <span className="hidden md:inline">Profile</span>
             </TabsTrigger>
             {!disabledSections.includes("knowledge") && (
-              <TabsTrigger value="knowledge" className="gap-2">
+              <TabsTrigger value="knowledge" className="gap-2 md:w-full md:justify-start">
                 <Brain className="h-4 w-4" />
-                <span className="hidden sm:inline">Knowledge</span>
+                <span className="hidden md:inline">Knowledge</span>
               </TabsTrigger>
             )}
             {!disabledSections.includes("projects") && (
-              <TabsTrigger value="projects" className="gap-2">
+              <TabsTrigger value="projects" className="gap-2 md:w-full md:justify-start">
                 <FolderKanban className="h-4 w-4" />
-                <span className="hidden sm:inline">Projects</span>
+                <span className="hidden md:inline">Projects</span>
               </TabsTrigger>
             )}
             {!disabledSections.includes("lifestyle") && (
-              <TabsTrigger value="lifestyle" className="gap-2">
+              <TabsTrigger value="lifestyle" className="gap-2 md:w-full md:justify-start">
                 <Heart className="h-4 w-4" />
-                <span className="hidden sm:inline">Lifestyle</span>
+                <span className="hidden md:inline">Lifestyle</span>
               </TabsTrigger>
             )}
             {!disabledSections.includes("circle") && (
-              <TabsTrigger value="circle" className="gap-2">
+              <TabsTrigger value="circle" className="gap-2 md:w-full md:justify-start">
                 <Users className="h-4 w-4" />
-                <span className="hidden sm:inline">Circle</span>
+                <span className="hidden md:inline">Circle</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="preferences" className="gap-2">
+            <TabsTrigger value="preferences" className="gap-2 md:w-full md:justify-start">
               <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Preferences</span>
+              <span className="hidden md:inline">Preferences</span>
             </TabsTrigger>
-            <TabsTrigger value="sections" className="gap-2">
+            <TabsTrigger value="sections" className="gap-2 md:w-full md:justify-start">
               <SlidersHorizontal className="h-4 w-4" />
-              <span className="hidden sm:inline">Sections</span>
+              <span className="hidden md:inline">Sections</span>
             </TabsTrigger>
           </TabsList>
+
+          <div className="min-w-0 flex-1">
 
           <TabsContent value="profile">
             <ProfileEditor
@@ -5996,6 +6002,7 @@ export default function App() {
               </CardContent>
             </Card>
           </TabsContent>
+          </div>
         </Tabs>
 
         {/* Actions Bar */}
