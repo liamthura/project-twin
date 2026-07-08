@@ -40,6 +40,7 @@ from dotenv import load_dotenv
 
 import persona_store
 import sections
+import settings_store
 from persona_store import FILE_MAP, generate_entity_id, get_all as get_all_persona_data
 
 # Load environment variables
@@ -751,7 +752,19 @@ def get_scoped_context(
     except ValueError as e:
         return {"error": f"Unknown scope '{e.args[0]}'. Valid: {sections.all_scope_names()}"}
 
-    needed = _files_for_scope(fields)
+    enabled = settings_store.enabled_sections()
+    # A section scope that names a disabled section is an explicit error.
+    for tok in ([scope] if isinstance(scope, str) else scope):
+        if tok in sections.SECTION_REGISTRY and tok not in enabled:
+            return {"error": f"Section '{tok}' is disabled. Enable it in settings."}
+
+    if fields == "all":
+        needed = [ft for ft in persona_store.VALID_FILES if ft in enabled]
+    else:
+        # Global/list scopes silently omit disabled sections.
+        fields = {fk: fl for fk, fl in fields.items() if fk in enabled}
+        needed = _files_for_scope(fields)
+
     all_data = {ft: load_json(FILE_MAP[ft]) for ft in needed}
     result = {}
 
