@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Info,
   Users,
+  SlidersHorizontal,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -5594,6 +5595,13 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
   );
 }
 
+const SECTION_LABELS = {
+  knowledge: "Knowledge",
+  projects: "Projects",
+  lifestyle: "Lifestyle",
+  circle: "Circle",
+};
+
 // Main App
 export default function App() {
   const [isConnected, setIsConnected] = useState(false);
@@ -5611,6 +5619,9 @@ export default function App() {
   const [projects, setProjects] = useState({});
   const [lifestyle, setLifestyle] = useState({});
   const [circle, setCircle] = useState({});
+
+  const [disabledSections, setDisabledSections] = useState([]);
+  const [toggleable, setToggleable] = useState([]);
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -5642,6 +5653,7 @@ export default function App() {
 
   useEffect(() => {
     loadAllData();
+    loadSettings();
   }, []);
 
   const loadAllData = async () => {
@@ -5661,6 +5673,16 @@ export default function App() {
       setIsConnected(false);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      const s = await api("/settings");
+      setDisabledSections(s.disabled_sections || []);
+      setToggleable(s.toggleable || []);
+    } catch (_) {
+      // non-fatal: default to all sections enabled
     }
   };
 
@@ -5735,6 +5757,27 @@ export default function App() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const toggleSection = async (key) => {
+    const previous = disabledSections;
+    const next = disabledSections.includes(key)
+      ? disabledSections.filter((k) => k !== key)
+      : [...disabledSections, key];
+    setDisabledSections(next); // optimistic
+    try {
+      await api("/settings", {
+        method: "PUT",
+        body: JSON.stringify({ disabled_sections: next }),
+      });
+    } catch (err) {
+      setDisabledSections(previous); // rollback
+      toast({
+        title: "Failed to update section settings",
+        description: err.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -5830,25 +5873,37 @@ export default function App() {
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">Profile</span>
             </TabsTrigger>
-            <TabsTrigger value="knowledge" className="gap-2">
-              <Brain className="h-4 w-4" />
-              <span className="hidden sm:inline">Knowledge</span>
-            </TabsTrigger>
-            <TabsTrigger value="projects" className="gap-2">
-              <FolderKanban className="h-4 w-4" />
-              <span className="hidden sm:inline">Projects</span>
-            </TabsTrigger>
-            <TabsTrigger value="lifestyle" className="gap-2">
-              <Heart className="h-4 w-4" />
-              <span className="hidden sm:inline">Lifestyle</span>
-            </TabsTrigger>
-            <TabsTrigger value="circle" className="gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Circle</span>
-            </TabsTrigger>
+            {!disabledSections.includes("knowledge") && (
+              <TabsTrigger value="knowledge" className="gap-2">
+                <Brain className="h-4 w-4" />
+                <span className="hidden sm:inline">Knowledge</span>
+              </TabsTrigger>
+            )}
+            {!disabledSections.includes("projects") && (
+              <TabsTrigger value="projects" className="gap-2">
+                <FolderKanban className="h-4 w-4" />
+                <span className="hidden sm:inline">Projects</span>
+              </TabsTrigger>
+            )}
+            {!disabledSections.includes("lifestyle") && (
+              <TabsTrigger value="lifestyle" className="gap-2">
+                <Heart className="h-4 w-4" />
+                <span className="hidden sm:inline">Lifestyle</span>
+              </TabsTrigger>
+            )}
+            {!disabledSections.includes("circle") && (
+              <TabsTrigger value="circle" className="gap-2">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Circle</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="preferences" className="gap-2">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Preferences</span>
+            </TabsTrigger>
+            <TabsTrigger value="sections" className="gap-2">
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Sections</span>
             </TabsTrigger>
           </TabsList>
 
@@ -5859,39 +5914,87 @@ export default function App() {
               onShowConfirmation={showConfirmation}
             />
           </TabsContent>
-          <TabsContent value="knowledge">
-            <KnowledgeEditor
-              data={knowledge}
-              onChange={handleKnowledgeChange}
-              onShowConfirmation={showConfirmation}
-            />
-          </TabsContent>
-          <TabsContent value="projects">
-            <ProjectsEditor
-              data={projects}
-              onChange={handleProjectsChange}
-              onShowConfirmation={showConfirmation}
-            />
-          </TabsContent>
-          <TabsContent value="lifestyle">
-            <LifestyleEditor
-              data={lifestyle}
-              onChange={handleLifestyleChange}
-              onShowConfirmation={showConfirmation}
-            />
-          </TabsContent>
-          <TabsContent value="circle">
-            <CircleEditor
-              data={circle}
-              onChange={handleCircleChange}
-              onShowConfirmation={showConfirmation}
-            />
-          </TabsContent>
+          {!disabledSections.includes("knowledge") && (
+            <TabsContent value="knowledge">
+              <KnowledgeEditor
+                data={knowledge}
+                onChange={handleKnowledgeChange}
+                onShowConfirmation={showConfirmation}
+              />
+            </TabsContent>
+          )}
+          {!disabledSections.includes("projects") && (
+            <TabsContent value="projects">
+              <ProjectsEditor
+                data={projects}
+                onChange={handleProjectsChange}
+                onShowConfirmation={showConfirmation}
+              />
+            </TabsContent>
+          )}
+          {!disabledSections.includes("lifestyle") && (
+            <TabsContent value="lifestyle">
+              <LifestyleEditor
+                data={lifestyle}
+                onChange={handleLifestyleChange}
+                onShowConfirmation={showConfirmation}
+              />
+            </TabsContent>
+          )}
+          {!disabledSections.includes("circle") && (
+            <TabsContent value="circle">
+              <CircleEditor
+                data={circle}
+                onChange={handleCircleChange}
+                onShowConfirmation={showConfirmation}
+              />
+            </TabsContent>
+          )}
           <TabsContent value="preferences">
             <PreferencesEditor
               data={preferences}
               onChange={handlePreferencesChange}
             />
+          </TabsContent>
+          <TabsContent value="sections">
+            <Card>
+              <CardHeader>
+                <CardTitle>Manage Sections</CardTitle>
+                <CardDescription>
+                  Turn optional sections on or off. Disabled sections are
+                  hidden from the tab bar, but their data is preserved and
+                  restored when re-enabled.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {toggleable.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No toggleable sections available.
+                  </p>
+                )}
+                {toggleable.map((key) => {
+                  const enabled = !disabledSections.includes(key);
+                  return (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between rounded-md border p-3"
+                    >
+                      <span className="font-medium">
+                        {SECTION_LABELS[key] || key}
+                      </span>
+                      <Button
+                        type="button"
+                        variant={enabled ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => toggleSection(key)}
+                      >
+                        {enabled ? "Enabled" : "Disabled"}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
