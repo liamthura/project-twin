@@ -167,6 +167,8 @@ async def get_file(file_type: str):
 @app.put("/api/files/{file_type}")
 async def update_file(file_type: str, update: FileUpdate):
     """Update a specific persona file."""
+    if file_type not in VALID_FILES:
+        raise HTTPException(status_code=400, detail=f"Unknown file type: {file_type}")
     write_json_file(file_type, update.data)
     return {"status": "saved", "file_type": file_type}
 
