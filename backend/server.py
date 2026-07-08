@@ -1125,6 +1125,10 @@ def normalize_data(data: dict, entity: str) -> dict:
 
 def execute_modify(action: str, entity: str, data: dict) -> str:
     """Execute a single modify operation. Returns result message."""
+    section = _section_for_entity(entity)
+    if section is not None and section not in settings_store.enabled_sections():
+        return f"❌ Section '{section}' is disabled; enable it in settings to modify it."
+
     entity = entity.lower()
     data = normalize_data(data, entity)
     
@@ -2374,6 +2378,16 @@ ENTITY_SCHEMA = {
                           "identifier": "topic"}
     }
 }
+
+
+def _section_for_entity(entity: str):
+    """The registry section (file_type) an entity writes to, or None if unknown."""
+    entity = entity.lower()
+    for file_name, entities in ENTITY_SCHEMA.items():
+        if entity in entities:
+            return file_name
+    return None
+
 
 # Usage instructions embedded in every get_schema digest so the LLM sees them up front.
 _SCHEMA_USAGE = {
