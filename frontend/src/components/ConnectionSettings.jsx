@@ -37,8 +37,12 @@ import {
   importData,
 } from "@/lib/api.js";
 
+const CLOUD_API_URL = "https://mygist-api.thuradev.qzz.io/api";
+
 export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
-  const [serverUrl, setServerUrl] = useState("");
+  const [connectionType, setConnectionType] = useState("cloud"); // "cloud" | "self-hosted"
+  const [serverUrl, setServerUrl] = useState(CLOUD_API_URL);
+  const [selfHostedUrl, setSelfHostedUrl] = useState("");
   const [token, setToken] = useState("");
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
@@ -54,7 +58,16 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
   useEffect(() => {
     if (isOpen) {
       const config = getConfig();
-      setServerUrl(config?.serverUrl || "");
+      const savedUrl = config?.serverUrl || "";
+      if (!config || savedUrl === CLOUD_API_URL) {
+        setConnectionType("cloud");
+        setServerUrl(CLOUD_API_URL);
+        setSelfHostedUrl("");
+      } else {
+        setConnectionType("self-hosted");
+        setServerUrl(savedUrl);
+        setSelfHostedUrl(savedUrl);
+      }
       setToken(config?.token || "");
       setTestResult(null);
       setBackupResult(null);
@@ -63,6 +76,21 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
       setConnectedAs(null);
     }
   }, [isOpen]);
+
+  const selectCloud = () => {
+    setConnectionType("cloud");
+    setServerUrl(CLOUD_API_URL);
+  };
+
+  const selectSelfHosted = () => {
+    setConnectionType("self-hosted");
+    setServerUrl(selfHostedUrl);
+  };
+
+  const handleSelfHostedUrlChange = (value) => {
+    setServerUrl(value);
+    setSelfHostedUrl(value);
+  };
 
   const handleTest = async () => {
     if (!serverUrl) {
@@ -135,7 +163,9 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
 
   const handleReset = () => {
     clearConfig();
-    setServerUrl("");
+    setConnectionType("cloud");
+    setServerUrl(CLOUD_API_URL);
+    setSelfHostedUrl("");
     setToken("");
     setTestResult(null);
     onConnectionChange?.();
@@ -188,26 +218,57 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
             Server Connection
           </DialogTitle>
           <DialogDescription>
-            Connect to your MyGist MCP server. Leave empty to use local
-            development server.
+            Connect to your MyGist MCP server. Use Cloud for the hosted
+            instance, or Self-hosted to point at your own server API.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Server URL */}
+          {/* Connection type */}
           <div className="space-y-2">
-            <Label htmlFor="serverUrl">Server URL</Label>
-            <Input
-              id="serverUrl"
-              placeholder="https://mygist.thuradev.qzz.io/api"
-              value={serverUrl}
-              onChange={(e) => setServerUrl(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Full URL to your MyGist API endpoint (e.g.,
-              https://mygist.example.com/api)
-            </p>
+            <Label>Connection Type</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={connectionType === "cloud" ? "default" : "outline"}
+                size="sm"
+                onClick={selectCloud}
+                className="flex-1"
+              >
+                <Globe className="h-4 w-4 mr-2" />
+                Cloud
+              </Button>
+              <Button
+                type="button"
+                variant={
+                  connectionType === "self-hosted" ? "default" : "outline"
+                }
+                size="sm"
+                onClick={selectSelfHosted}
+                className="flex-1"
+              >
+                <Server className="h-4 w-4 mr-2" />
+                Self-hosted
+              </Button>
+            </div>
           </div>
+
+          {/* Server URL (self-hosted only) */}
+          {connectionType === "self-hosted" && (
+            <div className="space-y-2">
+              <Label htmlFor="serverUrl">Server URL</Label>
+              <Input
+                id="serverUrl"
+                placeholder="https://your-mygist-server.com/api"
+                value={serverUrl}
+                onChange={(e) => handleSelfHostedUrlChange(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Full URL to your MyGist API endpoint. Leave empty to use the
+                local development server.
+              </p>
+            </div>
+          )}
 
           {/* API Token */}
           <div className="space-y-2">
