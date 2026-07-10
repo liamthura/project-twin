@@ -79,14 +79,15 @@ def test_identifier_correctness_spread():
     assert _call(entity="connection")["identifier"] == "name"
 
 
-def test_learning_entry_does_not_advertise_update():
-    # execute_modify's update path requires an id + followup_items (not topic),
-    # which conflicts with ids_automatic guidance — so update is not advertised.
+def test_learning_entry_advertises_full_crud():
     result = _call(entity="learning_entry")
-    assert result["actions"] == ["add", "remove"]
-    assert "add" in result["examples"]
-    assert "remove" in result["examples"]
-    assert "update" not in result["examples"]
+    assert result["actions"] == ["add", "update", "remove"]
+    assert result["identifier"] == "topic"
+    assert {"new_topic", "related_entries"} <= set(result["optional"])
+    assert set(result["examples"].keys()) == {"add", "update", "remove"}
+    # update example identifies by topic, not id
+    assert "topic" in result["examples"]["update"]["data"]
+    assert "id" not in result["examples"]["update"]["data"]
 
 
 def test_null_identifier_update_only_entity():

@@ -1122,6 +1122,31 @@ def normalize_data(data: dict, entity: str) -> dict:
     return normalized
 
 
+# Allowed related_entries link types -> (file, list_key) they must resolve into.
+_RELATED_ENTRY_TYPES = {
+    "domain": ("knowledge.json", "domains"),
+    "project": ("projects.json", "projects"),
+    "hobby": ("lifestyle.json", "hobbies"),
+}
+
+def _validate_related_entries(links):
+    """Return an error string if any link is malformed or dangling, else None."""
+    if not isinstance(links, list):
+        return "❌ related_entries must be a list of {type, id} objects"
+    for link in links:
+        if not isinstance(link, dict) or not link.get("type") or not link.get("id"):
+            return f"❌ Malformed related entry (need type and id): {link}"
+        spec = _RELATED_ENTRY_TYPES.get(link["type"])
+        if spec is None:
+            valid = ", ".join(sorted(_RELATED_ENTRY_TYPES))
+            return f"❌ Unknown related entry type '{link['type']}' (valid: {valid})"
+        file_name, list_key = spec
+        items = load_json(file_name).get(list_key, [])
+        if not any(isinstance(i, dict) and i.get("id") == link["id"] for i in items):
+            return f"❌ Related {link['type']} not found: {link['id']}"
+    return None
+
+
 # =============================================================================
 # EXECUTE MODIFY - Core entity modification logic
 # =============================================================================
@@ -1747,6 +1772,10 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         if action == "add":
             if not data.get("topic") or not data.get("details"):
                 return "❌ Learning entry requires 'topic' and 'details'"
+            if data.get("related_entries"):
+                err = _validate_related_entries(data["related_entries"])
+                if err:
+                    return err
             entry_id = f"learn_{datetime.now().strftime('%Y%m%d')}_{uuid.uuid4().hex[:6]}"
             entry = {
                 "id": entry_id, "topic": data["topic"], "details": data["details"],
@@ -1765,15 +1794,36 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             save_json("learning_log.json", log)
             return f"✅ Logged learning: {data['topic']} (id: {entry_id})"
         elif action == "update":
-            entry_id = data.get("id")
-            if entry_id and data.get("followup_items"):
-                for entry in entries:
-                    if entry.get("id") == entry_id:
-                        entry["followup_items"] = data["followup_items"]
-                        save_json("learning_log.json", log)
-                        return f"✅ Updated followup items for: {entry.get('topic', entry_id)}"
-                return f"❌ Entry not found: {entry_id}"
-            return "❌ Learning log update requires entry 'id' and 'followup_items'"
+            entry_id = data.get("id", "")
+            topic = data.get("topic", "")
+            if not entry_id and not topic:
+                return "❌ Learning log update requires 'id' or 'topic'"
+            target = None
+            for entry in reversed(entries):
+                if (entry_id and entry.get("id") == entry_id) or \
+                   (not entry_id and topic and entry.get("topic", "").lower() == topic.lower()):
+                    target = entry
+                    break
+            if target is None:
+                return f"❌ Learning entry not found: {entry_id or topic}"
+            if data.get("related_entries"):
+                err = _validate_related_entries(data["related_entries"])
+                if err:
+                    return err
+            updated = []
+            for field in ("details", "source", "tags", "key_decisions",
+                          "followup_items", "conversation_metadata", "related_entries"):
+                if data.get(field):
+                    target[field] = data[field]
+                    updated.append(field)
+            if data.get("new_topic"):
+                target["topic"] = data["new_topic"]
+                updated.append("topic")
+            if not updated:
+                return ("❌ Learning log update requires at least one of: details, source, tags, "
+                        "key_decisions, followup_items, conversation_metadata, related_entries, new_topic")
+            save_json("learning_log.json", log)
+            return f"✅ Updated learning entry: {target.get('topic', entry_id)} ({', '.join(updated)})"
         elif action == "remove":
             topic = data.get("topic", "")
             entry_id = data.get("id", "")
@@ -2392,13 +2442,9 @@ ENTITY_SCHEMA = {
                          "optional": ["tone", "detail_level"], "identifier": "mood"}
     },
     "learning_log": {
-        # `update` is intentionally NOT advertised: execute_modify's update path
-        # requires an entry `id` + `followup_items` (not `topic`), which conflicts
-        # with the ids_automatic guidance. That id-based partial update is deferred
-        # to the dedicated learning-log editing work (Phase 3). add/remove are
-        # accurate here (remove matches by `topic`).
-        "learning_entry": {"actions": ["add", "remove"], "required": ["topic", "details"],
-                          "optional": ["source", "tags", "conversation_metadata", "key_decisions", "followup_items"],
+        "learning_entry": {"actions": ["add", "update", "remove"], "required": ["topic", "details"],
+                          "optional": ["source", "tags", "conversation_metadata", "key_decisions",
+                                       "followup_items", "new_topic", "related_entries"],
                           "identifier": "topic"}
     }
 }

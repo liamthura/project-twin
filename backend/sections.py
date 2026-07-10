@@ -129,7 +129,7 @@ SECTION_REGISTRY = {
     "learning_log": SectionSpec(
         key="learning_log",
         default={"entries": []},  # persona_store.py:132-134
-        id_lists=(),
+        id_lists=(("entries", "learn"),),
         context_fields={"learning": ["entries"]},
     ),
 }
