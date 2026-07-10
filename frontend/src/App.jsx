@@ -222,7 +222,8 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
       );
     }
   };
-  const addEducation = () =>
+  const addEducation = () => {
+    const newIndex = (data.education || []).length;
     onChange({
       ...data,
       education: [
@@ -240,6 +241,8 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
         },
       ],
     });
+    setExpandedEducation((prev) => ({ ...prev, [newIndex]: true }));
+  };
 
   const updateEducation = (index, field, value) => {
     const next = [...(data.education || [])];
@@ -654,329 +657,371 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
             {Array.isArray(data.education) &&
             (data.education || []).length > 0 ? (
               <div className="space-y-4">
-                {(data.education || []).map((edu, eduIndex) => (
-                  <div
-                    key={eduIndex}
-                    className="p-4 rounded-lg border border-muted bg-muted/10 space-y-4"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-base">
-                          {edu.institution || "Untitled Institution"}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {edu.field_of_study && edu.degree_level
-                            ? `${edu.degree_level} in ${edu.field_of_study}`
-                            : edu.field_of_study || edu.degree_level || ""}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeEducation(eduIndex)}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                {(data.education || []).map((edu, eduIndex) => {
+                  const isExpanded = expandedEducation[eduIndex];
+                  const highlightsCount = (edu.highlights || []).length;
+                  const courseCount = (edu.coursework || []).length;
+                  const years = [edu.start_year, edu.end_year]
+                    .filter(Boolean)
+                    .join("–");
+                  return (
+                    <div
+                      key={eduIndex}
+                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                    >
+                      {/* Collapsed Header */}
+                      <div
+                        className="flex items-center gap-2 p-3 cursor-pointer"
+                        onClick={() => toggleEducation(eduIndex)}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor={`institution-${eduIndex}`}>
-                          Institution Name
-                        </Label>
-                        <Input
-                          id={`institution-${eduIndex}`}
-                          value={edu.institution || ""}
-                          onChange={(e) =>
-                            updateEducation(
-                              eduIndex,
-                              "institution",
-                              e.target.value
-                            )
-                          }
-                          placeholder="e.g. University of Cambridge, Harvard, etc."
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform text-muted-foreground ${
+                            isExpanded ? "" : "-rotate-90"
+                          }`}
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`degree-${eduIndex}`}>
-                          Degree Level
-                        </Label>
-                        <Input
-                          id={`degree-${eduIndex}`}
-                          value={edu.degree_level || ""}
-                          onChange={(e) =>
-                            updateEducation(
-                              eduIndex,
-                              "degree_level",
-                              e.target.value
-                            )
-                          }
-                          placeholder="e.g. Bachelor's, Master's, PhD, High School"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`field-${eduIndex}`}>
-                          Field of Study / Major
-                        </Label>
-                        <Input
-                          id={`field-${eduIndex}`}
-                          value={edu.field_of_study || ""}
-                          onChange={(e) =>
-                            updateEducation(
-                              eduIndex,
-                              "field_of_study",
-                              e.target.value
-                            )
-                          }
-                          placeholder="e.g. Computer Science, Business, etc."
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`status-${eduIndex}`}>Status</Label>
-                        <Select
-                          value={edu.status || "completed"}
-                          onValueChange={(value) =>
-                            updateEducation(eduIndex, "status", value)
-                          }
-                        >
-                          <SelectTrigger id={`status-${eduIndex}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="current">Current</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="incomplete">
-                              Incomplete
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`start-${eduIndex}`}>Start Year</Label>
-                        <Input
-                          id={`start-${eduIndex}`}
-                          value={edu.start_year || ""}
-                          onChange={(e) =>
-                            updateEducation(
-                              eduIndex,
-                              "start_year",
-                              e.target.value
-                            )
-                          }
-                          placeholder="e.g. 2020"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`end-${eduIndex}`}>End Year</Label>
-                        <Input
-                          id={`end-${eduIndex}`}
-                          value={edu.end_year || ""}
-                          onChange={(e) =>
-                            updateEducation(
-                              eduIndex,
-                              "end_year",
-                              e.target.value
-                            )
-                          }
-                          placeholder="e.g. 2024 or Expected 2026"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Coursework Section */}
-                    <div className="space-y-2">
-                      <Label>Coursework / Modules</Label>
-                      <div className="space-y-3">
-                        {(edu.coursework || []).map((course, courseIdx) => (
-                          <div
-                            key={courseIdx}
-                            className="space-y-2 p-3 rounded border border-muted bg-muted/20"
-                          >
-                            <div className="flex justify-between items-center mb-2">
-                              <Label className="text-sm font-medium">
-                                {course.name || "Untitled Course"}
-                              </Label>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() =>
-                                  removeCoursework(eduIndex, courseIdx)
-                                }
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs">Course Name</Label>
-                              <Input
-                                value={course.name || ""}
-                                onChange={(e) =>
-                                  updateCoursework(
-                                    eduIndex,
-                                    courseIdx,
-                                    "name",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="e.g. Data Structures"
-                                size="sm"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs">Topics Covered</Label>
-                              <ArrayInput
-                                items={course.topics || []}
-                                onChange={(items) =>
-                                  updateCoursework(
-                                    eduIndex,
-                                    courseIdx,
-                                    "topics",
-                                    items
-                                  )
-                                }
-                                placeholder="e.g. Algorithms, Hash tables"
-                              />
-                            </div>
+                        <div className="flex-1 flex items-center gap-2 min-w-0">
+                          <span className="font-medium truncate">
+                            {edu.institution || "Untitled Institution"}
+                          </span>
+                          <span className="text-sm text-muted-foreground truncate hidden sm:inline">
+                            {edu.field_of_study && edu.degree_level
+                              ? `${edu.degree_level} in ${edu.field_of_study}`
+                              : edu.field_of_study || edu.degree_level || ""}
+                          </span>
+                          <div className="flex gap-1.5 items-center flex-shrink-0">
+                            {years && (
+                              <Badge variant="secondary" className="h-5 text-xs">
+                                {years}
+                              </Badge>
+                            )}
+                            {courseCount > 0 && (
+                              <Badge variant="secondary" className="h-5 text-xs">
+                                {courseCount} courses
+                              </Badge>
+                            )}
+                            {highlightsCount > 0 && (
+                              <Badge variant="secondary" className="h-5 text-xs">
+                                {highlightsCount} highlights
+                              </Badge>
+                            )}
                           </div>
-                        ))}
+                        </div>
                         <Button
-                          onClick={() => addCoursework(eduIndex)}
-                          variant="outline"
-                          size="sm"
-                          className="w-full border-dashed"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Coursework
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Clubs Section */}
-                    <div className="space-y-2">
-                      <Label>Clubs & Societies</Label>
-                      <div className="space-y-3">
-                        {(edu.clubs || []).map((club, clubIdx) => (
-                          <div
-                            key={clubIdx}
-                            className="space-y-2 p-3 rounded border border-muted bg-muted/20"
-                          >
-                            <div className="flex justify-between items-center mb-2">
-                              <Label className="text-sm font-medium">
-                                {club.name || "Untitled Club"}
-                              </Label>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeClub(eduIndex, clubIdx)}
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs">Club Name</Label>
-                              <Input
-                                value={club.name || ""}
-                                onChange={(e) =>
-                                  updateClub(
-                                    eduIndex,
-                                    clubIdx,
-                                    "name",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="e.g. Robotics Club"
-                                size="sm"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs">
-                                Activities Involved
-                              </Label>
-                              <ArrayInput
-                                items={club.activities_involved || []}
-                                onChange={(items) =>
-                                  updateClub(
-                                    eduIndex,
-                                    clubIdx,
-                                    "activities_involved",
-                                    items
-                                  )
-                                }
-                                placeholder="e.g. Project lead, Event organizer"
-                              />
-                            </div>
-                          </div>
-                        ))}
-                        <Button
-                          onClick={() => addClub(eduIndex)}
-                          variant="outline"
-                          size="sm"
-                          className="w-full border-dashed"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Club
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Highlights Section */}
-                    <div className="space-y-2">
-                      <Label>Highlights</Label>
-                      <div className="space-y-3">
-                        {(edu.highlights || []).map((highlight, hIdx) => (
-                          <div
-                            key={hIdx}
-                            className="flex gap-2 items-start p-2 rounded border border-muted bg-muted/20"
-                          >
-                            <Input
-                              value={highlight || ""}
-                              onChange={(e) => {
-                                const updated = [...(data.education || [])];
-                                updated[eduIndex].highlights[hIdx] =
-                                  e.target.value;
-                                onChange({ ...data, education: updated });
-                              }}
-                              placeholder="e.g. Dean's List, Best Project Award"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                const updated = [...(data.education || [])];
-                                updated[eduIndex].highlights = (
-                                  edu.highlights || []
-                                ).filter((_, i) => i !== hIdx);
-                                onChange({ ...data, education: updated });
-                              }}
-                              className="h-10 w-10 text-destructive flex-shrink-0"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                        <Button
-                          onClick={() => {
-                            const updated = [...(data.education || [])];
-                            updated[eduIndex].highlights = [
-                              ...(edu.highlights || []),
-                              "",
-                            ];
-                            onChange({ ...data, education: updated });
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeEducation(eduIndex);
                           }}
-                          variant="outline"
-                          size="sm"
-                          className="w-full border-dashed"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
                         >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Highlight
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
+
+                      {/* Expanded Form */}
+                      {isExpanded && (
+                        <div className="p-4 pt-1 space-y-4">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor={`institution-${eduIndex}`}>
+                            Institution Name
+                          </Label>
+                          <Input
+                            id={`institution-${eduIndex}`}
+                            value={edu.institution || ""}
+                            onChange={(e) =>
+                              updateEducation(
+                                eduIndex,
+                                "institution",
+                                e.target.value
+                              )
+                            }
+                            placeholder="e.g. University of Cambridge, Harvard, etc."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`degree-${eduIndex}`}>
+                            Degree Level
+                          </Label>
+                          <Input
+                            id={`degree-${eduIndex}`}
+                            value={edu.degree_level || ""}
+                            onChange={(e) =>
+                              updateEducation(
+                                eduIndex,
+                                "degree_level",
+                                e.target.value
+                              )
+                            }
+                            placeholder="e.g. Bachelor's, Master's, PhD, High School"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`field-${eduIndex}`}>
+                            Field of Study / Major
+                          </Label>
+                          <Input
+                            id={`field-${eduIndex}`}
+                            value={edu.field_of_study || ""}
+                            onChange={(e) =>
+                              updateEducation(
+                                eduIndex,
+                                "field_of_study",
+                                e.target.value
+                              )
+                            }
+                            placeholder="e.g. Computer Science, Business, etc."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`status-${eduIndex}`}>Status</Label>
+                          <Select
+                            value={edu.status || "completed"}
+                            onValueChange={(value) =>
+                              updateEducation(eduIndex, "status", value)
+                            }
+                          >
+                            <SelectTrigger id={`status-${eduIndex}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="current">Current</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="incomplete">
+                                Incomplete
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`start-${eduIndex}`}>Start Year</Label>
+                          <Input
+                            id={`start-${eduIndex}`}
+                            value={edu.start_year || ""}
+                            onChange={(e) =>
+                              updateEducation(
+                                eduIndex,
+                                "start_year",
+                                e.target.value
+                              )
+                            }
+                            placeholder="e.g. 2020"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`end-${eduIndex}`}>End Year</Label>
+                          <Input
+                            id={`end-${eduIndex}`}
+                            value={edu.end_year || ""}
+                            onChange={(e) =>
+                              updateEducation(
+                                eduIndex,
+                                "end_year",
+                                e.target.value
+                              )
+                            }
+                            placeholder="e.g. 2024 or Expected 2026"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Coursework Section */}
+                      <div className="space-y-2">
+                        <Label>Coursework / Modules</Label>
+                        <div className="space-y-3">
+                          {(edu.coursework || []).map((course, courseIdx) => (
+                            <div
+                              key={courseIdx}
+                              className="space-y-2 p-3 rounded border border-muted bg-muted/20"
+                            >
+                              <div className="flex justify-between items-center mb-2">
+                                <Label className="text-sm font-medium">
+                                  {course.name || "Untitled Course"}
+                                </Label>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() =>
+                                    removeCoursework(eduIndex, courseIdx)
+                                  }
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Course Name</Label>
+                                <Input
+                                  value={course.name || ""}
+                                  onChange={(e) =>
+                                    updateCoursework(
+                                      eduIndex,
+                                      courseIdx,
+                                      "name",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="e.g. Data Structures"
+                                  size="sm"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Topics Covered</Label>
+                                <ArrayInput
+                                  items={course.topics || []}
+                                  onChange={(items) =>
+                                    updateCoursework(
+                                      eduIndex,
+                                      courseIdx,
+                                      "topics",
+                                      items
+                                    )
+                                  }
+                                  placeholder="e.g. Algorithms, Hash tables"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                          <Button
+                            onClick={() => addCoursework(eduIndex)}
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-dashed"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Coursework
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Clubs Section */}
+                      <div className="space-y-2">
+                        <Label>Clubs & Societies</Label>
+                        <div className="space-y-3">
+                          {(edu.clubs || []).map((club, clubIdx) => (
+                            <div
+                              key={clubIdx}
+                              className="space-y-2 p-3 rounded border border-muted bg-muted/20"
+                            >
+                              <div className="flex justify-between items-center mb-2">
+                                <Label className="text-sm font-medium">
+                                  {club.name || "Untitled Club"}
+                                </Label>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeClub(eduIndex, clubIdx)}
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Club Name</Label>
+                                <Input
+                                  value={club.name || ""}
+                                  onChange={(e) =>
+                                    updateClub(
+                                      eduIndex,
+                                      clubIdx,
+                                      "name",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="e.g. Robotics Club"
+                                  size="sm"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">
+                                  Activities Involved
+                                </Label>
+                                <ArrayInput
+                                  items={club.activities_involved || []}
+                                  onChange={(items) =>
+                                    updateClub(
+                                      eduIndex,
+                                      clubIdx,
+                                      "activities_involved",
+                                      items
+                                    )
+                                  }
+                                  placeholder="e.g. Project lead, Event organizer"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                          <Button
+                            onClick={() => addClub(eduIndex)}
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-dashed"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Club
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Highlights Section */}
+                      <div className="space-y-2">
+                        <Label>Highlights</Label>
+                        <div className="space-y-3">
+                          {(edu.highlights || []).map((highlight, hIdx) => (
+                            <div
+                              key={hIdx}
+                              className="flex gap-2 items-start p-2 rounded border border-muted bg-muted/20"
+                            >
+                              <Input
+                                value={highlight || ""}
+                                onChange={(e) => {
+                                  const updated = [...(data.education || [])];
+                                  updated[eduIndex].highlights[hIdx] =
+                                    e.target.value;
+                                  onChange({ ...data, education: updated });
+                                }}
+                                placeholder="e.g. Dean's List, Best Project Award"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  const updated = [...(data.education || [])];
+                                  updated[eduIndex].highlights = (
+                                    edu.highlights || []
+                                  ).filter((_, i) => i !== hIdx);
+                                  onChange({ ...data, education: updated });
+                                }}
+                                className="h-10 w-10 text-destructive flex-shrink-0"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            onClick={() => {
+                              const updated = [...(data.education || [])];
+                              updated[eduIndex].highlights = [
+                                ...(edu.highlights || []),
+                                "",
+                              ];
+                              onChange({ ...data, education: updated });
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-dashed"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Highlight
+                          </Button>
+                        </div>
+                      </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-8">
