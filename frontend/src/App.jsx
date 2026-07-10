@@ -5727,8 +5727,18 @@ function LearningLogEditor({ data, onChange, onShowConfirmation }) {
 
   const removeEntry = (index) => {
     const entry = entries[index];
-    const doRemove = () =>
+    const doRemove = () => {
       onChange({ ...data, entries: entries.filter((_, i) => i !== index) });
+      setExpandedEntries((prev) => {
+        const next = {};
+        for (const [k, v] of Object.entries(prev)) {
+          const i = Number(k);
+          if (i < index) next[i] = v;
+          else if (i > index) next[i - 1] = v;
+        }
+        return next;
+      });
+    };
     if (onShowConfirmation) {
       onShowConfirmation(
         "Remove Learning Entry",
