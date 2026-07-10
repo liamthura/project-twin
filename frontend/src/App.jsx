@@ -394,6 +394,14 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
     workExp: true,
   });
 
+  const [expandedWorkExp, setExpandedWorkExp] = useState({});
+  const [expandedEducation, setExpandedEducation] = useState({});
+
+  const toggleWorkExp = (index) =>
+    setExpandedWorkExp((prev) => ({ ...prev, [index]: !prev[index] }));
+  const toggleEducation = (index) =>
+    setExpandedEducation((prev) => ({ ...prev, [index]: !prev[index] }));
+
   // Info modal state
   const [infoModal, setInfoModal] = useState({
     isOpen: false,
@@ -1085,134 +1093,175 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
           <CardContent className="space-y-4">
             {data.work_experience && data.work_experience.length > 0 && (
               <div className="space-y-3">
-                {data.work_experience.map((exp, idx) => (
-                  <div
-                    key={idx}
-                    className="space-y-3 p-3 rounded border border-muted bg-muted/20"
-                  >
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Role</Label>
-                        <Input
-                          value={exp.role || ""}
-                          onChange={(e) => {
-                            const updated = [...data.work_experience];
-                            updated[idx].role = e.target.value;
-                            update("work_experience", updated);
-                          }}
-                          placeholder="e.g. Software Engineer"
+                {data.work_experience.map((exp, idx) => {
+                  const isExpanded = expandedWorkExp[idx];
+                  const highlightsCount = (exp.highlights || []).length;
+                  return (
+                    <div
+                      key={idx}
+                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                    >
+                      {/* Collapsed Header */}
+                      <div
+                        className="flex items-center gap-2 p-3 cursor-pointer"
+                        onClick={() => toggleWorkExp(idx)}
+                      >
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform text-muted-foreground ${
+                            isExpanded ? "" : "-rotate-90"
+                          }`}
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Company</Label>
-                        <Input
-                          value={exp.company || ""}
-                          onChange={(e) => {
-                            const updated = [...data.work_experience];
-                            updated[idx].company = e.target.value;
-                            update("work_experience", updated);
-                          }}
-                          placeholder="e.g. TechCorp"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Type</Label>
-                        <Input
-                          value={exp.type || ""}
-                          onChange={(e) => {
-                            const updated = [...data.work_experience];
-                            updated[idx].type = e.target.value;
-                            update("work_experience", updated);
-                          }}
-                          placeholder="e.g. Full-time"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Period</Label>
-                        <Input
-                          value={exp.period || ""}
-                          onChange={(e) => {
-                            const updated = [...data.work_experience];
-                            updated[idx].period = e.target.value;
-                            update("work_experience", updated);
-                          }}
-                          placeholder="e.g. Jan 2022 - Jun 2023"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Highlights</Label>
-                      <div className="space-y-3">
-                        {(exp.highlights || []).map((highlight, hIdx) => (
-                          <div
-                            key={hIdx}
-                            className="flex gap-2 items-start p-2 rounded border border-muted bg-muted/20"
-                          >
-                            <Input
-                              value={highlight || ""}
-                              onChange={(e) => {
-                                const updated = [...data.work_experience];
-                                updated[idx].highlights[hIdx] = e.target.value;
-                                update("work_experience", updated);
-                              }}
-                              placeholder="e.g. Led team of 5 engineers"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                const updated = [...data.work_experience];
-                                updated[idx].highlights = (
-                                  exp.highlights || []
-                                ).filter((_, i) => i !== hIdx);
-                                update("work_experience", updated);
-                              }}
-                              className="h-10 w-10 text-destructive flex-shrink-0"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                        <div className="flex-1 flex items-center gap-2 min-w-0">
+                          <span className="font-medium truncate">
+                            {[exp.role, exp.company].filter(Boolean).join(" — ") ||
+                              "Untitled experience"}
+                          </span>
+                          <div className="flex gap-1.5 items-center flex-shrink-0">
+                            {exp.period && (
+                              <Badge variant="secondary" className="h-5 text-xs">
+                                {exp.period}
+                              </Badge>
+                            )}
+                            {highlightsCount > 0 && (
+                              <Badge variant="secondary" className="h-5 text-xs">
+                                {highlightsCount} highlights
+                              </Badge>
+                            )}
                           </div>
-                        ))}
+                        </div>
                         <Button
-                          onClick={() => {
-                            const updated = [...data.work_experience];
-                            updated[idx].highlights = [
-                              ...(exp.highlights || []),
-                              "",
-                            ];
-                            update("work_experience", updated);
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            update(
+                              "work_experience",
+                              data.work_experience.filter((_, i) => i !== idx)
+                            );
                           }}
-                          variant="outline"
-                          size="sm"
-                          className="w-full border-dashed"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
                         >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Highlight
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
+
+                      {/* Expanded Form */}
+                      {isExpanded && (
+                        <div className="space-y-3 p-3 pt-0">
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Role</Label>
+                              <Input
+                                value={exp.role || ""}
+                                onChange={(e) => {
+                                  const updated = [...data.work_experience];
+                                  updated[idx].role = e.target.value;
+                                  update("work_experience", updated);
+                                }}
+                                placeholder="e.g. Software Engineer"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Company</Label>
+                              <Input
+                                value={exp.company || ""}
+                                onChange={(e) => {
+                                  const updated = [...data.work_experience];
+                                  updated[idx].company = e.target.value;
+                                  update("work_experience", updated);
+                                }}
+                                placeholder="e.g. TechCorp"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Type</Label>
+                              <Input
+                                value={exp.type || ""}
+                                onChange={(e) => {
+                                  const updated = [...data.work_experience];
+                                  updated[idx].type = e.target.value;
+                                  update("work_experience", updated);
+                                }}
+                                placeholder="e.g. Full-time"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Period</Label>
+                              <Input
+                                value={exp.period || ""}
+                                onChange={(e) => {
+                                  const updated = [...data.work_experience];
+                                  updated[idx].period = e.target.value;
+                                  update("work_experience", updated);
+                                }}
+                                placeholder="e.g. Jan 2022 - Jun 2023"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Highlights</Label>
+                            <div className="space-y-3">
+                              {(exp.highlights || []).map((highlight, hIdx) => (
+                                <div
+                                  key={hIdx}
+                                  className="flex gap-2 items-start p-2 rounded border border-muted bg-muted/20"
+                                >
+                                  <Input
+                                    value={highlight || ""}
+                                    onChange={(e) => {
+                                      const updated = [...data.work_experience];
+                                      updated[idx].highlights[hIdx] =
+                                        e.target.value;
+                                      update("work_experience", updated);
+                                    }}
+                                    placeholder="e.g. Led team of 5 engineers"
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                      const updated = [...data.work_experience];
+                                      updated[idx].highlights = (
+                                        exp.highlights || []
+                                      ).filter((_, i) => i !== hIdx);
+                                      update("work_experience", updated);
+                                    }}
+                                    className="h-10 w-10 text-destructive flex-shrink-0"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                              <Button
+                                onClick={() => {
+                                  const updated = [...data.work_experience];
+                                  updated[idx].highlights = [
+                                    ...(exp.highlights || []),
+                                    "",
+                                  ];
+                                  update("work_experience", updated);
+                                }}
+                                variant="outline"
+                                size="sm"
+                                className="w-full border-dashed"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Highlight
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const updated = data.work_experience.filter(
-                          (_, i) => i !== idx
-                        );
-                        update("work_experience", updated);
-                      }}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Remove
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             <Button
               onClick={() => {
+                const newIndex = (data.work_experience || []).length;
                 update("work_experience", [
                   ...(data.work_experience || []),
                   {
@@ -1223,6 +1272,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                     highlights: [],
                   },
                 ]);
+                setExpandedWorkExp((prev) => ({ ...prev, [newIndex]: true }));
               }}
               variant="outline"
               className="w-full border-dashed"
