@@ -150,3 +150,7 @@ def test_save_assigns_ids_to_learning_entries(as_user):
     entries = server.load_json("learning_log.json")["entries"]
     assert entries[0]["id"].startswith("learn_")
     assert entries[1]["id"] == "learn_keepme"  # setdefault: existing id untouched
+
+    first = server.load_json("learning_log.json")["entries"][0]["id"]
+    second = server.load_json("learning_log.json")["entries"][0]["id"]
+    assert first == second  # persisted by save(), not regenerated per load

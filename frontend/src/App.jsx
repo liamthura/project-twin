@@ -5708,6 +5708,7 @@ function LearningLogEditor({ data, onChange, onShowConfirmation }) {
   };
 
   const addEntry = () => {
+    setSearchTerm("");
     const newIndex = entries.length;
     onChange({
       ...data,
