@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   User,
   Brain,
+  BookOpen,
   Settings,
   FolderKanban,
   Heart,
@@ -5690,6 +5691,264 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
   );
 }
 
+// Learning Log Editor
+function LearningLogEditor({ data, onChange, onShowConfirmation }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [expandedEntries, setExpandedEntries] = useState({});
+
+  const entries = data.entries || [];
+
+  const toggleEntry = (key) =>
+    setExpandedEntries((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const updateEntry = (index, field, value) => {
+    const next = [...entries];
+    next[index] = { ...next[index], [field]: value };
+    onChange({ ...data, entries: next });
+  };
+
+  const addEntry = () => {
+    const newIndex = entries.length;
+    onChange({
+      ...data,
+      entries: [
+        ...entries,
+        {
+          topic: "",
+          details: "",
+          source: "manual",
+          tags: [],
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    });
+    setExpandedEntries((prev) => ({ ...prev, [newIndex]: true }));
+  };
+
+  const removeEntry = (index) => {
+    const entry = entries[index];
+    const doRemove = () =>
+      onChange({ ...data, entries: entries.filter((_, i) => i !== index) });
+    if (onShowConfirmation) {
+      onShowConfirmation(
+        "Remove Learning Entry",
+        `Remove "${entry?.topic || "entry"}"? This action cannot be undone.`,
+        doRemove
+      );
+    } else {
+      doRemove();
+    }
+  };
+
+  const matchesSearch = (entry) => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return true;
+    return [entry.topic, entry.details, ...(entry.tags || [])]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(q);
+  };
+
+  // Newest first; editing still targets the original array index.
+  const sortedIndexes = entries
+    .map((_, i) => i)
+    .sort((a, b) =>
+      (entries[b].timestamp || "").localeCompare(entries[a].timestamp || "")
+    );
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Learning Log</CardTitle>
+          <CardDescription>
+            Things you've learned, decisions you've made, and follow-ups —
+            captured from conversations or added here.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Input
+            placeholder="Search topic, details, or tags..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+
+          {entries.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No learning entries yet. Click "Add Entry" to get started.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {sortedIndexes
+                .filter((idx) => matchesSearch(entries[idx]))
+                .map((idx) => {
+                  const entry = entries[idx];
+                  const isExpanded = expandedEntries[idx];
+                  const tagCount = (entry.tags || []).length;
+                  const followupCount = (entry.followup_items || []).length;
+                  const date = (entry.timestamp || "").slice(0, 10);
+                  return (
+                    <div
+                      key={entry.id || idx}
+                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                    >
+                      {/* Collapsed Header */}
+                      <div
+                        className="flex items-center gap-2 p-3 cursor-pointer"
+                        onClick={() => toggleEntry(idx)}
+                      >
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform text-muted-foreground ${
+                            isExpanded ? "" : "-rotate-90"
+                          }`}
+                        />
+                        <div className="flex-1 flex items-center gap-2 min-w-0">
+                          <span className="font-medium truncate">
+                            {entry.topic || "Untitled entry"}
+                          </span>
+                          <div className="flex gap-1.5 items-center flex-shrink-0">
+                            {date && (
+                              <Badge variant="secondary" className="h-5 text-xs">
+                                {date}
+                              </Badge>
+                            )}
+                            {entry.source && (
+                              <Badge variant="outline" className="h-5 text-xs">
+                                {entry.source}
+                              </Badge>
+                            )}
+                            {tagCount > 0 && (
+                              <Badge variant="secondary" className="h-5 text-xs">
+                                {tagCount} tags
+                              </Badge>
+                            )}
+                            {followupCount > 0 && (
+                              <Badge variant="secondary" className="h-5 text-xs">
+                                {followupCount} follow-ups
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeEntry(idx);
+                          }}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* Expanded Form */}
+                      {isExpanded && (
+                        <div className="space-y-3 p-3 pt-0">
+                          <div className="space-y-2">
+                            <Label>Topic</Label>
+                            <Input
+                              value={entry.topic || ""}
+                              onChange={(e) =>
+                                updateEntry(idx, "topic", e.target.value)
+                              }
+                              placeholder="e.g. React Server Components"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Details</Label>
+                            <Textarea
+                              value={entry.details || ""}
+                              onChange={(e) =>
+                                updateEntry(idx, "details", e.target.value)
+                              }
+                              placeholder="What you learned or discussed..."
+                              rows={4}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Source</Label>
+                            <Input
+                              value={entry.source || ""}
+                              onChange={(e) =>
+                                updateEntry(idx, "source", e.target.value)
+                              }
+                              placeholder="e.g. conversation, article, course"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Tags</Label>
+                            <ArrayInput
+                              items={entry.tags || []}
+                              onChange={(items) =>
+                                updateEntry(idx, "tags", items)
+                              }
+                              placeholder="e.g. react, architecture"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Key Decisions</Label>
+                            <ArrayInput
+                              items={entry.key_decisions || []}
+                              onChange={(items) =>
+                                updateEntry(idx, "key_decisions", items)
+                              }
+                              placeholder="e.g. Chose Postgres over SQLite"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Follow-up Items</Label>
+                            <ArrayInput
+                              items={entry.followup_items || []}
+                              onChange={(items) =>
+                                updateEntry(idx, "followup_items", items)
+                              }
+                              placeholder="e.g. Read the migration guide"
+                            />
+                          </div>
+                          {(entry.related_entries || []).length > 0 && (
+                            <div className="space-y-2">
+                              <Label>Related</Label>
+                              <div className="flex flex-wrap gap-1.5">
+                                {entry.related_entries.map((link, i) => (
+                                  <Badge
+                                    key={i}
+                                    variant="outline"
+                                    className="h-5 text-xs"
+                                  >
+                                    {link.type}: {link.id}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            {entry.id ? `${entry.id} · ` : ""}
+                            {entry.timestamp || ""}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+
+          <Button
+            onClick={addEntry}
+            variant="outline"
+            className="w-full border-dashed"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Entry
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 const SECTION_LABELS = {
   knowledge: "Knowledge",
   projects: "Projects",
@@ -5714,6 +5973,7 @@ export default function App() {
   const [projects, setProjects] = useState({});
   const [lifestyle, setLifestyle] = useState({});
   const [circle, setCircle] = useState({});
+  const [learningLog, setLearningLog] = useState({});
 
   const [disabledSections, setDisabledSections] = useState([]);
   const [toggleable, setToggleable] = useState([]);
@@ -5762,6 +6022,7 @@ export default function App() {
       setProjects(response.data.projects || {});
       setLifestyle(response.data.lifestyle || {});
       setCircle(response.data.circle || {});
+      setLearningLog(response.data.learning_log || {});
       setIsConnected(true);
     } catch (err) {
       setError(err.message);
@@ -5827,6 +6088,10 @@ export default function App() {
     setCircle(newData);
     if (isAutosaveEnabled) debouncedSave("circle", newData);
   };
+  const handleLearningLogChange = (newData) => {
+    setLearningLog(newData);
+    if (isAutosaveEnabled) debouncedSave("learning_log", newData);
+  };
 
   const saveAll = async () => {
     setIsSaving(true);
@@ -5840,6 +6105,7 @@ export default function App() {
           projects,
           lifestyle,
           circle,
+          learning_log: learningLog,
         }),
       });
       setLastSaved(new Date());
@@ -5995,6 +6261,10 @@ export default function App() {
                 <span className="hidden md:inline">Circle</span>
               </TabsTrigger>
             )}
+            <TabsTrigger value="learning" className="gap-2 md:w-full md:justify-start">
+              <BookOpen className="h-4 w-4" />
+              <span className="hidden md:inline">Learning Log</span>
+            </TabsTrigger>
             <TabsTrigger value="preferences" className="gap-2 md:w-full md:justify-start">
               <Settings className="h-4 w-4" />
               <span className="hidden md:inline">Preferences</span>
@@ -6050,6 +6320,13 @@ export default function App() {
               />
             </TabsContent>
           )}
+          <TabsContent value="learning">
+            <LearningLogEditor
+              data={learningLog}
+              onChange={handleLearningLogChange}
+              onShowConfirmation={showConfirmation}
+            />
+          </TabsContent>
           <TabsContent value="preferences">
             <PreferencesEditor
               data={preferences}
