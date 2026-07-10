@@ -308,6 +308,7 @@ ENTITY_THRESHOLDS = {
     "preference": {"auto": 0.75, "ask": 0.55},
     "dislike": {"auto": 0.75, "ask": 0.50},
     "communication_default": {"auto": 0.80, "ask": 0.55},
+    "basic_info": {"auto": 0.90, "ask": 0.70},
     "mood_override": {"auto": 0.75, "ask": 0.50},
     "passion": {"auto": 0.72, "ask": 0.50},
     "curiosity": {"auto": 0.70, "ask": 0.45},
@@ -1077,6 +1078,8 @@ def normalize_data(data: dict, entity: str) -> dict:
         name_aliases = FIELD_ALIASES.get("email", ["address"])
     elif entity == "link":
         return normalized
+    elif entity == "basic_info":
+        return normalized
     elif entity == "language":
         name_aliases = FIELD_ALIASES.get("language", FIELD_ALIASES["name"])
     elif entity == "career_aspiration":
@@ -1304,7 +1307,23 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             aspirations.remove(found)
             save_json("profile.json", profile)
             return f"✅ Removed aspiration: {asp}"
-    
+
+    elif entity == "basic_info":
+        profile = load_json("profile.json")
+        if action == "update":
+            fields = ["name", "preferred_name", "current_role", "organisation",
+                      "location", "nationality", "bio"]
+            updated = []
+            for field in fields:
+                if data.get(field):
+                    profile[field] = data[field]
+                    updated.append(f"{field}={data[field]}")
+            if not updated:
+                return f"❌ basic_info update requires at least one of: {', '.join(fields)}"
+            save_json("profile.json", profile)
+            return f"✅ Updated profile: {', '.join(updated)}"
+        return "❌ basic_info only supports 'update' action"
+
     elif entity == "education":
         profile = load_json("profile.json")
         education = profile.setdefault("education", [])
@@ -2298,7 +2317,12 @@ ENTITY_SCHEMA = {
         "coursework_topic": {"actions": ["add", "remove"], "required": ["institution", "course"], "optional": [],
                             "identifier": "course", "parent": "institution"},
         "career_aspiration": {"actions": ["add", "remove"], "required": ["aspiration"], "optional": [],
-                             "identifier": "aspiration"}
+                             "identifier": "aspiration"},
+        "basic_info": {"actions": ["update"], "required": [],
+                      "optional": ["name", "preferred_name", "current_role", "organisation",
+                                   "location", "nationality", "bio"],
+                      "identifier": None,
+                      "description": "Update-only singleton for top-level profile fields"}
     },
     "lifestyle": {
         "hobby": {"actions": ["add", "update", "remove"], "required": ["name"],

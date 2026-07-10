@@ -146,3 +146,17 @@ def test_unknown_entity_returns_error():
 def test_unknown_file_returns_error():
     result = _call(file="does_not_exist")
     assert "error" in result
+
+
+def test_basic_info_is_update_only_singleton():
+    # basic_info mirrors communication_default: update-only, no identifier.
+    result = _call(entity="basic_info")
+    assert result["file"] == "profile"
+    assert result["actions"] == ["update"]
+    assert result["identifier"] is None
+    assert set(result["optional"]) == {
+        "name", "preferred_name", "current_role", "organisation",
+        "location", "nationality", "bio",
+    }
+    assert set(result["examples"].keys()) == {"update"}
+    assert result["examples"]["update"]["data"]  # non-empty example data
