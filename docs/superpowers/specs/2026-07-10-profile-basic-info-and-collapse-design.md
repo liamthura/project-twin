@@ -92,8 +92,9 @@ Mirror the Projects per-item pattern (`expandedProjects`, App.jsx:3517):
     badges, delete button (moved into the header).
   - Work title: `role` — `company` (fallback "Untitled"); badges: `period`,
     `N highlights` when > 0.
-  - Education title: `degree` — `institution` (fallback "Untitled"); badges:
-    `period`, `N highlights`, `N courses` when > 0.
+  - Education title: `institution` (fallback "Untitled Institution") with a
+    `degree in field` subtitle — preserves the pre-existing header content;
+    badges: `start_year–end_year`, `N courses`, `N highlights` when > 0.
   - The existing edit form renders only when expanded — form internals are
     unchanged.
 - Adding a new item sets its index to expanded so the user can type
