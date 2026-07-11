@@ -5976,6 +5976,13 @@ const SECTION_LABELS = {
   circle: "Circle",
 };
 
+const SECTION_DESCRIPTIONS = {
+  knowledge: "Domains you know and topics you track",
+  projects: "Active work and current learning",
+  lifestyle: "Hobbies, values, and routines",
+  circle: "People and relationships",
+};
+
 // Main App
 export default function App() {
   const [isConnected, setIsConnected] = useState(false);
@@ -6399,7 +6406,7 @@ export default function App() {
                   restored when re-enabled.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent>
                 {toggleable.length === 0 && (
                   <p className="text-sm text-muted-foreground">
                     No toggleable sections available.
@@ -6410,19 +6417,34 @@ export default function App() {
                   return (
                     <div
                       key={key}
-                      className="flex items-center justify-between rounded-md border p-3"
+                      className="flex items-center justify-between border-b border-border py-4 last:border-b-0"
                     >
-                      <span className="font-medium">
-                        {SECTION_LABELS[key] || key}
-                      </span>
-                      <Button
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium">
+                          {SECTION_LABELS[key] || key}
+                        </p>
+                        {SECTION_DESCRIPTIONS[key] && (
+                          <p className="text-xs text-muted-foreground">
+                            {SECTION_DESCRIPTIONS[key]}
+                          </p>
+                        )}
+                      </div>
+                      <button
                         type="button"
-                        variant={enabled ? "default" : "outline"}
-                        size="sm"
+                        role="switch"
+                        aria-checked={enabled}
+                        aria-label={`Toggle ${SECTION_LABELS[key] || key}`}
                         onClick={() => toggleSection(key)}
+                        className={`relative h-5 w-9 rounded-full transition-colors ${
+                          enabled ? "bg-primary" : "border bg-muted"
+                        }`}
                       >
-                        {enabled ? "Enabled" : "Disabled"}
-                      </Button>
+                        <span
+                          className={`absolute left-0 top-[2px] h-4 w-4 rounded-full border bg-card transition-transform ${
+                            enabled ? "translate-x-[18px]" : "translate-x-[2px]"
+                          }`}
+                        />
+                      </button>
                     </div>
                   );
                 })}
