@@ -6198,7 +6198,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b bg-card">
-        <div className="mx-auto flex h-[60px] max-w-[1400px] items-center justify-between px-8">
+        <div className="mx-auto flex h-[60px] max-w-6xl items-center justify-between px-4">
           <h1 className="text-lg font-semibold">MyGist</h1>
           <div className="flex items-center gap-4">
             {/* Auto-save toggle */}
@@ -6206,7 +6206,11 @@ export default function App() {
               type="button"
               role="switch"
               aria-checked={isAutosaveEnabled}
-              onClick={() => setIsAutosaveEnabled(!isAutosaveEnabled)}
+              onClick={() => {
+                const next = !isAutosaveEnabled;
+                setIsAutosaveEnabled(next);
+                if (next) saveAll();
+              }}
               className="flex items-center gap-2"
             >
               <span
@@ -6215,7 +6219,7 @@ export default function App() {
                 }`}
               >
                 <span
-                  className={`absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white transition-transform ${
+                  className={`absolute top-[2px] h-[14px] w-[14px] rounded-full bg-primary-foreground transition-transform ${
                     isAutosaveEnabled ? "translate-x-[16px]" : "translate-x-[2px]"
                   }`}
                 />
