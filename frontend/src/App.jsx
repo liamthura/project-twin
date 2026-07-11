@@ -9,11 +9,8 @@ import {
   Plus,
   X,
   RefreshCw,
-  Save,
-  Wifi,
   WifiOff,
   Loader2,
-  Check,
   Trash2,
   ChevronDown,
   Info,
@@ -51,10 +48,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  ConnectionSettings,
-  ConnectionStatus,
-} from "@/components/ConnectionSettings";
+import { ConnectionSettings } from "@/components/ConnectionSettings";
 import { api } from "@/lib/api.js";
 
 // Debounce hook
@@ -6203,88 +6197,120 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        {/* Header */}
-        <header className="mb-8">
-          <div className="flex items-start justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
-                MyGist
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                Your portable personal context for AI — stop repeating yourself
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <ConnectionStatus
-                onClick={() => setShowConnectionSettings(true)}
-              />
-              {isConnected ? (
-                <Badge variant="outline" className="gap-1.5">
-                  {isSaving ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Wifi className="h-3 w-3 text-green-500" />
-                  )}
-                  {isSaving ? "Saving..." : "Connected"}
-                </Badge>
-              ) : (
-                <Badge variant="destructive" className="gap-1.5">
-                  <WifiOff className="h-3 w-3" />
-                  Disconnected
-                </Badge>
-              )}
-            </div>
+      <header className="sticky top-0 z-20 border-b bg-card">
+        <div className="mx-auto flex h-[60px] max-w-[1400px] items-center justify-between px-8">
+          <h1 className="text-lg font-semibold">MyGist</h1>
+          <div className="flex items-center gap-4">
+            {/* Auto-save toggle */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isAutosaveEnabled}
+              onClick={() => setIsAutosaveEnabled(!isAutosaveEnabled)}
+              className="flex items-center gap-2"
+            >
+              <span
+                className={`relative h-[18px] w-8 rounded-full transition-colors ${
+                  isAutosaveEnabled ? "bg-primary" : "border bg-muted"
+                }`}
+              >
+                <span
+                  className={`absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white transition-transform ${
+                    isAutosaveEnabled ? "translate-x-[16px]" : "translate-x-[2px]"
+                  }`}
+                />
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">
+                Auto-save
+              </span>
+            </button>
+            {/* Save status */}
+            <span className="text-xs text-muted-foreground">
+              {isSaving
+                ? "Saving..."
+                : isAutosaveEnabled
+                  ? lastSaved
+                    ? "Saved just now"
+                    : "Saved"
+                  : "Unsaved changes"}
+            </span>
+            {!isAutosaveEnabled && (
+              <Button size="sm" onClick={saveAll} disabled={isSaving}>
+                Save changes
+              </Button>
+            )}
+            {!isConnected && (
+              <Badge variant="destructive" className="gap-1.5">
+                <WifiOff className="h-3 w-3" />
+                Disconnected
+              </Badge>
+            )}
+            {/* Account chip */}
+            <button
+              type="button"
+              onClick={() => setShowConnectionSettings(true)}
+              className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[13px] font-medium hover:bg-muted/50"
+            >
+              <User className="h-3.5 w-3.5 text-muted-foreground" />
+              {profile?.preferred_name || profile?.name || "Account"}
+            </button>
           </div>
-        </header>
+        </div>
+      </header>
 
+      <div className="mx-auto max-w-6xl px-4 py-8">
         <Tabs
           defaultValue="profile"
           orientation="vertical"
           className="flex flex-col gap-6 md:flex-row"
         >
-          <TabsList className="w-full flex-wrap md:sticky md:top-8 md:h-fit md:w-48 md:flex-col md:flex-nowrap md:items-stretch md:justify-start md:self-start">
-            <TabsTrigger value="profile" className="gap-2 md:w-full md:justify-start">
+          <div className="md:sticky md:top-8 md:w-48 md:self-start">
+          <TabsList className="w-full flex-nowrap overflow-x-auto md:flex-wrap md:overflow-visible md:h-fit md:flex-col md:items-stretch md:justify-start">
+            <TabsTrigger value="profile" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
               <User className="h-4 w-4" />
-              <span className="hidden md:inline">Profile</span>
+              <span>Profile</span>
             </TabsTrigger>
             {!disabledSections.includes("knowledge") && (
-              <TabsTrigger value="knowledge" className="gap-2 md:w-full md:justify-start">
+              <TabsTrigger value="knowledge" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
                 <Brain className="h-4 w-4" />
-                <span className="hidden md:inline">Knowledge</span>
+                <span>Knowledge</span>
               </TabsTrigger>
             )}
             {!disabledSections.includes("projects") && (
-              <TabsTrigger value="projects" className="gap-2 md:w-full md:justify-start">
+              <TabsTrigger value="projects" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
                 <FolderKanban className="h-4 w-4" />
-                <span className="hidden md:inline">Projects</span>
+                <span>Projects</span>
               </TabsTrigger>
             )}
             {!disabledSections.includes("lifestyle") && (
-              <TabsTrigger value="lifestyle" className="gap-2 md:w-full md:justify-start">
+              <TabsTrigger value="lifestyle" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
                 <Heart className="h-4 w-4" />
-                <span className="hidden md:inline">Lifestyle</span>
+                <span>Lifestyle</span>
               </TabsTrigger>
             )}
             {!disabledSections.includes("circle") && (
-              <TabsTrigger value="circle" className="gap-2 md:w-full md:justify-start">
+              <TabsTrigger value="circle" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
                 <Users className="h-4 w-4" />
-                <span className="hidden md:inline">Circle</span>
+                <span>Circle</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="learning" className="gap-2 md:w-full md:justify-start">
+            <TabsTrigger value="learning" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
               <BookOpen className="h-4 w-4" />
-              <span className="hidden md:inline">Learning Log</span>
+              <span>Learning Log</span>
             </TabsTrigger>
-            <TabsTrigger value="preferences" className="gap-2 md:w-full md:justify-start">
+            <TabsTrigger value="preferences" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
               <Settings className="h-4 w-4" />
-              <span className="hidden md:inline">Preferences</span>
+              <span>Preferences</span>
             </TabsTrigger>
-            <TabsTrigger value="sections" className="gap-2 md:w-full md:justify-start">
+            <TabsTrigger value="sections" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
               <SlidersHorizontal className="h-4 w-4" />
-              <span className="hidden md:inline">Sections</span>
+              <span>Sections</span>
             </TabsTrigger>
           </TabsList>
+          <p className="mt-4 hidden px-3 font-mono text-[11px] text-muted-foreground md:block">
+            {`v${__APP_VERSION__} (${__APP_COMMIT__})`}
+          </p>
+          </div>
 
           <div className="min-w-0 flex-1">
 
@@ -6383,44 +6409,10 @@ export default function App() {
                 })}
               </CardContent>
             </Card>
+            <p className="mt-4 px-1 font-mono text-[11px] text-muted-foreground md:hidden">
+              {`v${__APP_VERSION__} (${__APP_COMMIT__})`}
+            </p>
           </TabsContent>
-
-          {/* Actions Bar */}
-          <div className="sticky bottom-4 mt-8">
-          <Card className="bg-card/80 backdrop-blur-sm">
-            <CardContent className="py-3 px-4 flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex gap-2">
-                <Button onClick={saveAll} disabled={isSaving}>
-                  {isSaving ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  Save All
-                </Button>
-                <Button onClick={loadAllData} variant="outline">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Reload
-                </Button>
-              </div>
-              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={isAutosaveEnabled}
-                  onChange={(e) => setIsAutosaveEnabled(e.target.checked)}
-                  className="h-4 w-4 accent-primary"
-                />
-                Auto-save
-              </label>
-              {lastSaved && (
-                <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-                  <Check className="h-3.5 w-3.5 text-green-500" />
-                  Last saved: {lastSaved.toLocaleTimeString()}
-                </span>
-              )}
-            </CardContent>
-          </Card>
-        </div>
         </div>
         </Tabs>
       </div>
