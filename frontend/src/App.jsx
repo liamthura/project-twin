@@ -16,6 +16,9 @@ import {
   Info,
   Users,
   SlidersHorizontal,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -5992,6 +5995,24 @@ export default function App() {
   const [lastSaved, setLastSaved] = useState(null);
   const [isAutosaveEnabled, setIsAutosaveEnabled] = useState(true);
   const [showConnectionSettings, setShowConnectionSettings] = useState(false);
+
+  // Theme: "light" | "dark" | "system" (system follows the OS live)
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("mygist_theme") || "system"
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      const dark = theme === "dark" || (theme === "system" && mq.matches);
+      document.documentElement.classList.toggle("dark", dark);
+    };
+    apply();
+    localStorage.setItem("mygist_theme", theme);
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [theme]);
+  const cycleTheme = () =>
+    setTheme((t) => (t === "light" ? "dark" : t === "dark" ? "system" : "light"));
   const { toast } = useToast();
 
   const [profile, setProfile] = useState({});
@@ -6271,6 +6292,22 @@ export default function App() {
                 Disconnected
               </Badge>
             )}
+            {/* Theme toggle: light -> dark -> system */}
+            <button
+              type="button"
+              onClick={cycleTheme}
+              aria-label={`Theme: ${theme}. Click to change.`}
+              title={`Theme: ${theme}`}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border bg-card text-muted-foreground hover:text-foreground"
+            >
+              {theme === "light" ? (
+                <Sun className="h-4 w-4" />
+              ) : theme === "dark" ? (
+                <Moon className="h-4 w-4" />
+              ) : (
+                <Monitor className="h-4 w-4" />
+              )}
+            </button>
             {/* Account chip */}
             <button
               type="button"
