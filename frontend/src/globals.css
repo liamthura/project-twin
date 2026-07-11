@@ -100,3 +100,12 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .dark input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
 }
+
+/* Scroll without a visible scrollbar (mobile tab strip) */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

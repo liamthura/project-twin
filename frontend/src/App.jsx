@@ -648,7 +648,6 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
               </div>
             </div>
             <Button
-              variant="outline"
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
@@ -698,7 +697,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                               ? `${edu.degree_level} in ${edu.field_of_study}`
                               : edu.field_of_study || edu.degree_level || ""}
                           </span>
-                          <div className="flex gap-1.5 items-center flex-shrink-0">
+                          <div className="hidden sm:flex gap-1.5 items-center flex-shrink-0">
                             {years && (
                               <Badge variant="secondary" className="h-5 text-xs">
                                 {years}
@@ -1134,7 +1133,6 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
               </div>
             </div>
             <Button
-              variant="outline"
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
@@ -1185,7 +1183,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                             {[exp.role, exp.company].filter(Boolean).join(" — ") ||
                               "Untitled experience"}
                           </span>
-                          <div className="flex gap-1.5 items-center flex-shrink-0">
+                          <div className="hidden sm:flex gap-1.5 items-center flex-shrink-0">
                             {exp.period && (
                               <Badge variant="secondary" className="h-5 text-xs">
                                 {exp.period}
@@ -3633,7 +3631,7 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                           <span className="font-medium truncate">
                             {project.name || "Untitled project"}
                           </span>
-                          <div className="flex gap-1.5 items-center flex-shrink-0">
+                          <div className="hidden sm:flex gap-1.5 items-center flex-shrink-0">
                             {refCount > 0 && (
                               <Badge
                                 variant="secondary"
@@ -4459,7 +4457,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
                           <span className="font-medium truncate">
                             {hobby.name || "Untitled hobby"}
                           </span>
-                          <div className="flex gap-1.5 items-center flex-shrink-0">
+                          <div className="hidden sm:flex gap-1.5 items-center flex-shrink-0">
                             {hasSpecifics && (
                               <Badge
                                 variant="secondary"
@@ -5470,7 +5468,7 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
                           <span className="font-medium truncate">
                             {connection.name || "Untitled connection"}
                           </span>
-                          <div className="flex gap-1.5 items-center flex-shrink-0">
+                          <div className="hidden sm:flex gap-1.5 items-center flex-shrink-0">
                             {hasTraits && (
                               <Badge
                                 variant="secondary"
@@ -5827,7 +5825,7 @@ function LearningLogEditor({ data, onChange, onShowConfirmation }) {
                           <span className="font-medium truncate">
                             {entry.topic || "Untitled entry"}
                           </span>
-                          <div className="flex gap-1.5 items-center flex-shrink-0">
+                          <div className="hidden sm:flex gap-1.5 items-center flex-shrink-0">
                             {date && (
                               <Badge
                                 variant="secondary"
@@ -6328,7 +6326,7 @@ export default function App() {
           className="flex flex-col gap-6 md:flex-row"
         >
           <div className="md:sticky md:top-[84px] md:w-48 md:self-start">
-          <TabsList className="w-full flex-nowrap overflow-x-auto md:flex-wrap md:overflow-visible md:h-fit md:flex-col md:items-stretch md:justify-start">
+          <TabsList className="scrollbar-none w-full flex-nowrap overflow-x-auto md:flex-wrap md:overflow-visible md:h-fit md:flex-col md:items-stretch md:justify-start">
             <TabsTrigger value="profile" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
               <User className="h-4 w-4" />
               <span>Profile</span>
