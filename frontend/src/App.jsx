@@ -6240,7 +6240,32 @@ export default function App() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b bg-card">
         <div className="mx-auto flex h-[60px] max-w-6xl items-center justify-between px-4">
-          <h1 className="text-lg font-semibold">MyGist</h1>
+          <div className="flex items-center gap-2">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 96 96"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle
+                cx="45"
+                cy="40"
+                r="15"
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth="9"
+              />
+              <path
+                d="M60 40 v22 a14 14 0 0 1 -14 14 h-9"
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth="9"
+                strokeLinecap="round"
+              />
+            </svg>
+            <h1 className="text-lg font-semibold">MyGist</h1>
+          </div>
           <div className="flex items-center gap-4">
             {/* Auto-save toggle */}
             <button
