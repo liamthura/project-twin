@@ -6232,7 +6232,7 @@ export default function App() {
                 }`}
               >
                 <span
-                  className={`absolute top-[2px] h-[14px] w-[14px] rounded-full bg-primary-foreground transition-transform ${
+                  className={`absolute left-0 top-[2px] h-[14px] w-[14px] rounded-full bg-primary-foreground transition-transform ${
                     isAutosaveEnabled ? "translate-x-[16px]" : "translate-x-[2px]"
                   }`}
                 />
