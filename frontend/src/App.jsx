@@ -527,7 +527,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
     <div className="space-y-6">
       {/* Personal Information */}
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <CardTitle className="flex items-center gap-2">
             Personal Information
             <Button
@@ -613,7 +613,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
 
       {/* Academic Information */}
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("academic")}
@@ -644,6 +644,17 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                 </CardDescription>
               </div>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                addEducation();
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Education
+            </Button>
           </div>
         </CardHeader>
         {!collapsedSections.academic && (
@@ -662,7 +673,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                   return (
                     <div
                       key={eduIndex}
-                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                      className="border-b border-border last:border-b-0 hover:bg-muted/40 transition-colors"
                     >
                       {/* Collapsed Header */}
                       <div
@@ -828,7 +839,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                               {(edu.coursework || []).map((course, courseIdx) => (
                                 <div
                                   key={courseIdx}
-                                  className="space-y-2 p-3 rounded border border-muted bg-muted/20"
+                                  className="space-y-2 p-3 rounded-lg border"
                                 >
                                   <div className="flex justify-between items-center mb-2">
                                     <Label className="text-sm font-medium">
@@ -897,7 +908,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                               {(edu.clubs || []).map((club, clubIdx) => (
                                 <div
                                   key={clubIdx}
-                                  className="space-y-2 p-3 rounded border border-muted bg-muted/20"
+                                  className="space-y-2 p-3 rounded-lg border"
                                 >
                                   <div className="flex justify-between items-center mb-2">
                                     <Label className="text-sm font-medium">
@@ -966,7 +977,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                               {(edu.highlights || []).map((highlight, hIdx) => (
                                 <div
                                   key={hIdx}
-                                  className="flex gap-2 items-start p-2 rounded border border-muted bg-muted/20"
+                                  className="flex gap-2 items-start p-2 rounded-lg border"
                                 >
                                   <Input
                                     value={highlight || ""}
@@ -1024,15 +1035,6 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
               </p>
             )}
 
-            <Button
-              onClick={addEducation}
-              variant="outline"
-              className="w-full border-dashed"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Education
-            </Button>
-
             {/* Goals Section - Moved outside education entries */}
             <div className="space-y-2 pt-4 border-t">
               <Label>Academic & Career Goals</Label>
@@ -1040,7 +1042,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                 {(data.goals_and_careers || []).map((goalItem, idx) => (
                   <div
                     key={idx}
-                    className="space-y-2 p-3 rounded border border-muted bg-muted/20"
+                    className="space-y-2 p-3 rounded-lg border"
                   >
                     <div className="flex justify-between items-center mb-2">
                       <Label className="text-sm font-medium">
@@ -1098,7 +1100,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
 
       {/* Work Experience */}
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("workExp")}
@@ -1127,6 +1129,28 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                 <CardDescription>Your professional experience</CardDescription>
               </div>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                const newIndex = (data.work_experience || []).length;
+                update("work_experience", [
+                  ...(data.work_experience || []),
+                  {
+                    role: "",
+                    company: "",
+                    type: "",
+                    period: "",
+                    highlights: [],
+                  },
+                ]);
+                setExpandedWorkExp((prev) => ({ ...prev, [newIndex]: true }));
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Experience
+            </Button>
           </div>
         </CardHeader>
         {!collapsedSections.workExp && (
@@ -1139,7 +1163,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                   return (
                     <div
                       key={idx}
-                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                      className="border-b border-border last:border-b-0 hover:bg-muted/40 transition-colors"
                     >
                       {/* Collapsed Header */}
                       <div
@@ -1246,7 +1270,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                               {(exp.highlights || []).map((highlight, hIdx) => (
                                 <div
                                   key={hIdx}
-                                  className="flex gap-2 items-start p-2 rounded border border-muted bg-muted/20"
+                                  className="flex gap-2 items-start p-2 rounded-lg border"
                                 >
                                   <Input
                                     value={highlight || ""}
@@ -1299,34 +1323,13 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                 })}
               </div>
             )}
-            <Button
-              onClick={() => {
-                const newIndex = (data.work_experience || []).length;
-                update("work_experience", [
-                  ...(data.work_experience || []),
-                  {
-                    role: "",
-                    company: "",
-                    type: "",
-                    period: "",
-                    highlights: [],
-                  },
-                ]);
-                setExpandedWorkExp((prev) => ({ ...prev, [newIndex]: true }));
-              }}
-              variant="outline"
-              className="w-full border-dashed"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Experience
-            </Button>
           </CardContent>
         )}
       </Card>
 
       {/* Contact Information */}
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("contact")}
@@ -1367,7 +1370,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                 {(data.contact?.emails || []).map((email, index) => (
                   <div
                     key={index}
-                    className="p-3 rounded border border-muted bg-muted/20"
+                    className="p-3 rounded-lg border"
                   >
                     <div className="flex gap-3">
                       <div className="grid gap-3 sm:grid-cols-2 flex-1">
@@ -1438,7 +1441,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                 {(data.contact?.links || []).map((link, index) => (
                   <div
                     key={index}
-                    className="p-3 rounded border border-muted bg-muted/20"
+                    className="p-3 rounded-lg border"
                   >
                     <div className="flex gap-3">
                       <div className="grid gap-3 sm:grid-cols-2 flex-1">
@@ -1495,7 +1498,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
 
       {/* Languages */}
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("languages")}
@@ -1536,7 +1539,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                 {(data.languages_spoken || []).map((lang, index) => (
                   <div
                     key={index}
-                    className="p-3 rounded border border-muted bg-muted/20 space-y-3"
+                    className="p-3 rounded-lg border space-y-3"
                   >
                     <div className="flex gap-3">
                       <div className="grid gap-3 sm:grid-cols-2 flex-1">
@@ -1867,7 +1870,7 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
     <div className="space-y-6">
       {/* Skills Section */}
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("skills")}
@@ -1978,7 +1981,7 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
                   return (
                     <div
                       key={originalIndex}
-                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                      className="border-b border-border last:border-b-0 hover:bg-muted/40 transition-colors"
                     >
                       {/* Collapsed header */}
                       <div
@@ -2236,7 +2239,7 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
             ) : null}
 
             {filteredDomains.length === 0 && (
-              <div className="px-4 py-8 text-center text-muted-foreground text-sm border rounded-lg bg-muted/20">
+              <div className="px-4 py-8 text-center text-muted-foreground text-sm border rounded-lg">
                 {searchTerm || filterLevel !== "all"
                   ? "No skills match your filters."
                   : "No skills yet. Add one to get started."}
@@ -2308,7 +2311,7 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
 
       {/* Mental Tabs Section */}
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("mentalTabs")}
@@ -2396,7 +2399,7 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
                   return (
                     <div
                       key={originalIndex}
-                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                      className="border-b border-border last:border-b-0 hover:bg-muted/40 transition-colors"
                     >
                       {/* Collapsed header */}
                       <div
@@ -2648,7 +2651,7 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
                 })}
               </div>
             ) : (
-              <div className="px-4 py-8 text-center text-muted-foreground text-sm border rounded-lg bg-muted/20">
+              <div className="px-4 py-8 text-center text-muted-foreground text-sm border rounded-lg">
                 {tabSearchTerm
                   ? "No tabs match your search."
                   : "No mental tabs yet. Add one to save random knowledge."}
@@ -2843,7 +2846,7 @@ function PreferencesEditor({ data, onChange }) {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <CardTitle>Code Style</CardTitle>
           <CardDescription>
             Your preferred programming languages, frameworks, and tools
@@ -2880,7 +2883,7 @@ function PreferencesEditor({ data, onChange }) {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <CardTitle>Communication</CardTitle>
           <CardDescription>
             How you prefer AI responses to be formatted
@@ -2895,7 +2898,7 @@ function PreferencesEditor({ data, onChange }) {
                 Always active
               </Badge>
             </div>
-            <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
+            <div className="p-4 border rounded-lg space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Tone</Label>
@@ -2963,7 +2966,7 @@ function PreferencesEditor({ data, onChange }) {
                     }`}
                   >
                     <div
-                      className="flex items-center gap-2 p-3 bg-muted/30 hover:bg-muted/50 cursor-pointer"
+                      className="flex items-center gap-2 p-3 hover:bg-muted/40 cursor-pointer"
                       onClick={() => toggleMood(idx)}
                     >
                       <ChevronDown
@@ -3069,7 +3072,7 @@ function PreferencesEditor({ data, onChange }) {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-6 border rounded-lg bg-muted/20 text-muted-foreground text-sm">
+              <div className="text-center py-6 border rounded-lg text-muted-foreground text-sm">
                 No mood overrides yet. Add one to customize how AI responds
                 based on how you're feeling.
               </div>
@@ -3079,7 +3082,7 @@ function PreferencesEditor({ data, onChange }) {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <CardTitle>Learning Style</CardTitle>
           <CardDescription>How you learn best</CardDescription>
         </CardHeader>
@@ -3104,7 +3107,7 @@ function PreferencesEditor({ data, onChange }) {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <CardTitle>Dislikes & Deal-breakers</CardTitle>
           <CardDescription>
             Things you do not want in responses or suggestions
@@ -3291,7 +3294,7 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("ideas")}
@@ -3434,7 +3437,7 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                 })}
               </div>
             ) : (
-              <div className="px-4 py-8 text-center text-muted-foreground text-sm border rounded-lg bg-muted/20">
+              <div className="px-4 py-8 text-center text-muted-foreground text-sm border rounded-lg">
                 No ideas yet. Click &quot;Add Idea&quot; to get started.
               </div>
             )}
@@ -3502,7 +3505,7 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
       </Dialog>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("projects")}
@@ -3609,7 +3612,7 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                   return (
                     <div
                       key={originalIndex}
-                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                      className="border-b border-border last:border-b-0 hover:bg-muted/40 transition-colors"
                     >
                       {/* Collapsed Header */}
                       <div
@@ -3956,7 +3959,7 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                 (highlight, hIdx) => (
                                   <div
                                     key={hIdx}
-                                    className="flex gap-2 items-start p-2 rounded border border-muted bg-muted/20"
+                                    className="flex gap-2 items-start p-2 rounded-lg border"
                                   >
                                     <Input
                                       value={highlight || ""}
@@ -4330,7 +4333,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
     <div className="space-y-6">
       {/* Hobbies Section */}
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("hobbies")}
@@ -4433,7 +4436,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
                   return (
                     <div
                       key={idx}
-                      className={`rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden ${
+                      className={`border-b border-border last:border-b-0 hover:bg-muted/40 transition-colors ${
                         hobby.status === "inactive" ? "opacity-60" : ""
                       }`}
                     >
@@ -4852,7 +4855,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
       {/* Passions */}
       <Card>
         <CardHeader
-          className="cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+          className="sticky top-[60px] z-10 border-b bg-card cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
           onClick={() => toggleSection("passions")}
         >
           <div className="flex items-center gap-2">
@@ -4896,7 +4899,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
       {/* Curiosities */}
       <Card>
         <CardHeader
-          className="cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+          className="sticky top-[60px] z-10 border-b bg-card cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
           onClick={() => toggleSection("curiosities")}
         >
           <div className="flex items-center gap-2">
@@ -4940,7 +4943,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
       {/* Personality Traits */}
       <Card>
         <CardHeader
-          className="cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+          className="sticky top-[60px] z-10 border-b bg-card cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
           onClick={() => toggleSection("traits")}
         >
           <div className="flex items-center gap-2">
@@ -4983,7 +4986,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
 
       <Card>
         <CardHeader
-          className="cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+          className="sticky top-[60px] z-10 border-b bg-card cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
           onClick={() => toggleSection("values")}
         >
           <div className="flex items-center gap-2">
@@ -5025,7 +5028,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
       {/* Wellness Section */}
       <Card>
         <CardHeader
-          className="cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+          className="sticky top-[60px] z-10 border-b bg-card cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
           onClick={() => toggleSection("wellness")}
         >
           <div className="flex items-center gap-2">
@@ -5061,7 +5064,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
             <div className="space-y-4">
               <Label className="text-sm font-medium">Sleep Schedule</Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3 p-4 border rounded-lg bg-muted/20">
+                <div className="space-y-3 p-4 border rounded-lg">
                   <p className="text-sm font-medium">Weekdays</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
@@ -5114,7 +5117,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
                     </div>
                   </div>
                 </div>
-                <div className="space-y-3 p-4 border rounded-lg bg-muted/20">
+                <div className="space-y-3 p-4 border rounded-lg">
                   <p className="text-sm font-medium">Weekends</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
@@ -5378,7 +5381,7 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
     <div className="space-y-6">
       {/* Connections Section */}
       <Card>
-        <CardHeader>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
@@ -5445,7 +5448,7 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
                 return (
                   <div
                     key={idx}
-                    className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                    className="border-b border-border last:border-b-0 hover:bg-muted/40 transition-colors"
                   >
                     {/* Collapsed Header */}
                     <div
@@ -5765,12 +5768,19 @@ function LearningLogEditor({ data, onChange, onShowConfirmation }) {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Learning Log</CardTitle>
-          <CardDescription>
-            Things you've learned, decisions you've made, and follow-ups —
-            captured from conversations or added here.
-          </CardDescription>
+        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Learning Log</CardTitle>
+              <CardDescription>
+                Things you've learned, decisions you've made, and follow-ups —
+                captured from conversations or added here.
+              </CardDescription>
+            </div>
+            <Button size="sm" onClick={addEntry}>
+              Add entry
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
@@ -5796,7 +5806,7 @@ function LearningLogEditor({ data, onChange, onShowConfirmation }) {
                   return (
                     <div
                       key={entry.id || idx}
-                      className="rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors overflow-hidden"
+                      className="border-b border-border last:border-b-0 hover:bg-muted/40 transition-colors"
                     >
                       {/* Collapsed Header */}
                       <div
@@ -5814,7 +5824,10 @@ function LearningLogEditor({ data, onChange, onShowConfirmation }) {
                           </span>
                           <div className="flex gap-1.5 items-center flex-shrink-0">
                             {date && (
-                              <Badge variant="secondary" className="h-5 text-xs">
+                              <Badge
+                                variant="secondary"
+                                className="h-5 text-xs font-mono"
+                              >
                                 {date}
                               </Badge>
                             )}
@@ -5928,7 +5941,7 @@ function LearningLogEditor({ data, onChange, onShowConfirmation }) {
                               </div>
                             </div>
                           )}
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground font-mono">
                             {entry.id ? `${entry.id} · ` : ""}
                             {entry.timestamp || ""}
                           </p>
@@ -6376,7 +6389,7 @@ export default function App() {
           </TabsContent>
           <TabsContent value="sections">
             <Card>
-              <CardHeader>
+              <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
                 <CardTitle>Manage Sections</CardTitle>
                 <CardDescription>
                   Turn optional sections on or off. Disabled sections are
