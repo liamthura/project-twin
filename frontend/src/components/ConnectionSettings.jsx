@@ -227,29 +227,31 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
           {/* Connection type */}
           <div className="space-y-2">
             <Label>Connection Type</Label>
-            <div className="flex gap-2">
-              <Button
+            <div className="flex rounded-lg bg-muted p-0.5">
+              <button
                 type="button"
-                variant={connectionType === "cloud" ? "default" : "outline"}
-                size="sm"
                 onClick={selectCloud}
-                className="flex-1"
+                className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  connectionType === "cloud"
+                    ? "border bg-card text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
               >
-                <Globe className="h-4 w-4 mr-2" />
+                <Globe className="h-4 w-4" />
                 Cloud
-              </Button>
-              <Button
+              </button>
+              <button
                 type="button"
-                variant={
-                  connectionType === "self-hosted" ? "default" : "outline"
-                }
-                size="sm"
                 onClick={selectSelfHosted}
-                className="flex-1"
+                className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  connectionType === "self-hosted"
+                    ? "border bg-card text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
               >
-                <Server className="h-4 w-4 mr-2" />
+                <Server className="h-4 w-4" />
                 Self-hosted
-              </Button>
+              </button>
             </div>
           </div>
 
