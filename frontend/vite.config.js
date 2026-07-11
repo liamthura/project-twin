@@ -1,8 +1,19 @@
+import { execSync } from "node:child_process";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import pkg from "./package.json";
+
+let commit = "dev";
+try {
+  commit = execSync("git rev-parse --short HEAD").toString().trim();
+} catch {}
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_COMMIT__: JSON.stringify(commit),
+  },
   plugins: [react()],
   resolve: {
     alias: {
