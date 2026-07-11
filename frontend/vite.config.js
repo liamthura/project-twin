@@ -4,10 +4,12 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import pkg from "./package.json";
 
-let commit = "dev";
-try {
-  commit = execSync("git rev-parse --short HEAD").toString().trim();
-} catch {}
+let commit = process.env.APP_COMMIT || "dev";
+if (!process.env.APP_COMMIT) {
+  try {
+    commit = execSync("git rev-parse --short HEAD").toString().trim();
+  } catch {}
+}
 
 export default defineConfig({
   define: {

@@ -6,6 +6,8 @@ RUN npm ci --prefer-offline
 COPY . .
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
+ARG APP_COMMIT
+ENV APP_COMMIT=$APP_COMMIT
 RUN npm run build
 
 # Production stage

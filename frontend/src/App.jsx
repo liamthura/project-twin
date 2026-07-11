@@ -649,6 +649,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
+                setCollapsedSections((prev) => ({ ...prev, academic: false }));
                 addEducation();
               }}
             >
@@ -662,7 +663,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
             {/* Education Entries */}
             {Array.isArray(data.education) &&
             (data.education || []).length > 0 ? (
-              <div className="space-y-4">
+              <div>
                 {(data.education || []).map((edu, eduIndex) => {
                   const isExpanded = expandedEducation[eduIndex];
                   const highlightsCount = (edu.highlights || []).length;
@@ -1134,6 +1135,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
+                setCollapsedSections((prev) => ({ ...prev, workExp: false }));
                 const newIndex = (data.work_experience || []).length;
                 update("work_experience", [
                   ...(data.work_experience || []),
@@ -1156,7 +1158,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
         {!collapsedSections.workExp && (
           <CardContent className="space-y-4">
             {data.work_experience && data.work_experience.length > 0 && (
-              <div className="space-y-3">
+              <div>
                 {data.work_experience.map((exp, idx) => {
                   const isExpanded = expandedWorkExp[idx];
                   const highlightsCount = (exp.highlights || []).length;
@@ -1972,7 +1974,7 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
 
             {/* Domains list */}
             {filteredDomains.length > 0 ? (
-              <div className="space-y-2">
+              <div>
                 {filteredDomains.map((domain, index) => {
                   const originalIndex = (data.domains || []).indexOf(domain);
                   const isExpanded = expandedDomains[originalIndex];
@@ -2390,7 +2392,7 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
 
             {/* Tabs list */}
             {filteredTabs.length > 0 ? (
-              <div className="space-y-2">
+              <div>
                 {filteredTabs.map((tab, index) => {
                   const originalIndex = (data.mental_tabs || []).indexOf(tab);
                   const isExpanded = expandedTabs[originalIndex];
@@ -3361,10 +3363,10 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                   return (
                     <div
                       key={index}
-                      className={`p-3 rounded border transition-colors ${
+                      className={`p-3 rounded-lg border transition-colors ${
                         isEditing
                           ? "ring-1 ring-primary/30 bg-muted/30"
-                          : "bg-muted/20 hover:bg-muted/30 cursor-pointer"
+                          : "cursor-pointer"
                       }`}
                       onClick={() => !isEditing && setEditingIdeaIndex(index)}
                     >
@@ -3599,7 +3601,7 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
 
             {/* Projects List */}
             {filteredProjects.length > 0 ? (
-              <div className="space-y-2">
+              <div>
                 {filteredProjects.map((project) => {
                   const originalIndex = (data.projects || []).indexOf(project);
                   const tags = project.tags || project.tech_stack || [];
@@ -4425,7 +4427,7 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
 
             {/* Hobbies Table */}
             {filteredHobbies.length > 0 ? (
-              <div className="space-y-2">
+              <div>
                 {filteredHobbies.map((hobby, idx) => {
                   const originalIndex = (data.hobbies || []).indexOf(hobby);
                   const isExpanded = expandedHobbies[originalIndex];
@@ -5436,7 +5438,7 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
 
           {/* Connections List */}
           {filteredConnections.length > 0 ? (
-            <div className="space-y-2">
+            <div>
               {filteredConnections.map((connection, idx) => {
                 const originalIndex = (data.connections || []).indexOf(
                   connection
@@ -5794,7 +5796,7 @@ function LearningLogEditor({ data, onChange, onShowConfirmation }) {
               No learning entries yet. Click "Add Entry" to get started.
             </p>
           ) : (
-            <div className="space-y-2">
+            <div>
               {sortedIndexes
                 .filter((idx) => matchesSearch(entries[idx]))
                 .map((idx) => {
@@ -6232,7 +6234,7 @@ export default function App() {
                 }`}
               >
                 <span
-                  className={`absolute left-0 top-[2px] h-[14px] w-[14px] rounded-full bg-primary-foreground transition-transform ${
+                  className={`absolute left-0 top-[2px] h-[14px] w-[14px] rounded-full border bg-card transition-transform ${
                     isAutosaveEnabled ? "translate-x-[16px]" : "translate-x-[2px]"
                   }`}
                 />
@@ -6242,7 +6244,7 @@ export default function App() {
               </span>
             </button>
             {/* Save status */}
-            <span className="text-xs text-muted-foreground">
+            <span className="hidden sm:inline text-xs text-muted-foreground">
               {isSaving
                 ? "Saving..."
                 : isAutosaveEnabled
@@ -6281,7 +6283,7 @@ export default function App() {
           orientation="vertical"
           className="flex flex-col gap-6 md:flex-row"
         >
-          <div className="md:sticky md:top-8 md:w-48 md:self-start">
+          <div className="md:sticky md:top-[84px] md:w-48 md:self-start">
           <TabsList className="w-full flex-nowrap overflow-x-auto md:flex-wrap md:overflow-visible md:h-fit md:flex-col md:items-stretch md:justify-start">
             <TabsTrigger value="profile" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
               <User className="h-4 w-4" />
