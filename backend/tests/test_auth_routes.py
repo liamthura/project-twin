@@ -33,16 +33,3 @@ def test_whoami_identifies_the_caller(client):
 def test_whoami_rejects_missing_token(client):
     resp = client.get("/api/auth/whoami")
     assert resp.status_code == 401
-
-
-def test_rotate_issues_a_new_token_and_invalidates_the_old_one(client):
-    token = client.post("/api/auth/register", json={"username": "alice"}).json()["token"]
-    resp = client.post("/api/auth/rotate", headers={"Authorization": f"Bearer {token}"})
-    assert resp.status_code == 200
-    new_token = resp.json()["token"]
-    assert new_token != token
-
-    old = client.get("/api/auth/whoami", headers={"Authorization": f"Bearer {token}"})
-    assert old.status_code == 401
-    new = client.get("/api/auth/whoami", headers={"Authorization": f"Bearer {new_token}"})
-    assert new.status_code == 200

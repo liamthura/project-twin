@@ -60,7 +60,7 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
 
     # Public routes (no auth required)
-    if path in ("/health", "/healthz", "/api/health", "/api/auth/register"):
+    if path in ("/health", "/healthz", "/api/health", "/api/auth/register", "/api/auth/login"):
         return await call_next(request)
 
     # Protected routes: /mcp/* and /api/* -- resolve the bearer token to a user
@@ -115,11 +115,29 @@ async def health_check():
 
 
 # ============================================================================
-# Auth: self-serve token registration, whoami, rotate
+# Auth: register, login, whoami, set-password, token management
 # ============================================================================
+
+MIN_PASSWORD_LENGTH = 8
+
 
 class RegisterRequest(BaseModel):
     username: str
+    password: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class SetPasswordRequest(BaseModel):
+    password: str
+    current_password: Optional[str] = None
+
+
+class CreateTokenRequest(BaseModel):
+    label: str = "token"
 
 
 @app.post("/api/auth/register")
@@ -127,11 +145,32 @@ async def register(body: RegisterRequest):
     username = body.username.strip()
     if not username:
         raise HTTPException(status_code=400, detail="username is required")
+    if body.password is not None and len(body.password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"password must be at least {MIN_PASSWORD_LENGTH} characters",
+        )
     try:
-        user_id, token = db.create_user(username)
+        user_id, token = db.create_user(username, body.password)
     except db.DuplicateUsernameError:
         raise HTTPException(status_code=409, detail="username already taken")
     return {"user_id": user_id, "username": username, "token": token}
+
+
+@app.post("/api/auth/login")
+async def login(body: LoginRequest):
+    try:
+        user = db.verify_password(body.username, body.password)
+    except db.PasswordNotSetError:
+        raise HTTPException(
+            status_code=401, detail="password sign-in not set up for this account"
+        )
+    if user is None:
+        # Same body for unknown username and wrong password: never reveal
+        # whether the account exists.
+        raise HTTPException(status_code=401, detail="invalid username or password")
+    _, token = db.create_token(user["id"], "web")
+    return {"user_id": user["id"], "username": user["username"], "token": token}
 
 
 @app.get("/api/auth/whoami")
@@ -139,10 +178,37 @@ async def whoami(request: Request):
     return {"user_id": db.current_user_id.get(), "username": request.state.username}
 
 
-@app.post("/api/auth/rotate")
-async def rotate(request: Request):
-    new_token = db.rotate_token(db.current_user_id.get())
-    return {"token": new_token}
+@app.post("/api/auth/set-password")
+async def set_password(body: SetPasswordRequest):
+    if len(body.password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"password must be at least {MIN_PASSWORD_LENGTH} characters",
+        )
+    try:
+        db.set_password(db.current_user_id.get(), body.password, body.current_password)
+    except db.InvalidCredentialsError:
+        raise HTTPException(status_code=403, detail="current password is incorrect")
+    return {"status": "ok"}
+
+
+@app.get("/api/auth/tokens")
+async def list_tokens():
+    return {"tokens": db.list_tokens(db.current_user_id.get())}
+
+
+@app.post("/api/auth/tokens")
+async def create_token(body: CreateTokenRequest):
+    label = body.label.strip() or "token"
+    token_id, token = db.create_token(db.current_user_id.get(), label)
+    return {"id": token_id, "label": label, "token": token}
+
+
+@app.delete("/api/auth/tokens/{token_id}")
+async def revoke_token(token_id: str):
+    if not db.revoke_token(db.current_user_id.get(), token_id):
+        raise HTTPException(status_code=404, detail="token not found")
+    return {"status": "revoked"}
 
 
 @app.get("/api/files")

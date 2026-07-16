@@ -27,3 +27,6 @@ fastapi==0.123.9
 # Postgres driver
 psycopg[binary]==3.3.4
 psycopg-pool==3.3.1
+
+# Password hashing (tokens stay sha256; passwords need a slow hash)
+bcrypt==5.0.0
