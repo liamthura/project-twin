@@ -13,6 +13,7 @@ import {
   Globe,
   Download,
   Upload,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +40,12 @@ import {
 
 const CLOUD_API_URL = "https://mygist-api.thuradev.qzz.io/api";
 
-export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
+export function ConnectionSettings({
+  isOpen,
+  onClose,
+  onConnectionChange,
+  initialMode = "connect",
+}) {
   const [connectionType, setConnectionType] = useState("cloud"); // "cloud" | "self-hosted"
   const [serverUrl, setServerUrl] = useState(CLOUD_API_URL);
   const [selfHostedUrl, setSelfHostedUrl] = useState("");
@@ -51,9 +57,11 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
   const [importing, setImporting] = useState(false);
   const [importMode, setImportMode] = useState("replace");
   const [backupResult, setBackupResult] = useState(null);
-  const [mode, setMode] = useState("connect"); // "connect" | "register"
+  const [mode, setMode] = useState("connect"); // "connect" | "register" | "created"
   const [username, setUsername] = useState("");
   const [connectedAs, setConnectedAs] = useState(null);
+  const [newAccount, setNewAccount] = useState(null); // { username, token }
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -71,11 +79,13 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
       setToken(config?.token || "");
       setTestResult(null);
       setBackupResult(null);
-      setMode("connect");
+      setMode(initialMode);
       setUsername("");
       setConnectedAs(null);
+      setNewAccount(null);
+      setCopied(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialMode]);
 
   const selectCloud = () => {
     setConnectionType("cloud");
@@ -138,12 +148,9 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
     try {
       const { token: newToken } = await registerAccount(serverUrl, username);
       setToken(newToken);
-      setMode("connect");
-      setTestResult({
-        success: true,
-        message:
-          "Account created — token filled in below. Save it, it won't be shown again.",
-      });
+      setNewAccount({ username, token: newToken });
+      setMode("created");
+      setTestResult(null);
     } catch (err) {
       setTestResult({ success: false, message: err.message });
     } finally {
@@ -159,6 +166,17 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
     }
     onConnectionChange?.();
     onClose();
+  };
+
+  const handleCopyToken = async () => {
+    if (!newAccount) return;
+    try {
+      await navigator.clipboard.writeText(newAccount.token);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable; token stays visible for manual copy
+    }
   };
 
   const handleReset = () => {
@@ -213,16 +231,73 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Server className="h-5 w-5" />
-            Server Connection
-          </DialogTitle>
-          <DialogDescription>
-            Connect to your MyGist MCP server. Use Cloud for the hosted
-            instance, or Self-hosted to point at your own server API.
-          </DialogDescription>
+          {mode === "created" ? (
+            <>
+              <DialogTitle className="flex items-center gap-2">
+                <Check className="h-5 w-5 text-primary" />
+                Account created
+              </DialogTitle>
+              <DialogDescription>
+                One last step: save your access token before continuing.
+              </DialogDescription>
+            </>
+          ) : (
+            <>
+              <DialogTitle className="flex items-center gap-2">
+                <Server className="h-5 w-5" />
+                Server Connection
+              </DialogTitle>
+              <DialogDescription>
+                Connect to your MyGist MCP server. Use Cloud for the hosted
+                instance, or Self-hosted to point at your own server API.
+              </DialogDescription>
+            </>
+          )}
         </DialogHeader>
 
+        {mode === "created" && newAccount ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3 text-sm">
+              <Check className="h-4 w-4 flex-shrink-0 text-primary" />
+              <span>
+                Welcome, <strong>{newAccount.username}</strong>. Your account
+                is ready to use.
+              </span>
+            </div>
+            <div className="space-y-2">
+              <Label>Your access token</Label>
+              <div className="select-all break-all rounded-lg border bg-muted/50 p-3 font-mono text-sm">
+                {newAccount.token}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={handleCopyToken}
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy token
+                  </>
+                )}
+              </Button>
+            </div>
+            <div className="flex gap-2 rounded-lg border p-3 text-xs text-muted-foreground">
+              <Key className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              <span>
+                This token is the only key to your account. Save it in a
+                password manager or somewhere safe. For your security it will
+                not be shown again.
+              </span>
+            </div>
+          </div>
+        ) : (
         <div className="space-y-4">
           {/* Connection type */}
           <div className="space-y-2">
@@ -462,8 +537,15 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
             </p>
           </div>
         </div>
+        )}
 
         <DialogFooter className="gap-2 sm:gap-0">
+          {mode === "created" ? (
+            <Button className="w-full" onClick={handleSave}>
+              I saved my token, continue
+            </Button>
+          ) : (
+            <>
           <Button
             variant="outline"
             onClick={handleReset}
@@ -487,6 +569,8 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
             </Button>
             <Button onClick={handleSave}>Save</Button>
           </div>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

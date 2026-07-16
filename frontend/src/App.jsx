@@ -52,7 +52,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ConnectionSettings } from "@/components/ConnectionSettings";
-import { api } from "@/lib/api.js";
+import { api, getAuthToken } from "@/lib/api.js";
 
 // Debounce hook
 function useDebounce(callback, delay) {
@@ -5993,6 +5993,7 @@ export default function App() {
   const [lastSaved, setLastSaved] = useState(null);
   const [isAutosaveEnabled, setIsAutosaveEnabled] = useState(true);
   const [showConnectionSettings, setShowConnectionSettings] = useState(false);
+  const [connectionInitialMode, setConnectionInitialMode] = useState("connect");
 
   // Theme: "light" | "dark" | "system" (system follows the OS live)
   const [theme, setTheme] = useState(
@@ -6195,6 +6196,81 @@ export default function App() {
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
           <p className="text-muted-foreground">Connecting to backend...</p>
         </div>
+      </div>
+    );
+  }
+
+  // First run: no token configured yet. Welcome instead of an error.
+  if (error && !getAuthToken()) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-sm space-y-6 text-center">
+          <div className="flex justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
+              <svg
+                width="40"
+                height="40"
+                viewBox="0 0 96 96"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true"
+              >
+                <circle
+                  cx="45"
+                  cy="40"
+                  r="15"
+                  fill="none"
+                  stroke="#FFFFFF"
+                  strokeWidth="9"
+                />
+                <path
+                  d="M60 40 v22 a14 14 0 0 1 -14 14 h-9"
+                  fill="none"
+                  stroke="#FFFFFF"
+                  strokeWidth="9"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold">Welcome to MyGist</h1>
+            <p className="text-sm text-muted-foreground">
+              Your portable personal context for AI. Create an account or
+              connect with your access token to get started.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Button
+              className="w-full"
+              onClick={() => {
+                setConnectionInitialMode("register");
+                setShowConnectionSettings(true);
+              }}
+            >
+              Create an account
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setConnectionInitialMode("connect");
+                setShowConnectionSettings(true);
+              }}
+            >
+              I have a token
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Connects to the MyGist cloud by default. Self-hosted options are
+            in the next step.
+          </p>
+        </div>
+        <ConnectionSettings
+          isOpen={showConnectionSettings}
+          initialMode={connectionInitialMode}
+          onClose={() => setShowConnectionSettings(false)}
+          onConnectionChange={loadAllData}
+        />
       </div>
     );
   }
