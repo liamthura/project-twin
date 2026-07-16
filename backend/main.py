@@ -121,6 +121,22 @@ async def health_check():
 MIN_PASSWORD_LENGTH = 8
 
 
+def validate_new_password(password: str) -> None:
+    """Shared length rules for any password being set (register/set-password).
+    Login deliberately skips this: oversized passwords there are treated as an
+    ordinary failed login (see db.verify_password) to avoid an oracle."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"password must be at least {MIN_PASSWORD_LENGTH} characters",
+        )
+    if len(password.encode("utf-8")) > db.MAX_PASSWORD_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"password must be at most {db.MAX_PASSWORD_BYTES} bytes",
+        )
+
+
 class RegisterRequest(BaseModel):
     username: str
     password: Optional[str] = None
@@ -145,11 +161,8 @@ async def register(body: RegisterRequest):
     username = body.username.strip()
     if not username:
         raise HTTPException(status_code=400, detail="username is required")
-    if body.password is not None and len(body.password) < MIN_PASSWORD_LENGTH:
-        raise HTTPException(
-            status_code=400,
-            detail=f"password must be at least {MIN_PASSWORD_LENGTH} characters",
-        )
+    if body.password is not None:
+        validate_new_password(body.password)
     try:
         user_id, token = db.create_user(username, body.password)
     except db.DuplicateUsernameError:
@@ -180,11 +193,7 @@ async def whoami(request: Request):
 
 @app.post("/api/auth/set-password")
 async def set_password(body: SetPasswordRequest):
-    if len(body.password) < MIN_PASSWORD_LENGTH:
-        raise HTTPException(
-            status_code=400,
-            detail=f"password must be at least {MIN_PASSWORD_LENGTH} characters",
-        )
+    validate_new_password(body.password)
     try:
         db.set_password(db.current_user_id.get(), body.password, body.current_password)
     except db.InvalidCredentialsError:

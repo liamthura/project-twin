@@ -166,6 +166,49 @@ def test_set_password_requires_auth(client):
 
 
 # ---------------------------------------------------------------------------
+# bcrypt's 72-byte limit must never surface as a 500
+# ---------------------------------------------------------------------------
+
+
+def test_register_rejects_over_72_byte_password(client):
+    resp = client.post(
+        "/api/auth/register", json={"username": "alice", "password": "x" * 100}
+    )
+    assert resp.status_code == 400
+
+
+def test_set_password_rejects_over_72_byte_password(client):
+    reg = client.post("/api/auth/register", json={"username": "bob"}).json()
+    resp = client.post(
+        "/api/auth/set-password",
+        json={"password": "x" * 100},
+        headers=auth_headers(reg["token"]),
+    )
+    assert resp.status_code == 400
+
+
+def test_login_with_over_72_byte_password_is_ordinary_401(client):
+    client.post("/api/auth/register", json={"username": "alice", "password": "correcthorse"})
+    resp = client.post("/api/auth/login", json={"username": "alice", "password": "x" * 100})
+    assert resp.status_code == 401
+    # same body as any other bad-credential failure (no oracle)
+    wrong = client.post("/api/auth/login", json={"username": "alice", "password": "wrongpass"})
+    assert resp.json() == wrong.json()
+
+
+def test_set_password_with_over_72_byte_current_password_is_403_not_500(client):
+    reg = client.post(
+        "/api/auth/register", json={"username": "alice", "password": "correcthorse"}
+    ).json()
+    resp = client.post(
+        "/api/auth/set-password",
+        json={"password": "newpassword1", "current_password": "x" * 100},
+        headers=auth_headers(reg["token"]),
+    )
+    assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
 # Token CRUD
 # ---------------------------------------------------------------------------
 
@@ -256,6 +299,42 @@ def test_ensure_schema_backfills_legacy_token_hash_into_tokens_table():
     user = db.resolve_token(plaintext)
     assert user is not None
     assert user["username"] == "legacyuser"
+
+
+def test_revoked_token_does_not_resurrect_after_ensure_schema(client):
+    """users.token_hash must be cleared by the migration: otherwise revoking
+    a migrated/initial token and restarting re-inserts it as 'legacy'."""
+    reg = client.post("/api/auth/register", json={"username": "alice"}).json()
+    headers = auth_headers(reg["token"])
+
+    tokens = client.get("/api/auth/tokens", headers=headers).json()["tokens"]
+    assert len(tokens) == 1  # the initial 'web' token
+    revoke = client.delete(f"/api/auth/tokens/{tokens[0]['id']}", headers=headers)
+    assert revoke.status_code == 200
+
+    db.ensure_schema()  # simulates a server restart re-running the migration
+
+    resp = client.get("/api/auth/whoami", headers=headers)
+    assert resp.status_code == 401
+    assert db.resolve_token(reg["token"]) is None
+
+
+def test_migration_clears_users_token_hash():
+    plaintext = "legacy-plaintext-token-value-3"
+    with db.get_pool().connection() as conn:
+        conn.execute(
+            "insert into users (username, token_hash) values (%s, %s)",
+            ("legacyuser3", db.hash_token(plaintext)),
+        )
+
+    db.ensure_schema()
+
+    assert db.resolve_token(plaintext) is not None  # migrated into tokens
+    with db.get_pool().connection() as conn:
+        row = conn.execute(
+            "select token_hash from users where username = 'legacyuser3'"
+        ).fetchone()
+    assert row["token_hash"] is None  # and cleared at the source
 
 
 def test_ensure_schema_migration_is_idempotent():

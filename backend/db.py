@@ -67,6 +67,7 @@ def ensure_schema() -> None:
             );
         """)
         conn.execute("alter table users add column if not exists password_hash text;")
+        conn.execute("alter table users alter column token_hash drop not null;")
         conn.execute("""
             create table if not exists tokens (
                 id uuid primary key default gen_random_uuid(),
@@ -77,20 +78,31 @@ def ensure_schema() -> None:
                 last_used_at timestamptz
             );
         """)
-        # Migration: backfill legacy single-token users into the tokens table.
-        # Idempotent (unique token_hash + on conflict do nothing) and cheap, so
-        # it is safe to run on every startup. users.token_hash stays in place
-        # but is no longer read by auth.
+        # Migration: backfill legacy single-token users into the tokens table,
+        # then CLEAR users.token_hash. Clearing matters: if the hash stayed,
+        # revoking the migrated token and restarting would re-insert it here
+        # and resurrect the revoked credential. Idempotent and cheap, so it is
+        # safe to run on every startup.
         conn.execute("""
             insert into tokens (user_id, token_hash, label)
             select id, token_hash, 'legacy' from users
             where token_hash is not null
             on conflict (token_hash) do nothing;
         """)
+        conn.execute("update users set token_hash = null where token_hash is not null;")
 
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+# bcrypt truncates/rejects passwords over 72 bytes (raises in bcrypt >= 4.1).
+MAX_PASSWORD_BYTES = 72
+
+# Precomputed hash so bad-credential paths (unknown user, no password set,
+# oversized password) still cost one bcrypt op: latency must not reveal
+# whether a username exists.
+_DUMMY_HASH = bcrypt.hashpw(b"dummy-password-for-timing", bcrypt.gensalt())
 
 
 def hash_password(password: str) -> str:
@@ -98,7 +110,10 @@ def hash_password(password: str) -> str:
 
 
 def check_password(password: str, password_hash: str) -> bool:
-    return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+    password_bytes = password.encode("utf-8")
+    if len(password_bytes) > MAX_PASSWORD_BYTES:
+        return False  # can never be a stored password; bcrypt would raise
+    return bcrypt.checkpw(password_bytes, password_hash.encode("utf-8"))
 
 
 def create_user(username: str, password: Optional[str] = None) -> tuple[str, str]:
@@ -107,21 +122,19 @@ def create_user(username: str, password: Optional[str] = None) -> tuple[str, str
     Returns (user_id, plaintext_token).
     """
     token = secrets.token_urlsafe(32)
-    token_hash = hash_token(token)
     password_hash = hash_password(password) if password else None
     try:
         with get_pool().connection() as conn:
-            # users.token_hash is legacy (not null constraint, no longer read
-            # by auth); the tokens row is the live credential.
+            # users.token_hash stays null: the tokens row is the only
+            # credential record (a value here would be re-migrated -- and
+            # resurrected after revocation -- on the next startup).
             row = conn.execute(
-                "insert into users (username, token_hash, password_hash)"
-                " values (%s, %s, %s) returning id",
-                (username, token_hash, password_hash),
+                "insert into users (username, password_hash) values (%s, %s) returning id",
+                (username, password_hash),
             ).fetchone()
             conn.execute(
-                "insert into tokens (user_id, token_hash, label) values (%s, %s, 'web')"
-                " on conflict (token_hash) do nothing",
-                (row["id"], token_hash),
+                "insert into tokens (user_id, token_hash, label) values (%s, %s, 'web')",
+                (row["id"], hash_token(token)),
             )
     except psycopg.errors.UniqueViolation:
         raise DuplicateUsernameError(username)
@@ -217,15 +230,23 @@ def verify_password(username: str, password: str) -> Optional[dict]:
     """Check username + password. Returns {id, username} on success, None on
     bad credentials (indistinguishable for unknown user vs wrong password).
     Raises PasswordNotSetError when the account exists but has no password."""
+    password_bytes = password.encode("utf-8")
     with get_pool().connection() as conn:
         row = conn.execute(
             "select id, username, password_hash from users where username = %s",
             (username,),
         ).fetchone()
+    # Every failure branch performs exactly one bcrypt op so response timing
+    # doesn't reveal whether the username exists or has a password.
     if row is None:
+        bcrypt.checkpw(b"dummy-password-for-timing", _DUMMY_HASH)
         return None
     if row["password_hash"] is None:
+        bcrypt.checkpw(b"dummy-password-for-timing", _DUMMY_HASH)
         raise PasswordNotSetError()
-    if not check_password(password, row["password_hash"]):
+    if len(password_bytes) > MAX_PASSWORD_BYTES:
+        bcrypt.checkpw(b"dummy-password-for-timing", _DUMMY_HASH)
+        return None  # bcrypt would raise; ordinary failed login instead
+    if not bcrypt.checkpw(password_bytes, row["password_hash"].encode("utf-8")):
         return None
     return {"id": str(row["id"]), "username": row["username"]}
