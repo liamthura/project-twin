@@ -6207,7 +6207,6 @@ export default function App() {
   const [lastSaved, setLastSaved] = useState(null);
   const [isAutosaveEnabled, setIsAutosaveEnabled] = useState(true);
   const [showConnectionSettings, setShowConnectionSettings] = useState(false);
-  const [connectionInitialMode, setConnectionInitialMode] = useState("connect");
 
   // Theme: "light" | "dark" | "system" (system follows the OS live)
   const [theme, setTheme] = useState(
@@ -6454,16 +6453,12 @@ export default function App() {
             </p>
           </div>
           <WelcomeAuth
-            onUseToken={() => {
-              setConnectionInitialMode("connect");
-              setShowConnectionSettings(true);
-            }}
+            onUseToken={() => setShowConnectionSettings(true)}
             onSuccess={loadAllData}
           />
         </div>
         <ConnectionSettings
           isOpen={showConnectionSettings}
-          initialMode={connectionInitialMode}
           onClose={() => setShowConnectionSettings(false)}
           onConnectionChange={loadAllData}
         />

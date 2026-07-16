@@ -1,19 +1,21 @@
 import { useState, useEffect } from "react";
 import {
-  Settings,
   Wifi,
-  WifiOff,
   Loader2,
   Check,
   X,
   Server,
   Key,
-  ExternalLink,
   Laptop,
   Globe,
   Download,
   Upload,
   Copy,
+  User,
+  LogOut,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,25 +28,57 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/use-toast";
 import {
   CLOUD_API_URL,
   getConfig,
   saveConfig,
   clearConfig,
   testConnection,
-  registerAccount,
   whoami,
   getApiBase,
   exportData,
   importData,
+  setPassword,
+  listTokens,
+  createToken,
+  revokeToken,
 } from "@/lib/api.js";
 
-export function ConnectionSettings({
-  isOpen,
-  onClose,
-  onConnectionChange,
-  initialMode = "connect",
-}) {
+const TABS = [
+  { id: "connection", label: "Connection" },
+  { id: "tokens", label: "API tokens" },
+  { id: "data", label: "Data" },
+];
+
+// Segmented-control button classes, shared by the tab row, the
+// connection-type toggle, and the import-mode toggle.
+function segmentClass(active, disabled) {
+  if (disabled) {
+    return "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground/50 cursor-not-allowed";
+  }
+  return `flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+    active
+      ? "border bg-card text-foreground"
+      : "text-muted-foreground hover:text-foreground"
+  }`;
+}
+
+function formatDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
+  const { toast } = useToast();
+
+  const [activeTab, setActiveTab] = useState("connection");
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [signedInUsername, setSignedInUsername] = useState(null);
+
+  // Connection tab
   const [connectionType, setConnectionType] = useState("cloud"); // "cloud" | "self-hosted"
   const [serverUrl, setServerUrl] = useState(CLOUD_API_URL);
   const [selfHostedUrl, setSelfHostedUrl] = useState("");
@@ -52,39 +86,94 @@ export function ConnectionSettings({
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [showToken, setShowToken] = useState(false);
+
+  // Change password disclosure
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPasswordValue, setNewPasswordValue] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState(null);
+
+  // API tokens tab
+  const [tokensList, setTokensList] = useState([]);
+  const [tokensLoading, setTokensLoading] = useState(false);
+  const [tokensError, setTokensError] = useState(null);
+  const [newTokenLabel, setNewTokenLabel] = useState("mcp");
+  const [generating, setGenerating] = useState(false);
+  const [revealedToken, setRevealedToken] = useState(null); // { id, label, token }
+  const [copied, setCopied] = useState(false);
+  const [confirmRevokeId, setConfirmRevokeId] = useState(null);
+  const [revokingId, setRevokingId] = useState(null);
+
+  // Data tab
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importMode, setImportMode] = useState("replace");
-  const [backupResult, setBackupResult] = useState(null);
-  const [mode, setMode] = useState("connect"); // "connect" | "register" | "created"
-  const [username, setUsername] = useState("");
-  const [connectedAs, setConnectedAs] = useState(null);
-  const [newAccount, setNewAccount] = useState(null); // { username, token }
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      const config = getConfig();
-      const savedUrl = config?.serverUrl || "";
-      if (!config || savedUrl === CLOUD_API_URL) {
-        setConnectionType("cloud");
-        setServerUrl(CLOUD_API_URL);
-        setSelfHostedUrl("");
-      } else {
-        setConnectionType("self-hosted");
-        setServerUrl(savedUrl);
-        setSelfHostedUrl(savedUrl);
-      }
-      setToken(config?.token || "");
-      setTestResult(null);
-      setBackupResult(null);
-      setMode(initialMode);
-      setUsername("");
-      setConnectedAs(null);
-      setNewAccount(null);
-      setCopied(false);
+    if (!isOpen) return;
+
+    const config = getConfig();
+    const savedUrl = config?.serverUrl || "";
+    if (!config || savedUrl === CLOUD_API_URL) {
+      setConnectionType("cloud");
+      setServerUrl(CLOUD_API_URL);
+      setSelfHostedUrl("");
+    } else {
+      setConnectionType("self-hosted");
+      setServerUrl(savedUrl);
+      setSelfHostedUrl(savedUrl);
     }
-  }, [isOpen, initialMode]);
+    setToken(config?.token || "");
+    setTestResult(null);
+    setShowToken(false);
+    setActiveTab("connection");
+
+    setShowPasswordForm(false);
+    setCurrentPassword("");
+    setNewPasswordValue("");
+    setConfirmNewPassword("");
+    setPasswordError(null);
+
+    setTokensList([]);
+    setTokensError(null);
+    setNewTokenLabel("mcp");
+    setRevealedToken(null);
+    setCopied(false);
+    setConfirmRevokeId(null);
+
+    setImportMode("replace");
+
+    const signedIn = !!config?.token;
+    setIsSignedIn(signedIn);
+    setSignedInUsername(null);
+    if (signedIn) {
+      whoami()
+        .then((me) => setSignedInUsername(me.username))
+        .catch(() => setSignedInUsername("your account"));
+    }
+  }, [isOpen]);
+
+  const loadTokens = async () => {
+    setTokensLoading(true);
+    setTokensError(null);
+    try {
+      const list = await listTokens();
+      setTokensList(list);
+    } catch (err) {
+      setTokensError(err.message);
+    } finally {
+      setTokensLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && activeTab === "tokens" && isSignedIn) {
+      loadTokens();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, activeTab, isSignedIn]);
 
   const selectCloud = () => {
     setConnectionType("cloud");
@@ -109,14 +198,11 @@ export function ConnectionSettings({
 
     setTesting(true);
     setTestResult(null);
-    setConnectedAs(null);
 
     try {
       await testConnection(serverUrl, token);
-      // Reachable -- now confirm the token identifies a user.
       try {
         const me = await whoami(serverUrl, token);
-        setConnectedAs(me.username);
         setTestResult({ success: true, message: `Connected as ${me.username}` });
       } catch {
         setTestResult({
@@ -134,29 +220,6 @@ export function ConnectionSettings({
     }
   };
 
-  const handleRegister = async () => {
-    if (!serverUrl || !username) {
-      setTestResult({
-        success: false,
-        message: "Server URL and username are required",
-      });
-      return;
-    }
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const { token: newToken } = await registerAccount(serverUrl, username);
-      setToken(newToken);
-      setNewAccount({ username, token: newToken });
-      setMode("created");
-      setTestResult(null);
-    } catch (err) {
-      setTestResult({ success: false, message: err.message });
-    } finally {
-      setTesting(false);
-    }
-  };
-
   const handleSave = () => {
     if (serverUrl) {
       saveConfig({ serverUrl, token });
@@ -165,17 +228,6 @@ export function ConnectionSettings({
     }
     onConnectionChange?.();
     onClose();
-  };
-
-  const handleCopyToken = async () => {
-    if (!newAccount) return;
-    try {
-      await navigator.clipboard.writeText(newAccount.token);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard unavailable; token stays visible for manual copy
-    }
   };
 
   const handleReset = () => {
@@ -188,17 +240,107 @@ export function ConnectionSettings({
     onConnectionChange?.();
   };
 
+  const handleSignOut = () => {
+    clearConfig();
+    onConnectionChange?.();
+    onClose();
+  };
+
+  const handleSetPassword = async (e) => {
+    e.preventDefault();
+    setPasswordError(null);
+
+    if (newPasswordValue.length < 8) {
+      setPasswordError("Password must be at least 8 characters.");
+      return;
+    }
+    if (newPasswordValue !== confirmNewPassword) {
+      setPasswordError("Passwords do not match.");
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      await setPassword(newPasswordValue, currentPassword || undefined);
+      toast({ title: "Password updated", variant: "success" });
+      setShowPasswordForm(false);
+      setCurrentPassword("");
+      setNewPasswordValue("");
+      setConfirmNewPassword("");
+    } catch (err) {
+      setPasswordError(err.message);
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  const handleGenerateToken = async () => {
+    setGenerating(true);
+    try {
+      const result = await createToken(newTokenLabel.trim() || "mcp");
+      setRevealedToken(result);
+      setCopied(false);
+    } catch (err) {
+      toast({
+        title: "Failed to generate token",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleCopyRevealedToken = async () => {
+    if (!revealedToken) return;
+    try {
+      await navigator.clipboard.writeText(revealedToken.token);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable; token stays visible for manual copy
+    }
+  };
+
+  const handleDoneReveal = () => {
+    setRevealedToken(null);
+    setNewTokenLabel("mcp");
+    loadTokens();
+  };
+
+  const handleRevoke = async (id) => {
+    setRevokingId(id);
+    try {
+      await revokeToken(id);
+      setConfirmRevokeId(null);
+      toast({ title: "Token revoked", variant: "success" });
+      loadTokens();
+    } catch (err) {
+      toast({
+        title: "Failed to revoke token",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
   const handleExport = async () => {
     setExporting(true);
-    setBackupResult(null);
     try {
       const result = await exportData();
-      setBackupResult({
-        success: true,
-        message: `Downloaded ${result.filename}`,
+      toast({
+        title: "Export complete",
+        description: `Downloaded ${result.filename}`,
+        variant: "success",
       });
     } catch (error) {
-      setBackupResult({ success: false, message: error.message });
+      toast({
+        title: "Export failed",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setExporting(false);
     }
@@ -209,17 +351,21 @@ export function ConnectionSettings({
     if (!file) return;
 
     setImporting(true);
-    setBackupResult(null);
     try {
       const result = await importData(file, importMode);
-      setBackupResult({
-        success: true,
-        message: `${importMode === "merge" ? "Merged" : "Imported"} ${
-          result.imported_files?.length || 0
-        } files`,
+      toast({
+        title: importMode === "merge" ? "Merge complete" : "Import complete",
+        description: `${result.imported_files?.length || 0} files ${
+          importMode === "merge" ? "merged" : "imported"
+        }`,
+        variant: "success",
       });
     } catch (error) {
-      setBackupResult({ success: false, message: error.message });
+      toast({
+        title: "Import failed",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setImporting(false);
       e.target.value = ""; // Reset file input
@@ -230,347 +376,470 @@ export function ConnectionSettings({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          {mode === "created" ? (
-            <>
-              <DialogTitle className="flex items-center gap-2">
-                <Check className="h-5 w-5 text-primary" />
-                Account created
-              </DialogTitle>
-              <DialogDescription>
-                One last step: save your access token before continuing.
-              </DialogDescription>
-            </>
-          ) : (
-            <>
-              <DialogTitle className="flex items-center gap-2">
-                <Server className="h-5 w-5" />
-                Server Connection
-              </DialogTitle>
-              <DialogDescription>
-                Connect to your MyGist MCP server. Use Cloud for the hosted
-                instance, or Self-hosted to point at your own server API.
-              </DialogDescription>
-            </>
-          )}
+          <DialogTitle className="flex items-center gap-2">
+            <Server className="h-5 w-5" />
+            Account & Connection
+          </DialogTitle>
+          <DialogDescription>
+            Manage your connection, tokens, and data.
+          </DialogDescription>
         </DialogHeader>
 
-        {mode === "created" && newAccount ? (
+        <div className="flex rounded-lg bg-muted p-0.5">
+          {TABS.map((tab) => {
+            const disabled = tab.id !== "connection" && !isSignedIn;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => !disabled && setActiveTab(tab.id)}
+                disabled={disabled}
+                title={disabled ? "Sign in to manage tokens and data" : undefined}
+                className={segmentClass(activeTab === tab.id, disabled)}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {activeTab === "connection" && (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3 text-sm">
-              <Check className="h-4 w-4 flex-shrink-0 text-primary" />
-              <span>
-                Welcome, <strong>{newAccount.username}</strong>. Your account
-                is ready to use.
-              </span>
-            </div>
-            <div className="space-y-2">
-              <Label>Your access token</Label>
-              <div className="select-all break-all rounded-lg border bg-muted/50 p-3 font-mono text-sm">
-                {newAccount.token}
+            {isSignedIn && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/50 p-3 text-sm">
+                <span className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  Signed in as <strong>{signedInUsername || "your account"}</strong>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <LogOut className="h-3.5 w-3.5 mr-1.5" />
+                  Sign out
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={handleCopyToken}
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4 mr-2" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy token
-                  </>
-                )}
-              </Button>
-            </div>
-            <div className="flex gap-2 rounded-lg border p-3 text-xs text-muted-foreground">
-              <Key className="mt-0.5 h-4 w-4 flex-shrink-0" />
-              <span>
-                This token is the only key to your account. Save it in a
-                password manager or somewhere safe. For your security it will
-                not be shown again.
-              </span>
-            </div>
-          </div>
-        ) : (
-        <div className="space-y-4">
-          {/* Connection type */}
-          <div className="space-y-2">
-            <Label>Connection Type</Label>
-            <div className="flex rounded-lg bg-muted p-0.5">
-              <button
-                type="button"
-                onClick={selectCloud}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  connectionType === "cloud"
-                    ? "border bg-card text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Globe className="h-4 w-4" />
-                Cloud
-              </button>
-              <button
-                type="button"
-                onClick={selectSelfHosted}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  connectionType === "self-hosted"
-                    ? "border bg-card text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Server className="h-4 w-4" />
-                Self-hosted
-              </button>
-            </div>
-          </div>
+            )}
 
-          {/* Server URL (self-hosted only) */}
-          {connectionType === "self-hosted" && (
+            {/* Connection type */}
             <div className="space-y-2">
-              <Label htmlFor="serverUrl">Server URL</Label>
-              <Input
-                id="serverUrl"
-                placeholder="https://your-mygist-server.com/api"
-                value={serverUrl}
-                onChange={(e) => handleSelfHostedUrlChange(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Full URL to your MyGist API endpoint. Leave empty to use the
-                local development server.
-              </p>
-            </div>
-          )}
-
-          {/* API Token */}
-          <div className="space-y-2">
-            <Label htmlFor="token" className="flex items-center gap-2">
-              <Key className="h-3 w-3" />
-              API Token
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                id="token"
-                type={showToken ? "text" : "password"}
-                placeholder="Your access token"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowToken(!showToken)}
-              >
-                {showToken ? "Hide" : "Show"}
-              </Button>
-            </div>
-            {mode === "connect" ? (
-              <p className="text-xs text-muted-foreground">
-                Don&apos;t have a token?{" "}
+              <Label>Connection Type</Label>
+              <div className="flex rounded-lg bg-muted p-0.5">
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode("register");
-                    setTestResult(null);
-                  }}
-                  className="underline hover:text-foreground"
+                  onClick={selectCloud}
+                  className={segmentClass(connectionType === "cloud", false)}
                 >
-                  Create an account
+                  <Globe className="h-4 w-4" />
+                  Cloud
                 </button>
+                <button
+                  type="button"
+                  onClick={selectSelfHosted}
+                  className={segmentClass(connectionType === "self-hosted", false)}
+                >
+                  <Server className="h-4 w-4" />
+                  Self-hosted
+                </button>
+              </div>
+            </div>
+
+            {/* Server URL (self-hosted only) */}
+            {connectionType === "self-hosted" && (
+              <div className="space-y-2">
+                <Label htmlFor="serverUrl">Server URL</Label>
+                <Input
+                  id="serverUrl"
+                  placeholder="https://your-mygist-server.com/api"
+                  value={serverUrl}
+                  onChange={(e) => handleSelfHostedUrlChange(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Full URL to your MyGist API endpoint. Leave empty to use the
+                  local development server.
+                </p>
+              </div>
+            )}
+
+            {/* Manual token entry -- recovery path when not signed in */}
+            {!isSignedIn && (
+              <div className="space-y-2">
+                <Label htmlFor="token" className="flex items-center gap-2">
+                  <Key className="h-3 w-3" />
+                  API Token
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="token"
+                    type={showToken ? "text" : "password"}
+                    placeholder="Your access token"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowToken(!showToken)}
+                  >
+                    {showToken ? "Hide" : "Show"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Test Result */}
+            {testResult && (
+              <div
+                className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
+                  testResult.success
+                    ? "bg-accent text-accent-foreground"
+                    : "border border-destructive/40 text-destructive"
+                }`}
+              >
+                {testResult.success ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <X className="h-4 w-4" />
+                )}
+                {testResult.message}
+              </div>
+            )}
+
+            {/* Current Config Info */}
+            <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+              <p>
+                <strong>Current API:</strong> {getApiBase()}
               </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Registering issues a token — save it, it won&apos;t be shown again.
+              <p>
+                <strong>Mode:</strong>{" "}
+                {import.meta.env.DEV ? "Development (proxied)" : "Production"}
               </p>
+            </div>
+
+            {/* Change password */}
+            {isSignedIn && (
+              <div className="border-t pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordForm((v) => !v)}
+                  className="flex w-full items-center justify-between text-sm font-medium"
+                >
+                  Change password
+                  {showPasswordForm ? (
+                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </button>
+                {showPasswordForm && (
+                  <form onSubmit={handleSetPassword} className="mt-3 space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="current-password">Current password</Label>
+                      <Input
+                        id="current-password"
+                        type="password"
+                        autoComplete="current-password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Leave empty if you have not set a password before.
+                      </p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="new-password">New password</Label>
+                      <Input
+                        id="new-password"
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="At least 8 characters"
+                        value={newPasswordValue}
+                        onChange={(e) => setNewPasswordValue(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="confirm-new-password">
+                        Confirm new password
+                      </Label>
+                      <Input
+                        id="confirm-new-password"
+                        type="password"
+                        autoComplete="new-password"
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      />
+                    </div>
+                    {passwordError && (
+                      <p className="text-xs text-destructive">{passwordError}</p>
+                    )}
+                    <Button type="submit" size="sm" disabled={passwordSaving}>
+                      {passwordSaving ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Update password"
+                      )}
+                    </Button>
+                  </form>
+                )}
+              </div>
             )}
           </div>
+        )}
 
-          {/* Create account (register mode) */}
-          {mode === "register" && (
-            <div className="space-y-2">
-              <Label htmlFor="username">New account username</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="username"
-                  placeholder="pick a username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="flex-1"
-                />
+        {activeTab === "tokens" && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Tokens let AI clients (Claude, MCP) access your MyGist.
+            </p>
+
+            {revealedToken ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3 text-sm">
+                  <Check className="h-4 w-4 flex-shrink-0 text-primary" />
+                  <span>
+                    Token <strong>{revealedToken.label}</strong> created.
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <Label>Token</Label>
+                  <div className="select-all break-all rounded-lg border bg-muted/50 p-3 font-mono text-sm">
+                    {revealedToken.token}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleCopyRevealedToken}
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-4 w-4 mr-2" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy token
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <div className="flex gap-2 rounded-lg border p-3 text-xs text-muted-foreground">
+                  <Key className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span>
+                    This token won&apos;t be shown again. Save it in a password
+                    manager or somewhere safe.
+                  </span>
+                </div>
+                <Button className="w-full" onClick={handleDoneReveal}>
+                  Done
+                </Button>
+              </div>
+            ) : (
+              <>
+                {tokensLoading ? (
+                  <div className="flex items-center justify-center py-6 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  </div>
+                ) : tokensError ? (
+                  <p className="text-sm text-destructive">{tokensError}</p>
+                ) : tokensList.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No tokens yet. Generate one below to connect an AI client.
+                  </p>
+                ) : (
+                  <div className="rounded-lg border divide-y">
+                    {tokensList.map((t) => (
+                      <div
+                        key={t.id}
+                        className="flex items-center justify-between gap-3 p-3"
+                      >
+                        <div className="min-w-0 space-y-1">
+                          <p className="truncate text-sm font-medium">{t.label}</p>
+                          <p className="font-mono text-xs text-muted-foreground">
+                            created {formatDate(t.created_at) || "unknown"} &middot;{" "}
+                            last used {formatDate(t.last_used_at) || "never"}
+                          </p>
+                        </div>
+                        {confirmRevokeId === t.id ? (
+                          <div className="flex shrink-0 gap-2">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleRevoke(t.id)}
+                              disabled={revokingId === t.id}
+                            >
+                              {revokingId === t.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                "Revoke"
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setConfirmRevokeId(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => setConfirmRevokeId(t.id)}
+                            title="Revoke token"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-2 border-t pt-4">
+                  <Label htmlFor="new-token-label">Generate token</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="new-token-label"
+                      placeholder="mcp"
+                      value={newTokenLabel}
+                      onChange={(e) => setNewTokenLabel(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button onClick={handleGenerateToken} disabled={generating}>
+                      {generating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Generate token"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {activeTab === "data" && (
+          <div className="space-y-4">
+            <div className="rounded-lg border divide-y">
+              <div className="flex items-center justify-between gap-3 p-3">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Export backup</p>
+                  <p className="text-xs text-muted-foreground">
+                    Download everything as a zip.
+                  </p>
+                </div>
                 <Button
+                  variant="outline"
                   size="sm"
-                  onClick={handleRegister}
-                  disabled={testing || !serverUrl || !username}
+                  onClick={handleExport}
+                  disabled={exporting || importing}
+                  className="shrink-0"
                 >
-                  {testing ? (
+                  {exporting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    "Create account"
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Export
+                    </>
                   )}
                 </Button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("connect");
-                  setTestResult(null);
-                }}
-                className="text-xs text-muted-foreground underline hover:text-foreground"
-              >
-                Back to sign in
-              </button>
-            </div>
-          )}
-
-          {/* Test Result */}
-          {testResult && (
-            <div
-              className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
-                testResult.success
-                  ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                  : "bg-red-500/10 text-red-600 dark:text-red-400"
-              }`}
-            >
-              {testResult.success ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <X className="h-4 w-4" />
-              )}
-              {testResult.message}
-            </div>
-          )}
-
-          {/* Current Config Info */}
-          <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-            <p>
-              <strong>Current API:</strong> {getApiBase()}
-            </p>
-            <p>
-              <strong>Mode:</strong>{" "}
-              {import.meta.env.DEV ? "Development (proxied)" : "Production"}
-            </p>
-            {connectedAs && (
-              <p>
-                <strong>Signed in as:</strong> {connectedAs}
-              </p>
-            )}
-          </div>
-
-          {/* Backup & Restore */}
-          <div className="border-t pt-4 space-y-3">
-            <Label className="text-sm font-medium">Backup & Restore</Label>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExport}
-                disabled={exporting || importing}
-                className="flex-1"
-              >
-                {exporting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Export Data
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => document.getElementById("import-file").click()}
-                disabled={exporting || importing}
-                className="flex-1"
-              >
-                {importing ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Upload className="h-4 w-4 mr-2" />
-                )}
-                Import Data
-              </Button>
-              <input
-                id="import-file"
-                type="file"
-                accept=".zip"
-                onChange={handleImport}
-                className="hidden"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-muted-foreground">
-                Import mode:
-              </label>
-              <select
-                value={importMode}
-                onChange={(e) => setImportMode(e.target.value)}
-                className="text-xs bg-background border rounded px-2 py-1"
-              >
-                <option value="replace">Replace (overwrite)</option>
-                <option value="merge">Merge (combine data)</option>
-              </select>
-            </div>
-            {backupResult && (
-              <div
-                className={`p-2 rounded text-xs flex items-center gap-2 ${
-                  backupResult.success
-                    ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                    : "bg-red-500/10 text-red-600 dark:text-red-400"
-                }`}
-              >
-                {backupResult.success ? (
-                  <Check className="h-3 w-3" />
-                ) : (
-                  <X className="h-3 w-3" />
-                )}
-                {backupResult.message}
+              <div className="flex items-center justify-between gap-3 p-3">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Import backup</p>
+                  <p className="text-xs text-muted-foreground">
+                    Restore from a backup zip. A safety backup is made first.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById("import-file").click()}
+                  disabled={exporting || importing}
+                  className="shrink-0"
+                >
+                  {importing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Choose file
+                    </>
+                  )}
+                </Button>
+                <input
+                  id="import-file"
+                  type="file"
+                  accept=".zip"
+                  onChange={handleImport}
+                  className="hidden"
+                />
               </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Export downloads a zip of all your data. Import restores from a
-              backup (creates a safety backup first).
-            </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Import mode</Label>
+              <div className="flex rounded-lg bg-muted p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setImportMode("replace")}
+                  className={segmentClass(importMode === "replace", false)}
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImportMode("merge")}
+                  className={segmentClass(importMode === "merge", false)}
+                >
+                  Merge
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {importMode === "replace"
+                  ? "Replace overwrites your existing data with the backup's contents."
+                  : "Merge combines the backup with your existing data."}
+              </p>
+            </div>
           </div>
-        </div>
         )}
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          {mode === "created" ? (
-            <Button className="w-full" onClick={handleSave}>
-              I saved my token, continue
+        {activeTab === "connection" && (
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={handleReset}
+              className="sm:mr-auto"
+            >
+              Reset to Default
             </Button>
-          ) : (
-            <>
-          <Button
-            variant="outline"
-            onClick={handleReset}
-            className="sm:mr-auto"
-          >
-            Reset to Default
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleTest} disabled={testing}>
-              {testing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                <>
-                  <Wifi className="h-4 w-4 mr-2" />
-                  Test Connection
-                </>
-              )}
-            </Button>
-            <Button onClick={handleSave}>Save</Button>
-          </div>
-            </>
-          )}
-        </DialogFooter>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleTest} disabled={testing}>
+                {testing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  <>
+                    <Wifi className="h-4 w-4 mr-2" />
+                    Test Connection
+                  </>
+                )}
+              </Button>
+              <Button onClick={handleSave}>Save</Button>
+            </div>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

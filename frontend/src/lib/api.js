@@ -74,12 +74,22 @@ async function api(endpoint, options = {}) {
       headers,
     });
 
-    if (response.status === 401) {
-      throw new Error("Authentication failed. Check your API token.");
-    }
-
-    if (response.status === 403) {
-      throw new Error("Access forbidden. Invalid API token.");
+    if (response.status === 401 || response.status === 403) {
+      // Prefer the server's own detail (e.g. "current password is
+      // incorrect") over the generic fallback, so callers like
+      // set-password can show the real reason.
+      let detail = null;
+      try {
+        const body = await response.json();
+        detail = body?.detail;
+      } catch {
+        // no JSON body; fall back below
+      }
+      const fallback =
+        response.status === 401
+          ? "Authentication failed. Check your API token."
+          : "Access forbidden. Invalid API token.";
+      throw new Error(detail || fallback);
     }
 
     if (!response.ok) {
