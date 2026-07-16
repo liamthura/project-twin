@@ -3,6 +3,9 @@
  * Handles authentication and server connection
  */
 
+// Default hosted API base (full URL including the /api prefix).
+const CLOUD_API_URL = "https://mygist-api.thuradev.qzz.io/api";
+
 // Get config from localStorage or use defaults
 function getConfig() {
   const stored = localStorage.getItem("mygist_config");
@@ -113,18 +116,37 @@ async function testConnection(serverUrl, token) {
   return response.json();
 }
 
-// Register a new account (token-only auth). `serverUrl` is the full API base
-// including the /api prefix, matching the Server URL field / getApiBase().
-async function registerAccount(serverUrl, username) {
+// Register a new account. `serverUrl` is the full API base including the
+// /api prefix, matching the Server URL field / getApiBase(). `password` is
+// optional (bare-username/token-only accounts remain supported).
+async function registerAccount(serverUrl, username, password) {
   const url = serverUrl.endsWith("/") ? serverUrl.slice(0, -1) : serverUrl;
+  const body = { username };
+  if (password) body.password = password;
   const res = await fetch(`${url}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || "Registration failed");
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.detail || "Registration failed");
+  }
+  return res.json(); // { user_id, username, token }
+}
+
+// Sign in with username + password. `serverUrl` is the full API base
+// including the /api prefix (same shape as registerAccount).
+async function loginAccount(serverUrl, username, password) {
+  const url = serverUrl.endsWith("/") ? serverUrl.slice(0, -1) : serverUrl;
+  const res = await fetch(`${url}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.detail || "Sign in failed");
   }
   return res.json(); // { user_id, username, token }
 }
@@ -216,7 +238,38 @@ async function importData(file, mode = "replace") {
   return response.json();
 }
 
+// Set (or change) the current user's password. `currentPassword` is only
+// required when the account already has a password set.
+async function setPassword(newPassword, currentPassword) {
+  const body = { password: newPassword };
+  if (currentPassword) body.current_password = currentPassword;
+  return api("/auth/set-password", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// List the current user's API tokens (id, label, created_at, last_used_at).
+async function listTokens() {
+  return api("/auth/tokens");
+}
+
+// Create a new named API token. Returns { id, label, token } -- the
+// plaintext token is only ever shown once, at creation time.
+async function createToken(label) {
+  return api("/auth/tokens", {
+    method: "POST",
+    body: JSON.stringify({ label }),
+  });
+}
+
+// Revoke one of the current user's tokens.
+async function revokeToken(id) {
+  return api(`/auth/tokens/${id}`, { method: "DELETE" });
+}
+
 export {
+  CLOUD_API_URL,
   api,
   getConfig,
   saveConfig,
@@ -225,8 +278,13 @@ export {
   getAuthToken,
   testConnection,
   registerAccount,
+  loginAccount,
   whoami,
   isConfigured,
   exportData,
   importData,
+  setPassword,
+  listTokens,
+  createToken,
+  revokeToken,
 };

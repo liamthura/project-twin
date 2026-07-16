@@ -27,6 +27,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  CLOUD_API_URL,
   getConfig,
   saveConfig,
   clearConfig,
@@ -37,8 +38,6 @@ import {
   exportData,
   importData,
 } from "@/lib/api.js";
-
-const CLOUD_API_URL = "https://mygist-api.thuradev.qzz.io/api";
 
 export function ConnectionSettings({
   isOpen,
