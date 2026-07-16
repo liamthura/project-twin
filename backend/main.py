@@ -85,7 +85,7 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "https://mygist.thuradev.qzz.io",
         "http://localhost:1120",
-        "http://chat.orb.local"
+        "http://chat.orb.local",
         "http://147.79.18.20",
     ],
     allow_credentials=True,

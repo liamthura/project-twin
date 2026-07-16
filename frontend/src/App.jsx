@@ -6008,7 +6008,8 @@ function WelcomeAuth({ onUseToken, onSuccess }) {
   const [connectionType, setConnectionType] = useState("cloud"); // "cloud" | "self-hosted"
   const [selfHostedUrl, setSelfHostedUrl] = useState("");
 
-  const serverUrl = connectionType === "cloud" ? CLOUD_API_URL : selfHostedUrl;
+  const serverUrl =
+    connectionType === "cloud" ? CLOUD_API_URL : selfHostedUrl.trim();
 
   const switchMode = (next) => {
     setMode(next);
