@@ -261,7 +261,8 @@ async function setPassword(newPassword, currentPassword) {
 
 // List the current user's API tokens (id, label, created_at, last_used_at).
 async function listTokens() {
-  return api("/auth/tokens");
+  const result = await api("/auth/tokens");
+  return result.tokens;
 }
 
 // Create a new named API token. Returns { id, label, token } -- the
