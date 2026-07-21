@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, X, Trash2, ChevronDown, Info } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Info } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -404,13 +404,13 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
     <div className="space-y-6">
       {/* Personal Information */}
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
             Personal Information
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-primary"
+              className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
               onClick={() => openInfo("personal")}
             >
               <Info className="h-4 w-4" />
@@ -490,7 +490,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
 
       {/* Academic Information */}
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("academic")}
@@ -507,7 +507,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       openInfo("academic");
@@ -530,12 +530,12 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
               }}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Education
+              Add education
             </Button>
           </div>
         </CardHeader>
         {!collapsedSections.academic && (
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4">
             {/* Education Entries */}
             {Array.isArray(data.education) &&
             (data.education || []).length > 0 ? (
@@ -596,7 +596,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                             e.stopPropagation();
                             removeEducation(eduIndex);
                           }}
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                          className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -604,7 +604,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
 
                       {/* Expanded Form */}
                       {isExpanded && (
-                        <div className="p-4 pt-1 space-y-4">
+                        <div className="border-t bg-background/50 p-4 space-y-4">
                           <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
                               <Label htmlFor={`institution-${eduIndex}`}>
@@ -621,6 +621,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                   )
                                 }
                                 placeholder="e.g. University of Cambridge, Harvard, etc."
+                                className="h-9"
                               />
                             </div>
                             <div className="space-y-2">
@@ -638,6 +639,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                   )
                                 }
                                 placeholder="e.g. Bachelor's, Master's, PhD, High School"
+                                className="h-9"
                               />
                             </div>
                             <div className="space-y-2">
@@ -655,6 +657,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                   )
                                 }
                                 placeholder="e.g. Computer Science, Business, etc."
+                                className="h-9"
                               />
                             </div>
                             <div className="space-y-2">
@@ -665,7 +668,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                   updateEducation(eduIndex, "status", value)
                                 }
                               >
-                                <SelectTrigger id={`status-${eduIndex}`}>
+                                <SelectTrigger id={`status-${eduIndex}`} className="h-9">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -690,6 +693,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                   )
                                 }
                                 placeholder="e.g. 2020"
+                                className="h-9"
                               />
                             </div>
                             <div className="space-y-2">
@@ -705,6 +709,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                   )
                                 }
                                 placeholder="e.g. 2024 or Expected 2026"
+                                className="h-9"
                               />
                             </div>
                           </div>
@@ -728,9 +733,9 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                       onClick={() =>
                                         removeCoursework(eduIndex, courseIdx)
                                       }
-                                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                      className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive"
                                     >
-                                      <X className="h-3 w-3" />
+                                      <Trash2 className="h-4 w-4" />
                                     </Button>
                                   </div>
                                   <div className="space-y-2">
@@ -746,7 +751,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                         )
                                       }
                                       placeholder="e.g. Data Structures"
-                                      size="sm"
+                                      className="h-9"
                                     />
                                   </div>
                                   <div className="space-y-2">
@@ -767,13 +772,14 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                 </div>
                               ))}
                               <Button
+                                type="button"
                                 onClick={() => addCoursework(eduIndex)}
                                 variant="outline"
                                 size="sm"
-                                className="w-full border-dashed"
+                                className="h-8 w-full border-dashed"
                               >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Coursework
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                Add coursework
                               </Button>
                             </div>
                           </div>
@@ -795,9 +801,9 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                       variant="ghost"
                                       size="icon"
                                       onClick={() => removeClub(eduIndex, clubIdx)}
-                                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                      className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive"
                                     >
-                                      <Trash2 className="h-3 w-3" />
+                                      <Trash2 className="h-4 w-4" />
                                     </Button>
                                   </div>
                                   <div className="space-y-2">
@@ -813,7 +819,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                         )
                                       }
                                       placeholder="e.g. Robotics Club"
-                                      size="sm"
+                                      className="h-9"
                                     />
                                   </div>
                                   <div className="space-y-2">
@@ -836,13 +842,14 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                 </div>
                               ))}
                               <Button
+                                type="button"
                                 onClick={() => addClub(eduIndex)}
                                 variant="outline"
                                 size="sm"
-                                className="w-full border-dashed"
+                                className="h-8 w-full border-dashed"
                               >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Club
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                Add club
                               </Button>
                             </div>
                           </div>
@@ -865,6 +872,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                       onChange({ ...data, education: updated });
                                     }}
                                     placeholder="e.g. Dean's List, Best Project Award"
+                                    className="h-9"
                                   />
                                   <Button
                                     variant="ghost"
@@ -876,7 +884,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                       ).filter((_, i) => i !== hIdx);
                                       onChange({ ...data, education: updated });
                                     }}
-                                    className="h-10 w-10 text-destructive flex-shrink-0"
+                                    className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -891,12 +899,13 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                   ];
                                   onChange({ ...data, education: updated });
                                 }}
+                                type="button"
                                 variant="outline"
                                 size="sm"
-                                className="w-full border-dashed"
+                                className="h-8 w-full border-dashed"
                               >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Highlight
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                Add highlight
                               </Button>
                             </div>
                           </div>
@@ -927,12 +936,12 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                         variant="ghost"
                         size="icon"
                         onClick={() => removeGoal(idx)}
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive"
                       >
-                        <X className="h-3 w-3" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label className="text-xs">Goal</Label>
                         <Input
@@ -941,7 +950,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                             updateGoal(idx, "goal", e.target.value)
                           }
                           placeholder="e.g. Land ML internship"
-                          size="sm"
+                          className="h-9"
                         />
                       </div>
                       <div className="space-y-2">
@@ -952,20 +961,21 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                             updateGoal(idx, "target", e.target.value)
                           }
                           placeholder="e.g. Build a portfolio project"
-                          size="sm"
+                          className="h-9"
                         />
                       </div>
                     </div>
                   </div>
                 ))}
                 <Button
+                  type="button"
                   onClick={addGoal}
                   variant="outline"
                   size="sm"
-                  className="w-full border-dashed"
+                  className="h-8 w-full border-dashed"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Goal
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Add goal
                 </Button>
               </div>
             </div>
@@ -975,7 +985,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
 
       {/* Work Experience */}
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("workExp")}
@@ -992,7 +1002,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       openInfo("work");
@@ -1024,7 +1034,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
               }}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Experience
+              Add experience
             </Button>
           </div>
         </CardHeader>
@@ -1078,7 +1088,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                               data.work_experience.filter((_, i) => i !== idx)
                             );
                           }}
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                          className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -1086,8 +1096,8 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
 
                       {/* Expanded Form */}
                       {isExpanded && (
-                        <div className="space-y-3 p-3 pt-0">
-                          <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="border-t bg-background/50 p-4 space-y-4">
+                          <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
                               <Label>Role</Label>
                               <Input
@@ -1098,6 +1108,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                   update("work_experience", updated);
                                 }}
                                 placeholder="e.g. Software Engineer"
+                                className="h-9"
                               />
                             </div>
                             <div className="space-y-2">
@@ -1110,10 +1121,11 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                   update("work_experience", updated);
                                 }}
                                 placeholder="e.g. TechCorp"
+                                className="h-9"
                               />
                             </div>
                           </div>
-                          <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
                               <Label>Type</Label>
                               <Input
@@ -1124,6 +1136,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                   update("work_experience", updated);
                                 }}
                                 placeholder="e.g. Full-time"
+                                className="h-9"
                               />
                             </div>
                             <div className="space-y-2">
@@ -1136,6 +1149,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                   update("work_experience", updated);
                                 }}
                                 placeholder="e.g. Jan 2022 - Jun 2023"
+                                className="h-9"
                               />
                             </div>
                           </div>
@@ -1156,6 +1170,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                       update("work_experience", updated);
                                     }}
                                     placeholder="e.g. Led team of 5 engineers"
+                                    className="h-9"
                                   />
                                   <Button
                                     variant="ghost"
@@ -1167,13 +1182,14 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                       ).filter((_, i) => i !== hIdx);
                                       update("work_experience", updated);
                                     }}
-                                    className="h-10 w-10 text-destructive flex-shrink-0"
+                                    className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </div>
                               ))}
                               <Button
+                                type="button"
                                 onClick={() => {
                                   const updated = [...data.work_experience];
                                   updated[idx].highlights = [
@@ -1184,10 +1200,10 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                                 }}
                                 variant="outline"
                                 size="sm"
-                                className="w-full border-dashed"
+                                className="h-8 w-full border-dashed"
                               >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Highlight
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                Add highlight
                               </Button>
                             </div>
                           </div>
@@ -1204,7 +1220,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
 
       {/* Contact Information */}
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("contact")}
@@ -1221,7 +1237,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       openInfo("contact");
@@ -1238,7 +1254,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
           </div>
         </CardHeader>
         {!collapsedSections.contact && (
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Emails</Label>
               <div className="space-y-3">
@@ -1248,7 +1264,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                     className="p-3 rounded-lg border"
                   >
                     <div className="flex gap-3">
-                      <div className="grid gap-3 sm:grid-cols-2 flex-1">
+                      <div className="grid gap-4 sm:grid-cols-2 flex-1">
                         <div className="space-y-2">
                           <Label className="text-xs text-muted-foreground">
                             Address
@@ -1260,6 +1276,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                               updateEmail(index, "address", e.target.value)
                             }
                             placeholder="you@school.edu"
+                            className="h-9"
                           />
                         </div>
                         <div className="space-y-2">
@@ -1272,7 +1289,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                               updateEmail(index, "purpose", value)
                             }
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="h-9">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1292,7 +1309,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                         variant="ghost"
                         size="icon"
                         onClick={() => removeEmail(index)}
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive mt-1"
+                        className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive mt-1"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -1300,13 +1317,14 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                   </div>
                 ))}
                 <Button
+                  type="button"
                   onClick={addEmail}
                   variant="outline"
                   size="sm"
-                  className="w-full border-dashed"
+                  className="h-8 w-full border-dashed"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Email
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Add email
                 </Button>
               </div>
             </div>
@@ -1319,7 +1337,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                     className="p-3 rounded-lg border"
                   >
                     <div className="flex gap-3">
-                      <div className="grid gap-3 sm:grid-cols-2 flex-1">
+                      <div className="grid gap-4 sm:grid-cols-2 flex-1">
                         <div className="space-y-2">
                           <Label className="text-xs text-muted-foreground">
                             Label
@@ -1330,6 +1348,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                               updateLink(index, "label", e.target.value)
                             }
                             placeholder="e.g. Portfolio"
+                            className="h-9"
                           />
                         </div>
                         <div className="space-y-2">
@@ -1342,6 +1361,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                               updateLink(index, "url", e.target.value)
                             }
                             placeholder="https://example.com"
+                            className="h-9"
                           />
                         </div>
                       </div>
@@ -1349,7 +1369,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                         variant="ghost"
                         size="icon"
                         onClick={() => removeLink(index)}
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive mt-1"
+                        className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive mt-1"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -1357,13 +1377,14 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                   </div>
                 ))}
                 <Button
+                  type="button"
                   onClick={addLink}
                   variant="outline"
                   size="sm"
-                  className="w-full border-dashed"
+                  className="h-8 w-full border-dashed"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Link
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Add link
                 </Button>
               </div>
             </div>
@@ -1373,7 +1394,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
 
       {/* Languages */}
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("languages")}
@@ -1390,7 +1411,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       openInfo("languages");
@@ -1417,7 +1438,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                     className="p-3 rounded-lg border space-y-3"
                   >
                     <div className="flex gap-3">
-                      <div className="grid gap-3 sm:grid-cols-2 flex-1">
+                      <div className="grid gap-4 sm:grid-cols-2 flex-1">
                         <div className="space-y-2">
                           <Label className="text-xs text-muted-foreground">
                             Language
@@ -1428,6 +1449,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                               updateLanguage(index, "name", e.target.value)
                             }
                             placeholder="e.g. English"
+                            className="h-9"
                           />
                         </div>
                         <div className="space-y-2">
@@ -1440,7 +1462,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                               updateLanguage(index, "fluency", value)
                             }
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="h-9">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1461,7 +1483,7 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                         variant="ghost"
                         size="icon"
                         onClick={() => removeLanguage(index)}
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive mt-1"
+                        className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive mt-1"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -1469,13 +1491,14 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                   </div>
                 ))}
                 <Button
+                  type="button"
                   onClick={addLanguage}
                   variant="outline"
                   size="sm"
-                  className="w-full border-dashed"
+                  className="h-8 w-full border-dashed"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Language
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Add language
                 </Button>
               </div>
             </div>
