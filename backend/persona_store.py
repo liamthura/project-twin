@@ -7,6 +7,7 @@ callers already expect.
 
 import copy
 import json
+import logging
 import uuid
 
 import db
@@ -217,6 +218,13 @@ def save(file_type: str, data: dict) -> bool:
             do update set data = excluded.data, updated_at = now()
             """,
             (user_id, file_type, json.dumps(data)),
+        )
+    try:
+        import search_index
+        search_index.sync_index(user_id, file_type, data)
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "search index sync failed for %s (persona write succeeded)", file_type
         )
     return True
 
