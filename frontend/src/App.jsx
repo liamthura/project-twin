@@ -54,6 +54,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { segmentClass } from "@/components/ui/segmented-control";
 import { ConnectionSettings } from "@/components/ConnectionSettings";
 import {
   api,
@@ -6108,11 +6109,7 @@ function WelcomeAuth({ onUseToken, onSuccess }) {
               <button
                 type="button"
                 onClick={() => setConnectionType("cloud")}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  connectionType === "cloud"
-                    ? "border bg-card text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={segmentClass(connectionType === "cloud")}
               >
                 <Globe className="h-4 w-4" />
                 Cloud
@@ -6120,11 +6117,7 @@ function WelcomeAuth({ onUseToken, onSuccess }) {
               <button
                 type="button"
                 onClick={() => setConnectionType("self-hosted")}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  connectionType === "self-hosted"
-                    ? "border bg-card text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={segmentClass(connectionType === "self-hosted")}
               >
                 <Server className="h-4 w-4" />
                 Self-hosted

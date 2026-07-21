@@ -29,6 +29,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { segmentClass } from "@/components/ui/segmented-control";
 import {
   CLOUD_API_URL,
   getConfig,
@@ -50,19 +51,6 @@ const TABS = [
   { id: "tokens", label: "API tokens" },
   { id: "data", label: "Data" },
 ];
-
-// Segmented-control button classes, shared by the tab row, the
-// connection-type toggle, and the import-mode toggle.
-function segmentClass(active, disabled) {
-  if (disabled) {
-    return "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground/50 cursor-not-allowed";
-  }
-  return `flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-    active
-      ? "border bg-card text-foreground"
-      : "text-muted-foreground hover:text-foreground"
-  }`;
-}
 
 function formatDate(iso) {
   if (!iso) return null;
@@ -873,9 +861,9 @@ export function ConnectionStatus({ onClick }) {
   const ModeIcon = isRemote ? Globe : Laptop;
 
   const statusConfig = {
-    connected: { color: "text-green-500", label: "Connected" },
-    disconnected: { color: "text-red-500", label: "Disconnected" },
-    error: { color: "text-yellow-500", label: "Error" },
+    connected: { color: "text-success", label: "Connected" },
+    disconnected: { color: "text-destructive", label: "Disconnected" },
+    error: { color: "text-warning", label: "Error" },
     unknown: { color: "text-muted-foreground", label: "Checking..." },
   };
 
