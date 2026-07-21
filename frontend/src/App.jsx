@@ -277,7 +277,7 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
           <p className="text-muted-foreground">Connecting to backend...</p>
@@ -289,7 +289,7 @@ export default function App() {
   // First run: no token configured yet. Welcome instead of an error.
   if (error && !getAuthToken()) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="min-h-dvh flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-sm space-y-6 text-center">
           <div className="flex justify-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
@@ -305,13 +305,13 @@ export default function App() {
                   cy="40"
                   r="15"
                   fill="none"
-                  stroke="#FFFFFF"
+                  stroke="hsl(var(--primary-foreground))"
                   strokeWidth="9"
                 />
                 <path
                   d="M60 40 v22 a14 14 0 0 1 -14 14 h-9"
                   fill="none"
-                  stroke="#FFFFFF"
+                  stroke="hsl(var(--primary-foreground))"
                   strokeWidth="9"
                   strokeLinecap="round"
                 />
@@ -341,7 +341,7 @@ export default function App() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-dvh flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle className="text-destructive">
@@ -377,8 +377,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 border-b bg-card">
+    <div className="min-h-dvh bg-background">
+      <header className="sticky top-0 z-20 border-b bg-card pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-[60px] max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <svg
