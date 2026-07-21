@@ -178,10 +178,30 @@ public API and docstring semantics are unchanged.
 
 ## Dependencies
 
-`voyageai` is NOT added. The Voyage REST API is called with `httpx` (already
-a transitive dependency of fastmcp; add it explicitly to requirements.txt).
-One small module `backend/embeddings.py` owns: the client factory, batch
-embed, query embed, timeouts, and the "no key → None" behavior.
+`voyageai` is NOT added. All embedding HTTP calls use `httpx` (already a
+transitive dependency of fastmcp; add it explicitly to requirements.txt).
+One small module `backend/embeddings.py` owns: the provider factory, batch
+embed, query embed, timeouts, and the "not configured → None" behavior.
+
+**Provider configuration (hosted OR locally hosted models):**
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `EMBEDDING_PROVIDER` | `voyage` | `voyage` or `openai` (OpenAI-compatible `/v1/embeddings` — covers Ollama, LM Studio, llama.cpp server, vLLM, LocalAI, and OpenAI itself) |
+| `VOYAGE_API_KEY` | unset | Voyage key; unset with provider=voyage → FTS-only mode |
+| `EMBEDDING_API_URL` | provider default | Base URL for openai provider, e.g. `http://localhost:11434/v1` (Ollama) |
+| `EMBEDDING_API_KEY` | unset | Bearer key for openai provider; optional (local servers usually need none) |
+| `EMBEDDING_MODEL` | `voyage-3.5-lite` | Model name sent to the provider (e.g. `nomic-embed-text`) |
+| `EMBEDDING_DIM` | `1024` | Vector column dimension; read at schema-creation time |
+
+`ensure_schema` creates `vector(EMBEDDING_DIM)`. If the existing column's
+dimension differs from the configured value at boot, the backend logs a
+clear warning naming `scripts/backfill_search_index.py --recreate` (which
+drops + recreates the embedding column at the new dimension and re-embeds
+everything) and runs in FTS-only mode until that is done — it never writes
+mismatched vectors and never fails startup. For provider=openai the
+"configured" test is `EMBEDDING_API_URL` being set (key optional); for
+voyage it is `VOYAGE_API_KEY` being set.
 
 ## Error handling summary
 
@@ -189,6 +209,7 @@ embed, query embed, timeouts, and the "no key → None" behavior.
 |---|---|
 | No `VOYAGE_API_KEY` | FTS-only everywhere; `mode: "fts"` in responses |
 | pgvector extension unavailable (self-hosted vanilla Postgres) | Table created without embedding column; permanent FTS-only mode; startup never fails |
+| `EMBEDDING_DIM` mismatch with existing column | FTS-only mode + logged instruction to run backfill `--recreate`; startup never fails |
 | Voyage down / timeout on write | Row saved with NULL embedding; retried next save/backfill |
 | Voyage down / timeout on query | That search degrades to FTS-only |
 | Index sync exception | Logged; persona write still succeeds |
