@@ -27,6 +27,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -71,6 +72,36 @@ function useDebounce(callback, delay) {
 const TAB_TRIGGER_CLASS =
   "h-11 shrink-0 snap-start gap-2 rounded-full border md:h-9 md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent";
 
+// Tracks whether a horizontally scrollable element is at its start/end edge,
+// so the tab strip only fades the side that actually has more content.
+function useEdgeFade(deps) {
+  const ref = useRef(null);
+  const [edges, setEdges] = useState({ start: true, end: true });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      setEdges({
+        start: el.scrollLeft <= 1,
+        end: el.scrollLeft >= max - 1,
+      });
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  return [ref, edges];
+}
+
 // Main App
 export default function App() {
   const [isConnected, setIsConnected] = useState(false);
@@ -109,6 +140,8 @@ export default function App() {
   const [learningLog, setLearningLog] = useState({});
 
   const [disabledSections, setDisabledSections] = useState([]);
+  // Tab count changes when sections are toggled, so re-measure the strip then.
+  const [tabStripRef, tabStripEdges] = useEdgeFade([disabledSections]);
   const [toggleable, setToggleable] = useState([]);
 
   // Confirmation dialog state
@@ -487,7 +520,12 @@ export default function App() {
           className="flex flex-col gap-6 md:flex-row"
         >
           <div className="sticky top-[60px] z-10 -mx-4 bg-background px-4 pb-2 md:mx-0 md:px-0 md:pb-0 md:sticky md:top-[84px] md:w-48 md:self-start">
-          <TabsList className="scrollbar-none w-full flex-nowrap overflow-x-auto snap-x snap-proximity tab-strip-fade md:flex-wrap md:overflow-visible md:h-fit md:flex-col md:items-stretch md:justify-start">
+          <TabsList
+            ref={tabStripRef}
+            data-at-start={tabStripEdges.start}
+            data-at-end={tabStripEdges.end}
+            className="scrollbar-none w-full flex-nowrap overflow-x-auto snap-x snap-proximity tab-strip-fade md:flex-wrap md:overflow-visible md:h-fit md:flex-col md:items-stretch md:justify-start"
+          >
             <TabsTrigger value="profile" className={TAB_TRIGGER_CLASS}>
               <User className="h-4 w-4" />
               <span>Profile</span>
@@ -604,23 +642,21 @@ export default function App() {
               </CardHeader>
               <CardContent>
                 {toggleable.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No toggleable sections available.
-                  </p>
+                  <EmptyState>No toggleable sections available.</EmptyState>
                 )}
                 {toggleable.map((key) => {
                   const enabled = !disabledSections.includes(key);
                   return (
                     <div
                       key={key}
-                      className="flex items-center justify-between border-b border-border py-4 last:border-b-0"
+                      className="flex items-center justify-between gap-6 border-b border-border py-4 first:pt-1 last:border-b-0 last:pb-1"
                     >
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-medium">
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-sm font-medium leading-none">
                           {SECTION_LABELS[key] || key}
                         </p>
                         {SECTION_DESCRIPTIONS[key] && (
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs leading-relaxed text-muted-foreground">
                             {SECTION_DESCRIPTIONS[key]}
                           </p>
                         )}
