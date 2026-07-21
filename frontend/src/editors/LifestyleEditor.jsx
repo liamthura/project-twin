@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, X, Trash2, ChevronDown, Info } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Info } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -229,9 +229,9 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
     <div className="space-y-6">
       {/* Hobbies Section */}
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <div
-            className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
+            className="-m-6 flex cursor-pointer items-center justify-between rounded-t-lg p-6 transition-colors hover:bg-muted/50"
             onClick={() => toggleSection("hobbies")}
           >
             <div className="flex items-center gap-2">
@@ -246,7 +246,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       openInfo("hobbies");
@@ -268,7 +268,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
               size="sm"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Hobby
+              Add hobby
             </Button>
           </div>
         </CardHeader>
@@ -286,7 +286,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                     placeholder="Search hobbies..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="h-8"
+                    className="h-9"
                   />
                 </div>
                 <div className="w-[160px] space-y-1.5">
@@ -294,7 +294,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                     Skill Level
                   </Label>
                   <Select value={filterLevel} onValueChange={setFilterLevel}>
-                    <SelectTrigger id="level-filter" className="h-8">
+                    <SelectTrigger id="level-filter" className="h-9">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -311,9 +311,9 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                     variant="ghost"
                     size="sm"
                     onClick={clearFilters}
-                    className="h-8"
+                    className="h-9"
                   >
-                    Clear Filters
+                    Clear filters
                   </Button>
                 )}
               </div>
@@ -395,7 +395,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                             e.stopPropagation();
                             removeHobby(originalIndex);
                           }}
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                          className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -417,7 +417,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                   )
                                 }
                                 placeholder="Hobby name"
-                                className="h-8 bg-background"
+                                className="h-9 bg-background"
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </div>
@@ -433,7 +433,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                   )
                                 }
                               >
-                                <SelectTrigger className="h-8 bg-background">
+                                <SelectTrigger className="h-9 bg-background">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -456,7 +456,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                   updateHobby(originalIndex, "status", value)
                                 }
                               >
-                                <SelectTrigger className="h-8 bg-background">
+                                <SelectTrigger className="h-9 bg-background">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -524,7 +524,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                         {ref.url && (
                                           <Badge
                                             variant="secondary"
-                                            className="h-5 text-[11px]"
+                                            className="h-5 text-xs"
                                           >
                                             URL
                                           </Badge>
@@ -532,7 +532,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                         {ref.notes && (
                                           <Badge
                                             variant="secondary"
-                                            className="h-5 text-[11px]"
+                                            className="h-5 text-xs"
                                           >
                                             notes
                                           </Badge>
@@ -553,9 +553,9 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                           newRefs
                                         );
                                       }}
-                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive"
                                     >
-                                      <X className="h-4 w-4" />
+                                      <Trash2 className="h-4 w-4" />
                                     </Button>
                                   </div>
 
@@ -583,7 +583,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                               );
                                             }}
                                             placeholder="Reference name"
-                                            className="h-8 text-sm bg-background"
+                                            className="h-9 text-sm bg-background"
                                             onClick={(e) => e.stopPropagation()}
                                           />
                                           <Input
@@ -603,7 +603,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                               );
                                             }}
                                             placeholder="URL (optional)"
-                                            className="h-8 text-sm bg-background"
+                                            className="h-9 text-sm bg-background"
                                             onClick={(e) => e.stopPropagation()}
                                           />
                                         </div>
@@ -633,6 +633,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                 </div>
                               ))}
                               <Button
+                                type="button"
                                 variant="outline"
                                 size="sm"
                                 onClick={(e) => {
@@ -657,7 +658,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                 }}
                                 className="h-8 w-full border-dashed"
                               >
-                                <Plus className="h-4 w-4 mr-2" />
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
                                 Add reference
                               </Button>
                             </div>
@@ -742,7 +743,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
             </Button>
             <Button onClick={addHobby} disabled={!newHobbyName.trim()}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Hobby
+              Add hobby
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -750,34 +751,36 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
 
       {/* Passions */}
       <Card>
-        <CardHeader
-          className="sticky top-[60px] z-10 border-b bg-card cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
-          onClick={() => toggleSection("passions")}
-        >
-          <div className="flex items-center gap-2">
-            <ChevronDown
-              className={`h-5 w-5 transition-transform ${
-                collapsedSections.passions ? "-rotate-90" : ""
-              }`}
-            />
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Passions
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openInfo("passions");
-                  }}
-                >
-                  <Info className="h-4 w-4" />
-                </Button>
-              </CardTitle>
-              <CardDescription>
-                Things you're deeply passionate about
-              </CardDescription>
+        <CardHeader className="border-b">
+          <div
+            className="-m-6 flex cursor-pointer items-center justify-between rounded-t-lg p-6 transition-colors hover:bg-muted/50"
+            onClick={() => toggleSection("passions")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.passions ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Passions
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("passions");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  Things you're deeply passionate about
+                </CardDescription>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -794,34 +797,36 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
 
       {/* Curiosities */}
       <Card>
-        <CardHeader
-          className="sticky top-[60px] z-10 border-b bg-card cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
-          onClick={() => toggleSection("curiosities")}
-        >
-          <div className="flex items-center gap-2">
-            <ChevronDown
-              className={`h-5 w-5 transition-transform ${
-                collapsedSections.curiosities ? "-rotate-90" : ""
-              }`}
-            />
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Curiosities
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openInfo("curiosities");
-                  }}
-                >
-                  <Info className="h-4 w-4" />
-                </Button>
-              </CardTitle>
-              <CardDescription>
-                Topics you're curious to learn more about
-              </CardDescription>
+        <CardHeader className="border-b">
+          <div
+            className="-m-6 flex cursor-pointer items-center justify-between rounded-t-lg p-6 transition-colors hover:bg-muted/50"
+            onClick={() => toggleSection("curiosities")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.curiosities ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Curiosities
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("curiosities");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  Topics you're curious to learn more about
+                </CardDescription>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -838,32 +843,34 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
 
       {/* Personality Traits */}
       <Card>
-        <CardHeader
-          className="sticky top-[60px] z-10 border-b bg-card cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
-          onClick={() => toggleSection("traits")}
-        >
-          <div className="flex items-center gap-2">
-            <ChevronDown
-              className={`h-5 w-5 transition-transform ${
-                collapsedSections.traits ? "-rotate-90" : ""
-              }`}
-            />
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Personality Traits
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openInfo("traits");
-                  }}
-                >
-                  <Info className="h-4 w-4" />
-                </Button>
-              </CardTitle>
-              <CardDescription>Characteristics that define you</CardDescription>
+        <CardHeader className="border-b">
+          <div
+            className="-m-6 flex cursor-pointer items-center justify-between rounded-t-lg p-6 transition-colors hover:bg-muted/50"
+            onClick={() => toggleSection("traits")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.traits ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Personality Traits
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("traits");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>Characteristics that define you</CardDescription>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -881,32 +888,34 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
       </Card>
 
       <Card>
-        <CardHeader
-          className="sticky top-[60px] z-10 border-b bg-card cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
-          onClick={() => toggleSection("values")}
-        >
-          <div className="flex items-center gap-2">
-            <ChevronDown
-              className={`h-5 w-5 transition-transform ${
-                collapsedSections.values ? "-rotate-90" : ""
-              }`}
-            />
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Values
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openInfo("values");
-                  }}
-                >
-                  <Info className="h-4 w-4" />
-                </Button>
-              </CardTitle>
-              <CardDescription>What's important to you</CardDescription>
+        <CardHeader className="border-b">
+          <div
+            className="-m-6 flex cursor-pointer items-center justify-between rounded-t-lg p-6 transition-colors hover:bg-muted/50"
+            onClick={() => toggleSection("values")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.values ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Values
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("values");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>What's important to you</CardDescription>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -923,34 +932,36 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
 
       {/* Wellness Section */}
       <Card>
-        <CardHeader
-          className="sticky top-[60px] z-10 border-b bg-card cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
-          onClick={() => toggleSection("wellness")}
-        >
-          <div className="flex items-center gap-2">
-            <ChevronDown
-              className={`h-5 w-5 transition-transform ${
-                collapsedSections.wellness ? "-rotate-90" : ""
-              }`}
-            />
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Wellness
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openInfo("wellness");
-                  }}
-                >
-                  <Info className="h-4 w-4" />
-                </Button>
-              </CardTitle>
-              <CardDescription>
-                Sleep patterns, energy levels, and stress factors
-              </CardDescription>
+        <CardHeader className="border-b">
+          <div
+            className="-m-6 flex cursor-pointer items-center justify-between rounded-t-lg p-6 transition-colors hover:bg-muted/50"
+            onClick={() => toggleSection("wellness")}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsedSections.wellness ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Wellness
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("wellness");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  Sleep patterns, energy levels, and stress factors
+                </CardDescription>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -958,11 +969,11 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
           <CardContent className="space-y-6">
             {/* Sleep Schedule */}
             <div className="space-y-4">
-              <Label className="text-sm font-medium">Sleep Schedule</Label>
+              <p className="text-sm font-medium">Sleep Schedule</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-3 p-4 border rounded-lg">
                   <p className="text-sm font-medium">Weekdays</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
                         Bedtime
@@ -1015,7 +1026,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                 </div>
                 <div className="space-y-3 p-4 border rounded-lg">
                   <p className="text-sm font-medium">Weekends</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
                         Bedtime
@@ -1071,7 +1082,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
 
             {/* Energy Peaks */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Energy Peaks</Label>
+              <p className="text-sm font-medium">Energy Peaks</p>
               <p className="text-xs text-muted-foreground">
                 When do you feel most focused and productive?
               </p>
@@ -1089,7 +1100,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
 
             {/* Stress Triggers */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Stress Triggers</Label>
+              <p className="text-sm font-medium">Stress Triggers</p>
               <p className="text-xs text-muted-foreground">
                 Situations or patterns that tend to increase your stress
               </p>
