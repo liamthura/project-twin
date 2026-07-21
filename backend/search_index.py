@@ -13,11 +13,13 @@ import sections
 
 logger = logging.getLogger(__name__)
 
-TITLE_FIELDS = ("name", "title", "topic", "institution", "language", "degree")
+TITLE_FIELDS = ("name", "title", "topic", "idea", "role", "institution",
+                "language", "degree_level", "degree")
 TEXT_FIELDS = ("description", "notes", "content", "details", "role", "status",
-               "relationship", "source", "level", "category", "url")
+               "relationship", "source", "level", "category", "url",
+               "company", "note", "context", "field_of_study")
 NESTED_LIST_FIELDS = ("references", "highlights", "specifics", "coursework",
-                      "clubs", "tags")
+                      "clubs", "tags", "traits")
 
 
 def flatten_entity(entity):
@@ -80,6 +82,9 @@ def content_hash(text):
 
 # One background worker: embedding batches are small and ordering per user
 # doesn't matter (rows are keyed; a stale worker just overwrites NULL).
+# Note: ThreadPoolExecutor registers an atexit handler that JOINS pending
+# workers at interpreter shutdown -- it can slow shutdown in the worst case,
+# but it does not drop queued work.
 _EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="embed")
 
 
@@ -148,7 +153,7 @@ def _embed_rows(user_id, file_type, rows):
     except embeddings.EmbeddingError as exc:
         logger.warning("embedding batch failed (%s rows): %s", len(rows), exc)
         return
-    with suppress(Exception):
+    try:
         with db.get_pool().connection() as conn:
             for (eid, _text), vec in zip(rows, vectors):
                 conn.execute(
@@ -156,9 +161,21 @@ def _embed_rows(user_id, file_type, rows):
                     " where user_id = %s and file_type = %s and entity_id = %s",
                     (str(vec), user_id, file_type, eid),
                 )
+    except Exception:
+        logger.warning(
+            "embedding write-back failed (%s rows) for user=%s file_type=%s",
+            len(rows), user_id, file_type, exc_info=True,
+        )
 
 
 RRF_K = 60
+# Per-leg candidate pool for the FTS/vector CTEs below. A topic filter (file_type
+# = any(sections_pred)) narrows each leg's `where`, so a heavily-filtered query
+# can return well under CANDIDATES matches even though up to CANDIDATES rows are
+# scanned per leg -- worst case ~2×CANDIDATES rows reach the merge before the
+# outer `limit`. The window+limit CTE pattern here relies on the planner picking
+# an index scan bounded by `limit`; behavior (and cost) is plan-dependent and
+# should be re-checked with EXPLAIN if persona_search grows much larger.
 CANDIDATES = 40
 
 
@@ -174,19 +191,28 @@ def lazy_heal(user_id):
 
 
 def search(user_id, query, section_filter, limit, exclude_sections=None):
+    """Hybrid FTS + (optional) vector search over one user's persona_search
+    rows. Invariant: `user_id` must equal the bound `db.current_user_id` --
+    lazy_heal loads persona data via that contextvar, not via `user_id`
+    directly, so a mismatch would heal/read the wrong user's data."""
     with db.get_pool().connection() as conn:
         have_rows = conn.execute(
             "select exists(select 1 from persona_search where user_id = %s) as e",
             (user_id,),
         ).fetchone()["e"]
+        need_heal = False
         if not have_rows:
             have_data = conn.execute(
                 "select exists(select 1 from persona_data where user_id = %s"
                 " and file_type != '_settings') as e",
                 (user_id,),
             ).fetchone()["e"]
-            if have_data:
-                lazy_heal(user_id)
+            need_heal = have_data
+    # lazy_heal opens its own pool connection(s); it must run OUTSIDE the
+    # `with` block above so this call can't starve the pool by holding one
+    # connection while requesting another (deadlock under max_size=1 pools).
+    if need_heal:
+        lazy_heal(user_id)
 
     sections_pred = list(section_filter) if section_filter else [
         s for s in sections.SECTION_REGISTRY]

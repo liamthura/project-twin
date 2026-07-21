@@ -70,3 +70,14 @@ def test_get_provider_reads_environ(monkeypatch):
     monkeypatch.delenv("VOYAGE_API_KEY", raising=False)
     monkeypatch.delenv("EMBEDDING_API_URL", raising=False)
     assert embeddings.get_provider() is None
+
+
+def test_default_client_is_shared_not_created_per_call():
+    """No explicit client passed -> the provider must reuse the module-level
+    shared httpx.Client instead of opening a fresh one per call (leak)."""
+    p1 = embeddings._build_provider(
+        {"EMBEDDING_PROVIDER": "voyage", "VOYAGE_API_KEY": "vk"})
+    p2 = embeddings._build_provider(
+        {"EMBEDDING_PROVIDER": "voyage", "VOYAGE_API_KEY": "vk"})
+    assert p1._client is embeddings._CLIENT
+    assert p2._client is embeddings._CLIENT

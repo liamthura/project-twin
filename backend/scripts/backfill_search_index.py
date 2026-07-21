@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import db  # noqa: E402
+import persona_store  # noqa: E402
 import search_index  # noqa: E402
 
 
@@ -43,7 +44,6 @@ def backfill(recreate=False):
     for user_id in users:
         token = db.current_user_id.set(str(user_id))
         try:
-            import persona_store
             for file_type in persona_store.VALID_FILES:
                 data = persona_store.load(file_type)
                 if isinstance(data, dict) and "error" not in data:

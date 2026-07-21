@@ -47,6 +47,24 @@ def test_search_context_bad_section_errors(seeded):
     assert "Unknown section" in result.content[0].text
 
 
+def test_search_context_all_requested_sections_disabled_errors(seeded):
+    # Requesting only a disabled section must return the explicit disabled-
+    # section error (same wording as get_entity), not silently-empty results.
+    import server
+    import settings_store
+
+    settings_store.set_disabled_sections(["projects"])
+
+    async def _run():
+        tool = await server.mcp.get_tool("search_context")
+        return await tool.run({"query": "dashboard", "sections": "projects"})
+
+    result = asyncio.run(_run())
+    text = result.content[0].text
+    assert "disabled" in text
+    assert "projects" in text
+
+
 def test_get_entity_via_dispatch(seeded):
     import server
     pid = persona_store.load("projects")["projects"][0]["id"]

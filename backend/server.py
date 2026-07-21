@@ -3051,9 +3051,16 @@ def search_context(query: str, sections: Union[str, List[str], None] = None,
         if unknown:
             return (f"Unknown section(s): {', '.join(unknown)}. "
                     f"Valid: {', '.join(sorted(valid))}")
+    disabled = settings_store.get_disabled_sections()
+    if sections and all(s in disabled for s in sections):
+        # Every requested section is disabled -- an explicit error (same
+        # wording as get_entity), not a silently-empty result set.
+        if len(sections) == 1:
+            return f"❌ Section '{sections[0]}' is disabled. Enable it in settings."
+        return (f"❌ Sections {', '.join(repr(s) for s in sections)} are "
+                "disabled. Enable them in settings.")
     limit = max(1, min(int(limit), 25))
     user_id = db.current_user_id.get()
-    disabled = settings_store.get_disabled_sections()
     out = search_index.search(user_id, query.strip(), sections, limit,
                                exclude_sections=list(disabled))
     out["query"] = query.strip()

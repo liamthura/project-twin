@@ -25,13 +25,21 @@ class EmbeddingError(Exception):
     pass
 
 
+# Shared across all providers built without an explicit `client` (i.e. every
+# real call site -- get_provider() never passes one). A fresh httpx.Client
+# per call/provider would leak a connection pool on every request; get_provider()
+# stays env-dynamic (rebuilds the provider each call) but must not rebuild
+# the transport too.
+_CLIENT = httpx.Client()
+
+
 class _HttpProvider:
     def __init__(self, url, model, api_key, send_input_type, client):
         self._url = url
         self._model = model
         self._api_key = api_key
         self._send_input_type = send_input_type  # Voyage extension; OpenAI-compat servers reject unknown fields
-        self._client = client or httpx.Client()
+        self._client = client or _CLIENT
 
     def embed(self, texts, input_type="document"):
         headers = {}
