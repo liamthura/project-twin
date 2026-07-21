@@ -123,3 +123,23 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* Edge fade hinting at more tabs off-screen (mobile strip only) */
+@media (max-width: 767px) {
+  .tab-strip-fade {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 16px,
+      black calc(100% - 24px),
+      transparent
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 16px,
+      black calc(100% - 24px),
+      transparent
+    );
+  }
+}

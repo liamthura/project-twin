@@ -68,6 +68,9 @@ function useDebounce(callback, delay) {
   return debouncedCallback;
 }
 
+const TAB_TRIGGER_CLASS =
+  "h-11 shrink-0 snap-start gap-2 rounded-full border md:h-9 md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent";
+
 // Main App
 export default function App() {
   const [isConnected, setIsConnected] = useState(false);
@@ -403,7 +406,7 @@ export default function App() {
             </svg>
             <h1 className="text-lg font-semibold">MyGist</h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {/* Auto-save toggle */}
             <label className="flex cursor-pointer items-center gap-2">
               <Switch
@@ -414,7 +417,7 @@ export default function App() {
                 }}
                 aria-label="Auto-save"
               />
-              <span className="text-xs font-medium text-muted-foreground">Auto-save</span>
+              <span className="hidden sm:inline text-xs font-medium text-muted-foreground">Auto-save</span>
             </label>
             {/* Save status */}
             <span className="hidden sm:inline text-xs text-muted-foreground">
@@ -460,7 +463,9 @@ export default function App() {
               className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[13px] font-medium hover:bg-muted/50"
             >
               <User className="h-3.5 w-3.5 text-muted-foreground" />
-              {profile?.preferred_name || profile?.name || "Account"}
+              <span className="max-w-[128px] truncate">
+                {profile?.preferred_name || profile?.name || "Account"}
+              </span>
             </button>
           </div>
         </div>
@@ -472,45 +477,45 @@ export default function App() {
           orientation="vertical"
           className="flex flex-col gap-6 md:flex-row"
         >
-          <div className="md:sticky md:top-[84px] md:w-48 md:self-start">
-          <TabsList className="scrollbar-none w-full flex-nowrap overflow-x-auto md:flex-wrap md:overflow-visible md:h-fit md:flex-col md:items-stretch md:justify-start">
-            <TabsTrigger value="profile" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
+          <div className="sticky top-[60px] z-10 -mx-4 bg-background px-4 pb-2 md:static md:mx-0 md:px-0 md:pb-0 md:sticky md:top-[84px] md:w-48 md:self-start">
+          <TabsList className="scrollbar-none w-full flex-nowrap overflow-x-auto snap-x snap-proximity tab-strip-fade md:flex-wrap md:overflow-visible md:h-fit md:flex-col md:items-stretch md:justify-start">
+            <TabsTrigger value="profile" className={TAB_TRIGGER_CLASS}>
               <User className="h-4 w-4" />
               <span>Profile</span>
             </TabsTrigger>
             {!disabledSections.includes("knowledge") && (
-              <TabsTrigger value="knowledge" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
+              <TabsTrigger value="knowledge" className={TAB_TRIGGER_CLASS}>
                 <Brain className="h-4 w-4" />
                 <span>Knowledge</span>
               </TabsTrigger>
             )}
             {!disabledSections.includes("projects") && (
-              <TabsTrigger value="projects" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
+              <TabsTrigger value="projects" className={TAB_TRIGGER_CLASS}>
                 <FolderKanban className="h-4 w-4" />
                 <span>Projects</span>
               </TabsTrigger>
             )}
             {!disabledSections.includes("lifestyle") && (
-              <TabsTrigger value="lifestyle" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
+              <TabsTrigger value="lifestyle" className={TAB_TRIGGER_CLASS}>
                 <Heart className="h-4 w-4" />
                 <span>Lifestyle</span>
               </TabsTrigger>
             )}
             {!disabledSections.includes("circle") && (
-              <TabsTrigger value="circle" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
+              <TabsTrigger value="circle" className={TAB_TRIGGER_CLASS}>
                 <Users className="h-4 w-4" />
                 <span>Circle</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="learning" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
+            <TabsTrigger value="learning" className={TAB_TRIGGER_CLASS}>
               <BookOpen className="h-4 w-4" />
               <span>Learning Log</span>
             </TabsTrigger>
-            <TabsTrigger value="preferences" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
+            <TabsTrigger value="preferences" className={TAB_TRIGGER_CLASS}>
               <Settings className="h-4 w-4" />
               <span>Preferences</span>
             </TabsTrigger>
-            <TabsTrigger value="sections" className="gap-2 rounded-full border md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent">
+            <TabsTrigger value="sections" className={TAB_TRIGGER_CLASS}>
               <SlidersHorizontal className="h-4 w-4" />
               <span>Sections</span>
             </TabsTrigger>
@@ -641,7 +646,7 @@ export default function App() {
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleConfirm}>
-              Delete
+              {confirmDialog.title?.startsWith("Remove") ? "Remove" : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
