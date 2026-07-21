@@ -198,7 +198,7 @@ export default function PreferencesEditor({ data, onChange }) {
                     updateDefaultComm("detail_level", e.target.value)
                   }
                   placeholder="e.g. comprehensive with examples, step-by-step breakdowns when explaining code..."
-                  className="min-h-[60px] resize-none text-sm"
+                  className="min-h-[80px] resize-none text-sm"
                 />
               </div>
             </div>
@@ -327,7 +327,7 @@ export default function PreferencesEditor({ data, onChange }) {
                                 )
                               }
                               placeholder="e.g. brief and to the point, skip the explanations..."
-                              className="min-h-[60px] resize-none text-sm"
+                              className="min-h-[80px] resize-none text-sm"
                             />
                           </div>
                         </div>
