@@ -101,6 +101,16 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   filter: invert(0.7);
 }
 
+/* Expand small icon buttons to a >=44px hit area without changing layout */
+.tap-target {
+  position: relative;
+}
+.tap-target::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
 /* Scroll without a visible scrollbar (mobile tab strip) */
 .scrollbar-none {
   scrollbar-width: none;
