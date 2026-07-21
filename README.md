@@ -325,6 +325,8 @@ Insights are saved to your learning log with:
 | `get_preferences`        | Code style, communication, dislikes                                                            |
 | `get_projects`           | Current projects and learning goals                                                            |
 | `get_learning_log`       | Insights and conceptual learnings captured over time                                           |
+| `search_context`         | Search the persona by meaning and keywords; returns ranked snippets (hybrid FTS + embeddings, or FTS-only) |
+| `get_entity`              | Fetch one persona entity in full by its id (from `search_context` or `get_context` output)      |
 | `persona_modify`         | Add/update/remove items (flexible field aliases)                                               |
 | `persona_batch`          | Multiple modifications in one call                                                             |
 | `suggest_persona_update` | Analyze a message for potential updates (includes insight detection for learning log)          |
@@ -398,6 +400,55 @@ Run multiple updates in a single call:
 | `passion`              | add, remove         | passion                                                                   |
 | `learning_entry`       | add, remove         | topic, details, tags, source (optional)                                   |
 | And more...            |                     |                                                                           |
+
+---
+
+## Embedding search (optional)
+
+`search_context` and `get_entity` let Claude search your persona by meaning
+and keywords instead of loading whole sections. By default this runs in
+**FTS-only mode** (Postgres full-text search, keyword matching) — no setup
+required. Adding an embedding provider upgrades it to **hybrid mode** (FTS +
+vector similarity), which also catches paraphrases and related concepts, not
+just keyword matches.
+
+> **Note:** Hybrid mode requires the [pgvector](https://github.com/pgvector/pgvector)
+> extension. Neon supports it out of the box. A self-hosted vanilla Postgres
+> without the extension automatically falls back to FTS-only — nothing
+> breaks, you just lose semantic matching.
+
+Configure one of two providers via environment variables (`.env` supported):
+
+| Variable             | Required for       | Description                                                                 |
+| --------------------- | ------------------- | ----------------------------------------------------------------------------- |
+| `EMBEDDING_PROVIDER`  | either provider     | `voyage` (default) or `openai`                                                |
+| `VOYAGE_API_KEY`      | `voyage`             | API key for hosted [Voyage AI](https://www.voyageai.com/) embeddings          |
+| `EMBEDDING_API_URL`   | `openai`             | Base URL of an OpenAI-compatible `/v1/embeddings` endpoint (Ollama, LM Studio, llama.cpp server, vLLM, LocalAI, or OpenAI itself) |
+| `EMBEDDING_API_KEY`   | `openai` (optional)  | API key for the endpoint above; omit for local servers that don't require one |
+| `EMBEDDING_MODEL`     | optional             | Embedding model name (default: `voyage-3.5-lite`)                             |
+| `EMBEDDING_DIM`       | optional             | Vector dimension the `embedding` column is created at (default: `1024`); must match your model's output dimension |
+
+Leaving `EMBEDDING_PROVIDER`/`VOYAGE_API_KEY`/`EMBEDDING_API_URL` unset keeps
+the server in FTS-only mode.
+
+### Backfilling the search index
+
+New entities are indexed automatically as you write them. To (re)index
+everything that already exists — e.g. after enabling an embedding provider
+for the first time, or changing `EMBEDDING_MODEL`/`EMBEDDING_DIM` — run the
+backfill script from `backend/`:
+
+```bash
+python scripts/backfill_search_index.py             # index missing/changed entities
+python scripts/backfill_search_index.py --recreate  # drop + recreate the embedding
+                                                      # column at EMBEDDING_DIM, then
+                                                      # re-embed everything
+```
+
+Use `--recreate` whenever `EMBEDDING_DIM` changes (e.g. switching models) —
+the existing `embedding` column is at the old dimension and must be rebuilt.
+It reads `DATABASE_URL` and the `EMBEDDING_*` vars the same way the server
+does (`.env` supported).
 
 ---
 
