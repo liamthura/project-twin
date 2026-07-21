@@ -38,10 +38,13 @@ from fastmcp import FastMCP
 # from starlette.routing import Route
 from dotenv import load_dotenv
 
+import db
 import persona_store
+import search_index
 import sections
 import settings_store
 from persona_store import FILE_MAP, generate_entity_id, get_all as get_all_persona_data
+from sections import SECTION_REGISTRY
 
 # Load environment variables
 load_dotenv()
@@ -3060,7 +3063,8 @@ def get_raw(
     file: str = "all"
 ) -> str:
     """
-    Retrieve raw JSON file data. Use for editing or deep inspection.
+    Raw dump of persona file(s) — export/debug use. For finding specific
+    content, prefer search_context (ranked snippets) + get_entity (full detail).
 
     WHEN TO USE:
         - Before modifying data (to see current state)
@@ -3092,6 +3096,66 @@ def get_raw(
         return f"❌ Section '{file}' is disabled. Enable it in settings."
     else:
         return f"❌ Unknown file: {file}. Valid: all, {', '.join(persona_store.VALID_FILES)}"
+
+
+@mcp.tool()
+def search_context(query: str, sections: Union[str, List[str], None] = None,
+                    limit: int = 10) -> str:
+    """Search the persona for relevant entries by meaning and keywords.
+
+    PREFERRED way to find specific persona content — returns small ranked
+    snippets instead of whole sections. Follow up with get_entity(entity_id)
+    for full detail on a hit. Modes: "hybrid" (FTS + embeddings) or "fts"
+    (no embedding provider configured).
+
+    Args:
+        query: What to look for (natural language or keywords).
+        sections: Optional section name or list to restrict the search
+            (e.g. "projects" or ["knowledge", "learning_log"]).
+        limit: Max results, 1-25 (default 10).
+    """
+    if not query or not query.strip():
+        return "Error: query must be a non-empty string"
+    if isinstance(sections, str):
+        sections = [sections]
+    valid = set(SECTION_REGISTRY)
+    if sections:
+        unknown = [s for s in sections if s not in valid]
+        if unknown:
+            return (f"Unknown section(s): {', '.join(unknown)}. "
+                    f"Valid: {', '.join(sorted(valid))}")
+    limit = max(1, min(int(limit), 25))
+    user_id = db.current_user_id.get()
+    disabled = settings_store.get_disabled_sections()
+    out = search_index.search(user_id, query.strip(), sections, limit,
+                               exclude_sections=list(disabled))
+    out["query"] = query.strip()
+    return json.dumps(out, indent=2)
+
+
+@mcp.tool()
+def get_entity(entity_id: str) -> str:
+    """Fetch one persona entity in full by its id (as returned by
+    search_context results or embedded in get_context output).
+
+    Args:
+        entity_id: Prefixed id, e.g. "project_ab12cd34", "learn_20260721_x1y2z3".
+    """
+    loc = search_index.entity_location(entity_id)
+    if loc is None:
+        prefixes = sorted({p for p, _ in search_index._PREFIXES})
+        return ("Unknown entity id prefix. Valid prefixes: "
+                + ", ".join(prefixes))
+    file_type, list_key = loc
+    disabled = settings_store.get_disabled_sections()
+    if file_type in disabled:
+        return f"❌ Section '{file_type}' is disabled. Enable it in settings."
+    data = load_json(file_type)
+    for entity in data.get(list_key) or []:
+        if isinstance(entity, dict) and entity.get("id") == entity_id:
+            return json.dumps({"section": file_type, "entity_id": entity_id,
+                               "entity": entity}, indent=2)
+    return f"❌ Entity {entity_id} not found in {file_type}.{list_key}"
 
 
 @mcp.tool()
