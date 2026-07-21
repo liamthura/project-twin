@@ -21,7 +21,7 @@ the existing topic filter through it.
 
 ## Decisions made with the user
 
-- **Embedding provider:** Voyage AI (`voyage-3.5-lite`, 1024 dims), key via
+- **Embedding provider:** Voyage AI (`voyage-4-lite`, 1024 dims — 200M free tokens/month; voyage-3.5-lite was the original choice but is now legacy with no free tier), key via
   `VOYAGE_API_KEY` env var. No key → FTS-only mode; everything still works.
 - **Tool scope:** `search_context` + `get_entity` + rewired `topic` filter.
   `get_raw` keeps its behavior (docstring updated to steer AI callers toward
@@ -200,7 +200,7 @@ embed, query embed, timeouts, and the "not configured → None" behavior.
 | `VOYAGE_API_KEY` | unset | Voyage key; unset with provider=voyage → FTS-only mode |
 | `EMBEDDING_API_URL` | provider default | Base URL for openai provider, e.g. `http://localhost:11434/v1` (Ollama) |
 | `EMBEDDING_API_KEY` | unset | Bearer key for openai provider; optional (local servers usually need none) |
-| `EMBEDDING_MODEL` | `voyage-3.5-lite` | Model name sent to the provider (e.g. `nomic-embed-text`) |
+| `EMBEDDING_MODEL` | `voyage-4-lite` | Model name sent to the provider (e.g. `nomic-embed-text`) |
 | `EMBEDDING_DIM` | `1024` | Vector column dimension; read at schema-creation time |
 
 `ensure_schema` creates `vector(EMBEDDING_DIM)`. If the existing column's

@@ -425,7 +425,7 @@ Configure one of two providers via environment variables (`.env` supported):
 | `VOYAGE_API_KEY`      | `voyage`             | API key for hosted [Voyage AI](https://www.voyageai.com/) embeddings          |
 | `EMBEDDING_API_URL`   | `openai`             | Base URL of an OpenAI-compatible `/v1/embeddings` endpoint (Ollama, LM Studio, llama.cpp server, vLLM, LocalAI, or OpenAI itself) |
 | `EMBEDDING_API_KEY`   | `openai` (optional)  | API key for the endpoint above; omit for local servers that don't require one |
-| `EMBEDDING_MODEL`     | optional             | Embedding model name (default: `voyage-3.5-lite`)                             |
+| `EMBEDDING_MODEL`     | optional             | Embedding model name (default: `voyage-4-lite`, 200M free tokens/month)                             |
 | `EMBEDDING_DIM`       | optional             | Vector dimension the `embedding` column is created at (default: `1024`); must match your model's output dimension |
 
 Leaving `EMBEDDING_PROVIDER`/`VOYAGE_API_KEY`/`EMBEDDING_API_URL` unset keeps

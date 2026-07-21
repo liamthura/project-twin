@@ -18,7 +18,9 @@ import httpx
 TIMEOUT_SECONDS = 8.0  # document batches (background thread)
 QUERY_TIMEOUT_SECONDS = 2.0  # per-search query embedding (user-facing path)
 VOYAGE_URL = "https://api.voyageai.com/v1/embeddings"
-DEFAULT_MODEL = "voyage-3.5-lite"
+# voyage-4-lite: 200M free tokens/month (voyage-3.5-lite is legacy — no free
+# tier). Same 1024-dim default as the vector(EMBEDDING_DIM) column.
+DEFAULT_MODEL = "voyage-4-lite"
 
 
 class EmbeddingError(Exception):
