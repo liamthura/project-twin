@@ -55,6 +55,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { segmentClass } from "@/components/ui/segmented-control";
+import { EmptyState } from "@/components/ui/empty-state";
+import { InfoDialog } from "@/components/ui/info-dialog";
 import { ConnectionSettings } from "@/components/ConnectionSettings";
 import {
   api,
@@ -1044,9 +1046,7 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
                 })}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No education added yet. Click "Add Education" to get started.
-              </p>
+              <EmptyState>No education entries yet. Add one to get started.</EmptyState>
             )}
 
             {/* Goals Section - Moved outside education entries */}
@@ -1623,44 +1623,35 @@ function ProfileEditor({ data, onChange, onShowConfirmation }) {
       </Card>
 
       {/* Info Modal */}
-      <Dialog
+      <InfoDialog
         open={infoModal.isOpen}
         onOpenChange={(open) =>
           setInfoModal((prev) => ({ ...prev, isOpen: open }))
         }
+        title={infoModal.title}
+        description={infoModal.overview}
       >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5 text-primary" />
-              {infoModal.title}
-            </DialogTitle>
-            <DialogDescription>{infoModal.overview}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
-            <p className="font-medium text-foreground">
-              Tips for filling this section:
-            </p>
-            <ul className="space-y-2 text-muted-foreground">
-              {(infoModal.tips || []).map((tip, idx) => (
-                <li key={idx} className="flex gap-2">
-                  <span className="text-primary">•</span>
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() =>
-                setInfoModal((prev) => ({ ...prev, isOpen: false }))
-              }
-            >
-              Got it
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <p className="font-medium text-foreground">
+          Tips for filling this section:
+        </p>
+        <ul className="space-y-2 text-muted-foreground">
+          {(infoModal.tips || []).map((tip, idx) => (
+            <li key={idx} className="flex gap-2">
+              <span className="text-primary">•</span>
+              <span>{tip}</span>
+            </li>
+          ))}
+        </ul>
+        <DialogFooter>
+          <Button
+            onClick={() =>
+              setInfoModal((prev) => ({ ...prev, isOpen: false }))
+            }
+          >
+            Got it
+          </Button>
+        </DialogFooter>
+      </InfoDialog>
     </div>
   );
 }
@@ -2253,11 +2244,11 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
             ) : null}
 
             {filteredDomains.length === 0 && (
-              <div className="px-4 py-8 text-center text-muted-foreground text-sm border rounded-lg">
+              <EmptyState>
                 {searchTerm || filterLevel !== "all"
                   ? "No skills match your filters."
                   : "No skills yet. Add one to get started."}
-              </div>
+              </EmptyState>
             )}
           </CardContent>
         )}
@@ -2665,11 +2656,11 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
                 })}
               </div>
             ) : (
-              <div className="px-4 py-8 text-center text-muted-foreground text-sm border rounded-lg">
+              <EmptyState>
                 {tabSearchTerm
                   ? "No tabs match your search."
-                  : "No mental tabs yet. Add one to save random knowledge."}
-              </div>
+                  : "No mental tabs yet. Add one to get started."}
+              </EmptyState>
             )}
           </CardContent>
         )}
@@ -2723,44 +2714,35 @@ function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
       </Dialog>
 
       {/* Info Modal */}
-      <Dialog
+      <InfoDialog
         open={infoModal.isOpen}
         onOpenChange={(open) =>
           setInfoModal((prev) => ({ ...prev, isOpen: open }))
         }
+        title={infoModal.title}
+        description={infoModal.overview}
       >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5 text-primary" />
-              {infoModal.title}
-            </DialogTitle>
-            <DialogDescription>{infoModal.overview}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
-            <p className="font-medium text-foreground">
-              Tips for filling this section:
-            </p>
-            <ul className="space-y-2 text-muted-foreground">
-              {(infoModal.tips || []).map((tip, idx) => (
-                <li key={idx} className="flex gap-2">
-                  <span className="text-primary">•</span>
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() =>
-                setInfoModal((prev) => ({ ...prev, isOpen: false }))
-              }
-            >
-              Got it
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <p className="font-medium text-foreground">
+          Tips for filling this section:
+        </p>
+        <ul className="space-y-2 text-muted-foreground">
+          {(infoModal.tips || []).map((tip, idx) => (
+            <li key={idx} className="flex gap-2">
+              <span className="text-primary">•</span>
+              <span>{tip}</span>
+            </li>
+          ))}
+        </ul>
+        <DialogFooter>
+          <Button
+            onClick={() =>
+              setInfoModal((prev) => ({ ...prev, isOpen: false }))
+            }
+          >
+            Got it
+          </Button>
+        </DialogFooter>
+      </InfoDialog>
     </div>
   );
 }
@@ -3086,10 +3068,7 @@ function PreferencesEditor({ data, onChange }) {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-6 border rounded-lg text-muted-foreground text-sm">
-                No mood overrides yet. Add one to customize how AI responds
-                based on how you're feeling.
-              </div>
+              <EmptyState>No mood overrides yet. Add one to get started.</EmptyState>
             )}
           </div>
         </CardContent>
@@ -3451,9 +3430,7 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                 })}
               </div>
             ) : (
-              <div className="px-4 py-8 text-center text-muted-foreground text-sm border rounded-lg">
-                No ideas yet. Click &quot;Add Idea&quot; to get started.
-              </div>
+              <EmptyState>No ideas yet. Add one to get started.</EmptyState>
             )}
           </CardContent>
         )}
@@ -4042,11 +4019,11 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                 })}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">
+              <EmptyState>
                 {hasActiveFilters
                   ? "No projects match your search"
-                  : "No projects added yet"}
-              </p>
+                  : "No projects yet. Add one to get started."}
+              </EmptyState>
             )}
           </CardContent>
         )}
@@ -4108,44 +4085,35 @@ function ProjectsEditor({ data, onChange, onShowConfirmation }) {
       </Dialog>
 
       {/* Info Modal */}
-      <Dialog
+      <InfoDialog
         open={infoModal.isOpen}
         onOpenChange={(open) =>
           setInfoModal((prev) => ({ ...prev, isOpen: open }))
         }
+        title={infoModal.title}
+        description={infoModal.overview}
       >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5 text-primary" />
-              {infoModal.title}
-            </DialogTitle>
-            <DialogDescription>{infoModal.overview}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
-            <p className="font-medium text-foreground">
-              Tips for filling this section:
-            </p>
-            <ul className="space-y-2 text-muted-foreground">
-              {(infoModal.tips || []).map((tip, idx) => (
-                <li key={idx} className="flex gap-2">
-                  <span className="text-primary">•</span>
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() =>
-                setInfoModal((prev) => ({ ...prev, isOpen: false }))
-              }
-            >
-              Got it
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <p className="font-medium text-foreground">
+          Tips for filling this section:
+        </p>
+        <ul className="space-y-2 text-muted-foreground">
+          {(infoModal.tips || []).map((tip, idx) => (
+            <li key={idx} className="flex gap-2">
+              <span className="text-primary">•</span>
+              <span>{tip}</span>
+            </li>
+          ))}
+        </ul>
+        <DialogFooter>
+          <Button
+            onClick={() =>
+              setInfoModal((prev) => ({ ...prev, isOpen: false }))
+            }
+          >
+            Got it
+          </Button>
+        </DialogFooter>
+      </InfoDialog>
     </div>
   );
 }
@@ -4805,11 +4773,11 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
                 })}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">
+              <EmptyState>
                 {hasActiveFilters
                   ? "No hobbies match your filters"
-                  : "No hobbies added yet"}
-              </p>
+                  : "No hobbies yet. Add one to get started."}
+              </EmptyState>
             )}
           </CardContent>
         )}
@@ -5227,44 +5195,35 @@ function LifestyleEditor({ data, onChange, onShowConfirmation }) {
       </Card>
 
       {/* Info Modal */}
-      <Dialog
+      <InfoDialog
         open={infoModal.isOpen}
         onOpenChange={(open) =>
           setInfoModal((prev) => ({ ...prev, isOpen: open }))
         }
+        title={infoModal.title}
+        description={infoModal.overview}
       >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5 text-primary" />
-              {infoModal.title}
-            </DialogTitle>
-            <DialogDescription>{infoModal.overview}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
-            <p className="font-medium text-foreground">
-              Tips for filling this section:
-            </p>
-            <ul className="space-y-2 text-muted-foreground">
-              {(infoModal.tips || []).map((tip, idx) => (
-                <li key={idx} className="flex gap-2">
-                  <span className="text-primary">•</span>
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() =>
-                setInfoModal((prev) => ({ ...prev, isOpen: false }))
-              }
-            >
-              Got it
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <p className="font-medium text-foreground">
+          Tips for filling this section:
+        </p>
+        <ul className="space-y-2 text-muted-foreground">
+          {(infoModal.tips || []).map((tip, idx) => (
+            <li key={idx} className="flex gap-2">
+              <span className="text-primary">•</span>
+              <span>{tip}</span>
+            </li>
+          ))}
+        </ul>
+        <DialogFooter>
+          <Button
+            onClick={() =>
+              setInfoModal((prev) => ({ ...prev, isOpen: false }))
+            }
+          >
+            Got it
+          </Button>
+        </DialogFooter>
+      </InfoDialog>
     </div>
   );
 }
@@ -5596,11 +5555,11 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
               })}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-8">
+            <EmptyState>
               {hasActiveFilters
                 ? "No connections match your search"
-                : "No connections added yet"}
-            </p>
+                : "No connections yet. Add one to get started."}
+            </EmptyState>
           )}
         </CardContent>
       </Card>
@@ -5660,44 +5619,35 @@ function CircleEditor({ data, onChange, onShowConfirmation }) {
       </Dialog>
 
       {/* Info Modal */}
-      <Dialog
+      <InfoDialog
         open={infoModal.isOpen}
         onOpenChange={(open) =>
           setInfoModal((prev) => ({ ...prev, isOpen: open }))
         }
+        title={infoModal.title}
+        description={infoModal.overview}
       >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5 text-primary" />
-              {infoModal.title}
-            </DialogTitle>
-            <DialogDescription>{infoModal.overview}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
-            <p className="font-medium text-foreground">
-              Tips for filling this section:
-            </p>
-            <ul className="space-y-2 text-muted-foreground">
-              {(infoModal.tips || []).map((tip, idx) => (
-                <li key={idx} className="flex gap-2">
-                  <span className="text-primary">•</span>
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() =>
-                setInfoModal((prev) => ({ ...prev, isOpen: false }))
-              }
-            >
-              Got it
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <p className="font-medium text-foreground">
+          Tips for filling this section:
+        </p>
+        <ul className="space-y-2 text-muted-foreground">
+          {(infoModal.tips || []).map((tip, idx) => (
+            <li key={idx} className="flex gap-2">
+              <span className="text-primary">•</span>
+              <span>{tip}</span>
+            </li>
+          ))}
+        </ul>
+        <DialogFooter>
+          <Button
+            onClick={() =>
+              setInfoModal((prev) => ({ ...prev, isOpen: false }))
+            }
+          >
+            Got it
+          </Button>
+        </DialogFooter>
+      </InfoDialog>
     </div>
   );
 }
@@ -5804,9 +5754,7 @@ function LearningLogEditor({ data, onChange, onShowConfirmation }) {
           />
 
           {entries.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              No learning entries yet. Click "Add Entry" to get started.
-            </p>
+            <EmptyState>No entries yet. Add one to get started.</EmptyState>
           ) : (
             <div>
               {sortedIndexes
