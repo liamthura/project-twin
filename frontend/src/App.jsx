@@ -327,13 +327,19 @@ export default function App() {
           </div>
           <WelcomeAuth
             onUseToken={() => setShowConnectionSettings(true)}
-            onSuccess={loadAllData}
+            onSuccess={() => {
+              loadAllData();
+              loadSettings();
+            }}
           />
         </div>
         <ConnectionSettings
           isOpen={showConnectionSettings}
           onClose={() => setShowConnectionSettings(false)}
-          onConnectionChange={loadAllData}
+          onConnectionChange={() => {
+            loadAllData();
+            loadSettings();
+          }}
         />
       </div>
     );
@@ -370,7 +376,10 @@ export default function App() {
         <ConnectionSettings
           isOpen={showConnectionSettings}
           onClose={() => setShowConnectionSettings(false)}
-          onConnectionChange={loadAllData}
+          onConnectionChange={() => {
+            loadAllData();
+            loadSettings();
+          }}
         />
       </div>
     );
@@ -477,7 +486,7 @@ export default function App() {
           orientation="vertical"
           className="flex flex-col gap-6 md:flex-row"
         >
-          <div className="sticky top-[60px] z-10 -mx-4 bg-background px-4 pb-2 md:static md:mx-0 md:px-0 md:pb-0 md:sticky md:top-[84px] md:w-48 md:self-start">
+          <div className="sticky top-[60px] z-10 -mx-4 bg-background px-4 pb-2 md:mx-0 md:px-0 md:pb-0 md:sticky md:top-[84px] md:w-48 md:self-start">
           <TabsList className="scrollbar-none w-full flex-nowrap overflow-x-auto snap-x snap-proximity tab-strip-fade md:flex-wrap md:overflow-visible md:h-fit md:flex-col md:items-stretch md:justify-start">
             <TabsTrigger value="profile" className={TAB_TRIGGER_CLASS}>
               <User className="h-4 w-4" />
@@ -585,7 +594,7 @@ export default function App() {
           </TabsContent>
           <TabsContent value="sections">
             <Card>
-              <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+              <CardHeader className="border-b">
                 <CardTitle>Manage Sections</CardTitle>
                 <CardDescription>
                   Turn optional sections on or off. Disabled sections are
@@ -656,7 +665,10 @@ export default function App() {
       <ConnectionSettings
         isOpen={showConnectionSettings}
         onClose={() => setShowConnectionSettings(false)}
-        onConnectionChange={loadAllData}
+        onConnectionChange={() => {
+          loadAllData();
+          loadSettings();
+        }}
       />
 
       <Toaster />
