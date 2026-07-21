@@ -58,6 +58,18 @@ The HNSW index tolerates NULLs. `title` is stored so search hits can label
 results without loading blobs. Local test-db image is already
 `pgvector/pgvector:pg16`; Neon supports `CREATE EXTENSION vector` natively.
 
+**pgvector is optional (self-hosted vanilla Postgres support).**
+`ensure_schema` attempts `CREATE EXTENSION IF NOT EXISTS vector` in a
+try/except. If the extension is unavailable (e.g. a self-hoster on a plain
+`postgres:16` image), the table is created WITHOUT the `embedding` column and
+without the HNSW index, a module-level `VECTOR_AVAILABLE = False` flag is
+set, and the instance runs permanently in FTS-only mode: the sync path skips
+embedding scheduling, the search query skips the vector CTE, and
+`search_context` reports `mode: "fts"`. Startup must never fail because
+pgvector is missing. (If pgvector is installed later, the column/index are
+added by the same `ensure_schema` on next boot — guarded `ALTER TABLE ADD
+COLUMN IF NOT EXISTS` + `CREATE INDEX IF NOT EXISTS`.)
+
 ## Index sync (in `persona_store.save`)
 
 After `_assign_ids` and the blob upsert, for each section with `id_lists`:
@@ -176,6 +188,7 @@ embed, query embed, timeouts, and the "no key → None" behavior.
 | Failure | Behavior |
 |---|---|
 | No `VOYAGE_API_KEY` | FTS-only everywhere; `mode: "fts"` in responses |
+| pgvector extension unavailable (self-hosted vanilla Postgres) | Table created without embedding column; permanent FTS-only mode; startup never fails |
 | Voyage down / timeout on write | Row saved with NULL embedding; retried next save/backfill |
 | Voyage down / timeout on query | That search degrades to FTS-only |
 | Index sync exception | Logged; persona write still succeeds |
@@ -202,6 +215,9 @@ the pgvector image; `ensure_schema` gains the extension + table):
 - Search: FTS ranking sanity; hybrid RRF ordering with a deterministic fake
   embedder; sections filter; disabled-section exclusion; limit clamping;
   empty-index lazy heal.
+- Vector-unavailable mode: with `VECTOR_AVAILABLE` forced False, schema
+  creates without the embedding column, sync skips embedding, search stays
+  FTS-only end-to-end.
 - `get_entity`: every prefix resolves; longest-prefix (`learning_` vs
   `learn_`) collision; not-found; disabled section.
 - Topic rewire: scoped output keeps only matched id-list items; non-list
