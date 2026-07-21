@@ -139,11 +139,15 @@ search_context(query: str, sections: str | list[str] | None = None,
                limit: int = 10) -> str  # JSON
 ```
 Returns `{"query": ..., "mode": "hybrid" | "fts", "results": [
-  {"entity_id", "section", "title", "snippet", "score"}]}`.
+  {"entity_id", "section", "title", "snippet", "score", "fts_hit", "distance"}]}`.
+`fts_hit` is `true` when the row matched the FTS leg (`websearch_to_tsquery`);
+`distance` is the vector leg's cosine distance (`embedding <=> query_embedding`,
+lower = closer) or `null` when the row has no embedding or mode is `"fts"`.
 Validation: empty query → error string; unknown section names → error listing
-valid sections; limit clamped to 1..25. Docstring tells AI callers this is
-the preferred way to find relevant persona entries, and to follow up with
-`get_entity` for full detail.
+valid sections; every requested section disabled → the same disabled-section
+error wording `get_entity` uses (not a silent empty result); limit clamped to
+1..25. Docstring tells AI callers this is the preferred way to find relevant
+persona entries, and to follow up with `get_entity` for full detail.
 
 ```
 get_entity(entity_id: str) -> str  # JSON of the full entity
@@ -169,6 +173,11 @@ Prefix collision note: `learning_` (projects.current_learning) vs `learn_`
 2. In the scoped output, filter each id-list field to items whose id is in the
    match set. Non-id-list fields are untouched (same as today's behavior of
    keeping non-list content).
+   A row counts as a topic match when `fts_hit` is true, OR when it has a
+   vector `distance` at or under a hard cutoff of `0.5` cosine distance
+   (`fts_hit OR distance <= 0.5`; `TOPIC_VECTOR_DISTANCE_CUTOFF` in
+   `server.py`). Rows with neither an FTS hit nor a close-enough embedding
+   are dropped even if they were in the raw top-100 candidates.
 3. If the user's index is empty, the lazy-heal path (above) builds it first —
    so behavior is well-defined from the first call.
 

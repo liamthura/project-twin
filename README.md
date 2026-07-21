@@ -450,6 +450,13 @@ the existing `embedding` column is at the old dimension and must be rebuilt.
 It reads `DATABASE_URL` and the `EMBEDDING_*` vars the same way the server
 does (`.env` supported).
 
+After a dim-mismatch boot (the server logged a `WARNING: persona_search.embedding
+is vector(N) but EMBEDDING_DIM=M` and fell back to FTS-only), running
+`--recreate` is not enough by itself: **also restart the server process**. The
+already-running server cached `VECTOR_AVAILABLE = False` at startup and stays
+FTS-only until it reboots and re-runs `ensure_schema()`, even though the
+column backfill has since fixed the dimension mismatch.
+
 ---
 
 ## Roadmap
