@@ -21,6 +21,9 @@ from psycopg_pool import ConnectionPool
 
 _pool: Optional[ConnectionPool] = None
 
+VECTOR_AVAILABLE: bool = False
+EMBEDDING_DIM: int = int(os.environ.get("EMBEDDING_DIM", "1024"))
+
 # Set once per request by main.py's auth middleware; read by persona_store.py
 # (and, transitively, by server.py's MCP tools) to scope data to the caller.
 current_user_id: ContextVar[str] = ContextVar("current_user_id")
@@ -90,6 +93,63 @@ def ensure_schema() -> None:
             on conflict (token_hash) do nothing;
         """)
         conn.execute("update users set token_hash = null where token_hash is not null;")
+
+    # --- persona_search (hybrid retrieval index; derived data) ---
+    # Separate connection block: `_try_create_vector_extension`'s failure path
+    # calls conn.rollback(), which would also roll back the earlier
+    # (already-idempotent) DDL above if it shared this connection/transaction.
+    with get_pool().connection() as conn:
+        global VECTOR_AVAILABLE
+        VECTOR_AVAILABLE = _try_create_vector_extension(conn)
+        conn.execute("""
+            create table if not exists persona_search (
+                user_id uuid not null references users(id) on delete cascade,
+                file_type text not null,
+                entity_id text not null,
+                title text not null default '',
+                text text not null,
+                tsv tsvector generated always as (to_tsvector('english', text)) stored,
+                content_hash text not null,
+                updated_at timestamptz not null default now(),
+                primary key (user_id, file_type, entity_id)
+            );
+        """)
+        conn.execute(
+            "create index if not exists persona_search_tsv_idx"
+            " on persona_search using gin (tsv);"
+        )
+        if VECTOR_AVAILABLE:
+            conn.execute(
+                f"alter table persona_search add column if not exists embedding vector({EMBEDDING_DIM});"
+            )
+            # Existing column at a different dim? FTS-only until backfill --recreate.
+            row = conn.execute("""
+                select atttypmod as dim from pg_attribute
+                where attrelid = 'persona_search'::regclass and attname = 'embedding'
+            """).fetchone()
+            if row and row["dim"] not in (-1, EMBEDDING_DIM):
+                print(
+                    f"WARNING: persona_search.embedding is vector({row['dim']}) but "
+                    f"EMBEDDING_DIM={EMBEDDING_DIM}. Running FTS-only. To fix: "
+                    "python scripts/backfill_search_index.py --recreate"
+                )
+                VECTOR_AVAILABLE = False
+            else:
+                conn.execute(
+                    "create index if not exists persona_search_embedding_idx"
+                    " on persona_search using hnsw (embedding vector_cosine_ops);"
+                )
+
+
+def _try_create_vector_extension(conn) -> bool:
+    """True if pgvector is usable. Never raises — a self-hosted vanilla
+    Postgres without the extension runs in FTS-only mode (spec)."""
+    try:
+        conn.execute("create extension if not exists vector;")
+        return True
+    except psycopg.Error:
+        conn.rollback()
+        return False
 
 
 def hash_token(token: str) -> str:
