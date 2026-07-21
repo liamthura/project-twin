@@ -686,7 +686,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
             >
               Cancel
             </Button>
-            <Button onClick={handleAddSkillFromModal}>Add Skill</Button>
+            <Button onClick={handleAddSkillFromModal}>Add skill</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1086,7 +1086,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
             <Button variant="outline" onClick={() => setIsTabModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddTabFromModal}>Add Tab</Button>
+            <Button onClick={handleAddTabFromModal}>Add tab</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
