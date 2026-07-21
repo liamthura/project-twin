@@ -345,7 +345,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                     }}
                     className="h-9"
                   >
-                    Clear Filters
+                    Clear filters
                   </Button>
                 )}
               </div>

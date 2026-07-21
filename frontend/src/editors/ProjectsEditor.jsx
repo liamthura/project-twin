@@ -495,7 +495,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                     onClick={clearFilters}
                     className="h-9"
                   >
-                    Clear Filters
+                    Clear filters
                   </Button>
                 )}
               </div>
