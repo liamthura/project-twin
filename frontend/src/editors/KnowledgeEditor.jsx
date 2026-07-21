@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, X, Trash2, ChevronDown, Info } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Info } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -251,7 +251,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
     <div className="space-y-6">
       {/* Skills Section */}
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("skills")}
@@ -268,7 +268,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       openInfo("skills");
@@ -290,7 +290,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
               size="sm"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Skill
+              Add skill
             </Button>
           </div>
         </CardHeader>
@@ -399,7 +399,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                             e.stopPropagation();
                             removeDomain(originalIndex);
                           }}
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -421,7 +421,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                   )
                                 }
                                 placeholder="e.g. Python, Docker"
-                                className="h-8"
+                                className="h-9"
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </div>
@@ -433,7 +433,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                   updateDomain(originalIndex, "level", value)
                                 }
                               >
-                                <SelectTrigger className="h-8">
+                                <SelectTrigger className="h-9">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -510,14 +510,14 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                             newRefs
                                           );
                                         }}
-                                        className="h-6 w-6"
+                                        className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive"
                                       >
-                                        <X className="h-3 w-3" />
+                                        <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
                                     {isRefExpanded && (
                                       <div className="border-t p-2 space-y-2">
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                           <Input
                                             value={ref.name || ""}
                                             onChange={(e) => {
@@ -535,7 +535,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                               );
                                             }}
                                             placeholder="Reference name"
-                                            className="h-7 text-xs"
+                                            className="h-9"
                                             onClick={(e) => e.stopPropagation()}
                                           />
                                           <Input
@@ -555,7 +555,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                               );
                                             }}
                                             placeholder="URL"
-                                            className="h-7 text-xs"
+                                            className="h-9"
                                             onClick={(e) => e.stopPropagation()}
                                           />
                                         </div>
@@ -585,6 +585,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                 );
                               })}
                               <Button
+                                type="button"
                                 variant="outline"
                                 size="sm"
                                 onClick={(e) => {
@@ -604,10 +605,10 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                     [`${originalIndex}-${newRefIdx}`]: true,
                                   }));
                                 }}
-                                className="w-full border-dashed text-xs h-7"
+                                className="h-8 w-full border-dashed"
                               >
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add Reference
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                Add reference
                               </Button>
                             </div>
                           </div>
@@ -692,7 +693,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
 
       {/* Mental Tabs Section */}
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("mentalTabs")}
@@ -709,7 +710,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       openInfo("mentalTabs");
@@ -732,7 +733,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
               size="sm"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Tab
+              Add tab
             </Button>
           </div>
         </CardHeader>
@@ -825,7 +826,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                             e.stopPropagation();
                             removeTab(originalIndex);
                           }}
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -846,7 +847,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                 )
                               }
                               placeholder="Tab title"
-                              className="h-8"
+                              className="h-9"
                               onClick={(e) => e.stopPropagation()}
                             />
                           </div>
@@ -924,14 +925,14 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                             newRefs
                                           );
                                         }}
-                                        className="h-6 w-6"
+                                        className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive"
                                       >
-                                        <X className="h-3 w-3" />
+                                        <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
                                     {isRefExpanded && (
                                       <div className="border-t p-2 space-y-2">
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                           <Input
                                             value={ref.name || ""}
                                             onChange={(e) => {
@@ -949,7 +950,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                               );
                                             }}
                                             placeholder="Reference name"
-                                            className="h-7 text-xs"
+                                            className="h-9"
                                             onClick={(e) => e.stopPropagation()}
                                           />
                                           <Input
@@ -969,7 +970,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                               );
                                             }}
                                             placeholder="URL"
-                                            className="h-7 text-xs"
+                                            className="h-9"
                                             onClick={(e) => e.stopPropagation()}
                                           />
                                         </div>
@@ -999,6 +1000,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                 );
                               })}
                               <Button
+                                type="button"
                                 variant="outline"
                                 size="sm"
                                 onClick={(e) => {
@@ -1018,10 +1020,10 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                     [`${originalIndex}-${newRefIdx}`]: true,
                                   }));
                                 }}
-                                className="w-full border-dashed text-xs h-7"
+                                className="h-8 w-full border-dashed"
                               >
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add Reference
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                Add reference
                               </Button>
                             </div>
                           </div>
