@@ -111,7 +111,7 @@ export default function PreferencesEditor({ data, onChange }) {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <CardTitle>Code Style</CardTitle>
           <CardDescription>
             Your preferred programming languages, frameworks, and tools
@@ -148,7 +148,7 @@ export default function PreferencesEditor({ data, onChange }) {
       </Card>
 
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <CardTitle>Communication</CardTitle>
           <CardDescription>
             How you prefer AI responses to be formatted
@@ -158,7 +158,7 @@ export default function PreferencesEditor({ data, onChange }) {
           {/* Default Communication Style */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium">Default Style</Label>
+              <p className="text-sm font-medium">Default Style</p>
               <Badge variant="secondary" className="text-xs">
                 Always active
               </Badge>
@@ -171,7 +171,7 @@ export default function PreferencesEditor({ data, onChange }) {
                     value={comm.default.tone || ""}
                     onChange={(e) => updateDefaultComm("tone", e.target.value)}
                     placeholder="e.g. friendly but professional"
-                    className="h-8"
+                    className="h-9"
                   />
                 </div>
                 <div className="space-y-2">
@@ -184,7 +184,7 @@ export default function PreferencesEditor({ data, onChange }) {
                       updateDefaultComm("locale", e.target.value)
                     }
                     placeholder="e.g. British English"
-                    className="h-8"
+                    className="h-9"
                   />
                 </div>
               </div>
@@ -208,16 +208,16 @@ export default function PreferencesEditor({ data, onChange }) {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-sm font-medium">
+                <p className="text-sm font-medium">
                   When I'm feeling...
-                </Label>
+                </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Override defaults based on your mood or context
                 </p>
               </div>
-              <Button size="sm" variant="outline" onClick={addMoodOverride}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add Mood
+              <Button size="sm" onClick={addMoodOverride}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add mood
               </Button>
             </div>
 
@@ -243,14 +243,14 @@ export default function PreferencesEditor({ data, onChange }) {
                         {mood.when_feeling || "Untitled mood"}
                       </span>
                       {mood.tone && (
-                        <Badge variant="secondary" className="text-xs h-5">
+                        <Badge variant="secondary" className="h-5 text-xs">
                           {mood.tone}
                         </Badge>
                       )}
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive"
                         onClick={(e) => {
                           e.stopPropagation();
                           removeMoodOverride(idx);
@@ -273,7 +273,7 @@ export default function PreferencesEditor({ data, onChange }) {
                               )
                             }
                             placeholder="e.g. stressed, tired, excited, creative"
-                            className="h-8"
+                            className="h-9"
                           />
                         </div>
                         <div className="space-y-4">
@@ -292,7 +292,7 @@ export default function PreferencesEditor({ data, onChange }) {
                                   )
                                 }
                                 placeholder="e.g. gentle, encouraging"
-                                className="h-8"
+                                className="h-9"
                               />
                             </div>
                             <div className="space-y-2">
@@ -309,7 +309,7 @@ export default function PreferencesEditor({ data, onChange }) {
                                   )
                                 }
                                 placeholder="Leave blank to use default"
-                                className="h-8"
+                                className="h-9"
                               />
                             </div>
                           </div>
@@ -344,7 +344,7 @@ export default function PreferencesEditor({ data, onChange }) {
       </Card>
 
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <CardTitle>Learning Style</CardTitle>
           <CardDescription>How you learn best</CardDescription>
         </CardHeader>
@@ -369,7 +369,7 @@ export default function PreferencesEditor({ data, onChange }) {
       </Card>
 
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <CardTitle>Dislikes & Deal-breakers</CardTitle>
           <CardDescription>
             Things you do not want in responses or suggestions

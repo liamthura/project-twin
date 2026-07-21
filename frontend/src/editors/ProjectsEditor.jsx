@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, X, Trash2, ChevronDown, Info } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Info } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -200,7 +200,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("ideas")}
@@ -217,7 +217,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       openInfo("topOfMind");
@@ -239,7 +239,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
               size="sm"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Idea
+              Add idea
             </Button>
           </div>
         </CardHeader>
@@ -284,7 +284,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                   updateIdea("idea", e.target.value)
                                 }
                                 placeholder="What's the idea?"
-                                className="h-8 text-sm font-medium"
+                                className="h-9 text-sm font-medium"
                                 autoFocus
                                 onClick={(e) => e.stopPropagation()}
                               />
@@ -333,9 +333,9 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                             onChange({ ...data, top_of_mind: updated });
                             if (isEditing) setEditingIdeaIndex(null);
                           }}
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0"
+                          className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
                         >
-                          <X className="h-3 w-3" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
@@ -402,14 +402,14 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                 }
               }}
             >
-              Add Idea
+              Add idea
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
+        <CardHeader className="border-b">
           <div
             className="flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg -m-6 p-6"
             onClick={() => toggleSection("projects")}
@@ -427,7 +427,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-primary"
+                      className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
                         openInfo("projects");
@@ -450,7 +450,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
               size="sm"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Project
+              Add project
             </Button>
           </div>
         </CardHeader>
@@ -468,7 +468,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                     placeholder="Search projects..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="h-8"
+                    className="h-9"
                   />
                 </div>
                 <div className="min-w-[150px] space-y-1.5">
@@ -476,7 +476,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                     Status
                   </Label>
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger id="project-status" className="h-8">
+                    <SelectTrigger id="project-status" className="h-9">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -493,7 +493,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                     variant="ghost"
                     size="sm"
                     onClick={clearFilters}
-                    className="h-8"
+                    className="h-9"
                   >
                     Clear Filters
                   </Button>
@@ -580,7 +580,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                             e.stopPropagation();
                             removeProject(originalIndex);
                           }}
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                          className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -603,7 +603,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                   )
                                 }
                                 placeholder="Project name"
-                                className="h-8 bg-background"
+                                className="h-9 bg-background"
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </div>
@@ -615,7 +615,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                   updateProject(originalIndex, "status", value)
                                 }
                               >
-                                <SelectTrigger className="h-8 bg-background">
+                                <SelectTrigger className="h-9 bg-background">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -702,7 +702,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                           {ref.url && (
                                             <Badge
                                               variant="secondary"
-                                              className="h-5 text-[11px]"
+                                              className="h-5 text-xs"
                                             >
                                               URL
                                             </Badge>
@@ -710,7 +710,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                           {ref.notes && (
                                             <Badge
                                               variant="secondary"
-                                              className="h-5 text-[11px]"
+                                              className="h-5 text-xs"
                                             >
                                               notes
                                             </Badge>
@@ -731,9 +731,9 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                             newRefs
                                           );
                                         }}
-                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                        className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive"
                                       >
-                                        <X className="h-4 w-4" />
+                                        <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
 
@@ -757,7 +757,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                               );
                                             }}
                                             placeholder="Reference name"
-                                            className="h-8 text-sm bg-background"
+                                            className="h-9 text-sm bg-background"
                                             onClick={(e) => e.stopPropagation()}
                                           />
                                           <Input
@@ -777,7 +777,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                               );
                                             }}
                                             placeholder="URL (optional)"
-                                            className="h-8 text-sm bg-background"
+                                            className="h-9 text-sm bg-background"
                                             onClick={(e) => e.stopPropagation()}
                                           />
                                         </div>
@@ -808,6 +808,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                               })}
 
                               <Button
+                                type="button"
                                 variant="outline"
                                 size="sm"
                                 onClick={(e) => {
@@ -831,7 +832,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                 }}
                                 className="h-8 w-full border-dashed"
                               >
-                                <Plus className="h-4 w-4 mr-2" />
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
                                 Add reference
                               </Button>
                             </div>
@@ -899,7 +900,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                           projects: updated,
                                         });
                                       }}
-                                      className="h-10 w-10 text-destructive flex-shrink-0"
+                                      className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
                                     >
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
@@ -907,6 +908,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                 )
                               )}
                               <Button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const updated = [...(data.projects || [])];
@@ -918,10 +920,10 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                                 }}
                                 variant="outline"
                                 size="sm"
-                                className="w-full border-dashed"
+                                className="h-8 w-full border-dashed"
                               >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Highlight
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                Add highlight
                               </Button>
                             </div>
                           </div>
@@ -991,7 +993,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
             </Button>
             <Button onClick={addProject} disabled={!newProjectName.trim()}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Project
+              Add project
             </Button>
           </DialogFooter>
         </DialogContent>
