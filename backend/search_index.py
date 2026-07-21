@@ -156,3 +156,122 @@ def _embed_rows(user_id, file_type, rows):
                     " where user_id = %s and file_type = %s and entity_id = %s",
                     (str(vec), user_id, file_type, eid),
                 )
+
+
+RRF_K = 60
+CANDIDATES = 40
+
+
+def lazy_heal(user_id):
+    """Build FTS rows for a user whose persona predates the index (spec:
+    self-healing; embeddings follow in the background)."""
+    import persona_store
+    for file_type in sections.SECTION_REGISTRY:
+        with suppress(Exception):
+            data = persona_store.load(file_type)
+            if isinstance(data, dict) and "error" not in data:
+                sync_index(user_id, file_type, data)
+
+
+def search(user_id, query, section_filter, limit, exclude_sections=None):
+    with db.get_pool().connection() as conn:
+        have_rows = conn.execute(
+            "select exists(select 1 from persona_search where user_id = %s) as e",
+            (user_id,),
+        ).fetchone()["e"]
+        if not have_rows:
+            have_data = conn.execute(
+                "select exists(select 1 from persona_data where user_id = %s"
+                " and file_type != '_settings') as e",
+                (user_id,),
+            ).fetchone()["e"]
+            if have_data:
+                lazy_heal(user_id)
+
+    sections_pred = list(section_filter) if section_filter else [
+        s for s in sections.SECTION_REGISTRY]
+    if exclude_sections:
+        sections_pred = [s for s in sections_pred if s not in exclude_sections]
+
+    qvec = None
+    provider = embeddings.get_provider()
+    if provider is not None and db.VECTOR_AVAILABLE:
+        try:
+            qvec = provider.embed([query], input_type="query")[0]
+        except embeddings.EmbeddingError as exc:
+            logger.warning("query embedding failed, FTS-only for this call: %s", exc)
+
+    with db.get_pool().connection() as conn:
+        if qvec is None:
+            rows = conn.execute(
+                """
+                with fts as (
+                    select user_id, file_type, entity_id,
+                           row_number() over (order by ts_rank_cd(tsv, q) desc) as r
+                    from persona_search, websearch_to_tsquery('english', %(query)s) q
+                    where user_id = %(uid)s and file_type = any(%(sections)s)
+                      and tsv @@ q
+                    limit %(cand)s
+                )
+                select p.entity_id, p.file_type, p.title,
+                       ts_headline('english', p.text,
+                                   websearch_to_tsquery('english', %(query)s)) as snippet,
+                       1.0 / (%(k)s + fts.r) as score
+                from fts join persona_search p using (user_id, file_type, entity_id)
+                order by score desc limit %(limit)s
+                """,
+                {"query": query, "uid": user_id, "sections": sections_pred,
+                 "cand": CANDIDATES, "k": RRF_K, "limit": limit},
+            ).fetchall()
+            mode = "fts"
+        else:
+            rows = conn.execute(
+                """
+                with fts as (
+                    select user_id, file_type, entity_id,
+                           row_number() over (order by ts_rank_cd(tsv, q) desc) as r
+                    from persona_search, websearch_to_tsquery('english', %(query)s) q
+                    where user_id = %(uid)s and file_type = any(%(sections)s)
+                      and tsv @@ q
+                    limit %(cand)s
+                ), vec as (
+                    select user_id, file_type, entity_id,
+                           row_number() over (order by embedding <=> %(qvec)s) as r
+                    from persona_search
+                    where user_id = %(uid)s and file_type = any(%(sections)s)
+                      and embedding is not null
+                    order by embedding <=> %(qvec)s
+                    limit %(cand)s
+                ), merged as (
+                    select coalesce(fts.user_id, vec.user_id) as user_id,
+                           coalesce(fts.file_type, vec.file_type) as file_type,
+                           coalesce(fts.entity_id, vec.entity_id) as entity_id,
+                           coalesce(1.0 / (%(k)s + fts.r), 0)
+                         + coalesce(1.0 / (%(k)s + vec.r), 0) as score,
+                           fts.r is not null as fts_hit
+                    from fts full outer join vec
+                      using (user_id, file_type, entity_id)
+                )
+                select p.entity_id, p.file_type, p.title, m.score,
+                       case when m.fts_hit then
+                           ts_headline('english', p.text,
+                                       websearch_to_tsquery('english', %(query)s))
+                       else left(p.text, 160) end as snippet
+                from merged m join persona_search p using (user_id, file_type, entity_id)
+                order by m.score desc limit %(limit)s
+                """,
+                {"query": query, "uid": user_id, "sections": sections_pred,
+                 "cand": CANDIDATES, "k": RRF_K, "limit": limit,
+                 "qvec": str(qvec)},
+            ).fetchall()
+            mode = "hybrid"
+
+    return {
+        "mode": mode,
+        "results": [
+            {"entity_id": r["entity_id"], "section": r["file_type"],
+             "title": r["title"], "snippet": r["snippet"],
+             "score": float(r["score"])}
+            for r in rows
+        ],
+    }
