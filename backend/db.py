@@ -8,6 +8,7 @@ plaintext is returned exactly once at creation.
 """
 
 import hashlib
+import logging
 import os
 import secrets
 import uuid
@@ -19,10 +20,21 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
+logger = logging.getLogger(__name__)
+
 _pool: Optional[ConnectionPool] = None
 
 VECTOR_AVAILABLE: bool = False
-EMBEDDING_DIM: int = int(os.environ.get("EMBEDDING_DIM", "1024"))
+
+
+def _parse_dim(env) -> int:
+    """int(EMBEDDING_DIM) with a safe default. docker-compose substitutes an
+    unset passthrough var as "" (not absent), which crashes a plain
+    `int(env.get(..., "1024"))` -- `or` catches both missing and empty."""
+    return int(env.get("EMBEDDING_DIM") or "1024")
+
+
+EMBEDDING_DIM: int = _parse_dim(os.environ)
 
 # Set once per request by main.py's auth middleware; read by persona_store.py
 # (and, transitively, by server.py's MCP tools) to scope data to the caller.
@@ -95,12 +107,10 @@ def ensure_schema() -> None:
         conn.execute("update users set token_hash = null where token_hash is not null;")
 
     # --- persona_search (hybrid retrieval index; derived data) ---
-    # Separate connection block: `_try_create_vector_extension`'s failure path
-    # calls conn.rollback(), which would also roll back the earlier
-    # (already-idempotent) DDL above if it shared this connection/transaction.
+    # Table + GIN index commit in their own connection/transaction, separate
+    # from the vector DDL below: an HNSW build failure (old pgvector, odd
+    # server build) must not roll back this already-idempotent table DDL.
     with get_pool().connection() as conn:
-        global VECTOR_AVAILABLE
-        VECTOR_AVAILABLE = _try_create_vector_extension(conn)
         conn.execute("""
             create table if not exists persona_search (
                 user_id uuid not null references users(id) on delete cascade,
@@ -118,27 +128,18 @@ def ensure_schema() -> None:
             "create index if not exists persona_search_tsv_idx"
             " on persona_search using gin (tsv);"
         )
-        if VECTOR_AVAILABLE:
-            conn.execute(
-                f"alter table persona_search add column if not exists embedding vector({EMBEDDING_DIM});"
-            )
-            # Existing column at a different dim? FTS-only until backfill --recreate.
-            row = conn.execute("""
-                select atttypmod as dim from pg_attribute
-                where attrelid = 'persona_search'::regclass and attname = 'embedding'
-            """).fetchone()
-            if row and row["dim"] not in (-1, EMBEDDING_DIM):
-                print(
-                    f"WARNING: persona_search.embedding is vector({row['dim']}) but "
-                    f"EMBEDDING_DIM={EMBEDDING_DIM}. Running FTS-only. To fix: "
-                    "python scripts/backfill_search_index.py --recreate"
-                )
-                VECTOR_AVAILABLE = False
-            else:
-                conn.execute(
-                    "create index if not exists persona_search_embedding_idx"
-                    " on persona_search using hnsw (embedding vector_cosine_ops);"
-                )
+
+    # Vector DDL in its OWN connection/transaction, wrapped so any
+    # psycopg.Error (e.g. an HNSW build failure on pgvector <0.5 or an odd
+    # build) degrades to FTS-only instead of crashing startup.
+    global VECTOR_AVAILABLE
+    with get_pool().connection() as conn:
+        try:
+            VECTOR_AVAILABLE = _apply_vector_ddl(conn)
+        except psycopg.Error as exc:
+            conn.rollback()
+            VECTOR_AVAILABLE = False
+            logger.warning("vector DDL failed, running FTS-only: %s", exc)
 
 
 def _try_create_vector_extension(conn) -> bool:
@@ -150,6 +151,36 @@ def _try_create_vector_extension(conn) -> bool:
     except psycopg.Error:
         conn.rollback()
         return False
+
+
+def _apply_vector_ddl(conn) -> bool:
+    """Adds persona_search.embedding + its HNSW index if pgvector is usable
+    at the configured EMBEDDING_DIM. Returns whether vector search is now
+    available. May raise psycopg.Error (e.g. an HNSW build failure); the
+    caller catches it and degrades to FTS-only rather than losing the
+    persona_search table."""
+    if not _try_create_vector_extension(conn):
+        return False
+    conn.execute(
+        f"alter table persona_search add column if not exists embedding vector({EMBEDDING_DIM});"
+    )
+    # Existing column at a different dim? FTS-only until backfill --recreate.
+    row = conn.execute("""
+        select atttypmod as dim from pg_attribute
+        where attrelid = 'persona_search'::regclass and attname = 'embedding'
+    """).fetchone()
+    if row and row["dim"] not in (-1, EMBEDDING_DIM):
+        print(
+            f"WARNING: persona_search.embedding is vector({row['dim']}) but "
+            f"EMBEDDING_DIM={EMBEDDING_DIM}. Running FTS-only. To fix: "
+            "python scripts/backfill_search_index.py --recreate"
+        )
+        return False
+    conn.execute(
+        "create index if not exists persona_search_embedding_idx"
+        " on persona_search using hnsw (embedding vector_cosine_ops);"
+    )
+    return True
 
 
 def hash_token(token: str) -> str:
