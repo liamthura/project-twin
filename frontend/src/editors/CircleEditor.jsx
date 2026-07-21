@@ -362,7 +362,7 @@ export default function CircleEditor({ data, onChange, onShowConfirmation }) {
                                   )
                                 }
                                 placeholder="Context about your relationship, shared experiences, important details..."
-                                className="min-h-[200px] bg-background text-sm resize-none"
+                                className="min-h-[200px] bg-background resize-none"
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </div>

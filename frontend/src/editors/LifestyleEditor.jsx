@@ -583,7 +583,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                               );
                                             }}
                                             placeholder="Reference name"
-                                            className="h-9 text-sm bg-background"
+                                            className="h-9 bg-background"
                                             onClick={(e) => e.stopPropagation()}
                                           />
                                           <Input
@@ -603,7 +603,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                               );
                                             }}
                                             placeholder="URL (optional)"
-                                            className="h-9 text-sm bg-background"
+                                            className="h-9 bg-background"
                                             onClick={(e) => e.stopPropagation()}
                                           />
                                         </div>
@@ -677,7 +677,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                                 )
                               }
                               placeholder="Additional notes about this hobby..."
-                              className="min-h-[80px] bg-background text-sm"
+                              className="min-h-[80px] bg-background"
                               onClick={(e) => e.stopPropagation()}
                             />
                           </div>

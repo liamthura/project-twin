@@ -460,7 +460,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                 )
                               }
                               placeholder="Notes..."
-                              className="min-h-[80px] text-sm bg-background"
+                              className="min-h-[80px] bg-background"
                               onClick={(e) => e.stopPropagation()}
                             />
                           </div>
@@ -864,7 +864,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                                 )
                               }
                               placeholder="Your notes, insights, reminders..."
-                              className="min-h-[120px] text-sm bg-background"
+                              className="min-h-[120px] bg-background"
                               onClick={(e) => e.stopPropagation()}
                             />
                           </div>
