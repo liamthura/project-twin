@@ -901,6 +901,15 @@ def _filter_learning_log_by_time(data: dict, days: Optional[int] = None, limit: 
         return result
     return new_blob
 
+# Cosine distance cutoff for the vector half of hybrid-mode topic filtering.
+# pgvector's KNN has no built-in similarity threshold -- it always returns the
+# nearest CANDIDATES rows regardless of how dissimilar they actually are, so
+# without a cutoff every entity "matches" once a corpus has fewer than
+# CANDIDATES items. Related concepts typically land under ~0.5 cosine distance
+# for real embedding models; unrelated/orthogonal vectors (including this
+# suite's one-hot fakes) sit at 1.0.
+TOPIC_VECTOR_DISTANCE_CUTOFF = 0.5
+
 def _filter_by_topic(data: dict, topic: str) -> dict:
     """Keep only id-list items relevant to `topic`, via the search index
     (hybrid when embeddings are configured, FTS otherwise). Non-id-list
@@ -914,7 +923,11 @@ def _filter_by_topic(data: dict, topic: str) -> dict:
         return data
     user_id = db.current_user_id.get()
     hits = search_index.search(user_id, topic, id_sections, 100)
-    matched = {r["entity_id"] for r in hits["results"]}
+    matched = {
+        r["entity_id"] for r in hits["results"]
+        if r["fts_hit"] or (r["distance"] is not None
+                             and r["distance"] <= TOPIC_VECTOR_DISTANCE_CUTOFF)
+    }
     for ft in id_sections:
         spec = sections.SECTION_REGISTRY[ft]
         section_data = data.get(ft)

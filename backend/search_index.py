@@ -236,6 +236,7 @@ def search(user_id, query, section_filter, limit, exclude_sections=None):
                     limit %(cand)s
                 ), vec as (
                     select user_id, file_type, entity_id,
+                           embedding <=> %(qvec)s as dist,
                            row_number() over (order by embedding <=> %(qvec)s) as r
                     from persona_search
                     where user_id = %(uid)s and file_type = any(%(sections)s)
@@ -248,11 +249,13 @@ def search(user_id, query, section_filter, limit, exclude_sections=None):
                            coalesce(fts.entity_id, vec.entity_id) as entity_id,
                            coalesce(1.0 / (%(k)s + fts.r), 0)
                          + coalesce(1.0 / (%(k)s + vec.r), 0) as score,
-                           fts.r is not null as fts_hit
+                           fts.r is not null as fts_hit,
+                           vec.dist as distance
                     from fts full outer join vec
                       using (user_id, file_type, entity_id)
                 )
                 select p.entity_id, p.file_type, p.title, m.score,
+                       m.fts_hit, m.distance,
                        case when m.fts_hit then
                            ts_headline('english', p.text,
                                        websearch_to_tsquery('english', %(query)s))
@@ -271,7 +274,10 @@ def search(user_id, query, section_filter, limit, exclude_sections=None):
         "results": [
             {"entity_id": r["entity_id"], "section": r["file_type"],
              "title": r["title"], "snippet": r["snippet"],
-             "score": float(r["score"])}
+             "score": float(r["score"]),
+             "fts_hit": bool(r["fts_hit"]) if "fts_hit" in r.keys() else True,
+             "distance": float(r["distance"])
+                 if "distance" in r.keys() and r["distance"] is not None else None}
             for r in rows
         ],
     }

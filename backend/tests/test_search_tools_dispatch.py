@@ -32,7 +32,8 @@ def test_search_context_via_dispatch(seeded):
     assert payload["mode"] == "fts"
     assert payload["results"][0]["title"] == "Ledger"
     assert set(payload["results"][0]) == {"entity_id", "section", "title",
-                                          "snippet", "score"}
+                                          "snippet", "score", "fts_hit",
+                                          "distance"}
 
 
 def test_search_context_bad_section_errors(seeded):
