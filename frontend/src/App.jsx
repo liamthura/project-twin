@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -6536,32 +6537,17 @@ export default function App() {
           </div>
           <div className="flex items-center gap-4">
             {/* Auto-save toggle */}
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isAutosaveEnabled}
-              onClick={() => {
-                const next = !isAutosaveEnabled;
-                setIsAutosaveEnabled(next);
-                if (next) saveAll();
-              }}
-              className="flex items-center gap-2"
-            >
-              <span
-                className={`relative h-[18px] w-8 rounded-full transition-colors ${
-                  isAutosaveEnabled ? "bg-primary" : "border bg-muted"
-                }`}
-              >
-                <span
-                  className={`absolute left-0 top-[2px] h-[14px] w-[14px] rounded-full border bg-card transition-transform ${
-                    isAutosaveEnabled ? "translate-x-[16px]" : "translate-x-[2px]"
-                  }`}
-                />
-              </span>
-              <span className="text-xs font-medium text-muted-foreground">
-                Auto-save
-              </span>
-            </button>
+            <label className="flex cursor-pointer items-center gap-2">
+              <Switch
+                checked={isAutosaveEnabled}
+                onCheckedChange={(next) => {
+                  setIsAutosaveEnabled(next);
+                  if (next) saveAll();
+                }}
+                aria-label="Auto-save"
+              />
+              <span className="text-xs font-medium text-muted-foreground">Auto-save</span>
+            </label>
             {/* Save status */}
             <span className="hidden sm:inline text-xs text-muted-foreground">
               {isSaving
@@ -6757,22 +6743,11 @@ export default function App() {
                           </p>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={enabled}
+                      <Switch
+                        checked={enabled}
+                        onCheckedChange={() => toggleSection(key)}
                         aria-label={`Toggle ${SECTION_LABELS[key] || key}`}
-                        onClick={() => toggleSection(key)}
-                        className={`relative h-5 w-9 rounded-full transition-colors ${
-                          enabled ? "bg-primary" : "border bg-muted"
-                        }`}
-                      >
-                        <span
-                          className={`absolute left-0 top-[2px] h-4 w-4 rounded-full border bg-card transition-transform ${
-                            enabled ? "translate-x-[18px]" : "translate-x-[2px]"
-                          }`}
-                        />
-                      </button>
+                      />
                     </div>
                   );
                 })}
