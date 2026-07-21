@@ -30,3 +30,6 @@ psycopg-pool==3.3.1
 
 # Password hashing (tokens stay sha256; passwords need a slow hash)
 bcrypt==5.0.0
+
+# Embedding providers
+httpx==0.28.1
