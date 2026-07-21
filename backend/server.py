@@ -901,118 +901,32 @@ def _filter_learning_log_by_time(data: dict, days: Optional[int] = None, limit: 
         return result
     return new_blob
 
-# TODO: Find a way to let AI decide for keyword aliases matching rather than hard-coding, isntead give LLM-friendly instruction
-# Keyword aliases for topic filtering
-KEYWORD_ALIASES = {
-    "js": ["javascript", "js"],
-    "javascript": ["javascript", "js"],
-    "ts": ["typescript", "ts"],
-    "typescript": ["typescript", "ts"],
-    "react": ["react", "reactjs"],
-    "vue": ["vue", "vuejs"],
-    "next": ["next", "nextjs", "next.js"],
-    "nuxt": ["nuxt", "nuxtjs"],
-    "node": ["node", "nodejs", "node.js"],
-    "python": ["python", "py"],
-    "py": ["python", "py"],
-    "django": ["django", "dj"],
-    "fastapi": ["fastapi", "fast-api"],
-    "golang": ["go", "golang"],
-    "go": ["go", "golang"],
-    "k8s": ["kubernetes", "k8s"],
-    "kubernetes": ["kubernetes", "k8s"],
-    "ml": ["machine learning", "ml", "ai"],
-    "ai": ["artificial intelligence", "ai", "machine learning", "ml"],
-    "frontend": ["frontend", "front-end", "front end", "ui"],
-    "backend": ["backend", "back-end", "back end", "server"],
-}
-
-def _extract_keywords(topic: str) -> list:
-    """Extract and expand keywords from topic query."""
-    raw_keywords = re.split(r'[\s,;]+', topic.lower().strip())
-    raw_keywords = [k.strip() for k in raw_keywords if k.strip()]
-    
-    expanded = set()
-    for keyword in raw_keywords:
-        expanded.add(keyword)
-        if keyword in KEYWORD_ALIASES:
-            expanded.update(KEYWORD_ALIASES[keyword])
-    
-    return list(expanded)
-
-def _text_matches_keywords(text: str, keywords: list, min_match: int = 1) -> bool:
-    """Check if text matches any keywords."""
-    if not text or not keywords:
-        return False
-    
-    text_lower = text.lower()
-    matches = 0
-    
-    for keyword in keywords:
-        if len(keyword) <= 2:
-            pattern = r'\b' + re.escape(keyword) + r'\b'
-            if re.search(pattern, text_lower):
-                matches += 1
-        else:
-            if keyword in text_lower:
-                matches += 1
-    
-    return matches >= min_match
-
-def _item_matches_topic(item, keywords: list) -> bool:
-    """Check if an item is relevant to the given keywords."""
-    if isinstance(item, str):
-        return _text_matches_keywords(item, keywords)
-    elif isinstance(item, dict):
-        priority_fields = ["name", "title", "topic"]
-        searchable_fields = ["description", "notes", "content"]
-        
-        for field in priority_fields:
-            value = item.get(field)
-            if isinstance(value, str) and _text_matches_keywords(value, keywords):
-                return True
-        
-        tags = item.get("tags", [])
-        if isinstance(tags, list):
-            for tag in tags:
-                if isinstance(tag, str) and _text_matches_keywords(tag, keywords):
-                    return True
-        
-        for field in searchable_fields:
-            value = item.get(field)
-            if isinstance(value, str) and _text_matches_keywords(value, keywords):
-                return True
-        
-        for ref in item.get("references", []):
-            if _item_matches_topic(ref, keywords):
-                return True
-    
-    return False
-
 def _filter_by_topic(data: dict, topic: str) -> dict:
-    """Filter context to items relevant to a specific topic."""
-    filtered = {}
-    keywords = _extract_keywords(topic)
-    
-    for key, section in data.items():
-        if not isinstance(section, dict):
+    """Keep only id-list items relevant to `topic`, via the search index
+    (hybrid when embeddings are configured, FTS otherwise). Non-id-list
+    fields pass through untouched."""
+    import search_index
+
+    present_sections = [ft for ft in data if ft in sections.SECTION_REGISTRY]
+    id_sections = [ft for ft in present_sections
+                   if sections.SECTION_REGISTRY[ft].id_lists]
+    if not id_sections:
+        return data
+    user_id = db.current_user_id.get()
+    hits = search_index.search(user_id, topic, id_sections, 100)
+    matched = {r["entity_id"] for r in hits["results"]}
+    for ft in id_sections:
+        spec = sections.SECTION_REGISTRY[ft]
+        section_data = data.get(ft)
+        if not isinstance(section_data, dict):
             continue
-        filtered[key] = {}
-        for field, value in section.items():
-            if isinstance(value, list):
-                filtered_items = [item for item in value if _item_matches_topic(item, keywords)]
-                if filtered_items:
-                    filtered[key][field] = filtered_items
-            elif isinstance(value, dict):
-                if _item_matches_topic(value, keywords):
-                    filtered[key][field] = value
-            elif isinstance(value, str):
-                if _text_matches_keywords(value, keywords):
-                    filtered[key][field] = value
-        if not filtered[key]:
-            del filtered[key]
-    
-    return filtered
+        for list_key, _prefix in spec.id_lists:
+            if list_key in section_data and isinstance(section_data[list_key], list):
+                section_data[list_key] = [
+                    item for item in section_data[list_key]
+                    if isinstance(item, dict) and item.get("id") in matched
+                ]
+    return data
 
 def _filter_inactive(data: dict) -> dict:
     """Remove inactive/paused items from context."""
