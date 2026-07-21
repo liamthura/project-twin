@@ -13,8 +13,8 @@ import sections
 
 logger = logging.getLogger(__name__)
 
-TITLE_FIELDS = ("name", "title", "topic", "idea", "role", "institution",
-                "language", "degree_level", "degree")
+TITLE_FIELDS = ("name", "title", "topic", "idea", "goal", "role",
+                "institution", "language", "degree_level", "degree")
 TEXT_FIELDS = ("description", "notes", "content", "details", "role", "status",
                "relationship", "source", "level", "category", "url",
                "company", "note", "context", "field_of_study")

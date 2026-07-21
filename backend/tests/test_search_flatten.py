@@ -9,8 +9,8 @@ import search_index
 # domain ~L1462, mental_tab ~L1498, project ~L1543, current_learning ~L1581,
 # top_of_mind ~L1617, hobby ~L1339, connection ~L1665, learning_entry ~L1710).
 # `goal` (profile.goals_and_careers, {"goal": ...}) has no persona_modify
-# entity -- it's only reachable via the direct frontend PUT path -- and is
-# included to document that it stays untitled/untexted (out of scope here).
+# entity -- it's only reachable via the direct frontend PUT path -- but is
+# indexed via the "goal" title field so those entries stay searchable.
 FLATTEN_ENTITY_CASES = [
     ("work_experience",
      {"role": "Engineer", "company": "Acme Corp", "type": "Full-time",
@@ -23,7 +23,7 @@ FLATTEN_ENTITY_CASES = [
       "highlights": []},
      True, ["Northumbria University", "Computer Science"]),
     ("language", {"name": "Spanish", "fluency": "fluent"}, True, ["Spanish"]),
-    ("goal", {"goal": "Ship it"}, False, []),
+    ("goal", {"goal": "Ship it"}, True, ["Ship it"]),
     ("domain", {"name": "Rust", "level": "learning",
                 "notes": "Systems programming study"},
      True, ["Rust", "learning", "Systems programming study"]),

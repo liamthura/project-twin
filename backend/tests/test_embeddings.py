@@ -81,3 +81,18 @@ def test_default_client_is_shared_not_created_per_call():
         {"EMBEDDING_PROVIDER": "voyage", "VOYAGE_API_KEY": "vk"})
     assert p1._client is embeddings._CLIENT
     assert p2._client is embeddings._CLIENT
+
+
+def test_empty_model_env_falls_back_to_default():
+    def handler(request):
+        import json
+        assert json.loads(request.content)["model"] == embeddings.DEFAULT_MODEL
+        return httpx.Response(200, json={"data": [{"embedding": [1.0]}]})
+
+    # Compose injects EMBEDDING_MODEL="" for unset vars; must not send model:""
+    p = embeddings._build_provider(
+        {"EMBEDDING_PROVIDER": "voyage", "VOYAGE_API_KEY": "vk",
+         "EMBEDDING_MODEL": ""},
+        client=_mock_client(handler),
+    )
+    assert p.embed(["x"], input_type="document") == [[1.0]]

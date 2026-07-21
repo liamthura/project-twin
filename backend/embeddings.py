@@ -60,7 +60,9 @@ class _HttpProvider:
 
 def _build_provider(env, client=None):
     provider = env.get("EMBEDDING_PROVIDER", "voyage")
-    model = env.get("EMBEDDING_MODEL", DEFAULT_MODEL)
+    # `or` (not a get-default) so an orchestrator injecting EMBEDDING_MODEL=""
+    # (compose does this for unset vars) still falls back to the default.
+    model = env.get("EMBEDDING_MODEL") or DEFAULT_MODEL
     if provider == "voyage":
         key = env.get("VOYAGE_API_KEY")
         if not key:
