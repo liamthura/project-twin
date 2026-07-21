@@ -27,6 +27,7 @@ import { ArrayInput } from "@/components/ArrayInput";
 
 // Circle Editor
 export default function CircleEditor({ data, onChange, onShowConfirmation }) {
+  const [collapsed, setCollapsed] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedConnections, setExpandedConnections] = useState({});
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -116,7 +117,7 @@ export default function CircleEditor({ data, onChange, onShowConfirmation }) {
             ...data,
             connections: (data.connections || []).filter((_, i) => i !== index),
           });
-        }
+        },
       );
     } else {
       onChange({
@@ -135,10 +136,10 @@ export default function CircleEditor({ data, onChange, onShowConfirmation }) {
         ?.toLowerCase()
         .includes(searchLower);
       const matchesTrait = (connection.traits || []).some((trait) =>
-        trait.toLowerCase().includes(searchLower)
+        trait.toLowerCase().includes(searchLower),
       );
       return matchesName || matchesRelationship || matchesTrait;
-    }
+    },
   );
 
   const hasActiveFilters = searchTerm;
@@ -151,214 +152,236 @@ export default function CircleEditor({ data, onChange, onShowConfirmation }) {
     <div className="space-y-6">
       {/* Connections Section */}
       <Card>
-        <CardHeader className="sticky top-[60px] z-10 rounded-t-lg border-b bg-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Connections
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-primary"
-                  onClick={() => openInfo("connections")}
-                >
-                  <Info className="h-4 w-4" />
-                </Button>
-              </CardTitle>
-              <CardDescription>
-                People who matter in your life and your relationships with them
-              </CardDescription>
+        <CardHeader className="border-b">
+          <div
+            className="-m-6 flex cursor-pointer items-center justify-between rounded-t-lg p-6 transition-colors hover:bg-muted/50"
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  collapsed ? "-rotate-90" : ""
+                }`}
+              />
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Connections
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfo("connections");
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  People who matter in your life and your relationships with
+                  them
+                </CardDescription>
+              </div>
             </div>
-            <Button onClick={() => setIsAddModalOpen(true)} size="sm">
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsAddModalOpen(true);
+              }}
+              size="sm"
+            >
               <Plus className="h-4 w-4 mr-2" />
-              Add Connection
+              Add connection
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Search Bar */}
-          {(data.connections || []).length > 0 && (
-            <div className="flex flex-wrap gap-2 items-end">
-              <div className="flex-1 min-w-[200px] space-y-1.5">
-                <Label htmlFor="connection-search" className="text-xs">
-                  Search
-                </Label>
-                <Input
-                  id="connection-search"
-                  placeholder="Search connections..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-8"
-                />
-              </div>
-              {hasActiveFilters && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearFilters}
-                  className="h-8"
-                >
-                  Clear Filters
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* Connections List */}
-          {filteredConnections.length > 0 ? (
-            <div>
-              {filteredConnections.map((connection, idx) => {
-                const originalIndex = (data.connections || []).indexOf(
-                  connection
-                );
-                const isExpanded = expandedConnections[originalIndex];
-                const hasTraits = (connection.traits || []).length > 0;
-                const hasNotes = !!connection.notes;
-
-                return (
-                  <div
-                    key={idx}
-                    className="border-b border-border last:border-b-0 hover:bg-muted/40 transition-colors"
+        {!collapsed && (
+          <CardContent className="space-y-4">
+            {/* Search Bar */}
+            {(data.connections || []).length > 0 && (
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="flex-1 min-w-[200px] space-y-1.5">
+                  <Label htmlFor="connection-search" className="text-xs">
+                    Search
+                  </Label>
+                  <Input
+                    id="connection-search"
+                    placeholder="Search connections..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="h-9"
                   >
-                    {/* Collapsed Header */}
+                    Clear filters
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Connections List */}
+            {filteredConnections.length > 0 ? (
+              <div>
+                {filteredConnections.map((connection, idx) => {
+                  const originalIndex = (data.connections || []).indexOf(
+                    connection,
+                  );
+                  const isExpanded = expandedConnections[originalIndex];
+                  const hasTraits = (connection.traits || []).length > 0;
+                  const hasNotes = !!connection.notes;
+
+                  return (
                     <div
-                      className="flex items-center gap-2 p-3 cursor-pointer"
-                      onClick={() => toggleConnection(originalIndex)}
+                      key={idx}
+                      className="border-b border-border last:border-b-0 hover:bg-muted/40 transition-colors"
                     >
-                      <ChevronDown
-                        className={`h-4 w-4 transition-transform text-muted-foreground ${
-                          isExpanded ? "" : "-rotate-90"
-                        }`}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium truncate">
-                            {connection.name || "Untitled connection"}
-                          </span>
-                          <div className="hidden sm:flex gap-1.5 items-center flex-shrink-0">
-                            {hasTraits && (
-                              <Badge
-                                variant="secondary"
-                                className="h-5 text-xs"
-                              >
-                                {connection.traits.length} traits
-                              </Badge>
-                            )}
-                            {hasNotes && (
-                              <Badge
-                                variant="secondary"
-                                className="h-5 text-xs"
-                              >
-                                notes
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        {connection.relationship && (
-                          <p className="text-xs text-muted-foreground truncate mt-0.5">
-                            {connection.relationship}
-                          </p>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeConnection(originalIndex);
-                        }}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                      {/* Collapsed Header */}
+                      <div
+                        className="flex items-center gap-2 p-3 cursor-pointer"
+                        onClick={() => toggleConnection(originalIndex)}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Expanded Content */}
-                    {isExpanded && (
-                      <div className="border-t bg-background/50 p-4">
-                        <div className="grid gap-4 lg:grid-cols-[1fr_1.5fr]">
-                          {/* Left Column: Name, Relationship, Traits */}
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label>Name</Label>
-                              <Input
-                                value={connection.name || ""}
-                                onChange={(e) =>
-                                  updateConnection(
-                                    originalIndex,
-                                    "name",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="Person's name"
-                                className="h-8 bg-background"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Relationship</Label>
-                              <Input
-                                value={connection.relationship || ""}
-                                onChange={(e) =>
-                                  updateConnection(
-                                    originalIndex,
-                                    "relationship",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="e.g. Friend from university"
-                                className="h-8 bg-background"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Traits</Label>
-                              <ArrayInput
-                                items={connection.traits || []}
-                                onChange={(items) =>
-                                  updateConnection(
-                                    originalIndex,
-                                    "traits",
-                                    items
-                                  )
-                                }
-                                placeholder="Add trait..."
-                              />
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform text-muted-foreground ${
+                            isExpanded ? "" : "-rotate-90"
+                          }`}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium truncate">
+                              {connection.name || "Untitled connection"}
+                            </span>
+                            <div className="hidden sm:flex gap-1.5 items-center flex-shrink-0">
+                              {hasTraits && (
+                                <Badge
+                                  variant="secondary"
+                                  className="h-5 text-xs"
+                                >
+                                  {connection.traits.length} traits
+                                </Badge>
+                              )}
+                              {hasNotes && (
+                                <Badge
+                                  variant="secondary"
+                                  className="h-5 text-xs"
+                                >
+                                  notes
+                                </Badge>
+                              )}
                             </div>
                           </div>
+                          {connection.relationship && (
+                            <p className="text-xs text-muted-foreground truncate mt-0.5">
+                              {connection.relationship}
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeConnection(originalIndex);
+                          }}
+                          className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
 
-                          {/* Right Column: Notes */}
-                          <div className="space-y-2">
-                            <Label>Notes</Label>
-                            <Textarea
-                              value={connection.notes || ""}
-                              onChange={(e) =>
-                                updateConnection(
-                                  originalIndex,
-                                  "notes",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Context about your relationship, shared experiences, important details..."
-                              className="min-h-[200px] bg-background text-sm resize-none"
-                              onClick={(e) => e.stopPropagation()}
-                            />
+                      {/* Expanded Content */}
+                      {isExpanded && (
+                        <div className="border-t bg-background/50 p-4">
+                          <div className="grid gap-4 lg:grid-cols-[1fr_1.5fr]">
+                            {/* Left Column: Name, Relationship, Traits */}
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <Label>Name</Label>
+                                <Input
+                                  value={connection.name || ""}
+                                  onChange={(e) =>
+                                    updateConnection(
+                                      originalIndex,
+                                      "name",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="Person's name"
+                                  className="h-9 bg-background"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Relationship</Label>
+                                <Input
+                                  value={connection.relationship || ""}
+                                  onChange={(e) =>
+                                    updateConnection(
+                                      originalIndex,
+                                      "relationship",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="e.g. Friend from university"
+                                  className="h-9 bg-background"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Traits</Label>
+                                <ArrayInput
+                                  items={connection.traits || []}
+                                  onChange={(items) =>
+                                    updateConnection(
+                                      originalIndex,
+                                      "traits",
+                                      items,
+                                    )
+                                  }
+                                  placeholder="Add trait..."
+                                />
+                              </div>
+                            </div>
+
+                            {/* Right Column: Notes */}
+                            <div className="space-y-2">
+                              <Label>Notes</Label>
+                              <Textarea
+                                value={connection.notes || ""}
+                                onChange={(e) =>
+                                  updateConnection(
+                                    originalIndex,
+                                    "notes",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Context about your relationship, shared experiences, important details..."
+                                className="min-h-[200px] bg-background text-sm resize-none"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <EmptyState>
-              {hasActiveFilters
-                ? "No connections match your search"
-                : "No connections yet. Add one to get started."}
-            </EmptyState>
-          )}
-        </CardContent>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState>
+                {hasActiveFilters
+                  ? "No connections match your search"
+                  : "No connections yet. Add one to get started."}
+              </EmptyState>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       {/* Add Connection Modal */}
@@ -409,7 +432,7 @@ export default function CircleEditor({ data, onChange, onShowConfirmation }) {
               disabled={!newConnectionName.trim()}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Connection
+              Add connection
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -437,9 +460,7 @@ export default function CircleEditor({ data, onChange, onShowConfirmation }) {
         </ul>
         <DialogFooter>
           <Button
-            onClick={() =>
-              setInfoModal((prev) => ({ ...prev, isOpen: false }))
-            }
+            onClick={() => setInfoModal((prev) => ({ ...prev, isOpen: false }))}
           >
             Got it
           </Button>
@@ -448,4 +469,3 @@ export default function CircleEditor({ data, onChange, onShowConfirmation }) {
     </div>
   );
 }
-
