@@ -3160,8 +3160,17 @@ def get_entity(entity_id: Union[str, List[str]]) -> str:
     for eid in entity_id:
         result = _resolve_entity(eid)
         try:
-            entities.append(json.loads(result))
+            parsed = json.loads(result)
         except (json.JSONDecodeError, TypeError):
+            parsed = None
+        # A successful resolution is always a JSON object carrying an
+        # "entity" key (see _resolve_entity above) -- any other shape,
+        # even if it happens to be valid JSON (e.g. a bare string), is
+        # treated as an error so it can never be silently spliced into
+        # `entities` as something that looks like a resolved entity.
+        if isinstance(parsed, dict) and "entity" in parsed:
+            entities.append(parsed)
+        else:
             entities.append({"entity_id": eid, "error": result})
     return json.dumps({"entities": entities}, indent=2)
 
@@ -3269,7 +3278,19 @@ def _find_strong_match(file_type: str, entity_data: dict) -> Optional[dict]:
         # alone. OR-ing the title in front keeps that door open (title alone
         # can satisfy the FTS predicate) without weakening the vector leg,
         # which reads the whole query string regardless of the "OR" token.
-        query = f"{flattened_title} OR {flattened_text}" if flattened_title else flattened_text
+        if flattened_title:
+            # Phrase-quote the title so websearch_to_tsquery treats it as a
+            # literal adjacency requirement rather than parsing any OR/AND/
+            # NOT-like tokens embedded in the title itself as operators.
+            # Embedded double quotes are stripped first -- an unescaped quote
+            # inside the title would otherwise pair up with a later quote in
+            # `flattened_text` (which repeats the title verbatim as its first
+            # line) and silently swallow everything in between into one
+            # bogus phrase, breaking the match on the entity's own text.
+            safe_title = flattened_title.replace('"', "")
+            query = f'"{safe_title}" OR {flattened_text}'
+        else:
+            query = flattened_text
         hits = search_index.search(user_id, query, [file_type], limit=3)
         for hit in hits["results"]:
             if hit["distance"] is not None and hit["distance"] <= DUPLICATE_DISTANCE_CUTOFF:
@@ -3285,12 +3306,19 @@ def _find_strong_match(file_type: str, entity_data: dict) -> Optional[dict]:
         return None
 
 
-def _advisory_note(match: dict) -> str:
-    """The verbatim advisory line appended to a successful add's message
-    (spec wording -- leading space to separate it from the success message)."""
-    return (f' Note: resembles existing {match["entity_id"]} '
-            f'"{match["title"]}" — if this is the same item, '
-            f'use action="update" instead.')
+def _advisory_note(match: dict, supports_update: bool) -> str:
+    """The advisory line appended to a successful add's message (leading
+    space to separate it from the success message). `supports_update` tells
+    the caller whether this entity's ENTITY_SCHEMA actions include "update"
+    -- if not (e.g. top_of_mind, which is add/remove-only), suggesting
+    action="update" would be actionable advice for a dead end, so the
+    closing clause degrades to a plain duplicate flag instead (same prefix,
+    spec wording preserved verbatim for the update-capable case)."""
+    prefix = (f' Note: resembles existing {match["entity_id"]} '
+              f'"{match["title"]}" ')
+    if supports_update:
+        return prefix + '— if this is the same item, use action="update" instead.'
+    return prefix + '— it may be a duplicate.'
 
 
 @mcp.tool()
@@ -3326,12 +3354,15 @@ def persona_modify(
         Success/error message
     """
     match = None
+    supports_update = False
     if action == "add" and entity.lower() in ADVISORY_ENTITIES:
         file_type, _list_key = ADVISORY_ENTITIES[entity.lower()]
         match = _find_strong_match(file_type, normalize_data(data, entity.lower()))
+        supports_update = "update" in ENTITY_SCHEMA.get(file_type, {}).get(
+            entity.lower(), {}).get("actions", [])
     result = execute_modify(action, entity, data)
     if match and not result.startswith("❌"):
-        result += _advisory_note(match)
+        result += _advisory_note(match, supports_update)
     return result
 
 
@@ -3376,12 +3407,15 @@ def persona_batch(operations: list) -> str:
         entity = op.get("entity", "")
         data = op.get("data", {})
         match = None
+        supports_update = False
         if action == "add" and entity.lower() in ADVISORY_ENTITIES:
             file_type, _list_key = ADVISORY_ENTITIES[entity.lower()]
             match = _find_strong_match(file_type, normalize_data(data, entity.lower()))
+            supports_update = "update" in ENTITY_SCHEMA.get(file_type, {}).get(
+                entity.lower(), {}).get("actions", [])
         result = execute_modify(action, entity, data)
         if match and not result.startswith("❌"):
-            result += _advisory_note(match)
+            result += _advisory_note(match, supports_update)
         results.append(f"{i+1}. {result}")
 
     return "\n".join(results)

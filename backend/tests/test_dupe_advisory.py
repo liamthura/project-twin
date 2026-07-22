@@ -143,3 +143,62 @@ def test_batch_per_op_advisories(as_user, monkeypatch):
     ])
     # advisory attached to op 1's result line only
     assert out.count("resembles existing") == 1
+
+
+def _seed_top_of_mind(monkeypatch, provider, idea="Switch to a monorepo"):
+    monkeypatch.setattr(embeddings, "get_provider", lambda: provider)
+    persona_store.save("projects", {
+        "projects": [], "current_learning": [],
+        "top_of_mind": [{"idea": idea, "note": ""}],
+    })
+    uid = db.current_user_id.get()
+    search_index.sync_index(uid, "projects", persona_store.load("projects"),
+                            embed_sync=True)
+
+
+def test_top_of_mind_advisory_omits_update_hint(as_user, monkeypatch):
+    # top_of_mind's ENTITY_SCHEMA only lists ["add", "remove"] -- no "update"
+    # action exists for it, so the advisory must not suggest one (F1).
+    _seed_top_of_mind(monkeypatch, None)
+    out = server.persona_modify.fn(
+        "add", "top_of_mind",
+        {"item": "Switch to a monorepo", "note": "different note"})
+    assert "resembles existing" in out
+    assert 'action="update"' not in out
+    assert re.search(
+        r' Note: resembles existing top_\w+ "Switch to a monorepo"'
+        r' — it may be a duplicate\.',
+        out,
+    )
+
+
+def test_project_advisory_still_offers_update_hint(as_user, monkeypatch):
+    # Regression guard alongside the top_of_mind case above: an
+    # update-capable entity (project) must keep the verbatim update wording.
+    _seed_project(monkeypatch, None)
+    out = server.persona_modify.fn(
+        "add", "project", {"name": "Ledger", "description": "different words"})
+    assert 'use action="update" instead.' in out
+
+
+def test_advisory_survives_title_with_embedded_quote(as_user, monkeypatch):
+    # F4: a title containing a literal double-quote/operator-like text used
+    # to garble the FTS query (websearch_to_tsquery interpreting the stray
+    # quote as a phrase delimiter across "OR" and the rest of the query),
+    # causing the entity to fail to match even its own resurfaced text.
+    title = 'Ben "Franklin'
+    monkeypatch.setattr(embeddings, "get_provider", lambda: None)
+    persona_store.save("projects", {
+        "projects": [{"name": title,
+                      "description": "A history project about a founding father"}],
+        "current_learning": [], "top_of_mind": [],
+    })
+    uid = db.current_user_id.get()
+    search_index.sync_index(uid, "projects", persona_store.load("projects"),
+                            embed_sync=True)
+
+    out = server.persona_modify.fn(
+        "add", "project",
+        {"name": title,
+         "description": "different words about the same founding father"})
+    assert "resembles existing" in out
