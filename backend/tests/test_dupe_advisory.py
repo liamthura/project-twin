@@ -1,4 +1,7 @@
-import json
+import math
+import re
+
+import pytest
 
 import db
 import embeddings
@@ -6,6 +9,42 @@ import persona_store
 import search_index
 import server
 from tests.test_search_query import VocabProvider
+
+
+@pytest.fixture(autouse=True)
+def _drain_embed_executor_after(monkeypatch):
+    """search_index's background embed executor has one worker and lives for
+    the whole test session (module-level singleton), not per test. A real
+    "add" under a mocked provider schedules an async embed job there
+    (embed_sync=False is persona_store.save's default); if that job hasn't
+    run by the time this test's monkeypatch/db pool are torn down, it can
+    fire later under a *different* test's provider/pool -- order-dependent
+    flakiness. Depending on `monkeypatch` here forces this fixture's
+    teardown (LIFO) to run before monkeypatch's own, so draining (waiting
+    for anything already queued to finish) always happens while this test's
+    state is still live.
+    """
+    yield
+    search_index._EXECUTOR.submit(lambda: None).result(timeout=5)
+
+
+class AngleProvider:
+    """Fixed-angle fake: every document embeds to the same unit vector; the
+    query embeds to a unit vector at a chosen cosine similarity to it, so the
+    resulting cosine distance between any new entity and the seeded one is
+    exact and independent of text content -- lets boundary tests around
+    DUPLICATE_DISTANCE_CUTOFF (0.4) hit a precise, reproducible distance
+    (distance = 1 - cosine_similarity for unit vectors)."""
+
+    def __init__(self, cos_sim):
+        dim = db.EMBEDDING_DIM
+        self.doc_vec = [1.0, 0.0] + [0.0] * (dim - 2)
+        other = math.sqrt(max(0.0, 1.0 - cos_sim ** 2))
+        self.query_vec = [cos_sim, other] + [0.0] * (dim - 2)
+
+    def embed(self, texts, input_type="document"):
+        vec = self.query_vec if input_type == "query" else self.doc_vec
+        return [vec for _ in texts]
 
 
 def _seed_project(monkeypatch, provider):
@@ -25,7 +64,31 @@ def test_add_near_dupe_gets_advisory_but_still_writes(as_user, monkeypatch):
         "add", "project",
         {"name": "Ledger 2", "description": "javascript dashboard app"})
     assert "resembles existing" in out and "project_" in out
+    # Locks the verbatim spec wording (entity_id/title interpolated, no
+    # emoji, no distance field, plain double-quoted title) so drift in the
+    # message format is caught here rather than by a loose substring check.
+    assert re.search(
+        r' Note: resembles existing project_\w+ "Ledger"'
+        r' — if this is the same item, use action="update" instead\.',
+        out,
+    )
     assert len(persona_store.load("projects")["projects"]) == 2  # write happened
+
+
+def test_hybrid_distance_just_above_cutoff_no_advisory(as_user, monkeypatch):
+    # cos_sim=0.55 -> distance=0.45, just above DUPLICATE_DISTANCE_CUTOFF (0.4)
+    _seed_project(monkeypatch, AngleProvider(cos_sim=0.55))
+    out = server.persona_modify.fn(
+        "add", "project", {"name": "Something Else", "description": "unrelated text"})
+    assert "resembles existing" not in out
+
+
+def test_hybrid_distance_at_cutoff_gets_advisory(as_user, monkeypatch):
+    # cos_sim=0.65 -> distance=0.35, comfortably at/under the 0.4 cutoff
+    _seed_project(monkeypatch, AngleProvider(cos_sim=0.65))
+    out = server.persona_modify.fn(
+        "add", "project", {"name": "Something Else 2", "description": "unrelated text"})
+    assert "resembles existing" in out
 
 
 def test_add_unrelated_no_advisory(as_user, monkeypatch):

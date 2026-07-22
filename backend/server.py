@@ -3213,10 +3213,11 @@ def _find_strong_match(file_type: str, entity_data: dict) -> Optional[dict]:
 
 
 def _advisory_note(match: dict) -> str:
-    """The verbatim advisory line appended to a successful add's message."""
-    distance = "n/a" if match["distance"] is None else f"{match['distance']:.3f}"
-    return (f" ⚠️ Note: this resembles existing {match['entity_id']} "
-            f"({match['title']!r}, distance={distance})")
+    """The verbatim advisory line appended to a successful add's message
+    (spec wording -- leading space to separate it from the success message)."""
+    return (f' Note: resembles existing {match["entity_id"]} '
+            f'"{match["title"]}" — if this is the same item, '
+            f'use action="update" instead.')
 
 
 @mcp.tool()
