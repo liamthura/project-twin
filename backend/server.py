@@ -3316,7 +3316,9 @@ def persona_batch(operations: list) -> str:
 
 @mcp.tool()
 def suggest_persona_update(message: str, context: str = "") -> str:
-    """Analyze user message for potential persona updates. Call proactively during conversation.
+    """Analyze user message for potential persona updates, grounding each
+    `add` suggestion against existing data before returning it. Call
+    proactively during conversation.
 
     WHEN TO USE:
         - User mentions achievements, completions, new skills
@@ -3328,40 +3330,87 @@ def suggest_persona_update(message: str, context: str = "") -> str:
         message: User message to analyze
         context: Optional conversation context for ambiguity resolution
 
+    ANALYSIS: message text is scored for capture-worthiness (self-reference,
+    tense, concrete outputs, hypotheticals, ...) and turned into candidate
+    `add`/entity/data suggestions -- see CONFIDENCE BOOSTERS/REDUCERS below.
+
+    DEDUPE: each candidate `add` suggestion for a dedupe-eligible entity
+    (the same top-level id-list entities persona_modify checks -- project,
+    hobby, domain, connection, work_experience, education, etc.) is then
+    checked against existing persona data via the same search-backed
+    duplicate detector persona_modify's advisory uses. A strong match:
+        - attaches `existing_entity: {entity_id, title}` to the suggestion, and
+        - rewrites `action` from "add" to "update" -- but only when the
+          matched entity's identifier value can actually be derived from the
+          hit (a name/title-like identifier field), so every "update"
+          suggestion returned is executable via persona_modify as-is. When it
+          can't be derived, the suggestion stays "add" with `existing_entity`
+          attached as a hint only.
+    A failed dedupe check (search error, etc.) never blocks the response --
+    suggestions are returned unmodified in that case. The response always
+    carries `dedupe_checked: true` once this pass has run.
+
     RESPONSE INCLUDES:
         - confidence: 0.0-1.0 score based on statement quality
-        - suggestions: Ready-to-apply persona_modify operations
+        - suggestions: Ready-to-apply persona_modify operations, dedupe-checked
+          (may include `existing_entity` and an `action` rewritten to "update")
         - statement_signals: Evidence markers (self_referential, present_tense, etc.)
         - action_required: "auto_apply" | "ask_user" | "ignore"
-    
+        - dedupe_checked: true, confirming the dedupe pass ran
+
     DECISION GUIDANCE:
         - >= 0.8: High confidence. Apply via persona_modify, mention: "✓ Updated your persona..."
         - 0.5-0.8: Medium confidence. Ask: "Should I add X to your persona?"
         - < 0.5: Low confidence. Respond normally, no persona mention.
-    
+
     CONFIDENCE BOOSTERS (use your judgment and conversation context to adjust):
         - Self-referential ("I", "my") statements: +trust
         - Present tense declarations: +trust
         - Explicit state changes ("finished", "started"): +trust
         - Concrete outputs ("built", "deployed"): +trust
         - Duration indicators ("for months"): +trust
-    
+
     CONFIDENCE REDUCERS (use your judgment and conversation context to adjust):
         - Hypotheticals ("what if", "maybe"): -trust
         - Questions/requests for help: -trust
         - Casual venting: -trust
 
     RETURNS:
-        {should_capture, confidence, suggestions: [{action, entity, data}], instruction}
+        {should_capture, confidence, suggestions: [{action, entity, data,
+         existing_entity?}], dedupe_checked, instruction}
     """
     if not message:
         return json.dumps({
             "error": "No message provided", "should_capture": False,
             "confidence": 0.0, "suggestions": []
         }, indent=2)
-    
+
     analysis = analyze_message_for_capture(message, context)
-    
+
+    for suggestion in analysis["suggestions"]:
+        entity = suggestion.get("entity", "").lower()
+        if suggestion.get("action") != "add" or entity not in ADVISORY_ENTITIES:
+            continue
+        file_type, _list_key = ADVISORY_ENTITIES[entity]
+        data = suggestion.get("data", {})
+        match = _find_strong_match(file_type, normalize_data(data, entity))
+        if not match:
+            continue
+        suggestion["existing_entity"] = {
+            "entity_id": match["entity_id"], "title": match["title"]
+        }
+        file_name = _section_for_entity(entity)
+        identifier_field = ENTITY_SCHEMA.get(file_name, {}).get(entity, {}).get("identifier")
+        # Only rewrite to "update" when the identifier's value can actually
+        # be recovered from the hit -- i.e. the identifier is one of the
+        # name/title-like fields flatten_entity draws its title from. Other
+        # identifiers (e.g. work_experience's "company", top_of_mind's
+        # "item") aren't reflected in hit["title"], so deriving one would
+        # produce an un-executable update; keep those as "add".
+        if identifier_field and identifier_field in search_index.TITLE_FIELDS:
+            suggestion["data"] = dict(data, **{identifier_field: match["title"]})
+            suggestion["action"] = "update"
+
     # Determine action
     if analysis["confidence"] >= 0.8:
         action = "auto_apply"
@@ -3372,7 +3421,7 @@ def suggest_persona_update(message: str, context: str = "") -> str:
     else:
         action = "ignore"
         instruction = "LOW confidence. Respond normally without mentioning persona."
-    
+
     response = {
         "should_capture": analysis["should_capture"],
         "confidence": analysis["confidence"],
@@ -3384,9 +3433,10 @@ def suggest_persona_update(message: str, context: str = "") -> str:
         "state_changes": analysis.get("state_changes", []),
         "action_required": action,
         "ignore_reason": analysis.get("ignore_reason"),
+        "dedupe_checked": True,
         "instruction": instruction
     }
-    
+
     return json.dumps(response, indent=2)
 
 
