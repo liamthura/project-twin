@@ -747,10 +747,17 @@ def get_scoped_context(
     topic: str = None,
     include_inactive: bool = False,
     days: int = None,
-    limit: int = None
+    limit: int = None,
+    detail: str = "full"
 ) -> dict:
     """Get persona context filtered by scope(s) and optional topic. `scope` is a
-    global scope name, a section key, or a list mixing them (unioned)."""
+    global scope name, a section key, or a list mixing them (unioned).
+    `detail="titles"` reduces every id-list entity to its `{"id", "title"}`
+    stub (non-entity fields are untouched) — a lightweight index for browsing
+    before pulling full detail via get_entity."""
+    if detail not in ("full", "titles"):
+        return {"error": f"Unknown detail '{detail}'. Valid: full, titles"}
+
     try:
         fields = _resolve_scope_fields_multi(scope)
     except ValueError as e:
@@ -803,7 +810,10 @@ def get_scoped_context(
     
     if not include_inactive:
         result = _filter_inactive(result)
-    
+
+    if detail == "titles":
+        result = _stub_titles(result)
+
     scope_label = scope if isinstance(scope, str) else ",".join(scope)
     scope_desc = (
         sections.SCOPES.get(scope, f"{scope} section only")
@@ -938,6 +948,27 @@ def _filter_by_topic(data: dict, topic: str) -> dict:
                 section_data[list_key] = [
                     item for item in section_data[list_key]
                     if isinstance(item, dict) and item.get("id") in matched
+                ]
+    return data
+
+def _stub_titles(data: dict) -> dict:
+    """Reduce every id-list entity in `data` to a `{"id", "title"}` stub.
+    Non-id-list fields (profile scalars, always-on preferences, etc.) pass
+    through untouched. Applied after all other filters (topic/inactive/
+    days/limit) so stubbing operates on the already-filtered result."""
+    import search_index
+
+    for ft in [k for k in data if k in sections.SECTION_REGISTRY]:
+        spec = sections.SECTION_REGISTRY[ft]
+        section_data = data.get(ft)
+        if not isinstance(section_data, dict):
+            continue
+        for list_key, _prefix in spec.id_lists:
+            if list_key in section_data and isinstance(section_data[list_key], list):
+                section_data[list_key] = [
+                    {"id": e.get("id"), "title": search_index.flatten_entity(e)[0]}
+                    if isinstance(e, dict) else e
+                    for e in section_data[list_key]
                 ]
     return data
 
@@ -2947,7 +2978,8 @@ def get_context(
     topic: Optional[str] = None,
     include_inactive: bool = False,
     days: Optional[int] = None,
-    limit: Optional[int] = None
+    limit: Optional[int] = None,
+    detail: str = "full"
 ) -> str:
     """
     Retrieve scoped persona context. Call this FIRST at conversation start.
@@ -2976,11 +3008,14 @@ def get_context(
         include_inactive: Include inactive/paused items
         days: Limit learning_log to last N days
         limit: Max learning_log entries to return
+        detail: "full" (default) or "titles" — titles mode reduces every
+            id-list entity to a lightweight {"id", "title"} stub for
+            browsing before pulling full detail via get_entity
 
     RETURNS:
         Filtered persona data based on scope + user preferences (tone, detail_level, dislikes)
     """
-    result = get_scoped_context(scope, topic, include_inactive, days, limit)
+    result = get_scoped_context(scope, topic, include_inactive, days, limit, detail)
     # Compact serialization keeps the returned string consistent with the
     # token_estimate computed in get_scoped_context, and shrinks the payload.
     return json.dumps(result, ensure_ascii=False)
