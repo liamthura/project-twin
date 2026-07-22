@@ -2955,13 +2955,14 @@ def get_context(
     WHEN TO USE:
         - Start of any conversation (always)
         - When you need user preferences to tailor responses
+        - To FIND specific entries (a project, a note, a person), do NOT pull a large scope — use search_context, then get_entity.
 
     SCOPES (global):
         - minimal: Quick questions, greetings, code help. Returns: name, bio, top_of_mind, preferences
         - professional: Career, projects, technical. Returns: profile, skills, projects, code_style
         - personal: Life advice, hobbies, wellness. Returns: hobbies, personality, connections
         - learning: Skill development, roadmaps. Returns: skills, learning_log (last 60 days)
-        - full: Complex questions. Returns: everything
+        - full: complete dump — prefer targeted scopes plus search_context.
 
     SECTION SCOPES: profile | knowledge | preferences | projects | lifestyle | circle | learning_log
         - A section scope returns that whole section plus your always-on
