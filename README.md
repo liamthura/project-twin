@@ -15,6 +15,9 @@ mygist/
 ├── backend/
 │   ├── main.py          # Single entry point: REST API (/api), MCP server (/mcp), health check (/health)
 │   ├── server.py        # MCP tool definitions and persona logic (imported by main.py)
+│   ├── search_index.py  # Hybrid search index: per-entity FTS + optional embeddings
+│   ├── embeddings.py    # Embedding providers (Voyage AI or any OpenAI-compatible endpoint)
+│   ├── sections.py      # Declarative registry of persona sections
 │   └── archive/         # Retired server implementations, kept for reference
 ├── frontend/            # React app to manually edit your persona
 └── mygist_data/         # Legacy JSON persona files — migration source only
@@ -52,12 +55,10 @@ Create `backend/.env` (see `.env.example`):
 DATABASE_URL=postgresql://user:pass@host/dbname
 ```
 
-On a Neon project, enable `pgvector` once — it's unused today but avoids a
-future migration when embedding-search is added:
-
-```sql
-create extension if not exists vector;
-```
+The server enables `pgvector` automatically on startup when the extension is
+available (Neon ships it; the local test-db image too). If your Postgres
+doesn't have it, everything still works — search runs in FTS-only mode (see
+[Embedding search](#embedding-search-optional)).
 
 Prefer a throwaway local database for development and tests:
 
@@ -76,21 +77,26 @@ This starts a single process serving the REST API (`/api/*`), the MCP endpoint
 (`/mcp`), and a health check (`/health`). On startup it ensures the `users` and
 `persona_data` tables exist.
 
-### 3. Get a token
+### 3. Create an account and get a token
 
-Auth is token-only — a token *is* the credential (no passwords). Register a
-username to receive one, exactly once:
+Humans sign in with username + password; machines (Claude Desktop, scripts)
+authenticate with named, revocable bearer tokens. Easiest path: run the
+frontend and use the welcome page's **Create an account** form, then manage
+API tokens from the account dialog (**Account → API tokens**).
+
+Or via the API:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/auth/register \
-  -H "Content-Type: application/json" -d '{"username": "you"}'
+  -H "Content-Type: application/json" \
+  -d '{"username": "you", "password": "your-password"}'
 # -> {"user_id": "...", "username": "you", "token": "..."}
 ```
 
-…or use the frontend's **Create an account** button (Server Connection dialog).
-Save the token — it isn't shown again. Rotate later with
-`POST /api/auth/rotate`. Every read and write is scoped to the user behind the
-token.
+Save the token — its plaintext is shown exactly once. You can create and
+revoke additional named tokens any time (UI account dialog, or
+`POST /api/auth/tokens`). Every read and write is scoped to the user behind
+the token.
 
 Already have JSON persona files under `mygist_data/`? Import them into your new
 account in one pass (this also backfills stable entity IDs):
@@ -147,7 +153,8 @@ Just ask Claude things like:
 - "What hobbies do I have?"
 - "Remind me what I'm currently learning"
 
-Claude will call `get_persona` and respond with context about you.
+Claude will call `get_context` (or `search_context` for specific lookups) and
+respond with context about you.
 
 ### Updating Your Persona
 
@@ -307,9 +314,15 @@ Insights are saved to your learning log with:
 
 **Confidence Scoring**:
 
-- 0.5+ → Claude applies the update and mentions it
-- 0.4-0.5 → Claude asks "Want me to remember that?"
-- Below 0.4 → Ignored, no mention
+- 0.8+ → Claude applies the update and mentions it
+- 0.5-0.8 → Claude asks "Want me to remember that?"
+- Below 0.5 → Ignored, no mention
+
+**Dedupe grounding** — every capture suggestion is checked against your
+existing entries via the search index: if what you mentioned already exists,
+the suggestion is rewritten from "add" to an update targeting the existing
+entity (or tagged with an `existing_entity` hint), so repeated mentions
+don't pile up duplicates.
 
 ---
 
@@ -317,19 +330,18 @@ Insights are saved to your learning log with:
 
 | Tool                     | What it does                                                                                   |
 | ------------------------ | ---------------------------------------------------------------------------------------------- |
-| `get_persona`            | Get all your data at once                                                                      |
-| `get_context`            | Get scoped context (minimal/professional/personal/learning/full) with optional topic filtering |
-| `get_profile`            | Just your identity/work/education                                                              |
-| `get_lifestyle`          | Hobbies, passions, values, wellness                                                            |
-| `get_knowledge`          | Skills and mental tabs                                                                         |
-| `get_preferences`        | Code style, communication, dislikes                                                            |
-| `get_projects`           | Current projects and learning goals                                                            |
-| `get_learning_log`       | Insights and conceptual learnings captured over time                                           |
-| `search_context`         | Search the persona by meaning and keywords; returns ranked snippets (hybrid FTS + embeddings, or FTS-only) |
-| `get_entity`              | Fetch one persona entity in full by its id (from `search_context` or `get_context` output)      |
-| `persona_modify`         | Add/update/remove items (flexible field aliases)                                               |
-| `persona_batch`          | Multiple modifications in one call                                                             |
-| `suggest_persona_update` | Analyze a message for potential updates (includes insight detection for learning log)          |
+| `get_context`            | Scoped context bootstrap: global scopes (minimal/professional/personal/learning/full), section scopes, topic filtering, and a `detail="titles"` stub mode |
+| `search_context`         | Search the persona by meaning and keywords; ranked snippets with entity ids (hybrid FTS + embeddings, or FTS-only). Optional `sections`, `limit` (≤25), `days` recency filter |
+| `get_entity`             | Fetch persona entities in full by id — a single id, or a list of up to 25 (e.g. straight from `search_context` hits) |
+| `get_raw`                | Raw dump of persona file(s) — export/debug use                                                 |
+| `get_schema`             | Entity schema reference: valid entities, actions, and fields for writes                        |
+| `persona_modify`         | Add/update/remove items (flexible field aliases). Adds that resemble an existing entry get a duplicate advisory naming it |
+| `persona_batch`          | Multiple modifications in one call (per-op duplicate advisories included)                      |
+| `suggest_persona_update` | Analyze a message for potential updates, dedupe-checked against existing entries — suggestions for content you already have are rewritten to updates targeting the existing entity |
+
+The lean-retrieval pattern AI clients are steered toward: `search_context`
+(find, ~10 small ranked snippets) → `get_entity` (full detail for just the
+hits that matter), instead of pulling whole sections.
 
 ### Scoped Context (`get_context`)
 
@@ -343,11 +355,21 @@ Control how much data Claude loads based on the task:
 | `learning`     | ~3400  | Domains, current learning, goals               |
 | `full`         | ~8000  | Everything                                     |
 
-**Topic filtering**: Add `topic="Python"` to narrow results to matching items only.
+**Section scopes**: any section key (`profile`, `knowledge`, `projects`,
+`lifestyle`, `circle`, `learning_log`, `preferences`) works as a scope, alone
+or in a list — `get_context(scope=["lifestyle", "circle"])`.
+
+**Topic filtering**: Add `topic="Python"` to keep only relevant entries.
+This runs through the search index (semantic matching in hybrid mode, ranked
+keyword matching otherwise — no more hardcoded alias lists).
 
 ```
 get_context(scope="professional", topic="Python")  # ~245 tokens instead of 3600
 ```
+
+**Titles mode**: `detail="titles"` swaps every list entry for an
+`{id, title}` stub — on a real persona that cut a professional scope from
+~7,100 to ~1,600 tokens. Skim the stubs, then `get_entity` the ones you need.
 
 ### Batch Operations (`persona_batch`)
 
@@ -358,7 +380,7 @@ Run multiple updates in a single call:
   "operations": [
     {
       "action": "add",
-      "entity": "skill",
+      "entity": "domain",
       "data": { "name": "Rust", "level": "learning" }
     },
     {
@@ -380,9 +402,11 @@ Run multiple updates in a single call:
 
 ### Supported Entities
 
+Call `get_schema()` for the authoritative, always-current list (entities,
+actions, required/optional fields, examples). A sampler:
+
 | Entity                 | Actions             | Key Fields                                                                |
 | ---------------------- | ------------------- | ------------------------------------------------------------------------- |
-| `skill`                | add, update, remove | name, level                                                               |
 | `domain`               | add, update, remove | name, level, tags                                                         |
 | `project`              | add, update, remove | name, status, tags, description                                           |
 | `hobby`                | add, update, remove | name, skill_level, status (active/inactive), notes, specifics, references |
@@ -478,10 +502,16 @@ column backfill has since fixed the dimension mismatch.
 - [x] Hobby status tracking (active/inactive)
 - [x] Flexible field aliases across all entities
 - [x] Learning log with unique IDs and conversation context
+- [x] Multi-user Postgres storage with password sign-in + revocable API tokens
+- [x] Per-user section enable/disable
+- [x] Web UI: persona editor with account/token management, mobile-friendly
+- [x] Export/import (account dialog → Data)
+- [x] Hybrid search (Postgres FTS + pgvector embeddings, Voyage or local models)
+- [x] Lean retrieval tools (`search_context` + `get_entity`) and titles-only context mode
+- [x] Duplicate advisories and dedupe-grounded capture suggestions
 - [ ] Better auto-triggering (waiting on MCP improvements)
 - [ ] Conversation history for pattern detection
 - [ ] Data versioning
-- [ ] Export/import
 
 ---
 
