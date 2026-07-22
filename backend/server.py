@@ -3125,6 +3125,100 @@ def get_schema(
     return json.dumps(result, indent=2)
 
 
+# =============================================================================
+# ADVISORY DUPLICATE DETECTION — best-effort "resembles existing" nudge on adds
+# =============================================================================
+
+# Cosine distance cutoff for the vector leg of the duplicate-advisory search.
+# Deliberately tighter than TOPIC_VECTOR_DISTANCE_CUTOFF (topic filtering,
+# 0.5): that cutoff only needs "related enough to surface"; this one needs
+# "close enough to plausibly be the same thing," so a near-identical text
+# match is required before the write-time nudge fires.
+DUPLICATE_DISTANCE_CUTOFF = 0.4
+
+# Top-level id-list entities eligible for the advisory duplicate check on
+# "add": entity name -> (file_type, list_key). Built by cross-referencing
+# ENTITY_SCHEMA's add-capable entities against each execute_modify branch and
+# sections.SECTION_REGISTRY's id_lists -- only lists whose items get a stable
+# `id` (via persona_store._assign_ids) qualify, since the advisory result
+# must resolve to a real entity_id. Sub-entities that write into plain
+# nested lists with no id (email, link, work_highlight, *_reference,
+# coursework, coursework_topic, education_highlight, hobby_reference,
+# hobby_specific, project_tag, project_reference, project_highlight,
+# mental_tab_reference, domain_reference) are excluded, as are
+# non-id-list top-level entities: passion/curiosity/personality_trait/value/
+# energy_peak/dislike/preference (plain-value lists, no id_lists entry),
+# career_aspiration (writes into `career_aspirations`, a plain-string list
+# distinct from profile's registered `goals_and_careers` id_list -- no
+# ENTITY_SCHEMA entity currently targets `goals_and_careers`), the
+# update-only singletons basic_info/communication_default/sleep, and
+# `knowledge` (writes into a caller-chosen category via `data["category"]`,
+# not one fixed list_key -- `domain` already covers the one fixed id-list,
+# `domains`).
+ADVISORY_ENTITIES: dict[str, tuple[str, str]] = {
+    "work_experience": ("profile", "work_experience"),
+    "education": ("profile", "education"),
+    "language": ("profile", "languages_spoken"),
+    "domain": ("knowledge", "domains"),
+    "mental_tab": ("knowledge", "mental_tabs"),
+    "project": ("projects", "projects"),
+    "current_learning": ("projects", "current_learning"),
+    "top_of_mind": ("projects", "top_of_mind"),
+    "hobby": ("lifestyle", "hobbies"),
+    "connection": ("circle", "connections"),
+    "learning_entry": ("learning_log", "entries"),
+}
+
+
+def _find_strong_match(file_type: str, entity_data: dict) -> Optional[dict]:
+    """Advisory-only: does `entity_data` resemble an existing same-section
+    entity closely enough to warn about? Returns
+    {"entity_id", "title", "distance"} for the top qualifying hit, else None.
+    Never raises -- this runs before the real write and must not block it.
+
+    Criteria (checked per hit, so one pass covers both search modes):
+      - hybrid (embeddings configured): hit distance is not None and
+        <= DUPLICATE_DISTANCE_CUTOFF.
+      - FTS-only (no embeddings, hit distance is None): exact
+        case-insensitive title match against the flattened title (FTS
+        relevance/snippet overlap alone is too noisy to imply "duplicate").
+    """
+    try:
+        flattened_title, flattened_text = search_index.flatten_entity(entity_data)
+        if not flattened_text:
+            return None
+        user_id = db.current_user_id.get()
+        # `flattened_text` folds title + every text/nested field into one blob
+        # (fine for the vector leg -- length doesn't matter there), but
+        # websearch_to_tsquery ANDs all of its words together, so a hit whose
+        # title matches exactly but whose other fields don't share a single
+        # word would never satisfy the FTS leg's `tsv @@ q` on flattened_text
+        # alone. OR-ing the title in front keeps that door open (title alone
+        # can satisfy the FTS predicate) without weakening the vector leg,
+        # which reads the whole query string regardless of the "OR" token.
+        query = f"{flattened_title} OR {flattened_text}" if flattened_title else flattened_text
+        hits = search_index.search(user_id, query, [file_type], limit=3)
+        for hit in hits["results"]:
+            if hit["distance"] is not None and hit["distance"] <= DUPLICATE_DISTANCE_CUTOFF:
+                return {"entity_id": hit["entity_id"], "title": hit["title"],
+                        "distance": hit["distance"]}
+            if flattened_title and hit["title"].lower() == flattened_title.lower():
+                return {"entity_id": hit["entity_id"], "title": hit["title"],
+                        "distance": hit["distance"]}
+        return None
+    except Exception:
+        logger.warning("duplicate-advisory check failed for file_type=%s",
+                       file_type, exc_info=True)
+        return None
+
+
+def _advisory_note(match: dict) -> str:
+    """The verbatim advisory line appended to a successful add's message."""
+    distance = "n/a" if match["distance"] is None else f"{match['distance']:.3f}"
+    return (f" ⚠️ Note: this resembles existing {match['entity_id']} "
+            f"({match['title']!r}, distance={distance})")
+
+
 @mcp.tool()
 def persona_modify(
     action: Literal["add", "update", "remove"],
@@ -3154,10 +3248,17 @@ def persona_modify(
         - work_highlight: {company: "Acme", highlight: "Led migration"}
         - project_reference: {project_name: "MyApp", ref_name: "Docs", url: "https://..."}
 
-    RETURN: 
+    RETURN:
         Success/error message
     """
-    return execute_modify(action, entity, data)
+    match = None
+    if action == "add" and entity.lower() in ADVISORY_ENTITIES:
+        file_type, _list_key = ADVISORY_ENTITIES[entity.lower()]
+        match = _find_strong_match(file_type, normalize_data(data, entity.lower()))
+    result = execute_modify(action, entity, data)
+    if match and not result.startswith("❌"):
+        result += _advisory_note(match)
+    return result
 
 
 @mcp.tool()
@@ -3200,9 +3301,15 @@ def persona_batch(operations: list) -> str:
         action = op.get("action", "")
         entity = op.get("entity", "")
         data = op.get("data", {})
+        match = None
+        if action == "add" and entity.lower() in ADVISORY_ENTITIES:
+            file_type, _list_key = ADVISORY_ENTITIES[entity.lower()]
+            match = _find_strong_match(file_type, normalize_data(data, entity.lower()))
         result = execute_modify(action, entity, data)
+        if match and not result.startswith("❌"):
+            result += _advisory_note(match)
         results.append(f"{i+1}. {result}")
-    
+
     return "\n".join(results)
 
 
