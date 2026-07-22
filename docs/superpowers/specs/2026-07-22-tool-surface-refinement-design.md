@@ -64,11 +64,14 @@ some callers rely on it).
 ### 4. `get_entity` accepts a list
 
 `entity_id: Union[str, List[str]]`. String input: exactly today's behavior
-and response shape (backward compatible). List input: up to 10 ids, response
-`{"entities": [<per-id result>, ...]}` where each element is either the
-current single-entity success shape or `{"entity_id": ..., "error": "..."}`
-— per-id errors never fail the whole call. >10 ids → error string naming the
-cap. Empty list → error string.
+and response shape (backward compatible). List input: up to 25 ids (aligned
+with `search_context`'s max limit, so one search's hits always fit one
+call), response `{"entities": [<per-id result>, ...]}` where each element is
+either the current single-entity success shape or
+`{"entity_id": ..., "error": "..."}` — per-id errors never fail the whole
+call. >25 ids → error string naming the cap and advising to split into
+multiple calls (no cursor pagination — the caller holds the id list, so
+splitting IS pagination). Empty list → error string.
 
 ### 5a. `get_context` titles-only detail mode
 
@@ -87,6 +90,14 @@ New parameter `days: Optional[int] = None`. When set, the search restricts
 to rows with `updated_at >= now() - days` (both CTEs get the predicate; the
 lazy-heal and mode logic are unchanged). Validation: `days` must be a
 positive int (else error string).
+
+**Semantics (docstring must state this):** the filter is strictly
+PER-ENTITY — each indexed entry (a learning entry, a project, a tab…) is
+included or excluded by its own last-change time. It never excludes a whole
+section, and non-entity data (profile scalars, preferences, wellness) is
+not in the search index at all, so `days` cannot hide it. This differs from
+`get_context(days=…)`, which windows learning_log entries by their content
+timestamps.
 
 **Documented limitation (docstring + README):** `updated_at` is the
 last-content-change time of the indexed entry — a full reindex
@@ -122,7 +133,7 @@ not a substitute for entry-content timestamps.
   existing_entity attached; novel content → unchanged add; dispatch-path
   test for the response shape (`dedupe_checked`).
 - Item 4: single-string behavior byte-compatible (existing tests untouched
-  and passing); list happy path; mixed good/bad ids; 11 ids → cap error;
+  and passing); list happy path; mixed good/bad ids; 26 ids → cap error advising split;
   dispatch-path test for the union signature.
 - Item 5a: titles mode strips entities to id+title, non-id-list fields
   intact, token_estimate smaller than full mode for same data; invalid
