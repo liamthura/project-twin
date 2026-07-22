@@ -519,7 +519,7 @@ export default function App() {
           orientation="vertical"
           className="flex flex-col gap-6 md:flex-row"
         >
-          <div className="sticky top-[60px] z-10 -mx-4 bg-background px-4 pb-2 md:mx-0 md:px-0 md:pb-0 md:sticky md:top-[84px] md:w-48 md:self-start">
+          <div className="sticky top-[60px] z-10 -mx-4 border-b bg-background px-4 py-2.5 md:mx-0 md:border-0 md:px-0 md:py-0 md:sticky md:top-[84px] md:w-48 md:self-start">
           <TabsList
             ref={tabStripRef}
             data-at-start={tabStripEdges.start}
