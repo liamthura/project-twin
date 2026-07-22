@@ -16,6 +16,15 @@ os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
 def clean_database(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
 
+    # Tests must never see a real embedding provider: scripts/ modules call
+    # load_dotenv() at import (pytest collection), which can leak a real
+    # VOYAGE_API_KEY from backend/.env into os.environ — turning unpatched
+    # tests into live API callers and clogging the shared embed executor
+    # with slow network tasks (observed as order-dependent hybrid-search
+    # failures). Providers are always injected via monkeypatch in tests.
+    for var in ("VOYAGE_API_KEY", "EMBEDDING_API_URL", "EMBEDDING_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+
     import db as db_module
 
     if db_module._pool is not None:
