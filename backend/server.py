@@ -3068,14 +3068,10 @@ def search_context(query: str, sections: Union[str, List[str], None] = None,
     return json.dumps(out, indent=2)
 
 
-@mcp.tool()
-def get_entity(entity_id: str) -> str:
-    """Fetch one persona entity in full by its id (as returned by
-    search_context results or embedded in get_context output).
-
-    Args:
-        entity_id: Prefixed id, e.g. "project_ab12cd34", "learn_20260721_x1y2z3".
-    """
+def _resolve_entity(entity_id: str) -> str:
+    """Resolve a single entity id to its JSON success string, or a plain
+    (non-JSON) error string. Extracted from get_entity's original body so
+    both the single-id and batch paths share identical resolution logic."""
     loc = search_index.entity_location(entity_id)
     if loc is None:
         prefixes = sorted({p for p, _ in search_index._PREFIXES})
@@ -3091,6 +3087,38 @@ def get_entity(entity_id: str) -> str:
             return json.dumps({"section": file_type, "entity_id": entity_id,
                                "entity": entity}, indent=2)
     return f"❌ Entity {entity_id} not found in {file_type}.{list_key}"
+
+
+@mcp.tool()
+def get_entity(entity_id: Union[str, List[str]]) -> str:
+    """Fetch one or more persona entities in full by id (as returned by
+    search_context results or embedded in get_context output).
+
+    Args:
+        entity_id: Either a single prefixed id, e.g. "project_ab12cd34",
+            "learn_20260721_x1y2z3" — returns that entity's JSON directly
+            (or a plain error string if unresolvable) — or a list of up to
+            25 such ids, which returns `{"entities": [...]}` with one
+            element per id, in order: a successful lookup's parsed JSON, or
+            `{"entity_id": <id>, "error": <message>}` for any id that
+            failed to resolve.
+    """
+    if isinstance(entity_id, str):
+        return _resolve_entity(entity_id)
+
+    if not entity_id:
+        return "Error: entity_id list must not be empty."
+    if len(entity_id) > 25:
+        return "Error: at most 25 ids per call — split into multiple calls"
+
+    entities = []
+    for eid in entity_id:
+        result = _resolve_entity(eid)
+        try:
+            entities.append(json.loads(result))
+        except (json.JSONDecodeError, TypeError):
+            entities.append({"entity_id": eid, "error": result})
+    return json.dumps({"entities": entities}, indent=2)
 
 
 @mcp.tool()
