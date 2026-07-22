@@ -190,7 +190,7 @@ def lazy_heal(user_id):
                 sync_index(user_id, file_type, data)
 
 
-def search(user_id, query, section_filter, limit, exclude_sections=None):
+def search(user_id, query, section_filter, limit, exclude_sections=None, days=None):
     """Hybrid FTS + (optional) vector search over one user's persona_search
     rows. Invariant: `user_id` must equal the bound `db.current_user_id` --
     lazy_heal loads persona data via that contextvar, not via `user_id`
@@ -237,6 +237,7 @@ def search(user_id, query, section_filter, limit, exclude_sections=None):
                     from persona_search, websearch_to_tsquery('english', %(query)s) q
                     where user_id = %(uid)s and file_type = any(%(sections)s)
                       and tsv @@ q
+                      and (%(days)s::int is null or updated_at >= now() - make_interval(days => %(days)s))
                     limit %(cand)s
                 )
                 select p.entity_id, p.file_type, p.title,
@@ -247,7 +248,7 @@ def search(user_id, query, section_filter, limit, exclude_sections=None):
                 order by score desc limit %(limit)s
                 """,
                 {"query": query, "uid": user_id, "sections": sections_pred,
-                 "cand": CANDIDATES, "k": RRF_K, "limit": limit},
+                 "cand": CANDIDATES, "k": RRF_K, "limit": limit, "days": days},
             ).fetchall()
             mode = "fts"
         else:
@@ -259,6 +260,7 @@ def search(user_id, query, section_filter, limit, exclude_sections=None):
                     from persona_search, websearch_to_tsquery('english', %(query)s) q
                     where user_id = %(uid)s and file_type = any(%(sections)s)
                       and tsv @@ q
+                      and (%(days)s::int is null or updated_at >= now() - make_interval(days => %(days)s))
                     limit %(cand)s
                 ), vec as (
                     select user_id, file_type, entity_id,
@@ -267,6 +269,7 @@ def search(user_id, query, section_filter, limit, exclude_sections=None):
                     from persona_search
                     where user_id = %(uid)s and file_type = any(%(sections)s)
                       and embedding is not null
+                      and (%(days)s::int is null or updated_at >= now() - make_interval(days => %(days)s))
                     order by embedding <=> %(qvec)s
                     limit %(cand)s
                 ), merged as (
@@ -291,7 +294,7 @@ def search(user_id, query, section_filter, limit, exclude_sections=None):
                 """,
                 {"query": query, "uid": user_id, "sections": sections_pred,
                  "cand": CANDIDATES, "k": RRF_K, "limit": limit,
-                 "qvec": str(qvec)},
+                 "qvec": str(qvec), "days": days},
             ).fetchall()
             mode = "hybrid"
 

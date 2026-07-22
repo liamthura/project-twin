@@ -3063,7 +3063,7 @@ def get_raw(
 
 @mcp.tool()
 def search_context(query: str, sections: Union[str, List[str], None] = None,
-                    limit: int = 10) -> str:
+                    limit: int = 10, days: Optional[int] = None) -> str:
     """Search the persona for relevant entries by meaning and keywords.
 
     PREFERRED way to find specific persona content — returns small ranked
@@ -3071,11 +3071,19 @@ def search_context(query: str, sections: Union[str, List[str], None] = None,
     for full detail on a hit. Modes: "hybrid" (FTS + embeddings) or "fts"
     (no embedding provider configured).
 
+    `days` filters per-entity: each indexed entry is included or excluded by
+    its own last-change time, never by excluding a whole section, and it
+    only sees data that's in the search index (non-entity fields aren't
+    indexed). Note a full backfill with `--recreate` resets every entry's
+    last-change time, so `days` will look empty right after one.
+
     Args:
         query: What to look for (natural language or keywords).
         sections: Optional section name or list to restrict the search
             (e.g. "projects" or ["knowledge", "learning_log"]).
         limit: Max results, 1-25 (default 10).
+        days: Optional recency filter — only entries changed in the last
+            N days (positive integer). Omit for no filter.
     """
     if not query or not query.strip():
         return "Error: query must be a non-empty string"
@@ -3095,10 +3103,12 @@ def search_context(query: str, sections: Union[str, List[str], None] = None,
             return f"❌ Section '{sections[0]}' is disabled. Enable it in settings."
         return (f"❌ Sections {', '.join(repr(s) for s in sections)} are "
                 "disabled. Enable them in settings.")
+    if days is not None and days <= 0:
+        return "Error: days must be a positive integer"
     limit = max(1, min(int(limit), 25))
     user_id = db.current_user_id.get()
     out = search_index.search(user_id, query.strip(), sections, limit,
-                               exclude_sections=list(disabled))
+                               exclude_sections=list(disabled), days=days)
     out["query"] = query.strip()
     return json.dumps(out, indent=2)
 

@@ -431,6 +431,11 @@ Configure one of two providers via environment variables (`.env` supported):
 Leaving `EMBEDDING_PROVIDER`/`VOYAGE_API_KEY`/`EMBEDDING_API_URL` unset keeps
 the server in FTS-only mode.
 
+`search_context` also accepts a `days` argument to only return entries
+changed in the last N days (per-entry, in either mode) — note that a full
+backfill with `--recreate` (below) resets every entry's last-change time, so
+`days` will look empty right after one until entries change again.
+
 ### Backfilling the search index
 
 New entities are indexed automatically as you write them. To (re)index
