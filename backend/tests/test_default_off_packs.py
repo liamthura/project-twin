@@ -49,3 +49,13 @@ def test_default_off_pack_requires_opt_in(clean_database, as_user, monkeypatch):
     assert "circle" not in settings_store.enabled_sections()
     settings_store.set_enabled_optins(["circle"])
     assert "circle" in settings_store.enabled_sections()
+
+
+def test_put_without_enabled_sections_preserves_optins(clean_database, monkeypatch):
+    monkeypatch.setitem(sections.DEFAULT_ENABLED, "circle", False)
+    client, auth = _client_and_auth()
+    client.put("/api/settings", json={"disabled_sections": [], "enabled_sections": ["circle"]}, headers=auth)
+    r = client.put("/api/settings", json={"disabled_sections": []}, headers=auth)
+    assert r.status_code == 200
+    body = client.get("/api/settings", headers=auth).json()
+    assert body["enabled_sections"] == ["circle"]

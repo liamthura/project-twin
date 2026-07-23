@@ -251,7 +251,7 @@ async def update_file(file_type: str, update: FileUpdate):
 
 class SettingsUpdate(BaseModel):
     disabled_sections: list[str]
-    enabled_sections: list[str] = []
+    enabled_sections: Optional[list[str]] = None
 
 
 @app.get("/api/settings")
@@ -288,18 +288,19 @@ async def update_settings(update: SettingsUpdate):
             detail=f"Cannot disable: {sorted(invalid)}. "
                    f"Toggleable: {sorted(sections.toggleable_sections())}",
         )
-    default_off = {k for k, on in sections.DEFAULT_ENABLED.items() if not on}
-    bad_optins = set(update.enabled_sections) - default_off
-    if bad_optins:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot opt into: {sorted(bad_optins)}. "
-                   f"Opt-in packs: {sorted(default_off)}",
-        )
     settings_store.set_disabled_sections(sorted(requested))
-    settings_store.set_enabled_optins(sorted(set(update.enabled_sections)))
+    if update.enabled_sections is not None:
+        default_off = {k for k, on in sections.DEFAULT_ENABLED.items() if not on}
+        bad_optins = set(update.enabled_sections) - default_off
+        if bad_optins:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot opt into: {sorted(bad_optins)}. "
+                       f"Opt-in packs: {sorted(default_off)}",
+            )
+        settings_store.set_enabled_optins(sorted(set(update.enabled_sections)))
     return {"status": "saved", "disabled_sections": sorted(requested),
-            "enabled_sections": sorted(set(update.enabled_sections))}
+            "enabled_sections": sorted(settings_store.get_enabled_optins())}
 
 
 @app.get("/api/all")
