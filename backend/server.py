@@ -2304,111 +2304,13 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
 # existing item on update/remove. Nested entities also carry a `parent`: the
 # parent item's identifier field, which must be present in `data` too.
 # Both are verified against execute_modify's actual matching logic.
-ENTITY_SCHEMA = {
-    "profile": {
-        "email": {"actions": ["add", "update", "remove"], "required": ["address"], "optional": ["label"],
-                 "identifier": "address"},
-        "link": {"actions": ["add", "remove"], "required": ["url", "label"], "optional": [],
-                "identifier": "label"},
-        "language": {"actions": ["add", "update", "remove"], "required": ["name"], "optional": ["proficiency"],
-                    "valid_values": {"proficiency": ["native", "fluent", "conversational", "basic"]},
-                    "identifier": "name"},
-        "work_experience": {"actions": ["add", "update", "remove"], "required": ["company"],
-                           "optional": ["role", "period", "type", "location", "description", "highlights"],
-                           "identifier": "company"},
-        "work_highlight": {"actions": ["add", "remove"], "required": ["company", "highlight"], "optional": [],
-                          "identifier": "highlight", "parent": "company"},
-        "education": {"actions": ["add", "update", "remove"], "required": ["institution"],
-                     "optional": ["degree", "field", "period", "highlights", "coursework", "clubs"],
-                     "identifier": "institution"},
-        "education_highlight": {"actions": ["add", "remove"], "required": ["institution", "highlight"], "optional": [],
-                               "identifier": "highlight", "parent": "institution"},
-        "coursework": {"actions": ["add", "remove"], "required": ["institution", "course"], "optional": [],
-                      "identifier": "course", "parent": "institution"},
-        "coursework_topic": {"actions": ["add", "remove"], "required": ["institution", "course"], "optional": [],
-                            "identifier": "course", "parent": "institution"},
-        "career_aspiration": {"actions": ["add", "remove"], "required": ["aspiration"], "optional": [],
-                             "identifier": "aspiration"},
-        "basic_info": {"actions": ["update"], "required": [],
-                      "optional": ["name", "preferred_name", "current_role", "organisation",
-                                   "location", "nationality", "bio"],
-                      "identifier": None,
-                      "description": "Update-only singleton for top-level profile fields"}
-    },
-    "lifestyle": {
-        "hobby": {"actions": ["add", "update", "remove"], "required": ["name"],
-                 "optional": ["skill_level", "status", "notes", "specifics", "references"],
-                 "valid_values": {"skill_level": ["beginner", "learning", "intermediate", "advanced", "expert"],
-                                 "status": ["active", "inactive", "paused"]},
-                 "identifier": "name"},
-        "hobby_reference": {"actions": ["add", "update", "remove"], "required": ["hobby_name", "ref_name"],
-                           "optional": ["url", "notes"], "identifier": "ref_name", "parent": "hobby_name"},
-        "hobby_specific": {"actions": ["add", "remove"], "required": ["hobby_name", "specific"], "optional": [],
-                          "identifier": "specific", "parent": "hobby_name"},
-        "passion": {"actions": ["add", "remove"], "required": ["name"], "optional": [], "identifier": "name"},
-        "curiosity": {"actions": ["add", "remove"], "required": ["topic"], "optional": [], "identifier": "topic"},
-        "personality_trait": {"actions": ["add", "remove"], "required": ["trait"], "optional": [],
-                             "identifier": "trait"},
-        "value": {"actions": ["add", "remove"], "required": ["value"], "optional": [], "identifier": "value"},
-        "sleep": {"actions": ["update"], "required": ["day_type"], "optional": ["bedtime", "wakeup"],
-                 "valid_values": {"day_type": ["weekday", "weekend"]}, "identifier": "day_type"},
-        "energy_peak": {"actions": ["add", "remove"], "required": ["peak"], "optional": [], "identifier": "peak"}
-    },
-    "knowledge": {
-        "domain": {"actions": ["add", "update", "remove"], "required": ["name"],
-                  "optional": ["level", "notes", "references"],
-                  "valid_values": {"level": ["beginner", "learning", "intermediate", "advanced", "expert"]},
-                  "identifier": "name"},
-        "domain_reference": {"actions": ["add", "update", "remove"], "required": ["domain_name", "ref_name"],
-                            "optional": ["url", "notes"], "identifier": "ref_name", "parent": "domain_name"},
-        "knowledge": {"actions": ["add", "update", "remove"], "required": ["name"],
-                     "optional": ["category", "level", "notes", "references"],
-                     "description": "Generic knowledge entry with category support", "identifier": "name"},
-        "mental_tab": {"actions": ["add", "update", "remove"], "required": ["title"],
-                      "optional": ["notes", "tags", "status", "references"],
-                      "valid_values": {"status": ["open", "closed", "archived"]}, "identifier": "title"},
-        "mental_tab_reference": {"actions": ["add", "update", "remove"], "required": ["title", "ref_name"],
-                                "optional": ["url", "notes"], "identifier": "ref_name", "parent": "title"}
-    },
-    "projects": {
-        "project": {"actions": ["add", "update", "remove"], "required": ["name"],
-                   "optional": ["description", "status", "tags", "notes", "highlights", "references"],
-                   "valid_values": {"status": ["active", "paused", "completed", "archived", "idea"]},
-                   "identifier": "name"},
-        "project_tag": {"actions": ["add", "remove"], "required": ["project_name", "tag"], "optional": [],
-                       "identifier": "tag", "parent": "project_name"},
-        "project_reference": {"actions": ["add", "update", "remove"], "required": ["project_name", "ref_name"],
-                             "optional": ["url", "notes"], "identifier": "ref_name", "parent": "project_name"},
-        "project_highlight": {"actions": ["add", "remove"], "required": ["project_name", "highlight"], "optional": [],
-                             "identifier": "highlight", "parent": "project_name"},
-        "current_learning": {"actions": ["add", "update", "remove"], "required": ["topic"],
-                            "optional": ["context", "priority"],
-                            "valid_values": {"priority": ["low", "medium", "high"]}, "identifier": "topic"},
-        "top_of_mind": {"actions": ["add", "remove"], "required": ["item"], "optional": ["note"],
-                       "identifier": "item"}
-    },
-    "circle": {
-        "connection": {"actions": ["add", "update", "remove"], "required": ["name"],
-                      "optional": ["relationship", "traits", "notes", "contact"], "identifier": "name"}
-    },
-    "preferences": {
-        "dislike": {"actions": ["add", "remove"], "required": ["dislike"], "optional": [], "identifier": "dislike"},
-        "preference": {"actions": ["add", "update", "remove"], "required": ["key"],
-                      "optional": ["category", "value"],
-                      "description": "Generic key-value preference with category support", "identifier": "key"},
-        "communication_default": {"actions": ["update"], "required": [],
-                                 "optional": ["tone", "detail_level", "locale"], "identifier": None,
-                                 "description": "Update-only singleton for default communication style"},
-        "mood_override": {"actions": ["add", "update", "remove"], "required": ["mood"],
-                         "optional": ["tone", "detail_level"], "identifier": "mood"}
-    },
-    "learning_log": {
-        "learning_entry": {"actions": ["add", "update", "remove"], "required": ["topic", "details"],
-                          "optional": ["source", "tags", "conversation_metadata", "key_decisions",
-                                       "followup_items", "new_topic", "related_entries"],
-                          "identifier": "topic"}
-    }
-}
+# Per-entity write schema, owned by the section pack manifests
+# (backend/section_packs/<key>/manifest.json). Shape is unchanged:
+# {section_key: {entity_name: {actions, required, optional, valid_values?,
+# identifier, parent?, description?}}}.
+import pack_loader as _pack_loader
+
+ENTITY_SCHEMA = _pack_loader.build_entity_schema(_pack_loader.manifests())
 
 
 def _section_for_entity(entity: str):
