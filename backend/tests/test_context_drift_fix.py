@@ -19,13 +19,16 @@ def test_professional_scope_includes_previously_dropped_fields(as_user):
 
 def test_personal_scope_includes_goals_and_languages(as_user):
     import persona_store as store
+    g = store.load("goals")
+    g["goals"] = [{"title": "Ship it"}]
+    store.save("goals", g)
     p = store.load("profile")
-    p["goals_and_careers"] = [{"goal": "Ship it"}]
     p["languages_spoken"] = [{"name": "English"}]
     p["nationality"] = "British"
     store.save("profile", p)
 
-    ctx = json.loads(server.get_context.fn(scope="personal"))["context"]["profile"]
-    assert "goals_and_careers" in ctx
+    full_ctx = json.loads(server.get_context.fn(scope="personal"))["context"]
+    ctx = full_ctx["profile"]
+    assert "goals" in full_ctx["goals"]
     assert "languages_spoken" in ctx
     assert ctx.get("nationality") == "British"

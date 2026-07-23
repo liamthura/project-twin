@@ -75,7 +75,7 @@ def test_identifier_correctness_spread():
     assert _call(entity="curiosity")["identifier"] == "topic"
     assert _call(entity="mental_tab")["identifier"] == "title"
     assert _call(entity="learning_entry")["identifier"] == "topic"
-    assert _call(entity="career_aspiration")["identifier"] == "aspiration"
+    assert _call(entity="goal")["identifier"] == "title"
     assert _call(entity="connection")["identifier"] == "name"
 
 

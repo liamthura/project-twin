@@ -14,9 +14,7 @@
     "languages_spoken": [],
     "bio": "",
     "work_experience": [],
-    "career_aspirations": [],
     "education": [],
-    "goals_and_careers": [],
     "contact": {
       "emails": [],
       "links": []
@@ -34,10 +32,6 @@
     [
       "languages_spoken",
       "language"
-    ],
-    [
-      "goals_and_careers",
-      "goal"
     ]
   ],
   "scope_contributions": {
@@ -58,8 +52,7 @@
       "nationality",
       "languages_spoken",
       "work_experience",
-      "education",
-      "career_aspirations"
+      "education"
     ],
     "personal": [
       "name",
@@ -67,14 +60,12 @@
       "bio",
       "location",
       "nationality",
-      "languages_spoken",
-      "goals_and_careers"
+      "languages_spoken"
     ],
     "learning": [
       "name",
       "preferred_name",
-      "current_role",
-      "career_aspirations"
+      "current_role"
     ]
   },
   "entities": {
@@ -215,17 +206,6 @@
       "optional": [],
       "identifier": "course",
       "parent": "institution"
-    },
-    "career_aspiration": {
-      "actions": [
-        "add",
-        "remove"
-      ],
-      "required": [
-        "aspiration"
-      ],
-      "optional": [],
-      "identifier": "aspiration"
     },
     "basic_info": {
       "actions": [

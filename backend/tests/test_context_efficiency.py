@@ -15,10 +15,10 @@ def _seed():
 
 
 _EXPECTED_FILES_BY_SCOPE = {
-    "minimal": {"preferences", "profile", "projects"},
-    "professional": {"preferences", "profile", "knowledge", "projects"},
-    "personal": {"preferences", "profile", "lifestyle", "knowledge", "circle"},
-    "learning": {"preferences", "profile", "knowledge", "projects", "learning_log"},
+    "minimal": {"preferences", "profile", "projects", "goals"},
+    "professional": {"preferences", "profile", "knowledge", "projects", "goals"},
+    "personal": {"preferences", "profile", "lifestyle", "knowledge", "circle", "goals"},
+    "learning": {"preferences", "profile", "knowledge", "projects", "learning_log", "goals"},
 }
 
 
@@ -72,10 +72,10 @@ def test_resolve_scope_fields_full_is_all():
 
 def test_resolve_scope_fields_preserves_legacy_key_order():
     expected = {
-        "minimal": ["preferences", "profile", "projects"],
-        "professional": ["preferences", "profile", "knowledge", "projects"],
-        "personal": ["preferences", "profile", "lifestyle", "knowledge", "circle"],
-        "learning": ["preferences", "profile", "knowledge", "projects", "learning_log"],
+        "minimal": ["preferences", "profile", "projects", "goals"],
+        "professional": ["preferences", "profile", "knowledge", "projects", "goals"],
+        "personal": ["preferences", "profile", "lifestyle", "knowledge", "circle", "goals"],
+        "learning": ["preferences", "profile", "knowledge", "projects", "learning_log", "goals"],
     }
     for scope, keys in expected.items():
         assert list(server._resolve_scope_fields(scope).keys()) == keys

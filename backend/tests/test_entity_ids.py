@@ -39,13 +39,17 @@ def test_save_assigns_ids_to_gray_area_profile_lists(as_user):
         "work_experience": [{"company": "Acme"}],
         "education": [{"institution": "Uni"}],
         "languages_spoken": [{"name": "English"}],
-        "goals_and_careers": [{"goal": "Ship it"}],
     })
     p = store.load("profile")
     assert p["work_experience"][0]["id"].startswith("work_")
     assert p["education"][0]["id"].startswith("education_")
     assert p["languages_spoken"][0]["id"].startswith("language_")
-    assert p["goals_and_careers"][0]["id"].startswith("goal_")
+
+
+def test_save_assigns_ids_to_gray_area_goals_list(as_user):
+    store.save("goals", {"goals": [{"title": "Ship it"}]})
+    g = store.load("goals")
+    assert g["goals"][0]["id"].startswith("goal_")
 
 
 def test_save_assigns_ids_to_gray_area_project_and_knowledge_lists(as_user):

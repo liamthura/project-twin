@@ -80,11 +80,6 @@ def _normalize(file_type: str, data: dict) -> dict:
         else:
             data["education"] = []
 
-        # Ensure goals_and_careers is at profile level
-        if isinstance(education, dict) and education.get("goals_and_careers"):
-            data.setdefault("goals_and_careers", education["goals_and_careers"])
-        data.setdefault("goals_and_careers", [])
-
         contact = data.get("contact", {})
         # Convert single email string -> emails array
         if isinstance(contact, dict):
