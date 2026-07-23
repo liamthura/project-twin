@@ -12,20 +12,78 @@ import { ArrayInput } from "@/components/ArrayInput";
 
 const LONG_TEXT_FIELDS = new Set(["notes", "why", "description"]);
 
-function FieldInput({ field, value, onChange, entity, arrayFields }) {
+// Enums with this many values or fewer render as a segmented control;
+// larger sets render as wrapping chip radios. Clicking the active choice
+// clears it (all generic enum fields are optional).
+const SEGMENTED_MAX = 4;
+
+function SegmentedControl({ options, value, onChange }) {
+  return (
+    <div className="inline-flex rounded-lg bg-muted p-[3px]">
+      {options.map((v) => {
+        const active = value === v;
+        return (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(active ? undefined : v)}
+            className={`rounded-md px-3 py-1 text-sm capitalize transition-colors ${
+              active
+                ? "bg-background font-medium text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {v.replace(/_/g, " ")}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ChipRadioGroup({ options, value, onChange }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map((v) => {
+        const active = value === v;
+        return (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(active ? undefined : v)}
+            className={`rounded-full border px-3 py-1 text-xs capitalize transition-colors ${
+              active
+                ? "border-primary bg-accent font-medium text-accent-foreground"
+                : "border-input bg-background text-muted-foreground hover:bg-muted/50"
+            }`}
+          >
+            {v.replace(/_/g, " ")}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function FieldInput({ field, value, onChange, entity, arrayFields, customValue, onCustomChange }) {
   const enums = entity.valid_values?.[field];
   if (enums) {
+    const customField = `custom_${field}`;
+    const hasCustom = (entity.optional || []).includes(customField);
+    const Control = enums.length <= SEGMENTED_MAX ? SegmentedControl : ChipRadioGroup;
     return (
-      <select
-        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value || undefined)}
-      >
-        <option value="">—</option>
-        {enums.map((v) => (
-          <option key={v} value={v}>{v.replace(/_/g, " ")}</option>
-        ))}
-      </select>
+      <div className="space-y-2">
+        <Control options={enums} value={value} onChange={onChange} />
+        {hasCustom && value === "other" && (
+          <Input
+            value={customValue || ""}
+            onChange={(e) => onCustomChange?.(e.target.value)}
+            placeholder={`Custom ${field.replace(/_/g, " ")}…`}
+            className="h-8 max-w-[240px]"
+            autoFocus
+          />
+        )}
+      </div>
     );
   }
   if (arrayFields.includes(field)) {
@@ -56,10 +114,13 @@ function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowC
     onItems([item, ...items]);
   };
 
-  const updateItem = (idx, field, value) => {
+  const updateItem = (idx, changes) => {
     const next = [...items];
-    next[idx] = { ...next[idx], [field]: value };
-    if (value === undefined || value === "") delete next[idx][field];
+    next[idx] = { ...next[idx] };
+    for (const [field, value] of Object.entries(changes)) {
+      if (value === undefined || value === "") delete next[idx][field];
+      else next[idx][field] = value;
+    }
     onItems(next);
   };
 
@@ -80,26 +141,69 @@ function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowC
         <div className="text-sm text-muted-foreground">
           {items.length} {items.length === 1 ? "entry" : "entries"}
         </div>
-        <Dialog open={addOpen} onOpenChange={(o) => { setAddOpen(o); if (!o) setDraft({}); }}>
+        <Dialog
+          open={addOpen}
+          onOpenChange={(o) => {
+            setAddOpen(o);
+            // Preselect manifest defaults (e.g. stance: like) so the controls
+            // show the real initial state instead of applying it invisibly.
+            setDraft(o ? { ...(entity.field_defaults || {}) } : {});
+          }}
+        >
           <DialogTrigger asChild>
             <Button size="sm" variant="outline"><Plus className="mr-1 h-4 w-4" />Add</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add {entityName.replace(/_/g, " ")}</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
                 <Label className="text-xs capitalize">{titleField}</Label>
                 <Input
                   value={draft[titleField] || ""}
                   onChange={(e) => setDraft({ ...draft, [titleField]: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && draft[titleField]) {
+                      addItem(draft);
+                      setAddOpen(false);
+                      setDraft({});
+                    }
+                  }}
                   autoFocus
                 />
+                {suggestions.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {suggestions
+                      .filter((s) => !existingTitles.has(s.toLowerCase()))
+                      .slice(0, 8)
+                      .map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setDraft({ ...draft, [titleField]: s })}
+                          className="rounded-full border border-input bg-background px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-muted/50"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                  </div>
+                )}
               </div>
               {editFields.map((f) => (
-                <div key={f}>
+                <div key={f} className="space-y-1.5">
                   <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
-                  <FieldInput field={f} value={draft[f]} entity={entity} arrayFields={arrayFields}
-                    onChange={(v) => setDraft({ ...draft, [f]: v })} />
+                  <FieldInput
+                    field={f}
+                    value={draft[f]}
+                    entity={entity}
+                    arrayFields={arrayFields}
+                    customValue={draft[`custom_${f}`]}
+                    onChange={(v) => {
+                      const next = { ...draft, [f]: v };
+                      if (v !== "other") delete next[`custom_${f}`];
+                      setDraft(next);
+                    }}
+                    onCustomChange={(v) => setDraft({ ...draft, [`custom_${f}`]: v })}
+                  />
                 </div>
               ))}
             </div>
@@ -114,7 +218,7 @@ function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowC
       {suggestions.length > 0 && (
         <div className="space-y-1.5">
           <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            Suggested — tap to add
+            Suggested (tap to add)
           </div>
           <div className="flex flex-wrap gap-1.5">
             {suggestions
@@ -131,7 +235,7 @@ function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowC
       )}
 
       {items.length === 0 ? (
-        <EmptyState>Nothing here yet — add your first entry above.</EmptyState>
+        <EmptyState>Nothing here yet. Use Add, or tap a suggestion.</EmptyState>
       ) : (
         <div className="rounded-md border">
           {items.map((item, idx) => (
@@ -158,8 +262,19 @@ function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowC
                   {editFields.map((f) => (
                     <div key={f} className={LONG_TEXT_FIELDS.has(f) || arrayFields.includes(f) ? "sm:col-span-2" : ""}>
                       <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
-                      <FieldInput field={f} value={item[f]} entity={entity} arrayFields={arrayFields}
-                        onChange={(v) => updateItem(idx, f, v)} />
+                      <FieldInput
+                        field={f}
+                        value={item[f]}
+                        entity={entity}
+                        arrayFields={arrayFields}
+                        customValue={item[`custom_${f}`]}
+                        onChange={(v) =>
+                          updateItem(idx, v !== "other"
+                            ? { [f]: v, [`custom_${f}`]: undefined }
+                            : { [f]: v })
+                        }
+                        onCustomChange={(v) => updateItem(idx, { [`custom_${f}`]: v })}
+                      />
                     </div>
                   ))}
                 </div>
