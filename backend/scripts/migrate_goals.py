@@ -55,15 +55,30 @@ def migrate_user(user_id) -> dict:
     return {"moved": moved}
 
 
+def run_all(users) -> dict:
+    """Migrate every user row; one user's failure never blocks the rest."""
+    total, failures = 0, []
+    for row in users:
+        try:
+            stats = migrate_user(row["id"])
+            total += stats["moved"]
+            print(f"{row['username']}: moved {stats['moved']}")
+        except Exception as exc:  # noqa: BLE001 — batch isolation over one-shot prod data
+            failures.append((row["username"], repr(exc)))
+            print(f"{row['username']}: FAILED — {exc!r}")
+    return {"total": total, "users": len(users), "failures": failures}
+
+
 def main():
     with db.get_pool().connection() as conn:
         users = conn.execute("select id, username from users").fetchall()
-    total = 0
-    for row in users:
-        stats = migrate_user(row["id"])
-        total += stats["moved"]
-        print(f"{row['username']}: moved {stats['moved']}")
-    print(f"done — {total} goal(s) migrated across {len(users)} user(s)")
+    summary = run_all(users)
+    print(f"done — {summary['total']} goal(s) migrated across {summary['users']} user(s), "
+          f"{len(summary['failures'])} failure(s)")
+    if summary["failures"]:
+        for name, err in summary["failures"]:
+            print(f"  FAILED {name}: {err}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
