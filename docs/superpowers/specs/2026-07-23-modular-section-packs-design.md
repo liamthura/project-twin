@@ -109,12 +109,19 @@ New core-adjacent pack `goals` (default **on**), one entity:
 ```
 goal:
   required: title
-  optional: type, status, target_date, why, notes
+  optional: type, custom_type, status, target_date, why, notes
   valid_values:
-    type:   [career, learning, personal, health, financial, creative]
+    type:   [career, learning, personal, health, financial, creative, other]
     status: [active, achieved, paused, dropped]   (default: active)
   identifier: title
 ```
+
+`type: other` pairs with free-text `custom_type` (e.g. "faith",
+"community"); reads surface the custom label wherever the type would
+appear, writes with an unrecognized `type` value are coerced to
+`other` + `custom_type` (advisory notes the coercion) instead of erroring.
+The UI renders type as suggestion chips with an "Other…" free-text
+input — the same chip pattern as aesthetics.
 
 **Scope presence** (the point of the promotion), via a small goals hook —
 no generic filter mechanism:
