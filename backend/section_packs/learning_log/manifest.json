@@ -1,0 +1,44 @@
+{
+  "key": "learning_log",
+  "title": "Learning Log",
+  "description": "What you learn, decide, and reflect on",
+  "core": true,
+  "position": 70,
+  "defaults": {
+    "entries": []
+  },
+  "id_lists": [
+    [
+      "entries",
+      "learn"
+    ]
+  ],
+  "scope_contributions": {
+    "learning": [
+      "entries"
+    ]
+  },
+  "entities": {
+    "learning_entry": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "topic",
+        "details"
+      ],
+      "optional": [
+        "source",
+        "tags",
+        "conversation_metadata",
+        "key_decisions",
+        "followup_items",
+        "new_topic",
+        "related_entries"
+      ],
+      "identifier": "topic"
+    }
+  }
+}

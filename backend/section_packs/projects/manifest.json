@@ -1,0 +1,148 @@
+{
+  "key": "projects",
+  "title": "Projects",
+  "description": "Active work and current learning",
+  "core": false,
+  "position": 40,
+  "defaults": {
+    "projects": [],
+    "current_learning": [],
+    "top_of_mind": []
+  },
+  "id_lists": [
+    [
+      "projects",
+      "project"
+    ],
+    [
+      "current_learning",
+      "learning"
+    ],
+    [
+      "top_of_mind",
+      "top"
+    ]
+  ],
+  "scope_contributions": {
+    "minimal": [
+      "top_of_mind"
+    ],
+    "professional": [
+      "projects",
+      "current_learning",
+      "top_of_mind"
+    ],
+    "learning": [
+      "current_learning",
+      "top_of_mind"
+    ]
+  },
+  "entities": {
+    "project": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "name"
+      ],
+      "optional": [
+        "description",
+        "status",
+        "tags",
+        "notes",
+        "highlights",
+        "references"
+      ],
+      "valid_values": {
+        "status": [
+          "active",
+          "paused",
+          "completed",
+          "archived",
+          "idea"
+        ]
+      },
+      "identifier": "name"
+    },
+    "project_tag": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "project_name",
+        "tag"
+      ],
+      "optional": [],
+      "identifier": "tag",
+      "parent": "project_name"
+    },
+    "project_reference": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "project_name",
+        "ref_name"
+      ],
+      "optional": [
+        "url",
+        "notes"
+      ],
+      "identifier": "ref_name",
+      "parent": "project_name"
+    },
+    "project_highlight": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "project_name",
+        "highlight"
+      ],
+      "optional": [],
+      "identifier": "highlight",
+      "parent": "project_name"
+    },
+    "current_learning": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "topic"
+      ],
+      "optional": [
+        "context",
+        "priority"
+      ],
+      "valid_values": {
+        "priority": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "identifier": "topic"
+    },
+    "top_of_mind": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "item"
+      ],
+      "optional": [
+        "note"
+      ],
+      "identifier": "item"
+    }
+  }
+}

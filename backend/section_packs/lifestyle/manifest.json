@@ -1,0 +1,182 @@
+{
+  "key": "lifestyle",
+  "title": "Lifestyle",
+  "description": "Hobbies, values, and routines",
+  "core": false,
+  "position": 50,
+  "defaults": {
+    "hobbies": [],
+    "passions": [],
+    "curiosities": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+      "sleep": {
+        "weekday": {
+          "bedtime": "",
+          "wakeup": ""
+        },
+        "weekend": {
+          "bedtime": "",
+          "wakeup": ""
+        }
+      },
+      "energy_peaks": [],
+      "stress_triggers": []
+    }
+  },
+  "id_lists": [
+    [
+      "hobbies",
+      "hobby"
+    ]
+  ],
+  "scope_contributions": {
+    "personal": [
+      "hobbies",
+      "passions",
+      "curiosities",
+      "personality_traits",
+      "values",
+      "wellness"
+    ]
+  },
+  "entities": {
+    "hobby": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "name"
+      ],
+      "optional": [
+        "skill_level",
+        "status",
+        "notes",
+        "specifics",
+        "references"
+      ],
+      "valid_values": {
+        "skill_level": [
+          "beginner",
+          "learning",
+          "intermediate",
+          "advanced",
+          "expert"
+        ],
+        "status": [
+          "active",
+          "inactive",
+          "paused"
+        ]
+      },
+      "identifier": "name"
+    },
+    "hobby_reference": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "hobby_name",
+        "ref_name"
+      ],
+      "optional": [
+        "url",
+        "notes"
+      ],
+      "identifier": "ref_name",
+      "parent": "hobby_name"
+    },
+    "hobby_specific": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "hobby_name",
+        "specific"
+      ],
+      "optional": [],
+      "identifier": "specific",
+      "parent": "hobby_name"
+    },
+    "passion": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "name"
+      ],
+      "optional": [],
+      "identifier": "name"
+    },
+    "curiosity": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "topic"
+      ],
+      "optional": [],
+      "identifier": "topic"
+    },
+    "personality_trait": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "trait"
+      ],
+      "optional": [],
+      "identifier": "trait"
+    },
+    "value": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "value"
+      ],
+      "optional": [],
+      "identifier": "value"
+    },
+    "sleep": {
+      "actions": [
+        "update"
+      ],
+      "required": [
+        "day_type"
+      ],
+      "optional": [
+        "bedtime",
+        "wakeup"
+      ],
+      "valid_values": {
+        "day_type": [
+          "weekday",
+          "weekend"
+        ]
+      },
+      "identifier": "day_type"
+    },
+    "energy_peak": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "peak"
+      ],
+      "optional": [],
+      "identifier": "peak"
+    }
+  }
+}

@@ -131,3 +131,23 @@ def test_manifests_is_cached(tmp_path, monkeypatch):
     pack_loader.manifests()
     assert len(calls) == 1
     pack_loader._reset_cache()
+
+
+def test_core_manifests_reproduce_legacy_registry():
+    """While sections.py/server.py are still hardcoded, the generated
+    manifests must reproduce them exactly. After Tasks 5-6 flip those
+    modules onto the loader, this becomes a tautology and the golden
+    test carries the guarantee instead."""
+    import sections
+    import server
+
+    packs = pack_loader.load_packs()
+    assert list(packs) == list(sections.SECTION_REGISTRY)
+    for key, spec in sections.SECTION_REGISTRY.items():
+        m = packs[key]
+        assert m["defaults"] == spec.default, key
+        assert [tuple(t) for t in m["id_lists"]] == list(spec.id_lists), key
+        assert m.get("scope_contributions", {}) == spec.context_fields, key
+    assert pack_loader.build_entity_schema(packs) == server.ENTITY_SCHEMA
+    core = {k for k, m in packs.items() if m["core"]}
+    assert core == set(sections.ALWAYS_ON_SECTIONS)
