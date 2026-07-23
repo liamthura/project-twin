@@ -14,8 +14,12 @@ def _client_and_auth():
 
 def test_default_enabled_map_covers_all_packs(clean_database):
     assert set(sections.DEFAULT_ENABLED) == set(sections.SECTION_REGISTRY)
-    # Everything shipped so far defaults on.
-    assert all(sections.DEFAULT_ENABLED.values())
+    # media and aesthetics (Task 2, manifest-only packs) are the first
+    # default-off packs; everything else still defaults on.
+    assert sections.DEFAULT_ENABLED["media"] is False
+    assert sections.DEFAULT_ENABLED["aesthetics"] is False
+    assert all(v for k, v in sections.DEFAULT_ENABLED.items()
+               if k not in ("media", "aesthetics"))
 
 
 def test_pack_meta_carries_ui_and_entities(clean_database):
