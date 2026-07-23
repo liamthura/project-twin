@@ -4,48 +4,52 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --background: 60 9% 98%;
+    --foreground: 24 10% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 24 10% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 73 91% 58%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
+    --popover-foreground: 24 10% 10%;
+    --primary: 228 69% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 60 5% 96%;
+    --secondary-foreground: 24 10% 10%;
+    --muted: 60 5% 96%;
+    --muted-foreground: 25 5% 45%;
+    --accent: 223 100% 96%;
+    --accent-foreground: 228 69% 55%;
+    --destructive: 0 65% 48%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 73 91% 58%;
+    --success: 142 71% 35%;
+    --warning: 43 96% 40%;
+    --border: 20 6% 90%;
+    --input: 20 6% 90%;
+    --ring: 228 69% 55%;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 240 6% 4%;
-    --foreground: 0 0% 95%;
-    --card: 240 6% 7%;
-    --card-foreground: 0 0% 95%;
-    --popover: 240 6% 7%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 73 91% 58%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 240 5% 12%;
-    --secondary-foreground: 0 0% 95%;
-    --muted: 240 5% 16%;
-    --muted-foreground: 240 4% 55%;
-    --accent: 240 5% 16%;
-    --accent-foreground: 0 0% 95%;
-    --destructive: 0 62.8% 50%;
+    --background: 60 3% 7%;
+    --foreground: 60 5% 96%;
+    --card: 60 2% 10%;
+    --card-foreground: 60 5% 96%;
+    --popover: 60 2% 10%;
+    --popover-foreground: 60 5% 96%;
+    --primary: 228 94% 67%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 60 1% 14%;
+    --secondary-foreground: 60 5% 96%;
+    --muted: 60 1% 14%;
+    --muted-foreground: 24 5% 64%;
+    --accent: 227 22% 20%;
+    --accent-foreground: 228 94% 67%;
+    --destructive: 0 74% 54%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5% 18%;
-    --input: 240 5% 18%;
-    --ring: 73 91% 58%;
+    --success: 142 60% 50%;
+    --warning: 43 90% 55%;
+    --border: 60 2% 16%;
+    --input: 60 2% 16%;
+    --ring: 228 94% 67%;
   }
 }
 
@@ -55,7 +59,13 @@
   }
   body {
     @apply bg-background text-foreground;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
+}
+
+svg.lucide {
+  stroke-width: 1.75;
 }
 
 /* Custom scrollbar */
@@ -95,4 +105,72 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .dark input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
+}
+
+/* Expand small icon buttons to a >=44px hit area without changing layout */
+.tap-target {
+  position: relative;
+}
+.tap-target::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+/* Scroll without a visible scrollbar (mobile tab strip) */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Edge fade hinting at more tabs off-screen (mobile strip only) */
+@media (max-width: 767px) {
+  /* Fade only the side that has more tabs off-screen. The data-at-start /
+     data-at-end attributes are set from scroll position in App.jsx. */
+  .tab-strip-fade {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 16px,
+      black calc(100% - 24px),
+      transparent
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 16px,
+      black calc(100% - 24px),
+      transparent
+    );
+  }
+  .tab-strip-fade[data-at-start="true"] {
+    mask-image: linear-gradient(
+      to right,
+      black,
+      black calc(100% - 24px),
+      transparent
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      black,
+      black calc(100% - 24px),
+      transparent
+    );
+  }
+  .tab-strip-fade[data-at-end="true"] {
+    mask-image: linear-gradient(to right, transparent, black 16px, black);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 16px,
+      black
+    );
+  }
+  .tab-strip-fade[data-at-start="true"][data-at-end="true"] {
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
 }

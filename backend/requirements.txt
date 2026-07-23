@@ -1,5 +1,35 @@
-fastapi>=0.104.0
-uvicorn>=0.24.0
-python-dotenv>=1.0.0
-pydantic>=2.0.0
-mcp>=0.7.0
+# =============================================================================
+# MyGist MCP Server Dependencies
+# =============================================================================
+# Versions are pinned exactly: the app relies on Starlette middleware behaviour
+# (contextvar/request.state propagation) and the fastmcp 2.x tool API, both of
+# which can change across releases. Unpinned ranges previously let production
+# rebuilds drift onto fastmcp 3.x / starlette 1.x. Bump deliberately + re-test.
+
+# FastMCP - Modern MCP SDK with HTTP transport
+fastmcp==2.14.2
+
+# ASGI server
+uvicorn[standard]==0.38.0
+
+# Web framework (FastMCP dependency, explicit for middleware)
+starlette==0.50.0
+
+# Environment variables
+python-dotenv==1.2.1
+
+# Data validation (FastMCP dependency)
+pydantic==2.12.5
+
+# Legacy FastAPI for main.py (persona manager API)
+fastapi==0.123.9
+
+# Postgres driver
+psycopg[binary]==3.3.4
+psycopg-pool==3.3.1
+
+# Password hashing (tokens stay sha256; passwords need a slow hash)
+bcrypt==5.0.0
+
+# Embedding providers
+httpx==0.28.1

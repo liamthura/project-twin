@@ -1,0 +1,19 @@
+# MyGist - Ignore files for Docker build
+node_modules/
+.git/
+*.log
+.env
+.env.local
+.DS_Store
+__pycache__/
+*.pyc
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.cache/
+coverage/
+.pytest_cache/
+*.md
+!README.md

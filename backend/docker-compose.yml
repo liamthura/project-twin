@@ -1,0 +1,40 @@
+# MyGist API - Docker Compose for Local Development
+# Usage:
+#   docker compose up -d test-db   # Start local Postgres for tests
+#   docker compose up -d           # Start server + test-db
+#   docker compose logs -f         # View logs
+#   docker compose down            # Stop everything
+
+services:
+  test-db:
+    image: pgvector/pgvector:pg16
+    container_name: mygist-test-db
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=mygist
+      - POSTGRES_PASSWORD=mygist
+      - POSTGRES_DB=mygist_test
+    restart: unless-stopped
+
+  mygist:
+    build: .
+    container_name: mygist-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - DEBUG=true
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-voyage}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
+      - EMBEDDING_API_URL=${EMBEDDING_API_URL:-}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-1024}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped

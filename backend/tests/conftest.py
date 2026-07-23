@@ -1,0 +1,62 @@
+import os
+
+import psycopg
+import pytest
+
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL", "postgresql://mygist:mygist@localhost:5433/mygist_test"
+)
+
+# Set before any test module runs `import main`, which calls db.ensure_schema()
+# at import time and would otherwise KeyError on a missing DATABASE_URL.
+os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
+
+
+@pytest.fixture(autouse=True)
+def clean_database(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
+
+    # Tests must never see a real embedding provider: scripts/ modules call
+    # load_dotenv() at import (pytest collection), which can leak a real
+    # VOYAGE_API_KEY from backend/.env into os.environ — turning unpatched
+    # tests into live API callers and clogging the shared embed executor
+    # with slow network tasks (observed as order-dependent hybrid-search
+    # failures). Providers are always injected via monkeypatch in tests.
+    for var in ("VOYAGE_API_KEY", "EMBEDDING_API_URL", "EMBEDDING_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+
+    import db as db_module
+
+    if db_module._pool is not None:
+        db_module._pool.close()  # release the prior test's pool threads
+    db_module._pool = None  # force a fresh pool bound to the test database
+
+    conn = psycopg.connect(TEST_DATABASE_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute("drop table if exists persona_search;")  # references users
+        cur.execute("drop table if exists tokens;")  # references users
+        cur.execute("drop table if exists persona_data;")
+        cur.execute("drop table if exists users;")
+    conn.close()
+
+    db_module.ensure_schema()
+    yield
+
+    if db_module._pool is not None:
+        db_module._pool.close()  # close this test's pool so no threads linger
+        db_module._pool = None
+
+
+@pytest.fixture
+def as_user():
+    """Register a throwaway user and bind current_user_id to it for the test."""
+    import db
+
+    with db.get_pool().connection() as conn:
+        row = conn.execute(
+            "insert into users (username, token_hash) values ('u1', 'x') returning id"
+        ).fetchone()
+    token = db.current_user_id.set(str(row["id"]))
+    yield
+    db.current_user_id.reset(token)
