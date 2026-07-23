@@ -255,10 +255,21 @@ class SettingsUpdate(BaseModel):
 
 @app.get("/api/settings")
 async def get_settings():
+    enabled = settings_store.enabled_sections()
     return {
         "disabled_sections": sorted(settings_store.get_disabled_sections()),
         "toggleable": sorted(sections.toggleable_sections()),
         "always_on": sorted(sections.ALWAYS_ON_SECTIONS),
+        "packs": [
+            {
+                "key": key,
+                "title": meta["title"],
+                "description": meta["description"],
+                "core": meta["core"],
+                "enabled": key in enabled,
+            }
+            for key, meta in sections.PACK_META.items()
+        ],
     }
 
 
