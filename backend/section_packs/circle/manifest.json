@@ -1,0 +1,40 @@
+{
+  "key": "circle",
+  "title": "Circle",
+  "description": "People and relationships",
+  "core": false,
+  "position": 60,
+  "defaults": {
+    "connections": []
+  },
+  "id_lists": [
+    [
+      "connections",
+      "connection"
+    ]
+  ],
+  "scope_contributions": {
+    "personal": [
+      "connections"
+    ]
+  },
+  "entities": {
+    "connection": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "name"
+      ],
+      "optional": [
+        "relationship",
+        "traits",
+        "notes",
+        "contact"
+      ],
+      "identifier": "name"
+    }
+  }
+}

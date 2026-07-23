@@ -36,3 +36,26 @@ def test_put_rejects_unknown_section(clean_database):
     client, auth = _client_and_auth()
     r = client.put("/api/settings", json={"disabled_sections": ["bogus"]}, headers=auth)
     assert r.status_code == 400
+
+
+def test_get_settings_includes_pack_metadata(clean_database):
+    client, auth = _client_and_auth()
+    body = client.get("/api/settings", headers=auth).json()
+    packs = body["packs"]
+    assert [p["key"] for p in packs] == [
+        "profile", "knowledge", "preferences", "projects",
+        "lifestyle", "circle", "learning_log",
+    ]
+    profile = packs[0]
+    assert profile == {
+        "key": "profile",
+        "title": "Profile",
+        "description": "Identity, work, education, contact",
+        "core": True,
+        "enabled": True,
+    }
+    # disabling a toggleable pack is reflected in `enabled`
+    client.put("/api/settings", json={"disabled_sections": ["circle"]}, headers=auth)
+    body = client.get("/api/settings", headers=auth).json()
+    circle = next(p for p in body["packs"] if p["key"] == "circle")
+    assert circle["enabled"] is False and circle["core"] is False

@@ -1,0 +1,136 @@
+{
+  "key": "knowledge",
+  "title": "Knowledge",
+  "description": "Domains you know and topics you track",
+  "core": false,
+  "position": 20,
+  "defaults": {
+    "domains": [],
+    "mental_tabs": []
+  },
+  "id_lists": [
+    [
+      "domains",
+      "domain"
+    ],
+    [
+      "mental_tabs",
+      "tab"
+    ]
+  ],
+  "scope_contributions": {
+    "professional": [
+      "domains"
+    ],
+    "personal": [
+      "mental_tabs"
+    ],
+    "learning": [
+      "domains",
+      "mental_tabs"
+    ]
+  },
+  "entities": {
+    "domain": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "name"
+      ],
+      "optional": [
+        "level",
+        "notes",
+        "references"
+      ],
+      "valid_values": {
+        "level": [
+          "beginner",
+          "learning",
+          "intermediate",
+          "advanced",
+          "expert"
+        ]
+      },
+      "identifier": "name"
+    },
+    "domain_reference": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "domain_name",
+        "ref_name"
+      ],
+      "optional": [
+        "url",
+        "notes"
+      ],
+      "identifier": "ref_name",
+      "parent": "domain_name"
+    },
+    "knowledge": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "name"
+      ],
+      "optional": [
+        "category",
+        "level",
+        "notes",
+        "references"
+      ],
+      "description": "Generic knowledge entry with category support",
+      "identifier": "name"
+    },
+    "mental_tab": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "title"
+      ],
+      "optional": [
+        "notes",
+        "tags",
+        "status",
+        "references"
+      ],
+      "valid_values": {
+        "status": [
+          "open",
+          "closed",
+          "archived"
+        ]
+      },
+      "identifier": "title"
+    },
+    "mental_tab_reference": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "title",
+        "ref_name"
+      ],
+      "optional": [
+        "url",
+        "notes"
+      ],
+      "identifier": "ref_name",
+      "parent": "title"
+    }
+  }
+}

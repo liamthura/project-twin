@@ -1,0 +1,876 @@
+{
+  "always_on_sections": [
+    "learning_log",
+    "preferences",
+    "profile"
+  ],
+  "entity_schema": {
+    "circle": {
+      "connection": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "name",
+        "optional": [
+          "relationship",
+          "traits",
+          "notes",
+          "contact"
+        ],
+        "required": [
+          "name"
+        ]
+      }
+    },
+    "knowledge": {
+      "domain": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "name",
+        "optional": [
+          "level",
+          "notes",
+          "references"
+        ],
+        "required": [
+          "name"
+        ],
+        "valid_values": {
+          "level": [
+            "beginner",
+            "learning",
+            "intermediate",
+            "advanced",
+            "expert"
+          ]
+        }
+      },
+      "domain_reference": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "ref_name",
+        "optional": [
+          "url",
+          "notes"
+        ],
+        "parent": "domain_name",
+        "required": [
+          "domain_name",
+          "ref_name"
+        ]
+      },
+      "knowledge": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "description": "Generic knowledge entry with category support",
+        "identifier": "name",
+        "optional": [
+          "category",
+          "level",
+          "notes",
+          "references"
+        ],
+        "required": [
+          "name"
+        ]
+      },
+      "mental_tab": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "title",
+        "optional": [
+          "notes",
+          "tags",
+          "status",
+          "references"
+        ],
+        "required": [
+          "title"
+        ],
+        "valid_values": {
+          "status": [
+            "open",
+            "closed",
+            "archived"
+          ]
+        }
+      },
+      "mental_tab_reference": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "ref_name",
+        "optional": [
+          "url",
+          "notes"
+        ],
+        "parent": "title",
+        "required": [
+          "title",
+          "ref_name"
+        ]
+      }
+    },
+    "learning_log": {
+      "learning_entry": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "topic",
+        "optional": [
+          "source",
+          "tags",
+          "conversation_metadata",
+          "key_decisions",
+          "followup_items",
+          "new_topic",
+          "related_entries"
+        ],
+        "required": [
+          "topic",
+          "details"
+        ]
+      }
+    },
+    "lifestyle": {
+      "curiosity": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "topic",
+        "optional": [],
+        "required": [
+          "topic"
+        ]
+      },
+      "energy_peak": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "peak",
+        "optional": [],
+        "required": [
+          "peak"
+        ]
+      },
+      "hobby": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "name",
+        "optional": [
+          "skill_level",
+          "status",
+          "notes",
+          "specifics",
+          "references"
+        ],
+        "required": [
+          "name"
+        ],
+        "valid_values": {
+          "skill_level": [
+            "beginner",
+            "learning",
+            "intermediate",
+            "advanced",
+            "expert"
+          ],
+          "status": [
+            "active",
+            "inactive",
+            "paused"
+          ]
+        }
+      },
+      "hobby_reference": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "ref_name",
+        "optional": [
+          "url",
+          "notes"
+        ],
+        "parent": "hobby_name",
+        "required": [
+          "hobby_name",
+          "ref_name"
+        ]
+      },
+      "hobby_specific": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "specific",
+        "optional": [],
+        "parent": "hobby_name",
+        "required": [
+          "hobby_name",
+          "specific"
+        ]
+      },
+      "passion": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "name",
+        "optional": [],
+        "required": [
+          "name"
+        ]
+      },
+      "personality_trait": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "trait",
+        "optional": [],
+        "required": [
+          "trait"
+        ]
+      },
+      "sleep": {
+        "actions": [
+          "update"
+        ],
+        "identifier": "day_type",
+        "optional": [
+          "bedtime",
+          "wakeup"
+        ],
+        "required": [
+          "day_type"
+        ],
+        "valid_values": {
+          "day_type": [
+            "weekday",
+            "weekend"
+          ]
+        }
+      },
+      "value": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "value",
+        "optional": [],
+        "required": [
+          "value"
+        ]
+      }
+    },
+    "preferences": {
+      "communication_default": {
+        "actions": [
+          "update"
+        ],
+        "description": "Update-only singleton for default communication style",
+        "identifier": null,
+        "optional": [
+          "tone",
+          "detail_level",
+          "locale"
+        ],
+        "required": []
+      },
+      "dislike": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "dislike",
+        "optional": [],
+        "required": [
+          "dislike"
+        ]
+      },
+      "mood_override": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "mood",
+        "optional": [
+          "tone",
+          "detail_level"
+        ],
+        "required": [
+          "mood"
+        ]
+      },
+      "preference": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "description": "Generic key-value preference with category support",
+        "identifier": "key",
+        "optional": [
+          "category",
+          "value"
+        ],
+        "required": [
+          "key"
+        ]
+      }
+    },
+    "profile": {
+      "basic_info": {
+        "actions": [
+          "update"
+        ],
+        "description": "Update-only singleton for top-level profile fields",
+        "identifier": null,
+        "optional": [
+          "name",
+          "preferred_name",
+          "current_role",
+          "organisation",
+          "location",
+          "nationality",
+          "bio"
+        ],
+        "required": []
+      },
+      "career_aspiration": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "aspiration",
+        "optional": [],
+        "required": [
+          "aspiration"
+        ]
+      },
+      "coursework": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "course",
+        "optional": [],
+        "parent": "institution",
+        "required": [
+          "institution",
+          "course"
+        ]
+      },
+      "coursework_topic": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "course",
+        "optional": [],
+        "parent": "institution",
+        "required": [
+          "institution",
+          "course"
+        ]
+      },
+      "education": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "institution",
+        "optional": [
+          "degree",
+          "field",
+          "period",
+          "highlights",
+          "coursework",
+          "clubs"
+        ],
+        "required": [
+          "institution"
+        ]
+      },
+      "education_highlight": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "highlight",
+        "optional": [],
+        "parent": "institution",
+        "required": [
+          "institution",
+          "highlight"
+        ]
+      },
+      "email": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "address",
+        "optional": [
+          "label"
+        ],
+        "required": [
+          "address"
+        ]
+      },
+      "language": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "name",
+        "optional": [
+          "proficiency"
+        ],
+        "required": [
+          "name"
+        ],
+        "valid_values": {
+          "proficiency": [
+            "native",
+            "fluent",
+            "conversational",
+            "basic"
+          ]
+        }
+      },
+      "link": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "label",
+        "optional": [],
+        "required": [
+          "url",
+          "label"
+        ]
+      },
+      "work_experience": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "company",
+        "optional": [
+          "role",
+          "period",
+          "type",
+          "location",
+          "description",
+          "highlights"
+        ],
+        "required": [
+          "company"
+        ]
+      },
+      "work_highlight": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "highlight",
+        "optional": [],
+        "parent": "company",
+        "required": [
+          "company",
+          "highlight"
+        ]
+      }
+    },
+    "projects": {
+      "current_learning": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "topic",
+        "optional": [
+          "context",
+          "priority"
+        ],
+        "required": [
+          "topic"
+        ],
+        "valid_values": {
+          "priority": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      },
+      "project": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "name",
+        "optional": [
+          "description",
+          "status",
+          "tags",
+          "notes",
+          "highlights",
+          "references"
+        ],
+        "required": [
+          "name"
+        ],
+        "valid_values": {
+          "status": [
+            "active",
+            "paused",
+            "completed",
+            "archived",
+            "idea"
+          ]
+        }
+      },
+      "project_highlight": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "highlight",
+        "optional": [],
+        "parent": "project_name",
+        "required": [
+          "project_name",
+          "highlight"
+        ]
+      },
+      "project_reference": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "ref_name",
+        "optional": [
+          "url",
+          "notes"
+        ],
+        "parent": "project_name",
+        "required": [
+          "project_name",
+          "ref_name"
+        ]
+      },
+      "project_tag": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "tag",
+        "optional": [],
+        "parent": "project_name",
+        "required": [
+          "project_name",
+          "tag"
+        ]
+      },
+      "top_of_mind": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "identifier": "item",
+        "optional": [
+          "note"
+        ],
+        "required": [
+          "item"
+        ]
+      }
+    }
+  },
+  "section_order": [
+    "profile",
+    "knowledge",
+    "preferences",
+    "projects",
+    "lifestyle",
+    "circle",
+    "learning_log"
+  ],
+  "section_registry": {
+    "circle": {
+      "context_fields": {
+        "personal": [
+          "connections"
+        ]
+      },
+      "default": {
+        "connections": []
+      },
+      "id_lists": [
+        [
+          "connections",
+          "connection"
+        ]
+      ],
+      "key": "circle"
+    },
+    "knowledge": {
+      "context_fields": {
+        "learning": [
+          "domains",
+          "mental_tabs"
+        ],
+        "personal": [
+          "mental_tabs"
+        ],
+        "professional": [
+          "domains"
+        ]
+      },
+      "default": {
+        "domains": [],
+        "mental_tabs": []
+      },
+      "id_lists": [
+        [
+          "domains",
+          "domain"
+        ],
+        [
+          "mental_tabs",
+          "tab"
+        ]
+      ],
+      "key": "knowledge"
+    },
+    "learning_log": {
+      "context_fields": {
+        "learning": [
+          "entries"
+        ]
+      },
+      "default": {
+        "entries": []
+      },
+      "id_lists": [
+        [
+          "entries",
+          "learn"
+        ]
+      ],
+      "key": "learning_log"
+    },
+    "lifestyle": {
+      "context_fields": {
+        "personal": [
+          "hobbies",
+          "passions",
+          "curiosities",
+          "personality_traits",
+          "values",
+          "wellness"
+        ]
+      },
+      "default": {
+        "curiosities": [],
+        "hobbies": [],
+        "passions": [],
+        "personality_traits": [],
+        "values": [],
+        "wellness": {
+          "energy_peaks": [],
+          "sleep": {
+            "weekday": {
+              "bedtime": "",
+              "wakeup": ""
+            },
+            "weekend": {
+              "bedtime": "",
+              "wakeup": ""
+            }
+          },
+          "stress_triggers": []
+        }
+      },
+      "id_lists": [
+        [
+          "hobbies",
+          "hobby"
+        ]
+      ],
+      "key": "lifestyle"
+    },
+    "preferences": {
+      "context_fields": {},
+      "default": {
+        "code_style": {
+          "frameworks": [],
+          "preferred_languages": [],
+          "tools": []
+        },
+        "communication": {
+          "default": {
+            "detail_level": "",
+            "locale": "British English",
+            "tone": ""
+          },
+          "mood_overrides": []
+        },
+        "dislikes": [],
+        "learning_style": {
+          "avoid": [],
+          "preferred": []
+        }
+      },
+      "id_lists": [],
+      "key": "preferences"
+    },
+    "profile": {
+      "context_fields": {
+        "learning": [
+          "name",
+          "preferred_name",
+          "current_role",
+          "career_aspirations"
+        ],
+        "minimal": [
+          "name",
+          "preferred_name",
+          "bio",
+          "location",
+          "current_role"
+        ],
+        "personal": [
+          "name",
+          "preferred_name",
+          "bio",
+          "location",
+          "nationality",
+          "languages_spoken",
+          "goals_and_careers"
+        ],
+        "professional": [
+          "name",
+          "preferred_name",
+          "bio",
+          "location",
+          "current_role",
+          "organisation",
+          "nationality",
+          "languages_spoken",
+          "work_experience",
+          "education",
+          "career_aspirations"
+        ]
+      },
+      "default": {
+        "bio": "",
+        "career_aspirations": [],
+        "contact": {
+          "emails": [],
+          "links": []
+        },
+        "current_role": "",
+        "education": [],
+        "goals_and_careers": [],
+        "languages_spoken": [],
+        "location": "",
+        "name": "",
+        "nationality": "",
+        "organisation": "",
+        "preferred_name": "",
+        "work_experience": []
+      },
+      "id_lists": [
+        [
+          "work_experience",
+          "work"
+        ],
+        [
+          "education",
+          "education"
+        ],
+        [
+          "languages_spoken",
+          "language"
+        ],
+        [
+          "goals_and_careers",
+          "goal"
+        ]
+      ],
+      "key": "profile"
+    },
+    "projects": {
+      "context_fields": {
+        "learning": [
+          "current_learning",
+          "top_of_mind"
+        ],
+        "minimal": [
+          "top_of_mind"
+        ],
+        "professional": [
+          "projects",
+          "current_learning",
+          "top_of_mind"
+        ]
+      },
+      "default": {
+        "current_learning": [],
+        "projects": [],
+        "top_of_mind": []
+      },
+      "id_lists": [
+        [
+          "projects",
+          "project"
+        ],
+        [
+          "current_learning",
+          "learning"
+        ],
+        [
+          "top_of_mind",
+          "top"
+        ]
+      ],
+      "key": "projects"
+    }
+  }
+}

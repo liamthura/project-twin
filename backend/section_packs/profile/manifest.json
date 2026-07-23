@@ -1,0 +1,248 @@
+{
+  "key": "profile",
+  "title": "Profile",
+  "description": "Identity, work, education, contact",
+  "core": true,
+  "position": 10,
+  "defaults": {
+    "name": "",
+    "preferred_name": "",
+    "current_role": "",
+    "organisation": "",
+    "location": "",
+    "nationality": "",
+    "languages_spoken": [],
+    "bio": "",
+    "work_experience": [],
+    "career_aspirations": [],
+    "education": [],
+    "goals_and_careers": [],
+    "contact": {
+      "emails": [],
+      "links": []
+    }
+  },
+  "id_lists": [
+    [
+      "work_experience",
+      "work"
+    ],
+    [
+      "education",
+      "education"
+    ],
+    [
+      "languages_spoken",
+      "language"
+    ],
+    [
+      "goals_and_careers",
+      "goal"
+    ]
+  ],
+  "scope_contributions": {
+    "minimal": [
+      "name",
+      "preferred_name",
+      "bio",
+      "location",
+      "current_role"
+    ],
+    "professional": [
+      "name",
+      "preferred_name",
+      "bio",
+      "location",
+      "current_role",
+      "organisation",
+      "nationality",
+      "languages_spoken",
+      "work_experience",
+      "education",
+      "career_aspirations"
+    ],
+    "personal": [
+      "name",
+      "preferred_name",
+      "bio",
+      "location",
+      "nationality",
+      "languages_spoken",
+      "goals_and_careers"
+    ],
+    "learning": [
+      "name",
+      "preferred_name",
+      "current_role",
+      "career_aspirations"
+    ]
+  },
+  "entities": {
+    "email": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "address"
+      ],
+      "optional": [
+        "label"
+      ],
+      "identifier": "address"
+    },
+    "link": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "url",
+        "label"
+      ],
+      "optional": [],
+      "identifier": "label"
+    },
+    "language": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "name"
+      ],
+      "optional": [
+        "proficiency"
+      ],
+      "valid_values": {
+        "proficiency": [
+          "native",
+          "fluent",
+          "conversational",
+          "basic"
+        ]
+      },
+      "identifier": "name"
+    },
+    "work_experience": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "company"
+      ],
+      "optional": [
+        "role",
+        "period",
+        "type",
+        "location",
+        "description",
+        "highlights"
+      ],
+      "identifier": "company"
+    },
+    "work_highlight": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "company",
+        "highlight"
+      ],
+      "optional": [],
+      "identifier": "highlight",
+      "parent": "company"
+    },
+    "education": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "institution"
+      ],
+      "optional": [
+        "degree",
+        "field",
+        "period",
+        "highlights",
+        "coursework",
+        "clubs"
+      ],
+      "identifier": "institution"
+    },
+    "education_highlight": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "institution",
+        "highlight"
+      ],
+      "optional": [],
+      "identifier": "highlight",
+      "parent": "institution"
+    },
+    "coursework": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "institution",
+        "course"
+      ],
+      "optional": [],
+      "identifier": "course",
+      "parent": "institution"
+    },
+    "coursework_topic": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "institution",
+        "course"
+      ],
+      "optional": [],
+      "identifier": "course",
+      "parent": "institution"
+    },
+    "career_aspiration": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "aspiration"
+      ],
+      "optional": [],
+      "identifier": "aspiration"
+    },
+    "basic_info": {
+      "actions": [
+        "update"
+      ],
+      "required": [],
+      "optional": [
+        "name",
+        "preferred_name",
+        "current_role",
+        "organisation",
+        "location",
+        "nationality",
+        "bio"
+      ],
+      "identifier": null,
+      "description": "Update-only singleton for top-level profile fields"
+    }
+  }
+}

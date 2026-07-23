@@ -1,0 +1,86 @@
+{
+  "key": "preferences",
+  "title": "Preferences",
+  "description": "Communication style, code style, dislikes",
+  "core": true,
+  "position": 30,
+  "defaults": {
+    "code_style": {
+      "preferred_languages": [],
+      "frameworks": [],
+      "tools": []
+    },
+    "communication": {
+      "default": {
+        "tone": "",
+        "detail_level": "",
+        "locale": "British English"
+      },
+      "mood_overrides": []
+    },
+    "learning_style": {
+      "preferred": [],
+      "avoid": []
+    },
+    "dislikes": []
+  },
+  "id_lists": [],
+  "scope_contributions": {},
+  "entities": {
+    "dislike": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "dislike"
+      ],
+      "optional": [],
+      "identifier": "dislike"
+    },
+    "preference": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "key"
+      ],
+      "optional": [
+        "category",
+        "value"
+      ],
+      "description": "Generic key-value preference with category support",
+      "identifier": "key"
+    },
+    "communication_default": {
+      "actions": [
+        "update"
+      ],
+      "required": [],
+      "optional": [
+        "tone",
+        "detail_level",
+        "locale"
+      ],
+      "identifier": null,
+      "description": "Update-only singleton for default communication style"
+    },
+    "mood_override": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "mood"
+      ],
+      "optional": [
+        "tone",
+        "detail_level"
+      ],
+      "identifier": "mood"
+    }
+  }
+}

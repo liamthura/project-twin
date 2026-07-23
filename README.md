@@ -32,6 +32,15 @@ Persona data is stored in Postgres (Neon in production), one JSONB blob per
 `(user, file type)`. `mygist_data/` is kept only as the source for the one-off
 migration (`backend/scripts/migrate_json_to_postgres.py`).
 
+### Section packs
+
+Persona sections are defined as **packs** — one declarative
+`backend/section_packs/<key>/manifest.json` per section covering defaults,
+write schema, scope contributions, search id-lists, and editor UI hints.
+Packs are validated at boot (invalid packs are skipped with a warning) and
+toggled per user in the Sections manager. To add a section, see
+[docs/CONTRIBUTING-PACKS.md](docs/CONTRIBUTING-PACKS.md).
+
 ---
 
 ## Quick Start
