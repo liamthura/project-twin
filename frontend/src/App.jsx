@@ -313,19 +313,32 @@ export default function App() {
 
   const togglePack = async (key, wantEnabled) => {
     const previous = packs;
+    const prevDisabledSections = disabledSections;
     const next = packs.map((p) => (p.key === key ? { ...p, enabled: wantEnabled } : p));
     const disabled = next.filter((p) => !p.core && p.default_enabled && !p.enabled).map((p) => p.key);
     const optins = next.filter((p) => !p.default_enabled && p.enabled).map((p) => p.key);
     setPacks(next); // optimistic
+    setDisabledSections(disabled); // optimistic (for tab visibility)
     try {
       await api("/settings", {
         method: "PUT",
         body: JSON.stringify({ disabled_sections: disabled, enabled_sections: optins }),
       });
-      await loadSettings();
-      await loadAllData(); // newly-enabled sections need their data
+      if (wantEnabled) {
+        // Fetch fresh data but merge in ONLY the newly-enabled section —
+        // a full setState of all sections would race the debounced autosave.
+        const response = await api("/all");
+        setPackData((prev) => ({ ...prev, [key]: response.data?.[key] ?? {} }));
+      } else {
+        setPackData((prev) => {
+          const rest = { ...prev };
+          delete rest[key];
+          return rest;
+        });
+      }
     } catch (err) {
       setPacks(previous); // rollback
+      setDisabledSections(prevDisabledSections); // rollback
       toast({
         title: "Failed to update section settings",
         description: err.message,
