@@ -47,3 +47,38 @@ def test_full_scope_active_only(as_user):
     ctx = server.get_scoped_context("full")["context"]
     titles = {g["title"] for g in ctx["goals"]["goals"]}
     assert "Done goal" not in titles
+
+
+def test_personal_and_learning_scopes_full_active_goals(as_user):
+    _seed(n_active=2)
+    for scope in ("personal", "learning"):
+        ctx = server.get_scoped_context(scope)["context"]
+        goals = ctx["goals"]["goals"]
+        assert len(goals) == 2, scope
+        assert all(g["status"] == "active" for g in goals), scope
+
+
+def test_goals_section_scope_includes_paused(as_user):
+    _seed(n_active=1)
+    server.execute_modify("add", "goal", {"title": "Paused goal", "status": "paused"})
+    ctx = server.get_scoped_context("goals")["context"]
+    titles = {g["title"] for g in ctx["goals"]["goals"]}
+    assert "Paused goal" in titles
+
+
+def test_paused_goal_excluded_from_global_scopes(as_user):
+    _seed(n_active=1)
+    server.execute_modify("add", "goal", {"title": "Paused goal", "status": "paused"})
+    ctx = server.get_scoped_context("professional")["context"]
+    titles = {g["title"] for g in ctx["goals"]["goals"]}
+    assert "Paused goal" not in titles
+
+
+def test_minimal_include_inactive_still_caps_stubs(as_user):
+    """Deliberate contract: minimal's <=5 {id,title} stub cap applies even with
+    include_inactive=True — inactive goals become eligible, the shape holds."""
+    _seed(n_active=6)
+    ctx = server.get_scoped_context("minimal", include_inactive=True)["context"]
+    goals = ctx["goals"]["goals"]
+    assert len(goals) == 5
+    assert all(set(g) == {"id", "title"} for g in goals)
