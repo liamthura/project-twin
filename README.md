@@ -356,15 +356,17 @@ hits that matter), instead of pulling whole sections.
 
 Control how much data Claude loads based on the task:
 
-| Scope          | Tokens | Includes                                       |
-| -------------- | ------ | ---------------------------------------------- |
-| `minimal`      | ~150   | Name, bio, location, current role, top of mind |
-| `professional` | ~3600  | Work, skills, projects, domains                |
-| `personal`     | ~1400  | Hobbies, values, personality, wellness         |
-| `learning`     | ~3400  | Domains, current learning, goals               |
-| `full`         | ~8000  | Everything                                     |
+| Scope          | Tokens | Includes                                               |
+| -------------- | ------ | ------------------------------------------------------ |
+| `minimal`      | ~150   | Name, bio, location, current role, top of mind, top 5 active goal titles |
+| `professional` | ~3600  | Work, skills, projects, domains, active goals          |
+| `personal`     | ~1400  | Hobbies, values, personality, wellness, active goals   |
+| `learning`     | ~3400  | Domains, current learning, active goals                |
+| `full`         | ~8000  | Everything                                             |
 
-**Section scopes**: any section key (`profile`, `knowledge`, `projects`,
+Token estimates predate the goals pack; expect a small increase (active goals only; full entries are ~40 tokens each, minimal stubs ~10).
+
+**Section scopes**: any section key (`profile`, `knowledge`, `projects`, `goals`,
 `lifestyle`, `circle`, `learning_log`, `preferences`) works as a scope, alone
 or in a list — `get_context(scope=["lifestyle", "circle"])`.
 
@@ -417,6 +419,7 @@ actions, required/optional fields, examples). A sampler:
 | Entity                 | Actions             | Key Fields                                                                |
 | ---------------------- | ------------------- | ------------------------------------------------------------------------- |
 | `domain`               | add, update, remove | name, level, tags                                                         |
+| `goal`                 | add, update, remove | title, type (7 kinds + custom via "other"), status, target_date, why, notes |
 | `project`              | add, update, remove | name, status, tags, description                                           |
 | `hobby`                | add, update, remove | name, skill_level, status (active/inactive), notes, specifics, references |
 | `work_experience`      | add, update, remove | role, company, type, period, highlights                                   |
@@ -433,6 +436,8 @@ actions, required/optional fields, examples). A sampler:
 | `passion`              | add, remove         | passion                                                                   |
 | `learning_entry`       | add, remove         | topic, details, tags, source (optional)                                   |
 | And more...            |                     |                                                                           |
+
+**Note:** `career_aspiration` still works as a write alias and records a goal with type "career".
 
 ---
 
@@ -518,6 +523,7 @@ column backfill has since fixed the dimension mismatch.
 - [x] Hybrid search (Postgres FTS + pgvector embeddings, Voyage or local models)
 - [x] Lean retrieval tools (`search_context` + `get_entity`) and titles-only context mode
 - [x] Duplicate advisories and dedupe-grounded capture suggestions
+- [x] Goals as a first-class section (types, status, target dates, custom types, migration off profile lists)
 - [ ] Better auto-triggering (waiting on MCP improvements)
 - [ ] Conversation history for pattern detection
 - [ ] Data versioning
