@@ -358,7 +358,7 @@ Control how much data Claude loads based on the task:
 
 | Scope          | Tokens | Includes                                               |
 | -------------- | ------ | ------------------------------------------------------ |
-| `minimal`      | ~150   | Name, bio, location, current role, top of mind, top 5 active goal titles |
+| `minimal`      | ~150   | Name, bio, location, current role, top of mind, first 5 active goal titles |
 | `professional` | ~3600  | Work, skills, projects, domains, active goals          |
 | `personal`     | ~1400  | Hobbies, values, personality, wellness, active goals   |
 | `learning`     | ~3400  | Domains, current learning, active goals                |

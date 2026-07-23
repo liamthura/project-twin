@@ -3,6 +3,7 @@ export const SECTION_LABELS = {
   projects: "Projects",
   lifestyle: "Lifestyle",
   circle: "Circle",
+  goals: "Goals",
 };
 
 export const SECTION_DESCRIPTIONS = {
@@ -10,4 +11,5 @@ export const SECTION_DESCRIPTIONS = {
   projects: "Active work and current learning",
   lifestyle: "Hobbies, values, and routines",
   circle: "People and relationships",
+  goals: "What you're working toward — type, status, and target date",
 };

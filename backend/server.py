@@ -823,7 +823,6 @@ def get_scoped_context(
     if "goals" in result and not any(t in _goals_full_tokens for t in tokens):
         glist = result["goals"].get("goals")
         if isinstance(glist, list):
-            import search_index
             result["goals"]["goals"] = [
                 {"id": g.get("id"), "title": search_index.flatten_entity(g)[0]}
                 if isinstance(g, dict) else g

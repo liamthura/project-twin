@@ -250,46 +250,6 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
       );
     }
   };
-  const addGoal = () =>
-    onChange({
-      ...data,
-      goals_and_careers: [
-        ...(data.goals_and_careers || []),
-        { goal: "", target: "" },
-      ],
-    });
-
-  const updateGoal = (index, field, value) => {
-    const next = [...(data.goals_and_careers || [])];
-    next[index] = { ...(next[index] || {}), [field]: value };
-    onChange({ ...data, goals_and_careers: next });
-  };
-
-  const removeGoal = (index) => {
-    const goal = (data.goals_and_careers || [])[index];
-    if (onShowConfirmation) {
-      onShowConfirmation(
-        "Remove Goal",
-        `Remove "${goal?.goal || "goal"}"? This action cannot be undone.`,
-        () => {
-          onChange({
-            ...data,
-            goals_and_careers: (data.goals_and_careers || []).filter(
-              (_, i) => i !== index
-            ),
-          });
-        }
-      );
-    } else {
-      onChange({
-        ...data,
-        goals_and_careers: (data.goals_and_careers || []).filter(
-          (_, i) => i !== index
-        ),
-      });
-    }
-  };
-
   const [collapsedSections, setCollapsedSections] = useState({
     academic: true,
     contact: true,
@@ -919,65 +879,12 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
               <EmptyState>No education entries yet. Add one to get started.</EmptyState>
             )}
 
-            {/* Goals Section - Moved outside education entries */}
-            <div className="space-y-2 pt-4 border-t">
-              <Label>Academic & Career Goals</Label>
-              <div className="space-y-3">
-                {(data.goals_and_careers || []).map((goalItem, idx) => (
-                  <div
-                    key={idx}
-                    className="space-y-2 p-3 rounded-lg border"
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <Label className="text-sm font-medium">
-                        {goalItem.goal || "Untitled Goal"}
-                      </Label>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeGoal(idx)}
-                        className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label className="text-xs">Goal</Label>
-                        <Input
-                          value={goalItem.goal || ""}
-                          onChange={(e) =>
-                            updateGoal(idx, "goal", e.target.value)
-                          }
-                          placeholder="e.g. Land ML internship"
-                          className="h-9"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Target</Label>
-                        <Input
-                          value={goalItem.target || ""}
-                          onChange={(e) =>
-                            updateGoal(idx, "target", e.target.value)
-                          }
-                          placeholder="e.g. Build a portfolio project"
-                          className="h-9"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  onClick={addGoal}
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-full border-dashed"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                  Add goal
-                </Button>
-              </div>
+            {/* Goals moved to their own section (see Manage sections) */}
+            <div className="pt-4 border-t">
+              <EmptyState>
+                Goals moved to their own section — ask your AI to manage
+                them, or toggle the Goals section in Manage sections.
+              </EmptyState>
             </div>
           </CardContent>
         )}

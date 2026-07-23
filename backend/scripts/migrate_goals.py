@@ -14,33 +14,59 @@ import db  # noqa: E402
 import persona_store  # noqa: E402
 
 
-def _legacy_titles(profile: dict) -> list[str]:
-    titles = []
+def _legacy_entries(profile: dict) -> list[dict]:
+    """Extract legacy goal entries as {"title", "notes"?} dicts. `notes` is
+    populated from a dict item's `target` (or `deadline`) subfield — the
+    frontend used to author goals_and_careers as {goal, target}, and that
+    target must survive the move instead of being silently dropped."""
+    entries = []
     for asp in profile.get("career_aspirations") or []:
         if isinstance(asp, str) and asp.strip():
-            titles.append(asp.strip())
+            entries.append({"title": asp.strip()})
     for item in profile.get("goals_and_careers") or []:
         if isinstance(item, dict):
-            t = item.get("title") or item.get("name") or item.get("goal")
-            if t and str(t).strip():
-                titles.append(str(t).strip())
+            title = item.get("title") or item.get("name") or item.get("goal")
+            if title and str(title).strip():
+                entry = {"title": str(title).strip()}
+                target = item.get("target") or item.get("deadline")
+                if target and str(target).strip():
+                    entry["notes"] = f"target: {str(target).strip()}"
+                entries.append(entry)
         elif isinstance(item, str) and item.strip():
-            titles.append(item.strip())
-    return titles
+            entries.append({"title": item.strip()})
+    return entries
+
+
+def _load_raw_profile(user_id) -> dict:
+    """Read the profile blob straight off the persona_data row, bypassing
+    persona_store's _normalize. As of the goals-pack cleanup, _normalize
+    strips career_aspirations/goals_and_careers on every load — exactly the
+    keys this migration needs to see — so persona_store.load("profile")
+    would never surface them here. Mirrors settings_store's direct-row read."""
+    with db.get_pool().connection() as conn:
+        row = conn.execute(
+            "select data from persona_data where user_id = %s and file_type = %s",
+            (user_id, "profile"),
+        ).fetchone()
+    return row["data"] if row else {}
 
 
 def migrate_user(user_id) -> dict:
     db.current_user_id.set(user_id)
-    profile = persona_store.load("profile")
+    profile = _load_raw_profile(user_id)
     goals_blob = persona_store.load("goals")
     goals = goals_blob.setdefault("goals", [])
     existing = {g.get("title", "").lower() for g in goals if isinstance(g, dict)}
 
     moved = 0
-    for title in _legacy_titles(profile):
+    for entry in _legacy_entries(profile):
+        title = entry["title"]
         if title.lower() in existing:
             continue
-        goals.append({"title": title, "type": "career", "status": "active"})
+        goal = {"title": title, "type": "career", "status": "active"}
+        if "notes" in entry:
+            goal["notes"] = entry["notes"]
+        goals.append(goal)
         existing.add(title.lower())
         moved += 1
 

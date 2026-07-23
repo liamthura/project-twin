@@ -7,7 +7,10 @@ from scripts.migrate_goals import migrate_user
 def _seed_legacy_profile():
     profile = persona_store.load("profile")
     profile["career_aspirations"] = ["Become a consultant", "Lead a team"]
-    profile["goals_and_careers"] = [{"title": "Run a marathon"}, "Learn Mandarin"]
+    profile["goals_and_careers"] = [
+        {"goal": "Run a marathon", "target": "May 2027"},
+        "Learn Mandarin",
+    ]
     persona_store.save("profile", profile)
 
 
@@ -20,6 +23,8 @@ def test_migrate_moves_both_lists(as_user):
     assert titles == {"Become a consultant", "Lead a team", "Run a marathon", "Learn Mandarin"}
     assert all(g["type"] == "career" and g["status"] == "active" for g in goals)
     assert all("id" in g for g in goals)  # ids assigned on save
+    marathon = next(g for g in goals if g["title"] == "Run a marathon")
+    assert marathon["notes"] == "target: May 2027"
     profile = persona_store.load("profile")
     assert "career_aspirations" not in profile
     assert "goals_and_careers" not in profile
