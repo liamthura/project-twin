@@ -14,7 +14,7 @@ def test_get_settings_defaults(clean_database):
     client, auth = _client_and_auth()
     body = client.get("/api/settings", headers=auth).json()
     assert body["disabled_sections"] == []
-    assert set(body["toggleable"]) == {"knowledge", "projects", "lifestyle", "circle"}
+    assert set(body["toggleable"]) == {"knowledge", "projects", "lifestyle", "circle", "goals"}
     assert set(body["always_on"]) == {"profile", "preferences", "learning_log"}
 
 
@@ -43,7 +43,7 @@ def test_get_settings_includes_pack_metadata(clean_database):
     body = client.get("/api/settings", headers=auth).json()
     packs = body["packs"]
     assert [p["key"] for p in packs] == [
-        "profile", "knowledge", "preferences", "projects",
+        "profile", "goals", "knowledge", "preferences", "projects",
         "lifestyle", "circle", "learning_log",
     ]
     profile = packs[0]

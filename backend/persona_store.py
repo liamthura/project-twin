@@ -80,11 +80,6 @@ def _normalize(file_type: str, data: dict) -> dict:
         else:
             data["education"] = []
 
-        # Ensure goals_and_careers is at profile level
-        if isinstance(education, dict) and education.get("goals_and_careers"):
-            data.setdefault("goals_and_careers", education["goals_and_careers"])
-        data.setdefault("goals_and_careers", [])
-
         contact = data.get("contact", {})
         # Convert single email string -> emails array
         if isinstance(contact, dict):
@@ -109,6 +104,11 @@ def _normalize(file_type: str, data: dict) -> dict:
 
             contact.setdefault("links", [])
             data["contact"] = contact
+
+        # Phase 2 (goals pack): these lists moved to the goals section; strip
+        # them so old backups/imports can't resurrect invisible orphan keys.
+        data.pop("career_aspirations", None)
+        data.pop("goals_and_careers", None)
     if file_type == "projects":
         projects = data.get("projects", [])
         if isinstance(projects, list):

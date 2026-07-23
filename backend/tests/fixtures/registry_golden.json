@@ -24,6 +24,44 @@
         ]
       }
     },
+    "goals": {
+      "goal": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "title",
+        "optional": [
+          "type",
+          "custom_type",
+          "status",
+          "target_date",
+          "why",
+          "notes"
+        ],
+        "required": [
+          "title"
+        ],
+        "valid_values": {
+          "status": [
+            "active",
+            "achieved",
+            "paused",
+            "dropped"
+          ],
+          "type": [
+            "career",
+            "learning",
+            "personal",
+            "health",
+            "financial",
+            "creative",
+            "other"
+          ]
+        }
+      }
+    },
     "knowledge": {
       "domain": {
         "actions": [
@@ -363,17 +401,6 @@
         ],
         "required": []
       },
-      "career_aspiration": {
-        "actions": [
-          "add",
-          "remove"
-        ],
-        "identifier": "aspiration",
-        "optional": [],
-        "required": [
-          "aspiration"
-        ]
-      },
       "coursework": {
         "actions": [
           "add",
@@ -624,6 +651,7 @@
   },
   "section_order": [
     "profile",
+    "goals",
     "knowledge",
     "preferences",
     "projects",
@@ -648,6 +676,32 @@
         ]
       ],
       "key": "circle"
+    },
+    "goals": {
+      "context_fields": {
+        "learning": [
+          "goals"
+        ],
+        "minimal": [
+          "goals"
+        ],
+        "personal": [
+          "goals"
+        ],
+        "professional": [
+          "goals"
+        ]
+      },
+      "default": {
+        "goals": []
+      },
+      "id_lists": [
+        [
+          "goals",
+          "goal"
+        ]
+      ],
+      "key": "goals"
     },
     "knowledge": {
       "context_fields": {
@@ -765,8 +819,7 @@
         "learning": [
           "name",
           "preferred_name",
-          "current_role",
-          "career_aspirations"
+          "current_role"
         ],
         "minimal": [
           "name",
@@ -781,8 +834,7 @@
           "bio",
           "location",
           "nationality",
-          "languages_spoken",
-          "goals_and_careers"
+          "languages_spoken"
         ],
         "professional": [
           "name",
@@ -794,20 +846,17 @@
           "nationality",
           "languages_spoken",
           "work_experience",
-          "education",
-          "career_aspirations"
+          "education"
         ]
       },
       "default": {
         "bio": "",
-        "career_aspirations": [],
         "contact": {
           "emails": [],
           "links": []
         },
         "current_role": "",
         "education": [],
-        "goals_and_careers": [],
         "languages_spoken": [],
         "location": "",
         "name": "",
@@ -828,10 +877,6 @@
         [
           "languages_spoken",
           "language"
-        ],
-        [
-          "goals_and_careers",
-          "goal"
         ]
       ],
       "key": "profile"

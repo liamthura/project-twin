@@ -684,7 +684,7 @@ def get_field(data: dict, *field_names, default=None):
 
 # Canonical file order for context output — reproduces the historical
 # CONTEXT_SCOPES key order exactly (preferences first, then the rest).
-_CONTEXT_FILE_ORDER = ("preferences", "profile", "lifestyle", "knowledge", "circle", "projects", "learning_log")
+_CONTEXT_FILE_ORDER = ("preferences", "profile", "goals", "lifestyle", "knowledge", "circle", "projects", "learning_log")
 
 
 def _merge_fields(target: dict, addition: dict) -> None:
@@ -808,11 +808,26 @@ def get_scoped_context(
     elif "learning_log" in result and topic and limit and limit > 0:
         result = _filter_learning_log_by_time(result, None, limit)
     
+    tokens = [scope] if isinstance(scope, str) else list(scope)
     if not include_inactive:
-        result = _filter_inactive(result)
+        # Goals hook (1/2): the goals section scope shows every status.
+        exempt = frozenset({"goals"}) if "goals" in tokens else frozenset()
+        result = _filter_inactive(result, exempt)
 
     if detail == "titles":
         result = _stub_titles(result)
+
+    # Goals hook (2/2): when no goal-bearing scope was requested (i.e. goals
+    # rode in via minimal only), reduce to ≤5 active-goal {id, title} stubs.
+    _goals_full_tokens = {"professional", "personal", "learning", "goals", "full"}
+    if "goals" in result and not any(t in _goals_full_tokens for t in tokens):
+        glist = result["goals"].get("goals")
+        if isinstance(glist, list):
+            result["goals"]["goals"] = [
+                {"id": g.get("id"), "title": search_index.flatten_entity(g)[0]}
+                if isinstance(g, dict) else g
+                for g in glist[:5]
+            ]
 
     scope_label = scope if isinstance(scope, str) else ",".join(scope)
     scope_desc = (
@@ -972,12 +987,13 @@ def _stub_titles(data: dict) -> dict:
                 ]
     return data
 
-def _filter_inactive(data: dict) -> dict:
-    """Remove inactive/paused items from context."""
+def _filter_inactive(data: dict, exempt: frozenset = frozenset()) -> dict:
+    """Remove inactive/paused items from context. Sections named in `exempt`
+    pass through unfiltered (the goals section scope shows every status)."""
     filtered = {}
-    
+
     for key, section in data.items():
-        if not isinstance(section, dict):
+        if key in exempt or not isinstance(section, dict):
             filtered[key] = section
             continue
         filtered[key] = {}
@@ -1043,8 +1059,6 @@ def normalize_data(data: dict, entity: str) -> dict:
         return normalized
     elif entity == "language":
         name_aliases = FIELD_ALIASES.get("language", FIELD_ALIASES["name"])
-    elif entity == "career_aspiration":
-        name_aliases = FIELD_ALIASES.get("aspiration", ["aspiration"])
     elif entity == "curiosity":
         name_aliases = FIELD_ALIASES.get("curiosity", ["topic"])
     elif entity in ["value", "core_value"]:
@@ -1275,24 +1289,89 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return f"✅ Removed highlight from {company}"
             return f"❌ Highlight not found"
     
-    elif entity == "career_aspiration":
-        profile = load_json("profile.json")
-        aspirations = profile.setdefault("career_aspirations", [])
+    elif entity == "goal":
+        blob = load_json("goals.json")
+        goals = blob.setdefault("goals", [])
+        title = get_field(data, "title", "name", "goal")
+
+        def _coerce_type(raw, custom):
+            """Unknown types become other/custom_type — never an error."""
+            t = (raw or "").strip().lower()
+            if t and t not in GOAL_TYPES:
+                return "other", (custom or raw), f" (type '{raw}' stored as other/custom_type)"
+            return t, custom, ""
+
         if action == "add":
-            asp = data.get("aspiration", "")
-            if asp in aspirations:
-                return f"ℹ️ '{asp}' already in aspirations"
-            aspirations.append(asp)
-            save_json("profile.json", profile)
-            return f"✅ Added aspiration: {asp}"
+            if not title:
+                return "❌ Goal requires 'title'"
+            idx, _ = find_in_array(goals, title, "title")
+            if idx != -1:
+                return f"ℹ️ Goal '{title}' already exists"
+            gtype, custom_type, note = _coerce_type(
+                get_field(data, "type", "category"), get_field(data, "custom_type", "type_label"))
+            status = (get_field(data, "status") or "active").strip().lower()
+            if status not in GOAL_STATUSES:
+                return f"❌ Invalid status '{status}'. Valid: {sorted(GOAL_STATUSES)}"
+            item = {"title": title, "status": status}
+            if gtype:
+                item["type"] = gtype
+            if custom_type:
+                item["custom_type"] = custom_type
+            for f in ("target_date", "why", "notes"):
+                v = get_field(data, f)
+                if v:
+                    item[f] = v
+            goals.append(item)
+            save_json("goals.json", blob)
+            return f"✅ Added goal: {title}{note}"
+
+        elif action == "update":
+            idx, goal = find_in_array(goals, title or "", "title")
+            if idx == -1:
+                return f"❌ Goal '{title}' not found"
+            note = ""
+            if get_field(data, "type", "category") is not None:
+                gtype, custom_type, note = _coerce_type(
+                    get_field(data, "type", "category"), get_field(data, "custom_type", "type_label"))
+                if gtype:
+                    goal["type"] = gtype
+                    if gtype != "other":
+                        goal.pop("custom_type", None)
+                if custom_type:
+                    goal["custom_type"] = custom_type
+            status = get_field(data, "status")
+            if status:
+                status = status.strip().lower()
+                if status not in GOAL_STATUSES:
+                    return f"❌ Invalid status '{status}'. Valid: {sorted(GOAL_STATUSES)}"
+                goal["status"] = status
+            for f in ("target_date", "why", "notes"):
+                v = get_field(data, f)
+                if v is not None:
+                    goal[f] = v
+            new_title = get_field(data, "new_title")
+            if new_title:
+                goal["title"] = new_title
+            save_json("goals.json", blob)
+            return f"✅ Updated goal: {goal['title']}{note}"
+
         elif action == "remove":
-            asp = data.get("aspiration", "")
-            found = next((a for a in aspirations if a.lower() == asp.lower()), None)
-            if not found:
-                return f"❌ Aspiration '{asp}' not found"
-            aspirations.remove(found)
-            save_json("profile.json", profile)
-            return f"✅ Removed aspiration: {asp}"
+            idx, _ = find_in_array(goals, title or "", "title")
+            if idx == -1:
+                return f"❌ Goal '{title}' not found"
+            goals.pop(idx)
+            save_json("goals.json", blob)
+            return f"✅ Removed goal: {title}"
+
+    elif entity == "career_aspiration":
+        # Back-compat alias: aspirations are goals now (type=career).
+        asp = get_field(data, "aspiration", "goal", "title", "career_goal", "objective", "aim")
+        if not asp:
+            return "❌ career_aspiration requires 'aspiration'"
+        result = execute_modify(action, "goal", {"title": asp, "type": "career"})
+        if result.startswith("✅"):
+            result += " — career_aspiration is stored as a goal now; use entity 'goal'"
+        return result
 
     elif entity == "basic_info":
         profile = load_json("profile.json")
@@ -2312,6 +2391,9 @@ import pack_loader as _pack_loader
 
 ENTITY_SCHEMA = _pack_loader.build_entity_schema(_pack_loader.manifests())
 
+GOAL_TYPES = set(ENTITY_SCHEMA["goals"]["goal"]["valid_values"]["type"])
+GOAL_STATUSES = set(ENTITY_SCHEMA["goals"]["goal"]["valid_values"]["status"])
+
 
 def _section_for_entity(entity: str):
     """The registry section (file_type) an entity writes to, or None if unknown."""
@@ -2776,8 +2858,8 @@ def analyze_message_for_capture(message: str, context: str = "") -> dict:
                     is_career = any(ind in goal for ind in career_indicators)
                     if is_career:
                         suggestions.append({
-                            "action": "add", "entity": "career_aspiration",
-                            "data": {"aspiration": goal},
+                            "action": "add", "entity": "goal",
+                            "data": {"title": goal, "type": "career"},
                             "reason": f"Career/learning goal: {goal}",
                             "confidence": 0.65
                         })
@@ -3132,17 +3214,17 @@ DUPLICATE_DISTANCE_CUTOFF = 0.4
 # mental_tab_reference, domain_reference) are excluded, as are
 # non-id-list top-level entities: passion/curiosity/personality_trait/value/
 # energy_peak/dislike/preference (plain-value lists, no id_lists entry),
-# career_aspiration (writes into `career_aspirations`, a plain-string list
-# distinct from profile's registered `goals_and_careers` id_list -- no
-# ENTITY_SCHEMA entity currently targets `goals_and_careers`), the
-# update-only singletons basic_info/communication_default/sleep, and
+# the update-only singletons basic_info/communication_default/sleep, and
 # `knowledge` (writes into a caller-chosen category via `data["category"]`,
 # not one fixed list_key -- `domain` already covers the one fixed id-list,
-# `domains`).
+# `domains`). `career_aspiration` is not listed separately: it is a
+# back-compat alias that forwards straight into `goal`, so writes via the
+# career_aspiration alias get no duplicate advisory (only direct goal writes do).
 ADVISORY_ENTITIES: dict[str, tuple[str, str]] = {
     "work_experience": ("profile", "work_experience"),
     "education": ("profile", "education"),
     "language": ("profile", "languages_spoken"),
+    "goal": ("goals", "goals"),
     "domain": ("knowledge", "domains"),
     "mental_tab": ("knowledge", "mental_tabs"),
     "project": ("projects", "projects"),

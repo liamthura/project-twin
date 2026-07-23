@@ -41,3 +41,18 @@ def test_data_is_isolated_per_user():
 def test_get_all_returns_every_file_type(as_user):
     all_data = store.get_all()
     assert set(all_data.keys()) == set(store.VALID_FILES)
+
+
+def test_load_strips_dead_goals_keys_from_old_profile_blobs(as_user):
+    """Phase 2 (goals pack): career_aspirations/goals_and_careers moved to the
+    goals section. _normalize is the safety net that keeps old backups/imports
+    from resurrecting these now-invisible orphan keys on load."""
+    profile = {
+        **SECTION_REGISTRY["profile"].default,
+        "career_aspirations": ["Become a consultant"],
+        "goals_and_careers": [{"goal": "Run a marathon", "target": "May 2027"}],
+    }
+    store.save("profile", profile)
+    loaded = store.load("profile")
+    assert "career_aspirations" not in loaded
+    assert "goals_and_careers" not in loaded

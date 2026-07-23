@@ -1,0 +1,35 @@
+{
+  "key": "goals",
+  "title": "Goals",
+  "description": "What you're working toward — type, status, and target date",
+  "core": false,
+  "position": 15,
+  "defaults": { "goals": [] },
+  "id_lists": [["goals", "goal"]],
+  "scope_contributions": {
+    "minimal": ["goals"],
+    "professional": ["goals"],
+    "personal": ["goals"],
+    "learning": ["goals"]
+  },
+  "entities": {
+    "goal": {
+      "actions": ["add", "update", "remove"],
+      "required": ["title"],
+      "optional": ["type", "custom_type", "status", "target_date", "why", "notes"],
+      "valid_values": {
+        "type": ["career", "learning", "personal", "health", "financial", "creative", "other"],
+        "status": ["active", "achieved", "paused", "dropped"]
+      },
+      "identifier": "title"
+    }
+  },
+  "capture_triggers": ["goal is", "aiming to", "planning to", "hoping to", "want to", "working toward"],
+  "ui": {
+    "goals": {
+      "title_field": "title",
+      "badges": ["type", "status"],
+      "detail_fields": ["target_date", "why", "notes"]
+    }
+  }
+}
