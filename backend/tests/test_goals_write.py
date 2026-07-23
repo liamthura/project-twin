@@ -55,6 +55,15 @@ def test_career_aspiration_alias_creates_goal(as_user):
     assert g["type"] == "career"
 
 
+def test_goal_update_to_real_type_clears_custom_type(as_user):
+    server.execute_modify("add", "goal", {"title": "Serve", "type": "spiritual"})
+    msg = server.execute_modify("update", "goal", {"title": "Serve", "type": "career"})
+    assert msg.startswith("✅")
+    [g] = server.load_json("goals.json")["goals"]
+    assert g["type"] == "career"
+    assert "custom_type" not in g
+
+
 def test_career_aspiration_not_in_schema(clean_database):
     assert "career_aspiration" not in server.ENTITY_SCHEMA.get("profile", {})
     assert "goal" in server.ENTITY_SCHEMA["goals"]

@@ -1043,8 +1043,6 @@ def normalize_data(data: dict, entity: str) -> dict:
         return normalized
     elif entity == "language":
         name_aliases = FIELD_ALIASES.get("language", FIELD_ALIASES["name"])
-    elif entity == "career_aspiration":
-        name_aliases = FIELD_ALIASES.get("aspiration", ["aspiration"])
     elif entity == "curiosity":
         name_aliases = FIELD_ALIASES.get("curiosity", ["topic"])
     elif entity in ["value", "core_value"]:
@@ -1321,6 +1319,8 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                     get_field(data, "type", "category"), get_field(data, "custom_type", "type_label"))
                 if gtype:
                     goal["type"] = gtype
+                    if gtype != "other":
+                        goal.pop("custom_type", None)
                 if custom_type:
                     goal["custom_type"] = custom_type
             status = get_field(data, "status")
@@ -3202,8 +3202,8 @@ DUPLICATE_DISTANCE_CUTOFF = 0.4
 # `knowledge` (writes into a caller-chosen category via `data["category"]`,
 # not one fixed list_key -- `domain` already covers the one fixed id-list,
 # `domains`). `career_aspiration` is not listed separately: it is a
-# back-compat alias that forwards straight into `goal`, so its advisory
-# coverage comes from the `goal` entry below.
+# back-compat alias that forwards straight into `goal`, so writes via the
+# career_aspiration alias get no duplicate advisory (only direct goal writes do).
 ADVISORY_ENTITIES: dict[str, tuple[str, str]] = {
     "work_experience": ("profile", "work_experience"),
     "education": ("profile", "education"),
