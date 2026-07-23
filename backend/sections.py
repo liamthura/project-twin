@@ -6,6 +6,7 @@ once (via pack_loader) and exposes the same API downstream code has always
 used. Per-entity write schema is also manifest-owned and surfaced as
 server.ENTITY_SCHEMA — this registry owns section-level data only.
 """
+import copy
 from dataclasses import dataclass, field
 
 import pack_loader
@@ -34,12 +35,28 @@ assert set(SCOPES) == pack_loader.GLOBAL_SCOPE_NAMES  # keep the two lists in lo
 # the preferences slice every global scope carried before it was factored out.
 ALWAYS_ON = {"preferences": ["code_style", "learning_style", "communication", "dislikes"]}
 
+# Core sections a corrupted/missing manifest must never silently drop.
+_REQUIRED_CORE = frozenset({"profile", "preferences", "learning_log"})
+
+
+def _check_core(manifests: dict) -> None:
+    """Fail fast if a required core section failed to load — a silently
+    missing core section is worse than refusing to boot."""
+    missing = _REQUIRED_CORE - set(manifests)
+    if missing:
+        raise RuntimeError(
+            f"core section pack(s) failed to load: {sorted(missing)} — "
+            "check the section_packs warnings above"
+        )
+
+
 _MANIFESTS = pack_loader.manifests()
+_check_core(_MANIFESTS)
 
 SECTION_REGISTRY = {
     key: SectionSpec(
         key=key,
-        default=m["defaults"],
+        default=copy.deepcopy(m["defaults"]),
         id_lists=tuple(tuple(pair) for pair in m["id_lists"]),
         context_fields=m.get("scope_contributions", {}),
     )

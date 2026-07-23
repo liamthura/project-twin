@@ -133,6 +133,34 @@ def test_manifests_is_cached(tmp_path, monkeypatch):
     pack_loader._reset_cache()
 
 
+def test_check_core_raises_on_missing_core_section():
+    import sections
+
+    manifests = {"preferences": {}, "learning_log": {}}
+    with pytest.raises(RuntimeError, match="profile"):
+        sections._check_core(manifests)
+
+
+def test_check_core_does_not_raise_when_all_present():
+    import sections
+
+    manifests = {"profile": {}, "preferences": {}, "learning_log": {}, "lifestyle": {}}
+    sections._check_core(manifests)  # must not raise
+
+
+def test_load_packs_meta_schema_failure_is_not_swallowed_as_pack_invalidity(
+    tmp_path, monkeypatch
+):
+    _write_pack(tmp_path, "good")
+    monkeypatch.setattr(pack_loader, "META_SCHEMA_PATH", tmp_path / "does_not_exist.json")
+    pack_loader._meta_validator = None
+    try:
+        with pytest.raises((OSError, FileNotFoundError)):
+            pack_loader.load_packs(tmp_path)
+    finally:
+        pack_loader._meta_validator = None
+
+
 def test_core_manifests_reproduce_legacy_registry():
     """While sections.py/server.py are still hardcoded, the generated
     manifests must reproduce them exactly. After Tasks 5-6 flip those

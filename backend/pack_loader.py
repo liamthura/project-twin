@@ -60,6 +60,7 @@ def load_packs(packs_dir: Path = PACKS_DIR) -> dict[str, dict]:
     """Scan packs_dir for <key>/manifest.json. Invalid → warn + skip.
     Cross-pack collisions → PackError. Returns manifests ordered by
     (position, key)."""
+    _validator()  # fail loudly on a broken meta-schema, not as per-pack invalidity
     loaded: list[dict] = []
     for entry in sorted(packs_dir.iterdir()) if packs_dir.exists() else []:
         if not entry.is_dir() or entry.name.startswith("_"):
