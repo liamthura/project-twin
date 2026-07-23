@@ -66,8 +66,7 @@ Manifest fields (validated against a published JSON meta-schema at boot):
         "kind": ["book", "article", "podcast", "show", "film", "game", "video", "music"],
         "status": ["want", "in_progress", "finished", "dropped"]
       },
-      "identifier": "title",
-      "list": "items"
+      "identifier": "title"
     }
   },
   "capture_triggers": ["reading", "watched", "listening to"],
