@@ -60,6 +60,7 @@ Manifest fields (validated against a published JSON meta-schema at boot):
   "entities": {
     "media_item": {
       "actions": ["add", "update", "remove"],
+      "list": "items",
       "required": ["title"],
       "optional": ["kind", "status", "rating", "url", "notes", "tags"],
       "valid_values": {

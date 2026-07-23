@@ -38,7 +38,8 @@ Persona sections are defined as **packs** — one declarative
 `backend/section_packs/<key>/manifest.json` per section covering defaults,
 write schema, scope contributions, search id-lists, and editor UI hints.
 Packs are validated at boot (invalid packs are skipped with a warning) and
-toggled per user in the Sections manager. To add a section, see
+toggled per user in the Sections manager. Add-on packs can ship with `default_enabled: false`
+to opt-in via the Sections manager. To add a section, see
 [docs/CONTRIBUTING-PACKS.md](docs/CONTRIBUTING-PACKS.md).
 
 ---
@@ -367,7 +368,7 @@ Control how much data Claude loads based on the task:
 Token estimates predate the goals pack; expect a small increase (active goals only; full entries are ~40 tokens each, minimal stubs ~10).
 
 **Section scopes**: any section key (`profile`, `knowledge`, `projects`, `goals`,
-`lifestyle`, `circle`, `learning_log`, `preferences`) works as a scope, alone
+`lifestyle`, `circle`, `learning_log`, `preferences`, `media`, `aesthetics`) works as a scope, alone
 or in a list — `get_context(scope=["lifestyle", "circle"])`.
 
 **Topic filtering**: Add `topic="Python"` to keep only relevant entries.
@@ -435,6 +436,8 @@ actions, required/optional fields, examples). A sampler:
 | `value`                | add, remove         | value                                                                     |
 | `passion`              | add, remove         | passion                                                                   |
 | `learning_entry`       | add, remove         | topic, details, tags, source (optional)                                   |
+| `media_item`           | add, update, remove | title, kind, status, rating, url, notes, tags                             |
+| `aesthetic`            | add, update, remove | name, domain, stance, notes, references                                   |
 | And more...            |                     |                                                                           |
 
 **Note:** `career_aspiration` still works as a write alias and records a goal with type "career".
@@ -524,6 +527,7 @@ column backfill has since fixed the dimension mismatch.
 - [x] Lean retrieval tools (`search_context` + `get_entity`) and titles-only context mode
 - [x] Duplicate advisories and dedupe-grounded capture suggestions
 - [x] Goals as a first-class section (types, status, target dates, custom types, migration off profile lists)
+- [x] Media and aesthetics packs — manifest-only sections with a generic schema-driven write path and manifest-driven web editor
 - [ ] Better auto-triggering (waiting on MCP improvements)
 - [ ] Conversation history for pattern detection
 - [ ] Data versioning
