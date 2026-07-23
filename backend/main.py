@@ -83,6 +83,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
         "https://mygist.thuradev.qzz.io",
         "http://localhost:1120",
         "http://chat.orb.local",
