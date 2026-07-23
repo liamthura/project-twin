@@ -1,87 +1,58 @@
-# Modular Section Packs, First-Class Goals, and New Sections — Design
+# Modular Section Packs and First-Class Goals — Design (lean v2)
 
-**Date:** 2026-07-23
+**Date:** 2026-07-23 (revised same day after scope review)
 **Status:** Draft for review
-**Prototype:** Figma → MyGist file, frames adjacent to node 19-63
+**Prototype:** Figma → MyGist file, page "Section Packs (design plan)"
+(prototype shows some v1 ideas since cut — milestone bars, overdue strips,
+version chips; treat those as decoration, not scope)
 
-## Problem
+## Guiding principle
 
-Three connected problems, in priority order:
+MyGist is a **context provider**, not a tracker. Every feature must either
+(a) improve what an LLM can know about the person per token spent, or
+(b) reduce the cost of maintaining that knowledge. Anything that manages
+work rather than describes the person is out of scope.
 
-1. **Goals are buried and half-broken.** `profile.goals_and_careers` is a
-   registered id-list with no write path (no `ENTITY_SCHEMA` entity targets
-   it — acknowledged at `server.py:3234`), and `career_aspirations` is a bare
-   string list with no status, dates, or links. Goals deserve first-class
-   presence across scopes, not a corner of profile.
-2. **Sections are hardcoded.** Adding a section today means editing
-   `sections.py`, `ENTITY_SCHEMA` in `server.py`, `persona_store.DEFAULTS`,
-   and hand-writing a React editor. That blocks both our own roadmap
-   (media, timeline, routines, setup, places) and any community contribution.
-3. **Cross-cutting gaps.** No provenance (user vs AI-captured), no freshness
-   surfaced in reads, no sensitivity levels, no generic entity-to-entity
-   links, no staleness handling for `top_of_mind`.
+## Problems being solved
 
-## Goals
+1. **Goals are buried and half-broken.** `profile.goals_and_careers` is
+   registered but has no write path (acknowledged at `server.py:3234`);
+   `career_aspirations` is a bare string list. What a person is working
+   toward is among the highest-value context per token — it deserves a
+   section, not a corner of profile.
+2. **Sections are hardcoded in four places** (`sections.py`,
+   `ENTITY_SCHEMA`, `persona_store.DEFAULTS`, a bespoke React editor),
+   which blocks cheap additions and outside contribution.
 
-- Promote goals to a first-class, cross-scope section.
-- Restructure section definitions into self-contained, togglable
-  **Section Packs** — a plugin-like format others can contribute to.
-- Ship the previously agreed cross-cutting upgrades (provenance, freshness,
-  sensitivity, relations, staleness) as core capabilities every pack inherits.
-- Ship five new packs (media, timeline, routines, setup, places) as proof of
-  the format.
+## Non-Goals (explicit cuts from v1 of this spec)
 
-## Non-Goals
-
-- Runtime installation of third-party packs from a remote registry
-  (marketplace *UI* is designed for, backend distribution is future work).
-- Arbitrary third-party Python execution. v1 packs are declarative;
-  hooks remain core-authored.
-- Migrating existing bespoke React editors to the generic renderer
-  (they stay; the generic renderer is for new packs).
+- Goal milestones/progress tracking — task management, not context.
+- Generic entity relations / `resolve_related` — hybrid search already
+  connects related entries semantically; no graph layer.
+- Sensitivity/visibility levels — speculative; revisit on real need.
+- `review_stale` tool — surfacing `updated_at` covers it.
+- Scope-filter DSL in manifests — one consumer (goals) bakes its own rule.
+- Marketplace/versioning chrome, CI pipelines, remote pack installation.
+- timeline / routines / setup / places packs — deferred to a "when wanted"
+  list; the pack format makes each a later one-manifest job.
 
 ---
 
-## Part 1 — Section Pack architecture
+## Part 1 — Section Packs
 
-### Approaches considered
-
-- **A. Pure declarative manifests (JSON).** Safest and easiest to
-  contribute; cannot express custom behaviors (advisories, capture
-  heuristics beyond keywords).
-- **B. Python plugin classes.** Full power; but arbitrary code from
-  contributors is a trust and review burden, and overkill for what
-  sections actually vary in (fields, enums, scopes, UI hints).
-- **C. Hybrid (chosen).** Declarative `manifest.json` is the contract and
-  the only thing community packs need. Optional `hooks.py` (core-reviewed,
-  in-repo only for v1) for advanced behavior. Loader validates manifests
-  against a published meta-schema.
-
-Rationale: everything the current seven sections differ in is already
-data-shaped (defaults, id-lists, entity fields, enums, scope fields). C keeps
-contribution as easy as A without closing the door B opens.
-
-### Pack layout
+Each section becomes one directory with one declarative file:
 
 ```
-backend/section_packs/
-  media/
-    manifest.json     # required — the whole contract
-    hooks.py          # optional, core-authored (advisories, capture refiners)
-  goals/
-    manifest.json
-  ...
+backend/section_packs/<key>/manifest.json
 ```
 
-### Manifest format (meta-schema published as JSON Schema)
+Manifest fields (validated against a published JSON meta-schema at boot):
 
 ```json
 {
   "key": "media",
-  "version": "1.0.0",
-  "title": "Media & Reading",
-  "description": "Books, podcasts, shows, games — queue, in progress, finished.",
-  "icon": "book-open",
+  "title": "Media",
+  "description": "Books, podcasts, shows, games",
   "core": false,
   "defaults": { "items": [] },
   "id_lists": [["items", "media"]],
@@ -99,221 +70,112 @@ backend/section_packs/
       "list": "items"
     }
   },
-  "capture_triggers": ["reading", "watched", "listening to", "finished playing"],
-  "ui": {
-    "items": {
-      "title_field": "title",
-      "badges": ["kind", "status"],
-      "detail_fields": ["rating", "url", "notes", "tags"]
-    }
-  }
+  "capture_triggers": ["reading", "watched", "listening to"],
+  "ui": { "items": { "title_field": "title", "badges": ["kind", "status"] } }
 }
 ```
 
-### Loader (`section_packs.py`, new)
+Optional `hooks.py` (core-authored only, e.g. goals' "active only in
+scopes" rule). Community packs are manifest-only.
 
-At startup:
+**Loader** (`section_packs.py`): scan, validate, enforce invariants
+(unique keys/entity names/id-prefixes; entity lists exist in defaults;
+scope names valid), then merge into the existing `SECTION_REGISTRY`,
+`ENTITY_SCHEMA`, and `persona_store.DEFAULTS` — downstream code unchanged.
+Invalid pack → warn and skip; never a boot failure. Entity-name collision
+between two packs → fail fast (packaging bug).
 
-1. Scan `backend/section_packs/*/manifest.json`.
-2. Validate each against the meta-schema (jsonschema). Invalid pack →
-   log warning, skip pack, server still boots.
-3. Enforce invariants: unique `key`, unique entity names across all packs,
-   unique id-prefixes, every `entities[*].list` exists in `defaults`,
-   scope names ∈ known global scopes.
-4. Merge into the existing runtime structures — `SECTION_REGISTRY`,
-   `ENTITY_SCHEMA`, `persona_store.DEFAULTS` — so **downstream code does not
-   change**. `sections.py` keeps its API; its hardcoded dict becomes the
-   product of the loader.
+The seven existing sections are retro-fitted as core packs with **zero
+behavior change**, guarded by a golden test: registry + entity schema
+snapshots identical before/after.
 
-The seven existing sections are retro-fitted into pack format
-(`core: true` for profile/preferences/learning_log per `ALWAYS_ON_SECTIONS`)
-with **zero behavior change** — same keys, same defaults, same context
-fields. Golden test: registry snapshot before/after refactor is identical.
+**Toggling:** already built (`settings_store.disabled_sections`,
+`enabled_sections()`). The Sections screen stays a toggle list; it gains
+title/description/core from manifests and lists new packs. Disabled packs
+stay out of scopes, search, schema digests, and capture suggestions
+(all already keyed off `enabled_sections()` — add tests). New packs
+default off. Contribution docs: one page — copy template pack, boot
+validates it, open a PR.
 
-### Toggling / "installed packs"
+**Frontend:** `GenericSectionEditor.jsx` renders any pack's lists from
+`manifest.ui` (title + badge chips + detail fields, add/edit/remove via
+the existing write API). Existing bespoke editors stay and take
+precedence; the generic editor is only for packs without one.
 
-Already 90% built: `settings_store.disabled_sections` + `enabled_sections()`.
-Changes:
+## Part 2 — Goals
 
-- `GET /api/sections` gains manifest metadata (title, description, icon,
-  version, core) so the UI can render a proper Sections manager instead of
-  bare checkboxes.
-- Disabled pack ⇒ excluded from scopes, search, schema digest, capture
-  suggestions (all already keyed off `enabled_sections()` — verify + test).
-- New packs default **off** for existing users, **on** choice during
-  onboarding later. Core packs remain force-on.
-
-### Frontend: generic section renderer
-
-New `GenericSectionEditor.jsx` driven by `manifest.ui`: renders each id-list
-as cards (title field + badge chips + detail fields), add/edit/remove via
-existing `/api` write path. New packs get a usable editor for free; bespoke
-editors (Profile, Lifestyle, …) remain and take precedence when present.
-
-### Contribution story
-
-`docs/CONTRIBUTING-PACKS.md`: copy a template pack, edit `manifest.json`,
-run `python scripts/validate_pack.py section_packs/yourpack`, open a PR.
-CI validates manifests against the meta-schema.
-
----
-
-## Part 2 — Goals: first-class section pack
-
-New pack `goals` (replaces both `profile.career_aspirations` and the dormant
-`profile.goals_and_careers`).
-
-### Entities
+New core-adjacent pack `goals` (default **on**), one entity:
 
 ```
 goal:
   required: title
-  optional: type, status, target_date, why, milestones, related, notes
+  optional: type, status, target_date, why, notes
   valid_values:
     type:   [career, learning, personal, health, financial, creative]
     status: [active, achieved, paused, dropped]   (default: active)
   identifier: title
-
-goal_milestone:                      # parent-keyed, like work_highlight
-  required: [goal_title, milestone]
-  optional: [done]
-  identifier: milestone, parent: goal_title
 ```
 
-### Scope presence (the "bigger presence" requirement)
+**Scope presence** (the point of the promotion), via a small goals hook —
+no generic filter mechanism:
 
-| Scope        | What goals contributes                          |
-| ------------ | ----------------------------------------------- |
-| minimal      | titles of active goals (stub form, ≤5)          |
-| professional | active career + learning goals, full            |
-| personal     | active personal / health / creative goals, full |
-| learning     | active learning goals, full                     |
-| `goals`      | everything (free — section keys are scopes)     |
+| Scope                           | Contribution                        |
+| ------------------------------- | ----------------------------------- |
+| minimal                         | titles of active goals (stubs, ≤5)  |
+| professional/personal/learning  | active goals in full                |
+| `goals` (free, section scope)   | everything incl. achieved/dropped   |
 
-Scope filtering by `type` is a pack-level need the manifest expresses via
-`scope_contributions` entries of the form
-`{"list": "goals", "filter": {"type": ["career", "learning"]}, "status": ["active"]}` —
-a small, generic extension of context-field selection (any pack can use it).
+Non-active goals never spend scope tokens except in the `goals` scope.
 
-### Migration & back-compat
+**Migration:** `career_aspirations` strings and `goals_and_careers` items
+→ `goal {title, type: career}`; idempotent; the two profile lists are
+removed from defaults and scope fields. `career_aspiration` remains as a
+write alias that creates a `goal(type=career)` and returns an advisory
+naming the new entity. README scope-token table re-measured.
 
-- One-off migration (extends existing migrate script): each
-  `career_aspirations` string and each `goals_and_careers` item →
-  `goal {title, type: career, status: active, source: migrated}`.
-- `career_aspiration` entity stays as a **write alias**: adds route to a
-  `goal` with `type: career` (server-side rewrite + advisory naming the new
-  entity). Reads of profile no longer include the two removed lists.
-- `profile.context_fields` drops `career_aspirations`; scope budgets
-  re-measured in README table.
+## Part 3 — Freshness (minimal)
 
-### Goal linkage
+- Unify on the per-entry change time already maintained for the search
+  index; expose `updated_at` in `get_entity` results and `detail="titles"`
+  stubs. Not in scope payloads (token cost).
+- `top_of_mind` entries older than 30 days: reads append one advisory
+  line (existing advisory pattern). No new tools, no auto-delete.
 
-`project`, `current_learning`, and `learning_entry` gain optional
-`related_goals` (goal ids or titles, resolved to ids on save) — implemented
-via the generic relations mechanism in Part 3, goals is just the first user.
+## Part 4 — Media pack
 
----
+First add-on pack, manifest above, default off. Proves loader, generic
+editor, capture triggers, and search indexing end-to-end. Further pack
+ideas (timeline, routines, setup, places) live in the README roadmap as
+one-liners; each is a later single-manifest addition if demand shows up.
 
-## Part 3 — Cross-cutting core upgrades
+## Storage / data flow
 
-All implemented in core (`persona_store` / read paths), inherited by every
-pack automatically.
-
-### 3.1 Provenance & freshness
-
-Every id-carrying entry gets `_meta: {source, created_at, updated_at}`;
-`source ∈ {user, ai, migrated}` (writes via MCP tools → `ai`, via web UI →
-`user`). Reads: `_meta` is **excluded** from scope payloads by default
-(token cost), included in `get_entity` and `get_raw`. `search_context`
-already tracks per-entry change times — unify on `_meta.updated_at`.
-
-### 3.2 Sensitivity
-
-Optional `visibility: normal | sensitive` on any entry (default normal).
-Sensitive entries are excluded from `get_context` scope payloads unless
-`include_sensitive=true`; always visible in the web UI (badge + filter);
-`search_context` returns them only with the same flag. Token-level
-visibility ceilings are future work, noted not designed.
-
-### 3.3 Generic relations
-
-Optional `related: [id, ...]` on any entry, validated to existing ids on
-save (unknown id → advisory, saved anyway — links may be typed before their
-target). `get_entity` gains `resolve_related=true` to inline
-`{id, title}` stubs for one hop. This mechanism carries goal↔project↔learning
-links (Part 2) with zero goal-specific code.
-
-### 3.4 Staleness & review
-
-- `top_of_mind` items older than 30 days: reads append a one-line advisory
-  ("3 top-of-mind items are >30 days old — review?"), matching the existing
-  duplicate-advisory pattern. No auto-delete.
-- New tool `review_stale(days=180, sections=None)`: returns oldest-untouched
-  entries (id, title, updated_at) across enabled sections, capped at 25 —
-  the "is this still true?" workflow. Also surfaces `active` goals whose
-  `target_date` has passed.
-
----
-
-## Part 4 — New section packs (v1 set)
-
-Each is one manifest, default-off, personal-scope unless noted. Sketches
-(full field lists finalized per-pack at implementation):
-
-| Pack       | Key entities                                                                                                       | Scopes               |
-| ---------- | ------------------------------------------------------------------------------------------------------------------ | -------------------- |
-| `media`    | `media_item` (title, kind, status, rating, url, notes, tags)                                                        | personal             |
-| `timeline` | `life_event` (title, date, category: move/work/education/personal/health/milestone, details)                        | personal, full       |
-| `routines` | `routine` (name, cadence, time_window, kind: class/work/fitness/social/other); `availability` (update-only singleton) | personal, minimal(titles) |
-| `setup`    | `gear` (name, category: computer/phone/peripheral/software/subscription/home, details, since)                       | professional, personal |
-| `places`   | `place` (name, relation: lived/visited/wishlist/frequent, period, notes); `travel_prefs` (singleton)                | personal             |
-
-Ship order: **media first** (highest conversational value, exercises every
-manifest feature), then timeline, routines, setup, places.
-
----
-
-## Data flow / storage
-
-No schema changes to Postgres: packs are new `file_type` rows in
-`persona_data`, exactly like existing sections. Search indexing is already
-generic over `id_lists`. Export/import includes enabled packs' file types;
-import of a pack the user has disabled auto-enables it (with response note).
+No Postgres schema changes: packs are `file_type` rows like any section.
+Search indexing is already generic over `id_lists`. Export/import covers
+enabled packs; importing data for a disabled pack auto-enables it (noted
+in the response).
 
 ## Error handling
 
-- Invalid manifest → pack skipped at boot with warning; never a crash.
+- Invalid manifest → skip + warning at boot.
 - Write to a disabled pack's entity → error naming the pack and how to
-  enable it (Sections manager / `enable_sections` setting).
-- Entity name collisions across packs → boot-time error listing both packs
-  (fail fast; this is a packaging bug, not user data).
-- Migration is idempotent (skips goals already carrying `source: migrated`).
+  enable it.
+- Migration idempotent (skips already-migrated goals).
 
 ## Testing
 
-- Meta-schema validation tests (every shipped manifest validates; mutation
-  tests for each invariant).
-- Golden registry snapshot: pre-refactor `SECTION_REGISTRY`/`ENTITY_SCHEMA`
-  == post-refactor loader output for the seven core packs.
+- Meta-schema validation tests for every shipped manifest + invariant
+  mutation tests.
+- Golden registry/entity-schema snapshot across the retrofit.
 - Goals migration round-trip on fixture personas.
-- Scope-budget regression: token counts per scope before/after goals move.
-- Generic renderer smoke test via existing frontend test setup, if any;
-  otherwise manual checklist in the PR.
+- Scope-token regression: measure minimal/professional/personal/learning
+  before/after goals (guard the context-provider budget).
 
 ## Phasing
 
-1. **Pack loader + retrofit** (pure refactor, golden-tested, no user-visible change)
-2. **Goals pack + migration + aliases** (user-visible headline)
-3. **Cross-cutting core**: `_meta`, sensitivity, relations, staleness advisories, `review_stale`
-4. **New packs**: media → timeline → routines → setup → places
-5. **Sections manager UI** (marketplace-style toggle screen) + generic renderer + contribution docs
+1. **Pack loader + retrofit** — pure refactor, golden-tested.
+2. **Goals pack + migration + alias** — the user-visible headline.
+3. **Media pack + GenericSectionEditor** — proves the format end-to-end.
+4. **Freshness touches** — `updated_at` surfacing + top_of_mind advisory.
 
-Each phase is independently shippable in that order; 3 and 4 can swap if
-goals linkage is deferred.
-
-## Open questions (non-blocking, decide at implementation)
-
-- Whether `goal_milestone.done` flips `goal.status` suggestions ("all
-  milestones done — mark achieved?") — advisory only, cheap to add.
-- Whether `minimal` scope includes routines titles by default or only via
-  explicit opt-in (token budget measurement will decide).
+Each independently shippable, in order.
