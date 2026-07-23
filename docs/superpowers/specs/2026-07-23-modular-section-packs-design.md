@@ -141,12 +141,54 @@ naming the new entity. README scope-token table re-measured.
 - `top_of_mind` entries older than 30 days: reads append one advisory
   line (existing advisory pattern). No new tools, no auto-delete.
 
-## Part 4 — Media pack
+## Part 4 — First add-on packs: media and aesthetics
 
-First add-on pack, manifest above, default off. Proves loader, generic
-editor, capture triggers, and search indexing end-to-end. Further pack
-ideas (timeline, routines, setup, places) live in the README roadmap as
-one-liners; each is a later single-manifest addition if demand shows up.
+**Media** — manifest above, default off. Proves loader, generic editor,
+capture triggers, and search indexing end-to-end.
+
+**Aesthetics** — the user's taste in how things look, for design work,
+image generation, and recommendations. One entity keeps it flat; the
+`stance` field folds likes and dislikes into a single list:
+
+```
+aesthetic:
+  required: name          (e.g. "Minimalist UI", "Warm neutrals", "Y2K")
+  optional: domain, stance, notes, references
+  valid_values:
+    domain: [ui, graphic, typography, color, illustration, photography,
+             fashion, interior, general]
+    stance: [love, like, avoid]   (default: like)
+  identifier: name
+scope_contributions: personal (plus the free `aesthetics` section scope)
+capture_triggers: ["aesthetic", "design style", "vibe", "looks like",
+                   "color palette"]
+```
+
+**User-friendly input — `ui.suggestions`:** the manifest `ui` block gains
+one optional generic field: per-entity suggestion lists, e.g.
+
+```json
+"ui": {
+  "styles": {
+    "title_field": "name", "badges": ["domain", "stance"],
+    "suggestions": {
+      "name": ["Minimalist", "Maximalist", "Brutalist", "Pastel",
+               "Monochrome", "Retro-futurism", "Art deco", "Scandinavian",
+               "Y2K", "Editorial", "Hand-drawn", "Glassmorphism"]
+    }
+  }
+}
+```
+
+`GenericSectionEditor` renders suggestions as tappable chips (tap = add,
+with a Love/Avoid stance toggle; free text always available). The
+mechanism is generic — any pack can offer suggestions on any free-text
+field — so aesthetics needs no bespoke editor. No image/moodboard storage
+(cut as overengineering); visual references go in `references` links.
+
+Further pack ideas (timeline, routines, setup, places) live in the README
+roadmap as one-liners; each is a later single-manifest addition if demand
+shows up.
 
 ## Storage / data flow
 
@@ -175,7 +217,8 @@ in the response).
 
 1. **Pack loader + retrofit** — pure refactor, golden-tested.
 2. **Goals pack + migration + alias** — the user-visible headline.
-3. **Media pack + GenericSectionEditor** — proves the format end-to-end.
+3. **Media + Aesthetics packs + GenericSectionEditor** — proves the
+   format end-to-end, including chip suggestions (`ui.suggestions`).
 4. **Freshness touches** — `updated_at` surfacing + top_of_mind advisory.
 
 Each independently shippable, in order.
