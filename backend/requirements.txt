@@ -33,3 +33,6 @@ bcrypt==5.0.0
 
 # Embedding providers
 httpx==0.28.1
+
+# Section pack manifest validation (boot-time)
+jsonschema==4.25.1
