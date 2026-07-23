@@ -810,8 +810,8 @@ def get_scoped_context(
     
     tokens = [scope] if isinstance(scope, str) else list(scope)
     if not include_inactive:
-        # Goals hook (1/2): the goals section scope shows every status.
-        exempt = frozenset({"goals"}) if "goals" in tokens else frozenset()
+        # Goals/media hook (1/2): these section scopes show every status.
+        exempt = frozenset({"goals", "media"} & set(tokens))
         result = _filter_inactive(result, exempt)
 
     if detail == "titles":
@@ -1003,7 +1003,8 @@ def _filter_inactive(data: dict, exempt: frozenset = frozenset()) -> dict:
                 for item in value:
                     if isinstance(item, dict):
                         status = item.get("status", "active")
-                        if status in ["active", "open", "exploring", "planning", None, "completed"]:
+                        if status in ["active", "open", "exploring", "planning", None, "completed",
+                                       "want", "in_progress", "finished"]:
                             active_items.append(item)
                     else:
                         active_items.append(item)
@@ -2405,8 +2406,8 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return f"✅ Removed coursework topic: {course}"
             return f"❌ Coursework topic not found"
 
-    elif _generic_entity_spec(entity) is not None:
-        section, list_key, espec = _generic_entity_spec(entity)
+    elif (_gspec := _generic_entity_spec(entity)) is not None:
+        section, list_key, espec = _gspec
         blob = load_json(f"{section}.json")
         items = blob.setdefault(list_key, [])
         ident = espec["identifier"]

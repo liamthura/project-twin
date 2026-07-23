@@ -149,7 +149,6 @@ export default function App() {
   const [learningLog, setLearningLog] = useState({});
 
   const [disabledSections, setDisabledSections] = useState([]);
-  const [enabledOptins, setEnabledOptins] = useState([]);
   const [packs, setPacks] = useState([]);
   // Tab count changes when sections are toggled, so re-measure the strip then.
   const [tabStripRef, tabStripEdges] = useEdgeFade([disabledSections, packs]);
@@ -221,7 +220,6 @@ export default function App() {
       const s = await api("/settings");
       setDisabledSections(s.disabled_sections || []);
       setPacks(s.packs || []);
-      setEnabledOptins(s.enabled_sections || []);
     } catch (_) {
       // non-fatal: default to all sections enabled
     }

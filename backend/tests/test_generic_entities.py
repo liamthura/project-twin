@@ -62,3 +62,26 @@ def test_generic_entities_get_dupe_advisory_mapping(clean_database):
 def test_unknown_entity_still_errors(clean_database, as_user):
     msg = server.execute_modify("add", "flying_carpet", {"name": "x"})
     assert msg.startswith("❌")
+
+
+def test_media_statuses_survive_personal_scope(clean_database, as_user):
+    _enable("media")
+    for title, status in [("A", "want"), ("B", "in_progress"), ("C", "finished"), ("D", "dropped")]:
+        server.execute_modify("add", "media_item", {"title": title, "status": status})
+    ctx = server.get_scoped_context("personal")["context"]
+    titles = {i["title"] for i in ctx["media"]["items"]}
+    assert titles == {"A", "B", "C"}  # dropped filtered, everything else visible
+
+
+def test_media_section_scope_shows_dropped(clean_database, as_user):
+    _enable("media")
+    server.execute_modify("add", "media_item", {"title": "D", "status": "dropped"})
+    ctx = server.get_scoped_context("media")["context"]
+    assert {i["title"] for i in ctx["media"]["items"]} == {"D"}
+
+
+def test_aesthetic_avoid_survives_personal_scope(clean_database, as_user):
+    _enable("aesthetics")
+    server.execute_modify("add", "aesthetic", {"name": "Corporate memphis", "stance": "avoid"})
+    ctx = server.get_scoped_context("personal")["context"]
+    assert ctx["aesthetics"]["styles"][0]["stance"] == "avoid"
