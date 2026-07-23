@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { Plus, Trash2, ChevronDown } from "lucide-react";
+import {
+  Plus, Trash2, ChevronDown,
+  Heart, ThumbsUp, Ban, Bookmark, Play, Check, X, Pause, CircleDot,
+  BookOpen, Newspaper, Mic, Tv, Clapperboard, Gamepad2, Video, Music,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,22 +21,66 @@ const LONG_TEXT_FIELDS = new Set(["notes", "why", "description"]);
 // clears it (all generic enum fields are optional).
 const SEGMENTED_MAX = 4;
 
+// Semantic icon + color pairing for well-known enum values, so state reads
+// at a glance. Accessibility rule: color is never the only signal — every
+// value keeps its text label and gains an icon; tints meet AA in both themes.
+const VALUE_META = {
+  // aesthetics stance
+  love: { icon: Heart, tone: "text-rose-600 dark:text-rose-400",
+          chip: "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300" },
+  like: { icon: ThumbsUp },
+  avoid: { icon: Ban, tone: "text-amber-700 dark:text-amber-400",
+           chip: "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
+  // media + goal status
+  want: { icon: Bookmark },
+  in_progress: { icon: Play },
+  finished: { icon: Check, tone: "text-emerald-700 dark:text-emerald-400",
+              chip: "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" },
+  achieved: { icon: Check, tone: "text-emerald-700 dark:text-emerald-400",
+              chip: "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" },
+  active: { icon: CircleDot, tone: "text-emerald-700 dark:text-emerald-400",
+            chip: "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" },
+  paused: { icon: Pause, tone: "text-amber-700 dark:text-amber-400",
+            chip: "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
+  dropped: { icon: X },
+  // media kinds (icon only — categorical, no status semantics)
+  book: { icon: BookOpen },
+  article: { icon: Newspaper },
+  podcast: { icon: Mic },
+  show: { icon: Tv },
+  film: { icon: Clapperboard },
+  game: { icon: Gamepad2 },
+  video: { icon: Video },
+  music: { icon: Music },
+};
+
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
+
+function ValueIcon({ value, className }) {
+  const Icon = VALUE_META[value]?.icon;
+  return Icon ? <Icon aria-hidden="true" className={className} /> : null;
+}
+
 function SegmentedControl({ options, value, onChange }) {
   return (
     <div className="inline-flex rounded-lg bg-muted p-[3px]">
       {options.map((v) => {
         const active = value === v;
+        const tone = active ? VALUE_META[v]?.tone : undefined;
         return (
           <button
             key={v}
             type="button"
+            aria-pressed={active}
             onClick={() => onChange(active ? undefined : v)}
-            className={`rounded-md px-3 py-1 text-sm capitalize transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm capitalize transition-colors ${FOCUS_RING} ${
               active
-                ? "bg-background font-medium text-foreground shadow-sm"
+                ? `bg-background font-medium shadow-sm ${tone || "text-foreground"}`
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
+            <ValueIcon value={v} className="h-3.5 w-3.5" />
             {v.replace(/_/g, " ")}
           </button>
         );
@@ -46,17 +94,20 @@ function ChipRadioGroup({ options, value, onChange }) {
     <div className="flex flex-wrap gap-1.5">
       {options.map((v) => {
         const active = value === v;
+        const chip = active ? VALUE_META[v]?.chip : undefined;
         return (
           <button
             key={v}
             type="button"
+            aria-pressed={active}
             onClick={() => onChange(active ? undefined : v)}
-            className={`rounded-full border px-3 py-1 text-xs capitalize transition-colors ${
+            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs capitalize transition-colors ${FOCUS_RING} ${
               active
-                ? "border-primary bg-accent font-medium text-accent-foreground"
+                ? chip || "border-primary bg-accent font-medium text-accent-foreground"
                 : "border-input bg-background text-muted-foreground hover:bg-muted/50"
             }`}
           >
+            <ValueIcon value={v} className="h-3 w-3" />
             {v.replace(/_/g, " ")}
           </button>
         );
@@ -180,7 +231,7 @@ function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowC
                           key={s}
                           type="button"
                           onClick={() => setDraft({ ...draft, [titleField]: s })}
-                          className="rounded-full border border-input bg-background px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-muted/50"
+                          className={`rounded-full border border-input bg-background px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-muted/50 ${FOCUS_RING}`}
                         >
                           {s}
                         </button>
@@ -226,7 +277,7 @@ function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowC
               .map((s) => (
                 <button key={s} type="button"
                   onClick={() => addItem({ [titleField]: s })}
-                  className="rounded-full border border-input bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted/50">
+                  className={`rounded-full border border-input bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted/50 ${FOCUS_RING}`}>
                   + {s}
                 </button>
               ))}
@@ -246,11 +297,20 @@ function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowC
                 <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expanded[idx] ? "" : "-rotate-90"}`} />
                 <span className="truncate text-sm font-medium">{item[titleField]}</span>
                 <span className="flex flex-1 items-center gap-1.5">
-                  {badges.filter((b) => item[b]).map((b) => (
-                    <Badge key={b} variant="secondary" className="text-[10px]">
-                      {String(item[b]).replace(/_/g, " ")}
-                    </Badge>
-                  ))}
+                  {badges.filter((b) => item[b]).map((b) => {
+                    const value = String(item[b]);
+                    const chip = VALUE_META[value]?.chip;
+                    return (
+                      <Badge
+                        key={b}
+                        variant={chip ? "outline" : "secondary"}
+                        className={`gap-1 text-[10px] ${chip || ""}`}
+                      >
+                        <ValueIcon value={value} className="h-2.5 w-2.5" />
+                        {value.replace(/_/g, " ")}
+                      </Badge>
+                    );
+                  })}
                 </span>
                 <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0"
                   onClick={(e) => { e.stopPropagation(); removeItem(idx); }}>
