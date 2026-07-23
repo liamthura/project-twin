@@ -72,10 +72,10 @@ def test_resolve_scope_fields_full_is_all():
 
 def test_resolve_scope_fields_preserves_legacy_key_order():
     expected = {
-        "minimal": ["preferences", "profile", "projects", "goals"],
-        "professional": ["preferences", "profile", "knowledge", "projects", "goals"],
-        "personal": ["preferences", "profile", "lifestyle", "knowledge", "circle", "goals"],
-        "learning": ["preferences", "profile", "knowledge", "projects", "learning_log", "goals"],
+        "minimal": ["preferences", "profile", "goals", "projects"],
+        "professional": ["preferences", "profile", "goals", "knowledge", "projects"],
+        "personal": ["preferences", "profile", "goals", "lifestyle", "knowledge", "circle"],
+        "learning": ["preferences", "profile", "goals", "knowledge", "projects", "learning_log"],
     }
     for scope, keys in expected.items():
         assert list(server._resolve_scope_fields(scope).keys()) == keys

@@ -684,7 +684,7 @@ def get_field(data: dict, *field_names, default=None):
 
 # Canonical file order for context output — reproduces the historical
 # CONTEXT_SCOPES key order exactly (preferences first, then the rest).
-_CONTEXT_FILE_ORDER = ("preferences", "profile", "lifestyle", "knowledge", "circle", "projects", "learning_log")
+_CONTEXT_FILE_ORDER = ("preferences", "profile", "goals", "lifestyle", "knowledge", "circle", "projects", "learning_log")
 
 
 def _merge_fields(target: dict, addition: dict) -> None:
@@ -808,11 +808,27 @@ def get_scoped_context(
     elif "learning_log" in result and topic and limit and limit > 0:
         result = _filter_learning_log_by_time(result, None, limit)
     
+    tokens = [scope] if isinstance(scope, str) else list(scope)
     if not include_inactive:
-        result = _filter_inactive(result)
+        # Goals hook (1/2): the goals section scope shows every status.
+        exempt = frozenset({"goals"}) if "goals" in tokens else frozenset()
+        result = _filter_inactive(result, exempt)
 
     if detail == "titles":
         result = _stub_titles(result)
+
+    # Goals hook (2/2): when no goal-bearing scope was requested (i.e. goals
+    # rode in via minimal only), reduce to ≤5 active-goal {id, title} stubs.
+    _goals_full_tokens = {"professional", "personal", "learning", "goals", "full"}
+    if "goals" in result and not any(t in _goals_full_tokens for t in tokens):
+        glist = result["goals"].get("goals")
+        if isinstance(glist, list):
+            import search_index
+            result["goals"]["goals"] = [
+                {"id": g.get("id"), "title": search_index.flatten_entity(g)[0]}
+                if isinstance(g, dict) else g
+                for g in glist[:5]
+            ]
 
     scope_label = scope if isinstance(scope, str) else ",".join(scope)
     scope_desc = (
@@ -972,12 +988,13 @@ def _stub_titles(data: dict) -> dict:
                 ]
     return data
 
-def _filter_inactive(data: dict) -> dict:
-    """Remove inactive/paused items from context."""
+def _filter_inactive(data: dict, exempt: frozenset = frozenset()) -> dict:
+    """Remove inactive/paused items from context. Sections named in `exempt`
+    pass through unfiltered (the goals section scope shows every status)."""
     filtered = {}
-    
+
     for key, section in data.items():
-        if not isinstance(section, dict):
+        if key in exempt or not isinstance(section, dict):
             filtered[key] = section
             continue
         filtered[key] = {}
