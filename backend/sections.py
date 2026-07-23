@@ -67,9 +67,19 @@ SECTION_REGISTRY = {
 # Distinct from ALWAYS_ON (the always-included preferences *field* bundle above).
 ALWAYS_ON_SECTIONS = frozenset(k for k, m in _MANIFESTS.items() if m["core"])
 
+# Packs marked default_enabled: false are opt-in (settings.enabled_sections).
+DEFAULT_ENABLED = {key: m.get("default_enabled", True) for key, m in _MANIFESTS.items()}
+
 # Display metadata for the Sections manager UI (pack order preserved).
 PACK_META = {
-    key: {"title": m["title"], "description": m["description"], "core": m["core"]}
+    key: {
+        "title": m["title"],
+        "description": m["description"],
+        "core": m["core"],
+        "default_enabled": m.get("default_enabled", True),
+        "ui": m.get("ui", {}),
+        "entities": m["entities"],
+    }
     for key, m in _MANIFESTS.items()
 }
 

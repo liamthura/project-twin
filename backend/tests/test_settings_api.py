@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 import main
+import sections
 
 
 def _client_and_auth():
@@ -52,6 +53,9 @@ def test_get_settings_includes_pack_metadata(clean_database):
         "title": "Profile",
         "description": "Identity, work, education, contact",
         "core": True,
+        "default_enabled": True,
+        "ui": sections.PACK_META["profile"]["ui"],
+        "entities": sections.PACK_META["profile"]["entities"],
         "enabled": True,
     }
     # disabling a toggleable pack is reflected in `enabled`
