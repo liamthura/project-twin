@@ -1,0 +1,20 @@
+{
+  "key": "example",
+  "title": "Example",
+  "description": "One-line description shown in the Sections manager",
+  "core": false,
+  "position": 100,
+  "defaults": { "items": [] },
+  "id_lists": [["items", "example"]],
+  "scope_contributions": { "personal": ["items"] },
+  "entities": {
+    "example_item": {
+      "actions": ["add", "update", "remove"],
+      "required": ["name"],
+      "optional": ["notes", "tags"],
+      "identifier": "name"
+    }
+  },
+  "capture_triggers": ["example phrase"],
+  "ui": { "items": { "title_field": "name", "badges": [], "detail_fields": ["notes", "tags"] } }
+}
