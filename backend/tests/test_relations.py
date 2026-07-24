@@ -261,3 +261,339 @@ def test_get_raw_keeps_related(as_user):
     raw = json.loads(server.get_raw.fn("goals"))
 
     assert raw["goals"][0]["related"] == ["goal_deadbeef"]
+
+
+# ---------------------------------------------------------------------------
+# Task 2: action="link"/"unlink" -- entity-agnostic explicit relation writes
+# ---------------------------------------------------------------------------
+
+def test_link_happy_path_names_titles(as_user):
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    out = server.execute_modify("link", "link", {"entity_id": gid, "related": [pid]})
+
+    assert out.startswith("✅")
+    assert pid in out and "Ledger" in out
+    stored = persona_store.load("goals")["goals"][0]
+    assert stored["related"] == [pid]
+
+
+def test_link_entity_arg_is_ignored(as_user):
+    # The `entity` argument passed to persona_modify/execute_modify is
+    # completely ignored for link/unlink -- dispatch is on `action` alone.
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    out = server.execute_modify("link", "anything_goes_here",
+                                {"entity_id": gid, "related": [pid]})
+
+    assert out.startswith("✅")
+    assert persona_store.load("goals")["goals"][0]["related"] == [pid]
+
+
+def test_link_single_target_string_accepted(as_user):
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    out = server.execute_modify("link", "link", {"entity_id": gid, "related": pid})
+
+    assert out.startswith("✅")
+    assert persona_store.load("goals")["goals"][0]["related"] == [pid]
+
+
+def test_link_unknown_source_prefix(as_user):
+    out = server.execute_modify("link", "link", {"entity_id": "bogus_1234", "related": ["x"]})
+    assert out.startswith("❌")
+    assert "prefix" in out.lower()
+
+
+def test_link_source_not_found(as_user):
+    out = server.execute_modify("link", "link",
+                                {"entity_id": "goal_deadbeef", "related": ["x"]})
+    assert out.startswith("❌")
+    assert "not found" in out.lower()
+
+
+def test_link_source_in_disabled_section(as_user):
+    import settings_store
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+    settings_store.set_disabled_sections(["goals"])
+
+    out = server.execute_modify("link", "link", {"entity_id": gid, "related": ["project_x"]})
+
+    assert out.startswith("❌")
+    assert "disabled" in out.lower()
+
+
+def test_link_unknown_target_prefix(as_user):
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    out = server.execute_modify("link", "link", {"entity_id": gid, "related": ["bogus_1234"]})
+
+    assert out.startswith("❌")
+    assert "bogus_1234" in out
+
+
+def test_link_target_not_found(as_user):
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    out = server.execute_modify("link", "link", {"entity_id": gid, "related": ["project_deadbeef"]})
+
+    assert out.startswith("❌")
+    assert "project_deadbeef" in out
+    assert persona_store.load("goals")["goals"][0].get("related") in (None, [])
+
+
+def test_link_target_in_disabled_section(as_user):
+    import settings_store
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+    settings_store.set_disabled_sections(["projects"])
+
+    out = server.execute_modify("link", "link", {"entity_id": gid, "related": [pid]})
+
+    assert out.startswith("❌")
+    assert "disabled" in out.lower()
+    assert persona_store.load("goals")["goals"][0].get("related") in (None, [])
+
+
+def test_link_self_rejected(as_user):
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    out = server.execute_modify("link", "link", {"entity_id": gid, "related": [gid]})
+
+    assert out.startswith("❌")
+    assert gid in out
+    assert persona_store.load("goals")["goals"][0].get("related") in (None, [])
+
+
+def test_link_first_offender_named_and_nothing_partially_linked(as_user):
+    # Second target is bad -- validation must fail before either target is
+    # written (all-or-nothing), naming the offending target.
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    out = server.execute_modify("link", "link",
+                                {"entity_id": gid, "related": [pid, "project_deadbeef"]})
+
+    assert out.startswith("❌")
+    assert "project_deadbeef" in out
+    assert persona_store.load("goals")["goals"][0].get("related") in (None, [])
+
+
+def test_link_dedupes_across_calls(as_user):
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    server.execute_modify("link", "link", {"entity_id": gid, "related": [pid]})
+    out = server.execute_modify("link", "link", {"entity_id": gid, "related": [pid]})
+
+    assert out.startswith("✅")
+    assert persona_store.load("goals")["goals"][0]["related"] == [pid]
+
+
+def test_link_dedupes_within_one_call(as_user):
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    server.execute_modify("link", "link", {"entity_id": gid, "related": [pid, pid]})
+
+    assert persona_store.load("goals")["goals"][0]["related"] == [pid]
+
+
+def test_link_cap_at_ten(as_user):
+    for i in range(10):
+        server.execute_modify("add", "project", {"name": f"Proj{i}", "description": "x"})
+    project_ids = [p["id"] for p in server.load_json("projects.json")["projects"]]
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    out = server.execute_modify("link", "link", {"entity_id": gid, "related": project_ids})
+    assert out.startswith("✅")
+    assert len(persona_store.load("goals")["goals"][0]["related"]) == 10
+
+    server.execute_modify("add", "project", {"name": "Eleventh", "description": "x"})
+    eleventh = next(p["id"] for p in server.load_json("projects.json")["projects"]
+                    if p["name"] == "Eleventh")
+    out2 = server.execute_modify("link", "link", {"entity_id": gid, "related": [eleventh]})
+
+    assert out2 == "❌ related is capped at 10 links per entry"
+    assert len(persona_store.load("goals")["goals"][0]["related"]) == 10
+
+
+def test_unlink_removes_and_reports_missing(as_user):
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+    server.execute_modify("link", "link", {"entity_id": gid, "related": [pid]})
+
+    out = server.execute_modify("unlink", "link",
+                                {"entity_id": gid, "related": [pid, "project_neverlinked"]})
+
+    assert "✅" in out and pid in out
+    assert "ℹ️" in out and "project_neverlinked" in out
+    assert persona_store.load("goals")["goals"][0].get("related") in (None, [])
+
+
+def test_unlink_absent_id_only_gives_info_no_write(as_user):
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    out = server.execute_modify("unlink", "link",
+                                {"entity_id": gid, "related": ["project_neverlinked"]})
+
+    assert out.startswith("ℹ️")
+    assert "✅" not in out
+
+
+def test_unlink_no_targets_error(as_user):
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+    out = server.execute_modify("unlink", "link", {"entity_id": gid, "related": []})
+    assert out.startswith("❌")
+
+
+def test_link_one_directional_not_mirrored(as_user):
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    server.execute_modify("link", "link", {"entity_id": gid, "related": [pid]})
+
+    project = persona_store.load("projects")["projects"][0]
+    assert "related" not in project or pid not in (project.get("related") or [])
+
+
+def test_get_entity_round_trip_after_link(as_user):
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    server.execute_modify("link", "link", {"entity_id": gid, "related": [pid]})
+    out = json.loads(server.get_entity.fn(gid))
+
+    assert {"id": pid, "title": "Ledger", "section": "projects"} in out["related"]
+
+
+# ---------------------------------------------------------------------------
+# persona_batch passthrough for link/unlink ops
+# ---------------------------------------------------------------------------
+
+def test_batch_link_unlink_passthrough(as_user):
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    out = server.persona_batch.fn([
+        {"action": "link", "entity": "link", "data": {"entity_id": gid, "related": [pid]}},
+        {"action": "unlink", "entity": "link", "data": {"entity_id": gid, "related": [pid]}},
+    ])
+
+    assert "1. ✅" in out
+    assert "2. ✅" in out
+    assert persona_store.load("goals")["goals"][0].get("related") in (None, [])
+
+
+# ---------------------------------------------------------------------------
+# Cross-section relation nudge on persona_modify adds
+# ---------------------------------------------------------------------------
+
+def _seed_project_for_nudge(monkeypatch, provider):
+    monkeypatch.setattr(embeddings, "get_provider", lambda: provider)
+    persona_store.save("projects", {
+        "projects": [{"name": "Ledger", "description": "A JavaScript dashboard"}],
+        "current_learning": [], "top_of_mind": [],
+    })
+    uid = db.current_user_id.get()
+    search_index.sync_index(uid, "projects", persona_store.load("projects"), embed_sync=True)
+
+
+def test_nudge_fires_on_cross_section_fts_exact_title_match(as_user, monkeypatch):
+    # FTS-only mode (no provider): semantic_neighbors' FTS fallback is seeded
+    # with the just-written goal's own title -- an exact cross-section title
+    # match ("Ledger") is a null-distance hit, which counts per the
+    # fts_hit-truthiness rule.
+    _seed_project_for_nudge(monkeypatch, None)
+
+    out = server.persona_modify.fn("add", "goal", {"title": "Ledger", "type": "learning"})
+
+    assert "Possibly related to" in out
+    assert "Ledger" in out
+    assert "(projects)" in out
+    assert 'link them with action="link"' in out
+
+
+def test_nudge_does_not_fire_when_same_section_duplicate_advisory_fires(as_user, monkeypatch):
+    # Same-section dupe advisory wins: a project named "Ledger" resembling
+    # the existing "Ledger" project fires the dupe note, not the nudge --
+    # even though nothing here is cross-section related at all.
+    _seed_project_for_nudge(monkeypatch, None)
+
+    out = server.persona_modify.fn(
+        "add", "project", {"name": "Ledger", "description": "different words"})
+
+    assert "resembles existing" in out
+    assert "Possibly related to" not in out
+
+
+def test_nudge_does_not_fire_without_cross_section_match(as_user, monkeypatch):
+    _seed_project_for_nudge(monkeypatch, None)
+
+    out = server.persona_modify.fn(
+        "add", "goal", {"title": "Totally unrelated", "type": "learning"})
+
+    assert "Possibly related to" not in out
+
+
+def test_nudge_never_fires_on_update_or_remove(as_user, monkeypatch):
+    _seed_project_for_nudge(monkeypatch, None)
+    server.persona_modify.fn("add", "goal", {"title": "Ledger", "type": "learning"})
+
+    out = server.persona_modify.fn(
+        "update", "goal", {"title": "Ledger", "status": "active"})
+
+    assert "Possibly related to" not in out
+
+
+def test_nudge_batch_per_op_parity(as_user, monkeypatch):
+    _seed_project_for_nudge(monkeypatch, None)
+
+    out = server.persona_batch.fn([
+        {"action": "add", "entity": "goal", "data": {"title": "Ledger", "type": "learning"}},
+    ])
+
+    assert "Possibly related to" in out
+
+
+def test_nudge_probe_failure_never_breaks_write(as_user, monkeypatch):
+    _seed_project_for_nudge(monkeypatch, None)
+    monkeypatch.setattr(search_index, "semantic_neighbors",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("x")))
+
+    out = server.persona_modify.fn("add", "goal", {"title": "Ledger", "type": "learning"})
+
+    assert "Possibly related to" not in out
+    assert any(g["title"] == "Ledger" for g in persona_store.load("goals")["goals"])

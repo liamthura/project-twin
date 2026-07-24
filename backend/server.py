@@ -1230,8 +1230,116 @@ def _generic_entity_spec(entity: str):
     return section, list_key, espec
 
 
+def _execute_link(action: str, data: dict) -> str:
+    """Entity-agnostic link/unlink (action="link"/"unlink" on persona_modify):
+    writes/removes ids in a source entry's `related` array. Works on any
+    id-carrying entry via search_index.entity_location, so needs no
+    per-entity code -- the `entity` argument execute_modify was called with
+    is ignored here entirely (accept anything; entity="link" is documented
+    as the convention). Links are one-directional: stored on the source
+    entry only, never mirrored onto the target(s).
+
+    data shape: {"entity_id" (or "id"/"source"): <source id>,
+                 "related" (or "targets"): [<target id>, ...] or a single id}.
+    """
+    entity_id = get_field(data, "entity_id", "id", "source")
+    if not entity_id:
+        return "❌ link/unlink requires 'entity_id' (or 'id'/'source')"
+
+    targets = data.get("related")
+    if targets is None:
+        targets = data.get("targets")
+    if targets is None:
+        targets = []
+    if isinstance(targets, str):
+        targets = [targets]
+
+    prefixes = sorted({p for p, _ in search_index._PREFIXES})
+
+    # Source resolution mirrors _resolve_entity's loop (entity_location +
+    # blob scan) -- strict: unknown prefix / not found / disabled section
+    # all reject before either action touches anything.
+    loc = search_index.entity_location(entity_id)
+    if loc is None:
+        return ("❌ Unknown entity id prefix for '" + entity_id +
+                "'. Valid prefixes: " + ", ".join(prefixes))
+    file_type, list_key = loc
+    disabled = settings_store.get_disabled_sections()
+    if file_type in disabled:
+        return f"❌ Section '{file_type}' is disabled. Enable it in settings."
+    blob = load_json(file_type)
+    entry = next((e for e in blob.get(list_key) or []
+                  if isinstance(e, dict) and e.get("id") == entity_id), None)
+    if entry is None:
+        return f"❌ Entity {entity_id} not found in {file_type}.{list_key}"
+
+    if action == "link":
+        if not targets:
+            return "❌ link requires at least one target id ('related' or 'targets')"
+
+        enabled = settings_store.enabled_sections()
+        for tid in targets:
+            if tid == entity_id:
+                return f"❌ Cannot link {entity_id} to itself"
+            tloc = search_index.entity_location(tid)
+            if tloc is None:
+                return ("❌ Unknown entity id prefix for target '" + tid +
+                        "'. Valid prefixes: " + ", ".join(prefixes))
+            t_file_type, t_list_key = tloc
+            if t_file_type not in enabled:
+                return (f"❌ Cannot link to {tid}: section '{t_file_type}' "
+                        "is disabled.")
+            t_blob = blob if t_file_type == file_type else load_json(t_file_type)
+            t_exists = any(isinstance(e, dict) and e.get("id") == tid
+                           for e in t_blob.get(t_list_key) or [])
+            if not t_exists:
+                return f"❌ Target {tid} not found in {t_file_type}.{t_list_key}"
+
+        related = entry.setdefault("related", [])
+        seen = set(related)
+        new_ids = []
+        for tid in targets:
+            if tid not in seen:
+                seen.add(tid)
+                new_ids.append(tid)
+        if len(related) + len(new_ids) > 10:
+            return "❌ related is capped at 10 links per entry"
+        if new_ids:
+            related.extend(new_ids)
+            save_json(file_type, blob)
+
+        titles_map = search_index.resolve_titles(db.current_user_id.get(), targets)
+        named = [f'{tid} "{titles_map[tid]["title"]}"' if tid in titles_map else tid
+                 for tid in targets]
+        return f"✅ Linked {entity_id} to: {', '.join(named)}"
+
+    elif action == "unlink":
+        if not targets:
+            return "❌ unlink requires at least one target id ('related' or 'targets')"
+
+        related = entry.get("related") or []
+        removed = [tid for tid in targets if tid in related]
+        missing = [tid for tid in targets if tid not in related]
+        parts = []
+        if removed:
+            remaining = [rid for rid in related if rid not in removed]
+            if remaining:
+                entry["related"] = remaining
+            else:
+                entry.pop("related", None)
+            save_json(file_type, blob)
+            parts.append(f"✅ Unlinked {entity_id} from: {', '.join(removed)}")
+        if missing:
+            parts.append(f"ℹ️ Not linked: {', '.join(missing)}")
+        return " ".join(parts)
+
+    return f"❌ Unknown link action: {action}"
+
+
 def execute_modify(action: str, entity: str, data: dict) -> str:
     """Execute a single modify operation. Returns result message."""
+    if action in ("link", "unlink"):
+        return _execute_link(action, data)
     section = _section_for_entity(entity)
     if section is not None and section not in settings_store.enabled_sections():
         return f"❌ Section '{section}' is disabled; enable it in settings to modify it."
@@ -2560,6 +2668,14 @@ _SCHEMA_USAGE = {
         "Entities with a `parent` also need the parent's identifier in `data`, "
         "e.g. project_highlight needs {project_name, highlight}."
     ),
+    "linking": (
+        "Connect any two existing entries with persona_modify(action=\"link\", "
+        "entity=\"link\", data={entity_id: <source id>, related: [<target id>, ...]}) "
+        "-- `entity` is ignored for link/unlink (entity=\"link\" is just the "
+        "convention). action=\"unlink\" removes ids the same way. Links are "
+        "one-directional (stored on the source only) and capped at 10 per entry. "
+        "get_entity's `similar` list suggests candidate ids to link."
+    ),
 }
 
 
@@ -3528,6 +3644,93 @@ def _advisory_note(match: dict, supports_update: bool) -> str:
     return prefix + '— it may be a duplicate.'
 
 
+def _newly_written_entity_id(file_type: str, list_key: str, entity: str, data: dict):
+    """Best-effort recovery of the id just assigned to the item execute_modify
+    wrote (ids are never known ahead of a write -- persona_store assigns them
+    inside save). Keyed the same way the generic write branch itself resolves
+    an item: by the entity's ENTITY_SCHEMA identifier field. Returns None if
+    the identifier can't be read from `data` or no matching item is found
+    (never raises -- callers treat a miss as "skip the nudge")."""
+    identifier = ENTITY_SCHEMA.get(file_type, {}).get(entity, {}).get("identifier")
+    if not identifier:
+        return None
+    value = get_field(data, identifier, "name", "title")
+    if not value:
+        return None
+    items = load_json(file_type).get(list_key) or []
+    _, item = find_in_array(items, value, identifier)
+    return item.get("id") if isinstance(item, dict) else None
+
+
+def _cross_section_nudge(entity_id: str):
+    """Best-effort: does the entity just written at `entity_id` have a strong
+    cross-section neighbor worth nudging the caller to link? Probes via
+    search_index.semantic_neighbors on the entity's OWN just-synced index
+    row -- persona_store.save runs search_index.sync_index synchronously
+    (only the embedding fill is async), so by the time this runs -- always
+    AFTER execute_modify has already returned -- the title/text row already
+    exists even though the background embedding job usually hasn't landed
+    yet. That's exactly the "null source embedding" case semantic_neighbors
+    documents falling back to FTS for, seeded with the row's own title.
+
+    Applies the tight DUPLICATE_DISTANCE_CUTOFF (not semantic_neighbors' own
+    loose NEIGHBOR_DISTANCE_CUTOFF) to the vector leg. For the FTS-fallback
+    leg (distance is None), "use fts_hit truthiness" reduces to accepting
+    the hit as-is: search()'s merged query only ever produces a null vector
+    distance for a row that was NOT found via the vector CTE, and per the
+    full outer join that means it can only be present at all because it
+    matched the FTS predicate -- so a null-distance hit implies fts_hit is
+    already true by construction, in both fts-only and hybrid mode.
+
+    Never raises -- advisory-only, must never affect the write outcome.
+    """
+    try:
+        user_id = db.current_user_id.get()
+        excluded = list(set(sections.SECTION_REGISTRY) - settings_store.enabled_sections())
+        neighbors = search_index.semantic_neighbors(user_id, entity_id,
+                                                      exclude_sections=excluded)
+        for n in neighbors:
+            if n["distance"] is None or n["distance"] <= DUPLICATE_DISTANCE_CUTOFF:
+                return (f' Possibly related to {n["entity_id"]} "{n["title"]}" '
+                        f'({n["file_type"]}) — link them with action="link"')
+        return None
+    except Exception:
+        logger.warning("cross-section nudge probe failed for entity_id=%s",
+                       entity_id, exc_info=True)
+        return None
+
+
+def _augment_add_result(action: str, entity_lower: str, data: dict,
+                         match: Optional[dict], supports_update: bool,
+                         result: str) -> str:
+    """Append at most one advisory to a modify result: the pre-write
+    same-section duplicate note (`match`, computed before execute_modify ran
+    so it can't match the entity against itself) if one fired, else -- only
+    for a genuinely successful add of an ADVISORY_ENTITIES entity, and only
+    when no duplicate note fired -- a best-effort cross-section relation
+    nudge probed AFTER the write via the just-written entity's own index
+    row. The duplicate note always wins: at most one advisory per response.
+    """
+    # A stance flip already tells the caller what changed; piling an
+    # advisory on top of it is redundant noise, not new information.
+    dup_fired = (bool(match) and not result.startswith("❌")
+                 and not result.startswith("✅ Updated stance:"))
+    if dup_fired:
+        return result + _advisory_note(match, supports_update)
+    if action == "add" and entity_lower in ADVISORY_ENTITIES and result.startswith("✅"):
+        file_type, list_key = ADVISORY_ENTITIES[entity_lower]
+        try:
+            eid = _newly_written_entity_id(file_type, list_key, entity_lower, data)
+            if eid:
+                nudge = _cross_section_nudge(eid)
+                if nudge:
+                    result += nudge
+        except Exception:
+            logger.warning("cross-section nudge lookup failed for entity=%s",
+                           entity_lower, exc_info=True)
+    return result
+
+
 @mcp.tool()
 def persona_modify(
     action: Literal["add", "update", "remove"],
@@ -3568,11 +3771,7 @@ def persona_modify(
         supports_update = "update" in ENTITY_SCHEMA.get(file_type, {}).get(
             entity.lower(), {}).get("actions", [])
     result = execute_modify(action, entity, data)
-    # A stance flip already tells the caller what changed; piling an
-    # advisory on top of it is redundant noise, not new information.
-    if match and not result.startswith("❌") and not result.startswith("✅ Updated stance:"):
-        result += _advisory_note(match, supports_update)
-    return result
+    return _augment_add_result(action, entity.lower(), data, match, supports_update, result)
 
 
 @mcp.tool()
@@ -3623,10 +3822,7 @@ def persona_batch(operations: list) -> str:
             supports_update = "update" in ENTITY_SCHEMA.get(file_type, {}).get(
                 entity.lower(), {}).get("actions", [])
         result = execute_modify(action, entity, data)
-        # A stance flip already tells the caller what changed; piling an
-        # advisory on top of it is redundant noise, not new information.
-        if match and not result.startswith("❌") and not result.startswith("✅ Updated stance:"):
-            result += _advisory_note(match, supports_update)
+        result = _augment_add_result(action, entity.lower(), data, match, supports_update, result)
         results.append(f"{i+1}. {result}")
 
     return "\n".join(results)
