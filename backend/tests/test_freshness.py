@@ -62,3 +62,10 @@ def test_fresh_top_of_mind_no_advisory(clean_database, as_user):
     server.execute_modify("add", "top_of_mind", {"item": "Fresh thought"})
     payload = server.get_scoped_context("minimal")
     assert "advisories" not in payload
+
+
+def test_goals_minimal_titles_stubs_keep_updated_at(clean_database, as_user):
+    server.execute_modify("add", "goal", {"title": "Ship phase 4"})
+    ctx = server.get_scoped_context("minimal", detail="titles")["context"]
+    [stub] = ctx["goals"]["goals"]
+    assert set(stub) == {"id", "title", "updated_at"}

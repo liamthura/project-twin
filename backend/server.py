@@ -819,13 +819,18 @@ def get_scoped_context(
 
     # Goals hook (2/2): when no goal-bearing scope was requested (i.e. goals
     # rode in via minimal only), reduce to ≤5 active-goal {id, title} stubs.
+    def _goal_stub(g):
+        stub = {"id": g.get("id"), "title": search_index.flatten_entity(g)[0]}
+        if "updated_at" in g:
+            stub["updated_at"] = g["updated_at"]
+        return stub
+
     _goals_full_tokens = {"professional", "personal", "learning", "goals", "full"}
     if "goals" in result and not any(t in _goals_full_tokens for t in tokens):
         glist = result["goals"].get("goals")
         if isinstance(glist, list):
             result["goals"]["goals"] = [
-                {"id": g.get("id"), "title": search_index.flatten_entity(g)[0]}
-                if isinstance(g, dict) else g
+                _goal_stub(g) if isinstance(g, dict) else g
                 for g in glist[:5]
             ]
 

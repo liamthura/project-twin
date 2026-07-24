@@ -342,7 +342,7 @@ don't pile up duplicates.
 | ------------------------ | ---------------------------------------------------------------------------------------------- |
 | `get_context`            | Scoped context bootstrap: global scopes (minimal/professional/personal/learning/full), section scopes, topic filtering, and a `detail="titles"` stub mode (`{id, title, updated_at}`) |
 | `search_context`         | Search the persona by meaning and keywords; ranked snippets with entity ids (hybrid FTS + embeddings, or FTS-only). Optional `sections`, `limit` (≤25), `days` recency filter |
-| `get_entity`             | Fetch persona entities in full by id — a single id, or a list of up to 25 (e.g. straight from `search_context` hits); results carry `updated_at` (last change, day precision) |
+| `get_entity`             | Fetch persona entities in full by id — a single id, or a list of up to 25 (e.g. straight from `search_context` hits); each result carries `updated_at` (last change, day precision) when the entity is indexed |
 | `get_raw`                | Raw dump of persona file(s) — export/debug use                                                 |
 | `get_schema`             | Entity schema reference: valid entities, actions, and fields for writes                        |
 | `persona_modify`         | Add/update/remove items (flexible field aliases). Adds that resemble an existing entry get a duplicate advisory naming it |
@@ -475,7 +475,9 @@ the server in FTS-only mode.
 `search_context` also accepts a `days` argument to only return entries
 changed in the last N days (per-entry, in either mode) — note that a full
 backfill with `--recreate` (below) resets every entry's last-change time, so
-`days` will look empty right after one until entries change again.
+`days` will look empty right after one until entries change again; the reset
+also makes `updated_at` on `get_entity`/titles stubs read as today and suppresses
+the top-of-mind staleness advisory for 30 days, until entries change again.
 
 ### Backfilling the search index
 
