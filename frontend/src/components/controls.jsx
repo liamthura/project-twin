@@ -134,5 +134,21 @@ export function ChipRadioGroup({ options, value, onChange }) {
 // call sites don't have to.
 export function EnumControl({ options, value, onChange }) {
   const Control = options.length <= SEGMENTED_MAX ? SegmentedControl : ChipRadioGroup;
-  return <Control options={options} value={value} onChange={onChange} />;
+  const isLegacy = value && !options.includes(value);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {isLegacy && (
+        <button
+          type="button"
+          aria-pressed={true}
+          title="stored value not in the current option set"
+          onClick={() => onChange(undefined)}
+          className={`inline-flex items-center gap-1 rounded-full border border-dashed border-muted-foreground/50 bg-muted px-3 py-1 text-xs capitalize font-medium text-foreground transition-colors ${FOCUS_RING}`}
+        >
+          {String(value).replace(/_/g, " ")}
+        </button>
+      )}
+      <Control options={options} value={value} onChange={onChange} />
+    </div>
+  );
 }

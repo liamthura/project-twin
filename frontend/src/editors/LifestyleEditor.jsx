@@ -390,12 +390,12 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                             {hobby.skill_level}
                           </Badge>
                         )}
-                        {hobby.status === "inactive" && (
+                        {hobby.status && hobby.status !== "active" && (
                           <Badge
                             variant="secondary"
                             className="flex-shrink-0 opacity-60"
                           >
-                            inactive
+                            {hobby.status}
                           </Badge>
                         )}
                         <Button
