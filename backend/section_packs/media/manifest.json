@@ -1,33 +1,91 @@
 {
   "key": "media",
   "title": "Media",
-  "description": "Books, articles, podcasts, shows, and games — planned, in progress, and finished",
+  "description": "Favourites and what you're into right now: taste, not a log",
   "core": false,
   "position": 55,
   "default_enabled": false,
-  "defaults": { "items": [] },
-  "id_lists": [["items", "media"]],
-  "scope_contributions": { "personal": ["items"] },
+  "defaults": {
+    "items": []
+  },
+  "id_lists": [
+    [
+      "items",
+      "media"
+    ]
+  ],
+  "scope_contributions": {
+    "personal": [
+      "items"
+    ]
+  },
   "entities": {
     "media_item": {
-      "actions": ["add", "update", "remove"],
-      "required": ["title"],
-      "optional": ["kind", "status", "rating", "url", "notes", "tags"],
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "title"
+      ],
+      "optional": [
+        "kind",
+        "status",
+        "reaction",
+        "url",
+        "notes",
+        "tags"
+      ],
       "valid_values": {
-        "kind": ["book", "article", "podcast", "show", "film", "game", "video", "music"],
-        "status": ["want", "in_progress", "finished", "dropped"]
+        "kind": [
+          "book",
+          "article",
+          "podcast",
+          "show",
+          "film",
+          "game",
+          "video",
+          "music"
+        ],
+        "status": [
+          "want",
+          "in_progress",
+          "finished",
+          "dropped"
+        ],
+        "reaction": [
+          "loved",
+          "liked",
+          "disliked"
+        ]
       },
       "identifier": "title",
       "list": "items"
     }
   },
-  "capture_triggers": ["reading", "watched", "listening to", "finished playing"],
+  "capture_triggers": [
+    "reading",
+    "watched",
+    "listening to",
+    "finished playing"
+  ],
   "ui": {
     "items": {
       "title_field": "title",
-      "badges": ["kind", "status"],
-      "detail_fields": ["rating", "url", "notes", "tags"],
-      "array_fields": ["tags"]
+      "badges": [
+        "kind",
+        "status",
+        "reaction"
+      ],
+      "detail_fields": [
+        "url",
+        "notes",
+        "tags"
+      ],
+      "array_fields": [
+        "tags"
+      ]
     }
   }
 }

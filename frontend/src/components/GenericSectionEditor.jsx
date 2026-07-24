@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Plus, Trash2, ChevronDown,
-  Heart, ThumbsUp, Ban, Bookmark, Play, Check, X, Pause, CircleDot,
+  Heart, ThumbsUp, ThumbsDown, Ban, Bookmark, Play, Check, X, Pause, CircleDot,
   BookOpen, Newspaper, Mic, Tv, Clapperboard, Gamepad2, Video, Music,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,12 @@ const VALUE_META = {
   like: { icon: ThumbsUp },
   avoid: { icon: Ban, tone: "text-amber-700 dark:text-amber-400",
            chip: "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
+  // media reaction (taste signal, mirrors stance semantics)
+  loved: { icon: Heart, tone: "text-rose-600 dark:text-rose-400",
+           chip: "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300" },
+  liked: { icon: ThumbsUp },
+  disliked: { icon: ThumbsDown, tone: "text-amber-700 dark:text-amber-400",
+              chip: "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
   // media + goal status
   want: { icon: Bookmark },
   in_progress: { icon: Play },

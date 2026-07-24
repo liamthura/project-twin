@@ -436,9 +436,14 @@ actions, required/optional fields, examples). A sampler:
 | `value`                | add, remove         | value                                                                     |
 | `passion`              | add, remove         | passion                                                                   |
 | `learning_entry`       | add, remove         | topic, details, tags, source (optional)                                   |
-| `media_item`           | add, update, remove | title, kind, status, rating, url, notes, tags                             |
+| `media_item`           | add, update, remove | title, kind, status, reaction (loved/liked/disliked), url, notes, tags                             |
 | `aesthetic`            | add, update, remove | name, domain, stance, notes, references                                   |
 | And more...            |                     |                                                                           |
+
+Media and aesthetics are taste sections, not activity logs: capture favourites,
+current interests, and things you bounced off. The lightweight path is mentioning
+them in conversation and letting `suggest_persona_update` propose the entry;
+prune occasionally instead of data-entering.
 
 **Note:** `career_aspiration` still works as a write alias and records a goal with type "career".
 

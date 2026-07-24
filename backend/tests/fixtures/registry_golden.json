@@ -379,7 +379,7 @@
         "optional": [
           "kind",
           "status",
-          "rating",
+          "reaction",
           "url",
           "notes",
           "tags"
@@ -397,6 +397,11 @@
             "game",
             "video",
             "music"
+          ],
+          "reaction": [
+            "loved",
+            "liked",
+            "disliked"
           ],
           "status": [
             "want",
