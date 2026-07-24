@@ -310,3 +310,19 @@ def search(user_id, query, section_filter, limit, exclude_sections=None, days=No
             for r in rows
         ],
     }
+
+
+def entity_update_times(user_id, entity_ids) -> dict:
+    """{entity_id: 'YYYY-MM-DD'} for the given ids, from the same
+    persona_search.updated_at the `days` recency filter uses. Ids missing
+    from the index (e.g. rows predating a backfill) are simply absent."""
+    ids = [i for i in entity_ids if i]
+    if not ids:
+        return {}
+    with db.get_pool().connection() as conn:
+        rows = conn.execute(
+            "select entity_id, updated_at from persona_search"
+            " where user_id = %s and entity_id = any(%s)",
+            (user_id, ids),
+        ).fetchall()
+    return {r["entity_id"]: r["updated_at"].date().isoformat() for r in rows}

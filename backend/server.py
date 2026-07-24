@@ -842,6 +842,18 @@ def get_scoped_context(
         "token_estimate": 0,
         "context": result
     }
+    # Freshness advisory: top-of-mind is the one list that silently rots.
+    tom = result.get("projects", {}).get("top_of_mind") if isinstance(result.get("projects"), dict) else None
+    if isinstance(tom, list) and tom:
+        ids = [t.get("id") for t in tom if isinstance(t, dict)]
+        times = search_index.entity_update_times(db.current_user_id.get(), ids)
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).date().isoformat()
+        stale = sum(1 for i in ids if i in times and times[i] <= cutoff)
+        if stale:
+            payload["advisories"] = [
+                f"{stale} top-of-mind item(s) unchanged for over 30 days — "
+                "consider reviewing or removing them"
+            ]
     # Estimate against the full wrapper (the actual payload the caller receives),
     # not just the inner context. The few chars the final estimate value itself
     # adds are absorbed by the //4 heuristic.
@@ -967,12 +979,13 @@ def _filter_by_topic(data: dict, topic: str) -> dict:
     return data
 
 def _stub_titles(data: dict) -> dict:
-    """Reduce every id-list entity in `data` to a `{"id", "title"}` stub.
-    Non-id-list fields (profile scalars, always-on preferences, etc.) pass
-    through untouched. Applied after all other filters (topic/inactive/
-    days/limit) so stubbing operates on the already-filtered result."""
+    """Reduce every id-list entity in `data` to a `{"id", "title",
+    "updated_at"}` stub (updated_at day-precision, omitted for entries the
+    search index doesn't know). Applied after all other filters so stubbing
+    operates on the already-filtered result."""
     import search_index
 
+    stub_lists = []  # (section_data, list_key)
     for ft in [k for k in data if k in sections.SECTION_REGISTRY]:
         spec = sections.SECTION_REGISTRY[ft]
         section_data = data.get(ft)
@@ -985,6 +998,14 @@ def _stub_titles(data: dict) -> dict:
                     if isinstance(e, dict) else e
                     for e in section_data[list_key]
                 ]
+                stub_lists.append((section_data, list_key))
+    all_ids = [s["id"] for sd, lk in stub_lists for s in sd[lk]
+               if isinstance(s, dict) and s.get("id")]
+    times = search_index.entity_update_times(db.current_user_id.get(), all_ids)
+    for sd, lk in stub_lists:
+        for s in sd[lk]:
+            if isinstance(s, dict) and s.get("id") in times:
+                s["updated_at"] = times[s["id"]]
     return data
 
 def _filter_inactive(data: dict, exempt: frozenset = frozenset()) -> dict:
@@ -3212,8 +3233,11 @@ def _resolve_entity(entity_id: str) -> str:
     data = load_json(file_type)
     for entity in data.get(list_key) or []:
         if isinstance(entity, dict) and entity.get("id") == entity_id:
-            return json.dumps({"section": file_type, "entity_id": entity_id,
-                               "entity": entity}, indent=2)
+            payload = {"section": file_type, "entity_id": entity_id, "entity": entity}
+            times = search_index.entity_update_times(db.current_user_id.get(), [entity_id])
+            if entity_id in times:
+                payload["updated_at"] = times[entity_id]
+            return json.dumps(payload, indent=2)
     return f"❌ Entity {entity_id} not found in {file_type}.{list_key}"
 
 
