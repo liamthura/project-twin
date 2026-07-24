@@ -15,10 +15,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ArrayInput } from "@/components/ArrayInput";
+import { EnumControl } from "@/components/controls";
+
+const STANCES = ["like", "dislike"];
 
 // Preferences Editor
 export default function PreferencesEditor({ data, onChange }) {
   const [expandedMoods, setExpandedMoods] = useState({});
+  const [newLikeDislikeItem, setNewLikeDislikeItem] = useState("");
+  const [newLikeDislikeStance, setNewLikeDislikeStance] = useState("like");
 
   const updateCodeStyle = (field, value) =>
     onChange({
@@ -105,6 +110,33 @@ export default function PreferencesEditor({ data, onChange }) {
       ...data,
       learning_style: { ...(data.learning_style || {}), [field]: value },
     });
+
+  const addLikeDislike = () => {
+    if (newLikeDislikeItem.trim()) {
+      onChange({
+        ...data,
+        likes_dislikes: [
+          ...(data.likes_dislikes || []),
+          { item: newLikeDislikeItem.trim(), stance: newLikeDislikeStance },
+        ],
+      });
+      setNewLikeDislikeItem("");
+      setNewLikeDislikeStance("like");
+    }
+  };
+
+  const updateLikeDislike = (index, field, value) => {
+    const newItems = [...(data.likes_dislikes || [])];
+    newItems[index] = { ...newItems[index], [field]: value };
+    onChange({ ...data, likes_dislikes: newItems });
+  };
+
+  const removeLikeDislike = (index) => {
+    onChange({
+      ...data,
+      likes_dislikes: (data.likes_dislikes || []).filter((_, i) => i !== index),
+    });
+  };
 
   const comm = getComm();
 
@@ -370,18 +402,75 @@ export default function PreferencesEditor({ data, onChange }) {
 
       <Card>
         <CardHeader className="border-b">
-          <CardTitle>Dislikes & Deal-breakers</CardTitle>
+          <CardTitle>Likes & Dislikes</CardTitle>
           <CardDescription>
-            Things you do not want in responses or suggestions
+            Things you want every AI to know you like or avoid
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          <Label>List your dislikes or hard nos</Label>
-          <ArrayInput
-            items={data.dislikes || []}
-            onChange={(items) => onChange({ ...data, dislikes: items })}
-            placeholder="e.g. unsolicited sales tone, lorem ipsum, jargon..."
-          />
+          {(data.likes_dislikes || []).length > 0 ? (
+            <div className="space-y-2">
+              {(data.likes_dislikes || []).map((entry, idx) => (
+                <div
+                  key={idx}
+                  className="flex flex-wrap items-center gap-2 p-2 rounded-lg border bg-background/50"
+                >
+                  <Input
+                    value={entry.item || ""}
+                    onChange={(e) =>
+                      updateLikeDislike(idx, "item", e.target.value)
+                    }
+                    placeholder="Item"
+                    className="h-9 flex-1 min-w-[160px]"
+                  />
+                  <EnumControl
+                    options={STANCES}
+                    value={entry.stance}
+                    onChange={(value) => updateLikeDislike(idx, "stance", value)}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeLikeDislike(idx)}
+                    className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState>
+              Things you want every AI to know you like or avoid.
+            </EmptyState>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              value={newLikeDislikeItem}
+              onChange={(e) => setNewLikeDislikeItem(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newLikeDislikeItem.trim()) {
+                  e.preventDefault();
+                  addLikeDislike();
+                }
+              }}
+              placeholder="e.g. unsolicited sales tone, jargon..."
+              className="h-9 flex-1 min-w-[160px]"
+            />
+            <EnumControl
+              options={STANCES}
+              value={newLikeDislikeStance}
+              onChange={(value) => setNewLikeDislikeStance(value || "like")}
+            />
+            <Button
+              onClick={addLikeDislike}
+              size="sm"
+              variant="secondary"
+              disabled={!newLikeDislikeItem.trim()}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
