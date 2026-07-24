@@ -3,10 +3,14 @@ import {
   BookOpen, Newspaper, Mic, Tv, Clapperboard, Gamepad2, Video, Music,
   Archive, Lightbulb, ArrowDown, Minus, ArrowUp,
 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger,
+} from "@/components/ui/select";
 
 // Enums with this many values or fewer render as a segmented control;
-// larger sets render as wrapping chip radios. Clicking the active choice
-// clears it (all generic enum fields are optional).
+// larger sets render as a compact dropdown selector to save space.
+// Both allow clearing (all generic enum fields are optional): segmented
+// clears on active-click, the dropdown has an explicit Clear item.
 export const SEGMENTED_MAX = 4;
 
 // Semantic icon + color pairing for well-known enum values, so state reads
@@ -103,37 +107,59 @@ export function SegmentedControl({ options, value, onChange }) {
   );
 }
 
-export function ChipRadioGroup({ options, value, onChange }) {
+// Sentinel for the dropdown's Clear item — Radix Select forbids "" values.
+const CLEAR_SENTINEL = "__clear__";
+
+export function SelectControl({ options, value, onChange }) {
+  const isLegacy = Boolean(value) && !options.includes(value);
+  const tone = value && !isLegacy ? VALUE_META[value]?.tone : undefined;
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {options.map((v) => {
-        const active = value === v;
-        const chip = active ? VALUE_META[v]?.chip : undefined;
-        return (
-          <button
-            key={v}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onChange(active ? undefined : v)}
-            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs capitalize transition-colors ${FOCUS_RING} ${
-              active
-                ? chip || "border-primary bg-accent font-medium text-accent-foreground"
-                : "border-input bg-background text-muted-foreground hover:bg-muted/50"
-            }`}
-          >
-            <ValueIcon value={v} className="h-3 w-3" />
-            {v.replace(/_/g, " ")}
-          </button>
-        );
-      })}
-    </div>
+    <Select
+      value={value && !isLegacy ? value : ""}
+      onValueChange={(v) => onChange(v === CLEAR_SENTINEL ? undefined : v)}
+    >
+      <SelectTrigger
+        className={`h-9 w-auto min-w-[170px] gap-2 ${isLegacy ? "border-dashed" : ""}`}
+        title={isLegacy ? "stored value not in the current option set" : undefined}
+      >
+        {value ? (
+          <span className={`inline-flex items-center gap-1.5 capitalize ${tone || (isLegacy ? "text-muted-foreground" : "")}`}>
+            <ValueIcon value={value} className="h-3.5 w-3.5" />
+            {String(value).replace(/_/g, " ")}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">Select…</span>
+        )}
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((v) => (
+          <SelectItem key={v} value={v}>
+            <span className="inline-flex items-center gap-1.5 capitalize">
+              <ValueIcon value={v} className="h-3.5 w-3.5" />
+              {v.replace(/_/g, " ")}
+            </span>
+          </SelectItem>
+        ))}
+        {value && (
+          <>
+            <SelectSeparator />
+            <SelectItem value={CLEAR_SENTINEL}>
+              <span className="text-muted-foreground">Clear</span>
+            </SelectItem>
+          </>
+        )}
+      </SelectContent>
+    </Select>
   );
 }
 
 // Convenience wrapper: picks segmented-vs-chips based on option count so
 // call sites don't have to.
 export function EnumControl({ options, value, onChange }) {
-  const Control = options.length <= SEGMENTED_MAX ? SegmentedControl : ChipRadioGroup;
+  if (options.length > SEGMENTED_MAX) {
+    // Large enums: compact dropdown (legacy values render dashed in-trigger).
+    return <SelectControl options={options} value={value} onChange={onChange} />;
+  }
   const isLegacy = value && !options.includes(value);
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -148,7 +174,7 @@ export function EnumControl({ options, value, onChange }) {
           {String(value).replace(/_/g, " ")}
         </button>
       )}
-      <Control options={options} value={value} onChange={onChange} />
+      <SegmentedControl options={options} value={value} onChange={onChange} />
     </div>
   );
 }
