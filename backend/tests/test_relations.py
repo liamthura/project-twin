@@ -704,3 +704,33 @@ def test_nudge_fires_on_strong_cross_section_vector_match(as_user, monkeypatch):
     assert "Possibly related to" in out
     assert "(projects)" in out
     assert 'link them with action="link"' in out
+
+
+def test_related_resolution_masks_disabled_sections(as_user):
+    import settings_store
+    server.execute_modify("add", "project", {"name": "Dune", "description": "book project"})
+    server.execute_modify("add", "goal", {"title": "Read more sci-fi", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+    server.execute_modify("link", "link", {"entity_id": gid, "related": [pid]})
+    settings_store.set_disabled_sections(["projects"])
+    result = _get_entity(gid)
+    [stub] = result["related"]
+    assert stub["id"] == pid and stub["title"] is None and stub["section"] is None
+
+
+def test_nudge_suppressed_on_stance_flip_add(as_user, monkeypatch):
+    # When flipping a stance (like/dislike), the result starts with
+    # "✅ Updated stance:" and should NOT get a cross-section nudge,
+    # even when a strong cross-section match exists.
+    _seed_project_for_nudge(monkeypatch, None)
+
+    # First, establish a dislike for "Ledger"
+    server.persona_modify.fn("add", "dislike", {"item": "Ledger"})
+
+    # Now flip to like (result starts with "✅ Updated stance:")
+    # even though there's a strong cross-section match seeded (the project "Ledger")
+    out = server.persona_modify.fn("add", "like", {"item": "Ledger"})
+
+    assert "Updated stance" in out
+    assert "Possibly related" not in out

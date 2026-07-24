@@ -3402,15 +3402,20 @@ def _attach_relations(parsed_payloads: list, include_related: bool) -> None:
     titles_map = (search_index.resolve_titles(user_id, list(all_related_ids))
                   if all_related_ids else {})
 
+    enabled_sections = None
     if include_related:
-        excluded_sections = list(set(sections.SECTION_REGISTRY) - settings_store.enabled_sections())
+        enabled_sections = settings_store.enabled_sections()
+        excluded_sections = list(set(sections.SECTION_REGISTRY) - enabled_sections)
+    else:
+        enabled_sections = settings_store.enabled_sections()
 
     for payload in parsed_payloads:
         rel = payload["entity"].get("related")
         if isinstance(rel, list) and rel:
             payload["related"] = [
                 {"id": rid, "title": titles_map[rid]["title"], "section": titles_map[rid]["file_type"]}
-                if rid in titles_map else {"id": rid, "title": None, "section": None}
+                if rid in titles_map and titles_map[rid]["file_type"] in enabled_sections
+                else {"id": rid, "title": None, "section": None}
                 for rid in rel
             ]
         if include_related:
@@ -3720,7 +3725,7 @@ def _augment_add_result(action: str, entity_lower: str, data: dict,
                  and not result.startswith("✅ Updated stance:"))
     if dup_fired:
         return result + _advisory_note(match, supports_update)
-    if action == "add" and entity_lower in ADVISORY_ENTITIES and result.startswith("✅"):
+    if action == "add" and entity_lower in ADVISORY_ENTITIES and result.startswith("✅") and not result.startswith("✅ Updated stance:"):
         file_type, _list_key = ADVISORY_ENTITIES[entity_lower]
         try:
             nudge = _cross_section_nudge(file_type, normalize_data(data, entity_lower))
