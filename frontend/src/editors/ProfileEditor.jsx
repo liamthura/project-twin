@@ -24,6 +24,19 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfoDialog } from "@/components/ui/info-dialog";
 import { ArrayInput } from "@/components/ArrayInput";
+import { EnumControl } from "@/components/controls";
+
+// Canonical values from backend/section_packs/profile/manifest.json
+// (language.proficiency) — the old UI's beginner/professional scale isn't
+// in the manifest's valid_values, so it's replaced with the manifest's set.
+// The field is still stored under the "fluency" key, matching the app's
+// existing data-flow idiom and backend get_field alias handling.
+//
+// Note: the "Purpose" Select on emails and the "Status" Select on education
+// entries are NOT manifest-declared enums (the profile manifest's `email`
+// and `education` entities don't list those fields under valid_values), so
+// they're intentionally left as native selects — out of this sweep's scope.
+const LANGUAGE_PROFICIENCIES = ["native", "fluent", "conversational", "basic"];
 
 // Profile Editor
 export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
@@ -336,10 +349,9 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
       tips: [
         "Add each language you can communicate in.",
         "Fluency levels explained:",
-        "  • Beginner: Basic phrases and simple sentences.",
+        "  • Basic: Basic phrases and simple sentences.",
         "  • Conversational: Can hold everyday conversations.",
         "  • Fluent: Comfortable in most situations, may have occasional gaps.",
-        "  • Professional: Business-level proficiency, can write and present formally.",
         "  • Native: Mother tongue or equivalent.",
         "Order by strongest first—AI will prioritise top entries.",
       ],
@@ -1363,27 +1375,13 @@ export default function ProfileEditor({ data, onChange, onShowConfirmation }) {
                           <Label className="text-xs text-muted-foreground">
                             Fluency
                           </Label>
-                          <Select
-                            value={lang?.fluency || "conversational"}
-                            onValueChange={(value) =>
+                          <EnumControl
+                            options={LANGUAGE_PROFICIENCIES}
+                            value={lang?.fluency}
+                            onChange={(value) =>
                               updateLanguage(index, "fluency", value)
                             }
-                          >
-                            <SelectTrigger className="h-9">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="beginner">Beginner</SelectItem>
-                              <SelectItem value="conversational">
-                                Conversational
-                              </SelectItem>
-                              <SelectItem value="fluent">Fluent</SelectItem>
-                              <SelectItem value="native">Native</SelectItem>
-                              <SelectItem value="professional">
-                                Professional
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
+                          />
                         </div>
                       </div>
                       <Button
