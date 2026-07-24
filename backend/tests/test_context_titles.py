@@ -31,7 +31,7 @@ def test_titles_mode_reduces_id_list_entities_to_id_and_title(as_user):
     projects = out["context"]["projects"]["projects"]
     assert len(projects) == 2
     for p in projects:
-        assert set(p.keys()) == {"id", "title"}
+        assert set(p.keys()) == {"id", "title", "updated_at"}
         assert p["title"] in ("Ledger", "Ferris")
         assert p["id"]
 
@@ -63,8 +63,9 @@ def test_titles_composes_with_topic_filters_then_stubs(as_user, monkeypatch):
     out = server.get_scoped_context("professional", topic="rust", detail="titles")
     projects = out["context"]["projects"]["projects"]
     assert len(projects) == 1
-    assert projects[0] == {"id": projects[0]["id"], "title": "Ferris"}
-    assert set(projects[0].keys()) == {"id", "title"}
+    assert projects[0]["id"]
+    assert projects[0]["title"] == "Ferris"
+    assert set(projects[0].keys()) == {"id", "title", "updated_at"}
 
 
 def test_get_context_detail_via_dispatch(as_user, monkeypatch):
@@ -78,4 +79,4 @@ def test_get_context_detail_via_dispatch(as_user, monkeypatch):
     payload = json.loads(result.content[0].text)
     projects = payload["context"]["projects"]["projects"]
     for p in projects:
-        assert set(p.keys()) == {"id", "title"}
+        assert set(p.keys()) == {"id", "title", "updated_at"}

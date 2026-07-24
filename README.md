@@ -340,9 +340,9 @@ don't pile up duplicates.
 
 | Tool                     | What it does                                                                                   |
 | ------------------------ | ---------------------------------------------------------------------------------------------- |
-| `get_context`            | Scoped context bootstrap: global scopes (minimal/professional/personal/learning/full), section scopes, topic filtering, and a `detail="titles"` stub mode |
+| `get_context`            | Scoped context bootstrap: global scopes (minimal/professional/personal/learning/full), section scopes, topic filtering, and a `detail="titles"` stub mode (`{id, title, updated_at}`) |
 | `search_context`         | Search the persona by meaning and keywords; ranked snippets with entity ids (hybrid FTS + embeddings, or FTS-only). Optional `sections`, `limit` (≤25), `days` recency filter |
-| `get_entity`             | Fetch persona entities in full by id — a single id, or a list of up to 25 (e.g. straight from `search_context` hits) |
+| `get_entity`             | Fetch persona entities in full by id — a single id, or a list of up to 25 (e.g. straight from `search_context` hits); each result carries `updated_at` (last change, day precision) when the entity is indexed |
 | `get_raw`                | Raw dump of persona file(s) — export/debug use                                                 |
 | `get_schema`             | Entity schema reference: valid entities, actions, and fields for writes                        |
 | `persona_modify`         | Add/update/remove items (flexible field aliases). Adds that resemble an existing entry get a duplicate advisory naming it |
@@ -380,8 +380,8 @@ get_context(scope="professional", topic="Python")  # ~245 tokens instead of 3600
 ```
 
 **Titles mode**: `detail="titles"` swaps every list entry for an
-`{id, title}` stub — on a real persona that cut a professional scope from
-~7,100 to ~1,600 tokens. Skim the stubs, then `get_entity` the ones you need.
+`{id, title, updated_at}` stub — on a real persona that cut a professional scope from
+~7,100 to ~1,600 tokens. Stubs include `updated_at` so clients can weight stale context. Top-of-mind entries unchanged >30 days append a one-line advisory to the `get_context` output. Skim the stubs, then `get_entity` the ones you need.
 
 ### Batch Operations (`persona_batch`)
 
@@ -475,7 +475,9 @@ the server in FTS-only mode.
 `search_context` also accepts a `days` argument to only return entries
 changed in the last N days (per-entry, in either mode) — note that a full
 backfill with `--recreate` (below) resets every entry's last-change time, so
-`days` will look empty right after one until entries change again.
+`days` will look empty right after one until entries change again; the reset
+also makes `updated_at` on `get_entity`/titles stubs read as today and suppresses
+the top-of-mind staleness advisory for 30 days, until entries change again.
 
 ### Backfilling the search index
 
@@ -528,6 +530,7 @@ column backfill has since fixed the dimension mismatch.
 - [x] Duplicate advisories and dedupe-grounded capture suggestions
 - [x] Goals as a first-class section (types, status, target dates, custom types, migration off profile lists)
 - [x] Media and aesthetics packs — manifest-only sections with a generic schema-driven write path and manifest-driven web editor
+- [x] Freshness surfacing — updated_at on lean reads + top-of-mind staleness advisory
 - [ ] Better auto-triggering (waiting on MCP improvements)
 - [ ] Conversation history for pattern detection
 - [ ] Data versioning
