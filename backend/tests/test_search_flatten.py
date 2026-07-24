@@ -115,14 +115,13 @@ def test_flatten_section_no_id_lists_is_empty():
     assert search_index.flatten_section("preferences", {"dislikes": ["x"]}) == []
 
 
-def test_like_dislike_shape_has_no_title_or_text_fields():
-    """Documented gap, not a fix: likes_dislikes items store {"item",
-    "stance"} per the Phase 5 brief's exact shape -- neither field is in
-    TITLE_FIELDS/TEXT_FIELDS, so these entries get an id but are not
-    currently surfaced by search_index (flatten_section skips them, since
-    it requires non-empty text)."""
+def test_like_dislike_shape_has_title_and_text_fields():
+    """likes_dislikes items store {"item", "stance"} per the Phase 5
+    brief's exact shape. Both fields now join TITLE_FIELDS/TEXT_FIELDS,
+    making these entries fully searchable via flatten_section."""
     title, text = search_index.flatten_entity({"item": "Dark mode", "stance": "like"})
-    assert title == "" and text == ""
+    assert title == "Dark mode"
+    assert "like" in text
 
 
 def test_entity_location_longest_prefix_wins():

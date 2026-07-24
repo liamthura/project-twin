@@ -1,7 +1,7 @@
 {
   "key": "preferences",
   "title": "Preferences",
-  "description": "Communication style, code style, dislikes",
+  "description": "Communication style, code style, likes and dislikes",
   "core": true,
   "position": 30,
   "defaults": {
