@@ -820,6 +820,11 @@ def get_scoped_context(
         exempt = frozenset({"goals", "media"} & set(tokens))
         result = _filter_inactive(result, exempt)
 
+    # `related` is stored-link bookkeeping, not context payload (like `_meta`):
+    # strip it from every id-list entry regardless of include_inactive/detail.
+    # get_entity and get_raw are the surfaces that resolve/return it.
+    result = _strip_related(result)
+
     if detail == "titles":
         result = _stub_titles(result)
 
@@ -1024,6 +1029,31 @@ def _stub_titles(data: dict) -> dict:
             if isinstance(s, dict) and s.get("id") in times:
                 s["updated_at"] = times[s["id"]]
     return data
+
+def _strip_related(data: dict) -> dict:
+    """Strip the `related` key from every id-list entity in `data` (token
+    discipline for scope reads, like `_meta` -- stored links are surfaced
+    via get_entity/get_raw instead). Entries that carry `related` are
+    rebuilt as new dicts (`related` dropped) rather than deleted from in
+    place: `data`'s item dicts are the same objects `load_json` just handed
+    back from persona_store.load, and this mirrors `_stub_titles`'/
+    `_filter_by_topic`'s existing pattern of reassigning a fresh list rather
+    than mutating entries destructively."""
+    for ft in [k for k in data if k in sections.SECTION_REGISTRY]:
+        spec = sections.SECTION_REGISTRY[ft]
+        section_data = data.get(ft)
+        if not isinstance(section_data, dict):
+            continue
+        for list_key, _prefix in spec.id_lists:
+            items = section_data.get(list_key)
+            if isinstance(items, list):
+                section_data[list_key] = [
+                    {k: v for k, v in item.items() if k != "related"}
+                    if isinstance(item, dict) and "related" in item else item
+                    for item in items
+                ]
+    return data
+
 
 def _filter_inactive(data: dict, exempt: frozenset = frozenset()) -> dict:
     """Remove inactive/paused items from context. Sections named in `exempt`
@@ -3228,8 +3258,56 @@ def _resolve_entity(entity_id: str) -> str:
     return f"❌ Entity {entity_id} not found in {file_type}.{list_key}"
 
 
+def _attach_relations(parsed_payloads: list, include_related: bool) -> None:
+    """Mutate each resolved get_entity payload in `parsed_payloads` (dicts
+    carrying an "entity" key, as produced by _resolve_entity) in place:
+
+    - Stored `related` links are ALWAYS resolved to `{"id", "title",
+      "section"}` stubs when present (regardless of `include_related`) --
+      an id that no longer resolves (since-deleted entry) still surfaces as
+      `{"id", "title": None, "section": None}` rather than being hidden.
+      Entities with no `related` field get no "related" key at all.
+    - When `include_related` is truthy, also attach derived "similar"
+      neighbors (`[]` if none / the entry isn't indexed).
+
+    One `resolve_titles` call covers every payload's related ids combined
+    (no N+1 across a batch); neighbors are still looked up per entity via
+    semantic_neighbors, bounded by get_entity's 25-id batch cap.
+    """
+    if not parsed_payloads:
+        return
+    user_id = db.current_user_id.get()
+
+    all_related_ids = set()
+    for payload in parsed_payloads:
+        rel = payload["entity"].get("related")
+        if isinstance(rel, list) and rel:
+            all_related_ids.update(rel)
+    titles_map = (search_index.resolve_titles(user_id, list(all_related_ids))
+                  if all_related_ids else {})
+
+    if include_related:
+        excluded_sections = list(set(sections.SECTION_REGISTRY) - settings_store.enabled_sections())
+
+    for payload in parsed_payloads:
+        rel = payload["entity"].get("related")
+        if isinstance(rel, list) and rel:
+            payload["related"] = [
+                {"id": rid, "title": titles_map[rid]["title"], "section": titles_map[rid]["file_type"]}
+                if rid in titles_map else {"id": rid, "title": None, "section": None}
+                for rid in rel
+            ]
+        if include_related:
+            neighbors = search_index.semantic_neighbors(
+                user_id, payload["entity_id"], exclude_sections=excluded_sections)
+            payload["similar"] = [
+                {"id": n["entity_id"], "title": n["title"], "section": n["file_type"]}
+                for n in neighbors
+            ]
+
+
 @mcp.tool()
-def get_entity(entity_id: Union[str, List[str]]) -> str:
+def get_entity(entity_id: Union[str, List[str]], include_related: bool = False) -> str:
     """Fetch one or more persona entities in full by id (as returned by
     search_context results or embedded in get_context output).
 
@@ -3241,9 +3319,24 @@ def get_entity(entity_id: Union[str, List[str]]) -> str:
             element per id, in order: a successful lookup's parsed JSON, or
             `{"entity_id": <id>, "error": <message>}` for any id that
             failed to resolve.
+        include_related: When True, also attach derived `"similar"`
+            neighbors (cross-section, semantically close entries) to every
+            resolved entity. Stored `"related"` links (explicit, via
+            action="link") are always resolved and included when present,
+            independent of this flag; an id whose target has since been
+            deleted still appears, as `{"id", "title": None, "section":
+            None}`, rather than being silently dropped.
     """
     if isinstance(entity_id, str):
-        return _resolve_entity(entity_id)
+        result = _resolve_entity(entity_id)
+        try:
+            parsed = json.loads(result)
+        except (json.JSONDecodeError, TypeError):
+            parsed = None
+        if isinstance(parsed, dict) and "entity" in parsed:
+            _attach_relations([parsed], include_related)
+            return json.dumps(parsed, indent=2)
+        return result
 
     if not entity_id:
         return "Error: entity_id list must not be empty."
@@ -3251,6 +3344,7 @@ def get_entity(entity_id: Union[str, List[str]]) -> str:
         return "Error: at most 25 ids per call — split into multiple calls"
 
     entities = []
+    resolved_payloads = []
     for eid in entity_id:
         result = _resolve_entity(eid)
         try:
@@ -3264,8 +3358,10 @@ def get_entity(entity_id: Union[str, List[str]]) -> str:
         # `entities` as something that looks like a resolved entity.
         if isinstance(parsed, dict) and "entity" in parsed:
             entities.append(parsed)
+            resolved_payloads.append(parsed)
         else:
             entities.append({"entity_id": eid, "error": result})
+    _attach_relations(resolved_payloads, include_related)
     return json.dumps({"entities": entities}, indent=2)
 
 

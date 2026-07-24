@@ -312,6 +312,108 @@ def search(user_id, query, section_filter, limit, exclude_sections=None, days=No
     }
 
 
+# Cosine distance cutoff for semantic_neighbors' vector leg. Same threshold
+# semantics as server.TOPIC_VECTOR_DISTANCE_CUTOFF ("related enough to
+# surface"); duplicated here rather than imported -- search_index must not
+# depend on server (server already depends on search_index).
+NEIGHBOR_DISTANCE_CUTOFF = 0.5
+
+
+def semantic_neighbors(user_id, entity_id, limit=5, exclude_sections=None):
+    """Cross-section semantically-similar entries for `entity_id` -- the
+    derived "similar" surface on get_entity (zero-maintenance: works on all
+    existing data, no explicit linking required).
+
+    Always excludes the source entity's own file_type (cross-section by
+    default) plus any caller-supplied `exclude_sections` (e.g. disabled
+    sections -- callers should pass those in; this function has no settings
+    dependency of its own), and always excludes the source id itself.
+
+    Vector path (nearest persona_search rows by cosine distance, filtered to
+    NEIGHBOR_DISTANCE_CUTOFF) when pgvector is available AND the source row
+    itself has a computed embedding. Otherwise falls back to `search()`
+    seeded with the source row's title -- covers FTS-only installs and a
+    source row whose embedding hasn't landed yet (fresh write, async embed
+    still pending, or the row predates a backfill).
+
+    Returns [] if the source entity isn't indexed at all (e.g. its section
+    was just added and hasn't synced), if every other section is excluded,
+    or if the source row's title is empty (nothing to seed a fallback with).
+    """
+    with db.get_pool().connection() as conn:
+        row = conn.execute(
+            "select file_type, title, embedding from persona_search"
+            " where user_id = %s and entity_id = %s",
+            (user_id, entity_id),
+        ).fetchone()
+    if row is None:
+        return []
+
+    exclude = {row["file_type"]}
+    if exclude_sections:
+        exclude.update(exclude_sections)
+    sections_pred = [s for s in sections.SECTION_REGISTRY if s not in exclude]
+    if not sections_pred:
+        return []
+
+    if db.VECTOR_AVAILABLE and row["embedding"] is not None:
+        with db.get_pool().connection() as conn:
+            rows = conn.execute(
+                """
+                select entity_id, file_type, title,
+                       embedding <=> %(qvec)s as dist
+                from persona_search
+                where user_id = %(uid)s and file_type = any(%(sections)s)
+                  and entity_id != %(eid)s and embedding is not null
+                order by dist
+                limit %(limit)s
+                """,
+                {"qvec": row["embedding"], "uid": user_id,
+                 "sections": sections_pred, "eid": entity_id, "limit": limit},
+            ).fetchall()
+        return [
+            {"entity_id": r["entity_id"], "file_type": r["file_type"],
+             "title": r["title"], "distance": float(r["dist"])}
+            for r in rows
+            if r["dist"] is not None and r["dist"] <= NEIGHBOR_DISTANCE_CUTOFF
+        ]
+
+    # FTS fallback: websearch_to_tsquery ANDs bare words together, which
+    # would require an exact full-title match across sections (too strict
+    # for a "similar" surface -- unrelated entries rarely share every word
+    # of a title). OR-joining the title's words instead surfaces anything
+    # sharing at least one significant word, e.g. a shared project name.
+    words = [w for w in row["title"].replace('"', "").split() if w]
+    if not words:
+        return []
+    query = " OR ".join(words)
+    hits = search(user_id, query, sections_pred, limit)
+    return [
+        {"entity_id": r["entity_id"], "file_type": r["section"],
+         "title": r["title"], "distance": r["distance"]}
+        for r in hits["results"] if r["entity_id"] != entity_id
+    ]
+
+
+def resolve_titles(user_id, entity_ids) -> dict:
+    """{entity_id: {"title", "file_type"}} for the given ids, in one query
+    over persona_search -- resolves stored `related` links without an N+1
+    per referenced id. Ids missing from the index (e.g. a dangling link to a
+    since-deleted entry) are simply absent from the result; the caller
+    surfaces those as unresolved stubs rather than hiding them."""
+    ids = [i for i in entity_ids if i]
+    if not ids:
+        return {}
+    with db.get_pool().connection() as conn:
+        rows = conn.execute(
+            "select entity_id, title, file_type from persona_search"
+            " where user_id = %s and entity_id = any(%s)",
+            (user_id, ids),
+        ).fetchall()
+    return {r["entity_id"]: {"title": r["title"], "file_type": r["file_type"]}
+            for r in rows}
+
+
 def entity_update_times(user_id, entity_ids) -> dict:
     """{entity_id: 'YYYY-MM-DD'} for the given ids, from the same
     persona_search.updated_at the `days` recency filter uses. Ids missing
