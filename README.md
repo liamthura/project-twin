@@ -342,16 +342,25 @@ don't pile up duplicates.
 | ------------------------ | ---------------------------------------------------------------------------------------------- |
 | `get_context`            | Scoped context bootstrap: global scopes (minimal/professional/personal/learning/full), section scopes, topic filtering, and a `detail="titles"` stub mode (`{id, title, updated_at}`) |
 | `search_context`         | Search the persona by meaning and keywords; ranked snippets with entity ids (hybrid FTS + embeddings, or FTS-only). Optional `sections`, `limit` (≤25), `days` recency filter |
-| `get_entity`             | Fetch persona entities in full by id — a single id, or a list of up to 25 (e.g. straight from `search_context` hits); each result carries `updated_at` (last change, day precision) when the entity is indexed |
+| `get_entity`             | Fetch persona entities in full by id (single or up to 25); `include_related=true` returns stored explicit `related` links and derived semantic `similar` neighbors (both as {id, title, section} stubs; dangling links show title/section null); `related` is always resolved when present, independent of `include_related` |
 | `get_raw`                | Raw dump of persona file(s) — export/debug use                                                 |
 | `get_schema`             | Entity schema reference: valid entities, actions, and fields for writes                        |
-| `persona_modify`         | Add/update/remove items (flexible field aliases). Adds that resemble an existing entry get a duplicate advisory naming it |
+| `persona_modify`         | Add/update/remove/link items (flexible field aliases, `action="link"` or `"unlink"` for connecting any two entries; strictly validated both ends, one-directional, capped at 10 links per entry). Adds that resemble an existing entry get a duplicate advisory naming it |
 | `persona_batch`          | Multiple modifications in one call (per-op duplicate advisories included)                      |
 | `suggest_persona_update` | Analyze a message for potential updates, dedupe-checked against existing entries — suggestions for content you already have are rewritten to updates targeting the existing entity |
 
 The lean-retrieval pattern AI clients are steered toward: `search_context`
 (find, ~10 small ranked snippets) → `get_entity` (full detail for just the
 hits that matter), instead of pulling whole sections.
+
+### Relations
+
+Entries can link to other entries (any section, any entity type) via explicit
+`related` links or derived `similar` semantic neighbors. Links are one-directional
+(stored on source only), capped at 10 per entry, and stripped from scope
+payloads (fetch them with `get_entity(id, include_related=true)`). AI authors
+links via an add-response nudge when a new entry closely matches an existing
+one — you can accept the nudge or ignore it. Unlink with `persona_modify(action="unlink")`.
 
 ### Scoped Context (`get_context`)
 
@@ -542,6 +551,7 @@ column backfill has since fixed the dimension mismatch.
 - [x] Media and aesthetics packs — manifest-only sections with a generic schema-driven write path and manifest-driven web editor
 - [x] Freshness surfacing — updated_at on lean reads + top-of-mind staleness advisory
 - [x] List consolidation — interests, likes/dislikes, learning goals unified; searchable taste lists
+- [x] Relations — semantic neighbors + explicit entry links (link/unlink), AI-authored
 - [ ] Better auto-triggering (waiting on MCP improvements)
 - [ ] Conversation history for pattern detection
 - [ ] Data versioning
