@@ -31,6 +31,9 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfoDialog } from "@/components/ui/info-dialog";
 import { ArrayInput } from "@/components/ArrayInput";
+import { EnumControl } from "@/components/controls";
+
+const MENTAL_TAB_STATUSES = ["open", "closed", "archived"];
 
 // Knowledge Editor
 export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) {
@@ -53,6 +56,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
   const [newTabTitle, setNewTabTitle] = useState("");
   const [newTabContent, setNewTabContent] = useState("");
   const [newTabTags, setNewTabTags] = useState([]);
+  const [newTabStatus, setNewTabStatus] = useState(undefined);
   const [tabSearchTerm, setTabSearchTerm] = useState("");
 
   // Info modal state
@@ -169,6 +173,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
             title: newTabTitle.trim(),
             notes: newTabContent,
             tags: newTabTags,
+            status: newTabStatus,
             references: [],
             created_at: new Date().toISOString(),
           },
@@ -178,6 +183,7 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
       setNewTabTitle("");
       setNewTabContent("");
       setNewTabTags([]);
+      setNewTabStatus(undefined);
       setIsTabModalOpen(false);
     }
   };
@@ -427,24 +433,13 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                             </div>
                             <div className="space-y-2">
                               <Label>Proficiency</Label>
-                              <Select
+                              <EnumControl
+                                options={levels}
                                 value={domain.level || "learning"}
-                                onValueChange={(value) =>
+                                onChange={(value) =>
                                   updateDomain(originalIndex, "level", value)
                                 }
-                              >
-                                <SelectTrigger className="h-9">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {levels.map((level) => (
-                                    <SelectItem key={level} value={level}>
-                                      {level.charAt(0).toUpperCase() +
-                                        level.slice(1)}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              />
                             </div>
                           </div>
 
@@ -655,18 +650,11 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
             </div>
             <div className="space-y-2">
               <Label htmlFor="skill-level">Proficiency Level</Label>
-              <Select value={newDomainLevel} onValueChange={setNewDomainLevel}>
-                <SelectTrigger id="skill-level">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {levels.map((level) => (
-                    <SelectItem key={level} value={level}>
-                      {level.charAt(0).toUpperCase() + level.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <EnumControl
+                options={levels}
+                value={newDomainLevel}
+                onChange={setNewDomainLevel}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="skill-notes">Notes (Optional)</Label>
@@ -849,6 +837,17 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                               placeholder="Tab title"
                               className="h-9"
                               onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Status</Label>
+                            <EnumControl
+                              options={MENTAL_TAB_STATUSES}
+                              value={tab.status}
+                              onChange={(value) =>
+                                updateTab(originalIndex, "status", value)
+                              }
                             />
                           </div>
 
@@ -1061,6 +1060,19 @@ export default function KnowledgeEditor({ data, onChange, onShowConfirmation }) 
                 placeholder="e.g. AWS CLI Commands, Git Workflows"
                 value={newTabTitle}
                 onChange={(e) => setNewTabTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newTabTitle.trim()) {
+                    handleAddTabFromModal();
+                  }
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tab-status">Status</Label>
+              <EnumControl
+                options={MENTAL_TAB_STATUSES}
+                value={newTabStatus}
+                onChange={setNewTabStatus}
               />
             </div>
             <div className="space-y-2">

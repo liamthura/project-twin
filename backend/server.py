@@ -1492,23 +1492,26 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         lifestyle = load_json("lifestyle.json")
         hobbies = lifestyle.setdefault("hobbies", [])
         name = get_field(data, "name", "hobby", "hobby_name", "title", "activity")
-        skill_level = get_field(data, "skill_level", "level", "proficiency", default="enthusiast")
+        skill_level = get_field(data, "skill_level", "level", "proficiency")
         status = get_field(data, "status", "state", "is_active", default="active")
         if status in ["inactive", "stopped", "paused", "not_active", "false", False]:
             status = "inactive"
         else:
             status = "active"
         notes = get_field(data, "notes", "description", "details", default="")
-        
+
         if action == "add":
             if not name:
                 return "❌ Hobby requires a name"
             if any(h.get("name", "").lower() == name.lower() for h in hobbies):
                 return f"ℹ️ Hobby '{name}' already exists"
-            hobbies.append({
-                "id": generate_entity_id("hobby"), "name": name, "skill_level": skill_level,
+            new_hobby = {
+                "id": generate_entity_id("hobby"), "name": name,
                 "status": status, "notes": notes, "specifics": data.get("specifics", []), "references": []
-            })
+            }
+            if skill_level:
+                new_hobby["skill_level"] = skill_level
+            hobbies.append(new_hobby)
             save_json("lifestyle.json", lifestyle)
             return f"✅ Added hobby: {name} (status: {status})"
         elif action == "update":
@@ -1702,7 +1705,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         project_list = projects.setdefault("projects", [])
         name = get_field(data, "name", "project", "project_name", "title")
         description = get_field(data, "description", "desc", "summary", default="")
-        status = get_field(data, "status", "state", "progress", default="planning")
+        status = get_field(data, "status", "state", "progress", default="active")
         notes = get_field(data, "notes", "details", default="")
         
         if action == "add":

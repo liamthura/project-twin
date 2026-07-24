@@ -31,6 +31,12 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfoDialog } from "@/components/ui/info-dialog";
 import { ArrayInput } from "@/components/ArrayInput";
+import { EnumControl } from "@/components/controls";
+
+// Canonical values from backend/section_packs/projects/manifest.json — the
+// old UI's "planning" status isn't in the manifest's valid_values, so it's
+// dropped in favour of the manifest's "idea".
+const PROJECT_STATUSES = ["active", "paused", "completed", "archived", "idea"];
 
 // Projects Editor
 export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
@@ -79,7 +85,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
       tips: [
         "Name: Clear, descriptive title for the project.",
         "Status options:",
-        "  • Planning: Still in ideation/research phase.",
+        "  • Idea: Still in ideation/research phase.",
         "  • Active: Currently working on it.",
         "  • Paused: Temporarily on hold.",
         "  • Completed: Finished and shipped.",
@@ -96,6 +102,24 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
     const info = sectionInfo[sectionKey];
     if (info) {
       setInfoModal({ isOpen: true, ...info });
+    }
+  };
+
+  const addIdea = () => {
+    if (newIdea.trim()) {
+      const normalizedIdeas = (data.top_of_mind || []).map((item) =>
+        typeof item === "string" ? { idea: item, note: "" } : item
+      );
+      onChange({
+        ...data,
+        top_of_mind: [
+          ...normalizedIdeas,
+          { idea: newIdea.trim(), note: newIdeaNote.trim() },
+        ],
+      });
+      setNewIdea("");
+      setNewIdeaNote("");
+      setIsIdeaModalOpen(false);
     }
   };
 
@@ -366,6 +390,11 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                 value={newIdea}
                 onChange={(e) => setNewIdea(e.target.value)}
                 placeholder="Project idea or thing you want to build..."
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newIdea.trim()) {
+                    addIdea();
+                  }
+                }}
               />
             </div>
             <div className="space-y-2">
@@ -383,25 +412,7 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
             <Button variant="outline" onClick={() => setIsIdeaModalOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={() => {
-                if (newIdea.trim()) {
-                  const normalizedIdeas = (data.top_of_mind || []).map((item) =>
-                    typeof item === "string" ? { idea: item, note: "" } : item
-                  );
-                  onChange({
-                    ...data,
-                    top_of_mind: [
-                      ...normalizedIdeas,
-                      { idea: newIdea.trim(), note: newIdeaNote.trim() },
-                    ],
-                  });
-                  setNewIdea("");
-                  setNewIdeaNote("");
-                  setIsIdeaModalOpen(false);
-                }
-              }}
-            >
+            <Button onClick={addIdea}>
               Add idea
             </Button>
           </DialogFooter>
@@ -481,10 +492,11 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="planning">Planning</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="paused">Paused</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
+                      {PROJECT_STATUSES.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -609,29 +621,13 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
                             </div>
                             <div className="space-y-2">
                               <Label>Status</Label>
-                              <Select
+                              <EnumControl
+                                options={PROJECT_STATUSES}
                                 value={project.status || "active"}
-                                onValueChange={(value) =>
+                                onChange={(value) =>
                                   updateProject(originalIndex, "status", value)
                                 }
-                              >
-                                <SelectTrigger className="h-9 bg-background">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="planning">
-                                    Planning
-                                  </SelectItem>
-                                  <SelectItem value="active">Active</SelectItem>
-                                  <SelectItem value="paused">Paused</SelectItem>
-                                  <SelectItem value="completed">
-                                    Completed
-                                  </SelectItem>
-                                  <SelectItem value="archived">
-                                    Archived
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
+                              />
                             </div>
                           </div>
 
@@ -970,21 +966,11 @@ export default function ProjectsEditor({ data, onChange, onShowConfirmation }) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="project-status">Status</Label>
-              <Select
+              <EnumControl
+                options={PROJECT_STATUSES}
                 value={newProjectStatus}
-                onValueChange={setNewProjectStatus}
-              >
-                <SelectTrigger id="project-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="planning">Planning</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="paused">Paused</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={setNewProjectStatus}
+              />
             </div>
           </div>
           <DialogFooter>

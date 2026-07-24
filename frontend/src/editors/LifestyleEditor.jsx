@@ -31,6 +31,13 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfoDialog } from "@/components/ui/info-dialog";
 import { ArrayInput } from "@/components/ArrayInput";
+import { EnumControl } from "@/components/controls";
+
+// Canonical values from backend/section_packs/lifestyle/manifest.json —
+// the manifest is the source of truth (the old UI used a different,
+// non-validated 4-value casual/enthusiast/serious/expert scale).
+const SKILL_LEVELS = ["beginner", "learning", "intermediate", "advanced", "expert"];
+const HOBBY_STATUSES = ["active", "inactive", "paused"];
 
 // Lifestyle Editor
 export default function LifestyleEditor({ data, onChange, onShowConfirmation }) {
@@ -48,7 +55,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
   });
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newHobbyName, setNewHobbyName] = useState("");
-  const [newHobbyLevel, setNewHobbyLevel] = useState("enthusiast");
+  const [newHobbyLevel, setNewHobbyLevel] = useState(undefined);
 
   // Info modal state
   const [infoModal, setInfoModal] = useState({
@@ -65,8 +72,8 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
         "Track activities you enjoy outside of work. This helps AI understand your lifestyle and can suggest relevant recommendations.",
       tips: [
         "Name: The hobby or activity.",
-        "Skill Level: Casual, Enthusiast, Serious, or Expert.",
-        "Status: Active (currently doing) or Inactive (paused/stopped).",
+        "Skill Level: Beginner, Learning, Intermediate, Advanced, or Expert.",
+        "Status: Active (currently doing), Paused (on hold), or Inactive (stopped).",
         "Specifics: Sub-areas or variations you focus on.",
         "Notes: Your experience, goals, or what you enjoy most.",
         "References: Links to gear, communities, or learning resources.",
@@ -176,7 +183,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
       }));
       // Reset modal state
       setNewHobbyName("");
-      setNewHobbyLevel("enthusiast");
+      setNewHobbyLevel(undefined);
       setIsAddModalOpen(false);
     }
   };
@@ -299,10 +306,11 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Levels</SelectItem>
-                      <SelectItem value="casual">Casual</SelectItem>
-                      <SelectItem value="enthusiast">Enthusiast</SelectItem>
-                      <SelectItem value="serious">Serious</SelectItem>
-                      <SelectItem value="expert">Expert</SelectItem>
+                      {SKILL_LEVELS.map((level) => (
+                        <SelectItem key={level} value={level}>
+                          {level.charAt(0).toUpperCase() + level.slice(1)}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -377,15 +385,17 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                             )}
                           </div>
                         </div>
-                        <Badge variant="outline" className="flex-shrink-0">
-                          {hobby.skill_level || "enthusiast"}
-                        </Badge>
-                        {hobby.status === "inactive" && (
+                        {hobby.skill_level && (
+                          <Badge variant="outline" className="flex-shrink-0 capitalize">
+                            {hobby.skill_level}
+                          </Badge>
+                        )}
+                        {hobby.status && hobby.status !== "active" && (
                           <Badge
                             variant="secondary"
                             className="flex-shrink-0 opacity-60"
                           >
-                            inactive
+                            {hobby.status}
                           </Badge>
                         )}
                         <Button
@@ -423,49 +433,27 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
                             </div>
                             <div className="space-y-2">
                               <Label>Skill Level</Label>
-                              <Select
-                                value={hobby.skill_level || "enthusiast"}
-                                onValueChange={(value) =>
+                              <EnumControl
+                                options={SKILL_LEVELS}
+                                value={hobby.skill_level}
+                                onChange={(value) =>
                                   updateHobby(
                                     originalIndex,
                                     "skill_level",
                                     value
                                   )
                                 }
-                              >
-                                <SelectTrigger className="h-9 bg-background">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="casual">Casual</SelectItem>
-                                  <SelectItem value="enthusiast">
-                                    Enthusiast
-                                  </SelectItem>
-                                  <SelectItem value="serious">
-                                    Serious
-                                  </SelectItem>
-                                  <SelectItem value="expert">Expert</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              />
                             </div>
                             <div className="space-y-2">
                               <Label>Status</Label>
-                              <Select
+                              <EnumControl
+                                options={HOBBY_STATUSES}
                                 value={hobby.status || "active"}
-                                onValueChange={(value) =>
+                                onChange={(value) =>
                                   updateHobby(originalIndex, "status", value)
                                 }
-                              >
-                                <SelectTrigger className="h-9 bg-background">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="active">Active</SelectItem>
-                                  <SelectItem value="inactive">
-                                    Inactive
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
+                              />
                             </div>
                           </div>
 
@@ -724,17 +712,11 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
             </div>
             <div className="space-y-2">
               <Label htmlFor="hobby-level">Skill Level</Label>
-              <Select value={newHobbyLevel} onValueChange={setNewHobbyLevel}>
-                <SelectTrigger id="hobby-level">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="casual">Casual</SelectItem>
-                  <SelectItem value="enthusiast">Enthusiast</SelectItem>
-                  <SelectItem value="serious">Serious</SelectItem>
-                  <SelectItem value="expert">Expert</SelectItem>
-                </SelectContent>
-              </Select>
+              <EnumControl
+                options={SKILL_LEVELS}
+                value={newHobbyLevel}
+                onChange={setNewHobbyLevel}
+              />
             </div>
           </div>
           <DialogFooter>
