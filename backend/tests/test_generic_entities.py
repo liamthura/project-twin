@@ -32,10 +32,10 @@ def test_media_duplicate_identifier(clean_database, as_user):
 def test_media_update_and_remove(clean_database, as_user):
     _enable("media")
     server.execute_modify("add", "media_item", {"title": "Dune", "status": "want"})
-    msg = server.execute_modify("update", "media_item", {"title": "Dune", "status": "finished", "rating": "5"})
+    msg = server.execute_modify("update", "media_item", {"title": "Dune", "status": "finished", "reaction": "loved"})
     assert msg.startswith("✅")
     [item] = server.load_json("media.json")["items"]
-    assert item["status"] == "finished" and item["rating"] == "5"
+    assert item["status"] == "finished" and item["reaction"] == "loved"
     assert server.execute_modify("remove", "media_item", {"title": "Dune"}).startswith("✅")
     assert server.load_json("media.json")["items"] == []
 
