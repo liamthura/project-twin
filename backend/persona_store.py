@@ -122,6 +122,9 @@ def _normalize(file_type: str, data: dict) -> dict:
                     project.setdefault("references", [])
                     project.setdefault("notes", "")
                     project.setdefault("highlights", [])
+        # Phase 5 (consolidation): current_learning folds into goals (type=learning);
+        # strip it so old backups/imports can't resurrect an invisible orphan key.
+        data.pop("current_learning", None)
     if file_type == "knowledge":
         domains = data.get("domains", [])
         if isinstance(domains, list):
@@ -133,9 +136,15 @@ def _normalize(file_type: str, data: dict) -> dict:
             for tab in mental_tabs:
                 if isinstance(tab, dict):
                     tab.setdefault("references", [])
+        # Phase 5 (consolidation): proficiency_levels retired; strip it so old
+        # backups/imports can't resurrect an invisible orphan key.
+        data.pop("proficiency_levels", None)
     if file_type == "preferences":
         if isinstance(data, dict):
-            data.setdefault("dislikes", [])
+            # Phase 5 (consolidation): dislikes moved into likes_dislikes
+            # (stance-tagged); strip it so old backups/imports can't
+            # resurrect an invisible orphan key.
+            data.pop("dislikes", None)
             # Migrate old flat communication structure to new nested structure
             if "communication" in data:
                 comm = data["communication"]
@@ -156,6 +165,13 @@ def _normalize(file_type: str, data: dict) -> dict:
                 )
     if file_type == "lifestyle":
         if isinstance(data, dict):
+            # Phase 5 (consolidation): passions/curiosities folded into the
+            # kind-tagged interests list; references was dormant/unused.
+            # Strip them so old backups/imports can't resurrect invisible
+            # orphan keys.
+            data.pop("passions", None)
+            data.pop("curiosities", None)
+            data.pop("references", None)
             data.setdefault("wellness", {
                 "sleep": {
                     "weekday": {"bedtime": "", "wakeup": ""},

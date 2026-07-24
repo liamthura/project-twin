@@ -6,17 +6,12 @@
   "position": 40,
   "defaults": {
     "projects": [],
-    "current_learning": [],
     "top_of_mind": []
   },
   "id_lists": [
     [
       "projects",
       "project"
-    ],
-    [
-      "current_learning",
-      "learning"
     ],
     [
       "top_of_mind",
@@ -29,11 +24,9 @@
     ],
     "professional": [
       "projects",
-      "current_learning",
       "top_of_mind"
     ],
     "learning": [
-      "current_learning",
       "top_of_mind"
     ]
   },
@@ -109,28 +102,6 @@
       "identifier": "highlight",
       "parent": "project_name"
     },
-    "current_learning": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
-      ],
-      "required": [
-        "topic"
-      ],
-      "optional": [
-        "context",
-        "priority"
-      ],
-      "valid_values": {
-        "priority": [
-          "low",
-          "medium",
-          "high"
-        ]
-      },
-      "identifier": "topic"
-    },
     "top_of_mind": {
       "actions": [
         "add",
@@ -142,7 +113,8 @@
       "optional": [
         "note"
       ],
-      "identifier": "item"
+      "identifier": "item",
+      "description": "Inbox for fleeting ideas and current thoughts — expect entries to be pruned"
     }
   }
 }

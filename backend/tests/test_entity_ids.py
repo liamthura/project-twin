@@ -53,12 +53,20 @@ def test_save_assigns_ids_to_gray_area_goals_list(as_user):
 
 
 def test_save_assigns_ids_to_gray_area_project_and_knowledge_lists(as_user):
-    store.save("projects", {"current_learning": [{"topic": "Rust"}], "top_of_mind": [{"topic": "Launch"}]})
+    store.save("projects", {"top_of_mind": [{"topic": "Launch"}]})
     store.save("knowledge", {"mental_tabs": [{"name": "Read paper"}]})
     proj = store.load("projects")
-    assert proj["current_learning"][0]["id"].startswith("learning_")
     assert proj["top_of_mind"][0]["id"].startswith("top_")
     assert store.load("knowledge")["mental_tabs"][0]["id"].startswith("tab_")
+
+
+def test_save_assigns_ids_to_gray_area_lifestyle_and_preferences_lists(as_user):
+    # Phase 5 (consolidation): interests (lifestyle) and likes_dislikes
+    # (preferences) are the new id-carrying gray-area lists.
+    store.save("lifestyle", {"interests": [{"name": "Photography", "kind": "passion"}]})
+    store.save("preferences", {"likes_dislikes": [{"item": "Dark mode", "stance": "like"}]})
+    assert store.load("lifestyle")["interests"][0]["id"].startswith("interest_")
+    assert store.load("preferences")["likes_dislikes"][0]["id"].startswith("taste_")
 
 
 def test_save_assigns_ids_via_direct_frontend_path(as_user):

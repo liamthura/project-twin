@@ -72,7 +72,7 @@ def test_entity_detail_includes_examples_and_optional():
 
 def test_identifier_correctness_spread():
     assert _call(entity="hobby")["identifier"] == "name"
-    assert _call(entity="curiosity")["identifier"] == "topic"
+    assert _call(entity="interest")["identifier"] == "name"
     assert _call(entity="mental_tab")["identifier"] == "title"
     assert _call(entity="learning_entry")["identifier"] == "topic"
     assert _call(entity="goal")["identifier"] == "title"

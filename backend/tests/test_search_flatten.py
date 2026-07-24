@@ -6,11 +6,14 @@ import search_index
 # Representative shapes for every id-list entity server.py's persona_modify
 # (execute_modify) can store, taken from the actual dicts each branch builds
 # (see server.py: work_experience ~L1186, education ~L1290, language ~L1160,
-# domain ~L1462, mental_tab ~L1498, project ~L1543, current_learning ~L1581,
-# top_of_mind ~L1617, hobby ~L1339, connection ~L1665, learning_entry ~L1710).
-# `goal` (profile.goals_and_careers, {"goal": ...}) has no persona_modify
-# entity -- it's only reachable via the direct frontend PUT path -- but is
-# indexed via the "goal" title field so those entries stay searchable.
+# domain ~L1462, mental_tab ~L1498, project ~L1543, interest ~generic write
+# branch, top_of_mind ~L1617, hobby ~L1339, connection ~L1665,
+# learning_entry ~L1710). `goal` (profile.goals_and_careers, {"goal": ...})
+# has no persona_modify entity -- it's only reachable via the direct
+# frontend PUT path -- but is indexed via the "goal" title field so those
+# entries stay searchable. Phase 5 (consolidation): current_learning folds
+# into `goal` (already covered below); passion/curiosity fold into
+# `interest`.
 FLATTEN_ENTITY_CASES = [
     ("work_experience",
      {"role": "Engineer", "company": "Acme Corp", "type": "Full-time",
@@ -36,9 +39,9 @@ FLATTEN_ENTITY_CASES = [
       "tags": ["writing"], "references": [], "highlights": ["Launched v1"],
       "notes": "side project"},
      True, ["Blog", "A blog", "active", "writing", "Launched v1", "side project"]),
-    ("current_learning",
-     {"topic": "Rust", "context": "needed for new job", "priority": "high"},
-     True, ["Rust", "needed for new job"]),
+    ("interest",
+     {"name": "Photography", "kind": "passion", "notes": "weekend shoots"},
+     True, ["Photography", "weekend shoots"]),
     ("top_of_mind", {"idea": "Ship v2", "note": "before Friday"},
      True, ["Ship v2", "before Friday"]),
     ("hobby",
@@ -99,19 +102,32 @@ def test_flatten_entity_title_fallbacks():
 def test_flatten_section_skips_entities_without_id():
     rows = search_index.flatten_section("projects", {
         "projects": [{"id": "project_a1b2c3d4", "name": "P1"}, {"name": "no id yet"}],
-        "current_learning": [{"id": "learning_a1b2c3d4", "topic": "Rust"}],
-        "top_of_mind": [],
+        "top_of_mind": [{"id": "top_a1b2c3d4", "idea": "Ship v2"}],
     })
     ids = [r[0] for r in rows]
-    assert ids == ["project_a1b2c3d4", "learning_a1b2c3d4"]
+    assert ids == ["project_a1b2c3d4", "top_a1b2c3d4"]
 
 
 def test_flatten_section_no_id_lists_is_empty():
+    # "dislikes" is a Phase 5-retired key -- preferences.id_lists now points
+    # at "likes_dislikes" instead, so a blob still carrying the old key
+    # yields no entities regardless of its shape.
     assert search_index.flatten_section("preferences", {"dislikes": ["x"]}) == []
+
+
+def test_like_dislike_shape_has_no_title_or_text_fields():
+    """Documented gap, not a fix: likes_dislikes items store {"item",
+    "stance"} per the Phase 5 brief's exact shape -- neither field is in
+    TITLE_FIELDS/TEXT_FIELDS, so these entries get an id but are not
+    currently surfaced by search_index (flatten_section skips them, since
+    it requires non-empty text)."""
+    title, text = search_index.flatten_entity({"item": "Dark mode", "stance": "like"})
+    assert title == "" and text == ""
 
 
 def test_entity_location_longest_prefix_wins():
     assert search_index.entity_location("learn_20260721_ab12cd") == ("learning_log", "entries")
-    assert search_index.entity_location("learning_ab12cd34") == ("projects", "current_learning")
     assert search_index.entity_location("hobby_ab12cd34") == ("lifestyle", "hobbies")
+    assert search_index.entity_location("interest_ab12cd34") == ("lifestyle", "interests")
+    assert search_index.entity_location("taste_ab12cd34") == ("preferences", "likes_dislikes")
     assert search_index.entity_location("nope_123") is None
