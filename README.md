@@ -259,11 +259,11 @@ Hobbies (with sub-categories and gear lists), passions, curiosities, personality
 
 ### Knowledge
 
-Skills/domains with proficiency levels, mental tabs (custom lists like "favorite matcha spots" or "learning resources")
+Skills/domains with proficiency levels, mental tabs (saved bookmarks/shelves), top of mind (idea inbox)
 
 ### Preferences
 
-Code style, communication preferences, learning style, response format, dislikes
+Code style, communication preferences, learning style, response format, likes/dislikes
 
 ### Projects
 
@@ -285,7 +285,7 @@ Insights, realizations, and conceptual learnings captured across conversations:
 | You say                                 | What gets updated                         |
 | --------------------------------------- | ----------------------------------------- |
 | "I started learning Rust"               | Knowledge → Domains: Rust (learning)      |
-| "I hate morning meetings"               | Preferences → Dislikes: morning meetings  |
+| "I hate morning meetings"               | Preferences → Dislikes: morning meetings (or use dislike entity) |
 | "I picked up photography last month"    | Lifestyle → Hobbies: Photography (active) |
 | "I don't really play badminton anymore" | Lifestyle → Hobbies: Badminton (inactive) |
 | "I usually sleep around 1am"            | Lifestyle → Wellness → Sleep              |
@@ -431,14 +431,19 @@ actions, required/optional fields, examples). A sampler:
 | `project_reference`    | add, remove         | project_name, ref_name, url, notes                                        |
 | `mental_tab_reference` | add, remove         | title (mental tab), ref_name, url, notes                                  |
 | `top_of_mind`          | add, remove         | item/idea, note                                                           |
-| `current_learning`     | add, remove         | topic                                                                     |
-| `dislike`              | add, remove         | item                                                                      |
+| `interest`             | add, update, remove | name, kind (passion/curiosity optional), notes                            |
+| `like`                 | add, remove         | item (stored in preferences.likes_dislikes)                              |
+| `dislike`              | add, remove         | item (stored in preferences.likes_dislikes)                              |
 | `value`                | add, remove         | value                                                                     |
-| `passion`              | add, remove         | passion                                                                   |
 | `learning_entry`       | add, remove         | topic, details, tags, source (optional)                                   |
 | `media_item`           | add, update, remove | title, kind, status, reaction (loved/liked/disliked), url, notes, tags                             |
 | `aesthetic`            | add, update, remove | name, domain, stance, notes, references                                   |
 | And more...            |                     |                                                                           |
+
+**Write aliases (still accepted for backward compatibility):**
+- `passion` → creates `interest` (kind: passion)
+- `curiosity` → creates `interest` (kind: curiosity)  
+- `current_learning` → creates `goal` (type: learning)
 
 Media and aesthetics are taste sections, not activity logs: capture favourites,
 current interests, and things you bounced off. The lightweight path is mentioning
@@ -536,6 +541,7 @@ column backfill has since fixed the dimension mismatch.
 - [x] Goals as a first-class section (types, status, target dates, custom types, migration off profile lists)
 - [x] Media and aesthetics packs — manifest-only sections with a generic schema-driven write path and manifest-driven web editor
 - [x] Freshness surfacing — updated_at on lean reads + top-of-mind staleness advisory
+- [x] List consolidation — interests, likes/dislikes, learning goals unified; searchable taste lists
 - [ ] Better auto-triggering (waiting on MCP improvements)
 - [ ] Conversation history for pattern detection
 - [ ] Data versioning
