@@ -1,7 +1,7 @@
 {
   "key": "projects",
   "title": "Projects",
-  "description": "Active work and current learning",
+  "description": "Active work and side projects",
   "core": false,
   "position": 40,
   "defaults": {

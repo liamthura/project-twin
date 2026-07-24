@@ -993,7 +993,8 @@ def _stub_titles(data: dict) -> dict:
     """Reduce every id-list entity in `data` to a `{"id", "title",
     "updated_at"}` stub (updated_at day-precision, omitted for entries the
     search index doesn't know). Applied after all other filters so stubbing
-    operates on the already-filtered result."""
+    operates on the already-filtered result. Polarity fields (stance,
+    reaction) survive stubbing — a dislike must never read as a like."""
     import search_index
 
     stub_lists = []  # (section_data, list_key)
@@ -1004,11 +1005,16 @@ def _stub_titles(data: dict) -> dict:
             continue
         for list_key, _prefix in spec.id_lists:
             if list_key in section_data and isinstance(section_data[list_key], list):
-                section_data[list_key] = [
-                    {"id": e.get("id"), "title": search_index.flatten_entity(e)[0]}
-                    if isinstance(e, dict) else e
-                    for e in section_data[list_key]
-                ]
+                def _stub(e):
+                    if not isinstance(e, dict):
+                        return e
+                    stub = {"id": e.get("id"), "title": search_index.flatten_entity(e)[0]}
+                    if "stance" in e:
+                        stub["stance"] = e["stance"]
+                    if "reaction" in e:
+                        stub["reaction"] = e["reaction"]
+                    return stub
+                section_data[list_key] = [_stub(e) for e in section_data[list_key]]
                 stub_lists.append((section_data, list_key))
     all_ids = [s["id"] for sd, lk in stub_lists for s in sd[lk]
                if isinstance(s, dict) and s.get("id")]
@@ -3466,7 +3472,9 @@ def persona_modify(
         supports_update = "update" in ENTITY_SCHEMA.get(file_type, {}).get(
             entity.lower(), {}).get("actions", [])
     result = execute_modify(action, entity, data)
-    if match and not result.startswith("❌"):
+    # A stance flip already tells the caller what changed; piling an
+    # advisory on top of it is redundant noise, not new information.
+    if match and not result.startswith("❌") and not result.startswith("✅ Updated stance:"):
         result += _advisory_note(match, supports_update)
     return result
 
@@ -3519,7 +3527,9 @@ def persona_batch(operations: list) -> str:
             supports_update = "update" in ENTITY_SCHEMA.get(file_type, {}).get(
                 entity.lower(), {}).get("actions", [])
         result = execute_modify(action, entity, data)
-        if match and not result.startswith("❌"):
+        # A stance flip already tells the caller what changed; piling an
+        # advisory on top of it is redundant noise, not new information.
+        if match and not result.startswith("❌") and not result.startswith("✅ Updated stance:"):
             result += _advisory_note(match, supports_update)
         results.append(f"{i+1}. {result}")
 

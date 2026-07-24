@@ -210,3 +210,20 @@ def test_run_all_isolates_per_user_failures(monkeypatch):
     assert calls == ["bad", "ok"]          # second user still processed
     assert summary["total"] == 2
     assert len(summary["failures"]) == 1 and summary["failures"][0][0] == "u1"
+
+
+def test_titles_mode_keeps_stance_on_always_on_likes_dislikes(clean_database, as_user):
+    server.execute_modify("add", "dislike", {"item": "Morning meetings"})
+    ctx = server.get_scoped_context("minimal", detail="titles")["context"]
+    [stub] = ctx["preferences"]["likes_dislikes"]
+    assert stub["stance"] == "dislike"
+    assert stub["title"] == "Morning meetings"
+
+
+def test_titles_mode_keeps_stance_on_aesthetics(clean_database, as_user):
+    import settings_store
+    settings_store.set_enabled_optins(["aesthetics"])
+    server.execute_modify("add", "aesthetic", {"name": "Corporate memphis", "stance": "avoid"})
+    ctx = server.get_scoped_context("aesthetics", detail="titles")["context"]
+    [stub] = ctx["aesthetics"]["styles"]
+    assert stub["stance"] == "avoid"

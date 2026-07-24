@@ -255,7 +255,7 @@ Name, bio, location, work experience, education, languages spoken, career aspira
 
 ### Lifestyle
 
-Hobbies (with sub-categories and gear lists), passions, curiosities, personality traits, values, sleep schedule, energy peaks
+Hobbies (with sub-categories and gear lists), interests, personality traits, values, sleep schedule, energy peaks
 
 ### Knowledge
 
@@ -267,7 +267,7 @@ Code style, communication preferences, learning style, response format, likes/di
 
 ### Projects
 
-Current projects, what you're learning, top-of-mind items
+Current projects, top-of-mind items (learning topics now live as goals — see `goal`, type: learning)
 
 ### Learning Log
 
@@ -289,7 +289,7 @@ Insights, realizations, and conceptual learnings captured across conversations:
 | "I picked up photography last month"    | Lifestyle → Hobbies: Photography (active) |
 | "I don't really play badminton anymore" | Lifestyle → Hobbies: Badminton (inactive) |
 | "I usually sleep around 1am"            | Lifestyle → Wellness → Sleep              |
-| "I'm really into mechanical keyboards"  | Lifestyle → Passions                      |
+| "I'm really into mechanical keyboards"  | Lifestyle → Interests                     |
 | "Just finished the Solterra project"    | Projects → Status: completed              |
 
 ---
