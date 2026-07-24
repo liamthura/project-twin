@@ -3575,11 +3575,22 @@ ADVISORY_ENTITIES.update({
 })
 
 
-def _find_strong_match(file_type: str, entity_data: dict) -> Optional[dict]:
-    """Advisory-only: does `entity_data` resemble an existing same-section
-    entity closely enough to warn about? Returns
-    {"entity_id", "title", "distance"} for the top qualifying hit, else None.
-    Never raises -- this runs before the real write and must not block it.
+def _find_strong_match(file_type: str, entity_data: dict,
+                        same_section: bool = True) -> Optional[dict]:
+    """Advisory-only: does `entity_data` resemble an existing entity closely
+    enough to warn about? Returns {"entity_id", "title", "distance",
+    "file_type"} for the top qualifying hit, else None. Never raises -- this
+    runs before/around the real write and must not block it.
+
+    `same_section` controls search scope, not the strength criteria (those
+    apply identically either way):
+      - True (default; the same-section duplicate-advisory use): search is
+        confined to `file_type` itself via `section_filter=[file_type]`.
+      - False (the cross-section relation-nudge use): `file_type` itself is
+        excluded instead, and the search spans every OTHER enabled section
+        (disabled sections are excluded too -- an advisory pointing at a
+        section the user can't currently see would be actionable-looking
+        but dead).
 
     Criteria (checked per hit, so one pass covers both search modes):
       - hybrid (embeddings configured): hit distance is not None and
@@ -3601,6 +3612,11 @@ def _find_strong_match(file_type: str, entity_data: dict) -> Optional[dict]:
         # alone. OR-ing the title in front keeps that door open (title alone
         # can satisfy the FTS predicate) without weakening the vector leg,
         # which reads the whole query string regardless of the "OR" token.
+        # Crucially, this ANDs the bare words of `flattened_text` together
+        # (websearch_to_tsquery's default for adjacent bare words) rather
+        # than OR-ing them -- unlike semantic_neighbors' FTS fallback, a
+        # single shared word (e.g. "Factory") can never satisfy this query
+        # on its own; either the full phrase matches or every word does.
         if flattened_title:
             # Phrase-quote the title so websearch_to_tsquery treats it as a
             # literal adjacency requirement rather than parsing any OR/AND/
@@ -3614,14 +3630,22 @@ def _find_strong_match(file_type: str, entity_data: dict) -> Optional[dict]:
             query = f'"{safe_title}" OR {flattened_text}'
         else:
             query = flattened_text
-        hits = search_index.search(user_id, query, [file_type], limit=3)
+        if same_section:
+            section_filter, exclude_sections = [file_type], None
+        else:
+            section_filter = None
+            exclude_sections = list(
+                (set(sections.SECTION_REGISTRY) - settings_store.enabled_sections())
+                | {file_type})
+        hits = search_index.search(user_id, query, section_filter, limit=3,
+                                   exclude_sections=exclude_sections)
         for hit in hits["results"]:
             if hit["distance"] is not None and hit["distance"] <= DUPLICATE_DISTANCE_CUTOFF:
                 return {"entity_id": hit["entity_id"], "title": hit["title"],
-                        "distance": hit["distance"]}
+                        "distance": hit["distance"], "file_type": hit["section"]}
             if flattened_title and hit["title"].lower() == flattened_title.lower():
                 return {"entity_id": hit["entity_id"], "title": hit["title"],
-                        "distance": hit["distance"]}
+                        "distance": hit["distance"], "file_type": hit["section"]}
         return None
     except Exception:
         logger.warning("duplicate-advisory check failed for file_type=%s",
@@ -3644,59 +3668,36 @@ def _advisory_note(match: dict, supports_update: bool) -> str:
     return prefix + '— it may be a duplicate.'
 
 
-def _newly_written_entity_id(file_type: str, list_key: str, entity: str, data: dict):
-    """Best-effort recovery of the id just assigned to the item execute_modify
-    wrote (ids are never known ahead of a write -- persona_store assigns them
-    inside save). Keyed the same way the generic write branch itself resolves
-    an item: by the entity's ENTITY_SCHEMA identifier field. Returns None if
-    the identifier can't be read from `data` or no matching item is found
-    (never raises -- callers treat a miss as "skip the nudge")."""
-    identifier = ENTITY_SCHEMA.get(file_type, {}).get(entity, {}).get("identifier")
-    if not identifier:
-        return None
-    value = get_field(data, identifier, "name", "title")
-    if not value:
-        return None
-    items = load_json(file_type).get(list_key) or []
-    _, item = find_in_array(items, value, identifier)
-    return item.get("id") if isinstance(item, dict) else None
+def _cross_section_nudge(file_type: str, entity_data: dict):
+    """Best-effort: does the item just added (`entity_data`, in `file_type`)
+    have a STRONG match in some OTHER enabled section worth nudging the
+    caller to link? Routed entirely through `_find_strong_match(...,
+    same_section=False)` -- the same tight vector cutoff and FTS strength
+    rules (exact-title match, AND-joined bare words) the same-section
+    duplicate advisory already applies, just pointed at every other enabled
+    section instead of `file_type` itself. This intentionally replaces an
+    earlier design that probed search_index.semantic_neighbors on the
+    just-written row: that helper's FTS fallback OR-joins each word of the
+    title (appropriate for "similar" surfacing, wrong for a write-time
+    advisory), so a single shared word like "Factory" was enough to fire a
+    nudge between two otherwise-unrelated entries -- a false positive fixed
+    by using `_find_strong_match`'s stricter query construction instead.
 
-
-def _cross_section_nudge(entity_id: str):
-    """Best-effort: does the entity just written at `entity_id` have a strong
-    cross-section neighbor worth nudging the caller to link? Probes via
-    search_index.semantic_neighbors on the entity's OWN just-synced index
-    row -- persona_store.save runs search_index.sync_index synchronously
-    (only the embedding fill is async), so by the time this runs -- always
-    AFTER execute_modify has already returned -- the title/text row already
-    exists even though the background embedding job usually hasn't landed
-    yet. That's exactly the "null source embedding" case semantic_neighbors
-    documents falling back to FTS for, seeded with the row's own title.
-
-    Applies the tight DUPLICATE_DISTANCE_CUTOFF (not semantic_neighbors' own
-    loose NEIGHBOR_DISTANCE_CUTOFF) to the vector leg. For the FTS-fallback
-    leg (distance is None), "use fts_hit truthiness" reduces to accepting
-    the hit as-is: search()'s merged query only ever produces a null vector
-    distance for a row that was NOT found via the vector CTE, and per the
-    full outer join that means it can only be present at all because it
-    matched the FTS predicate -- so a null-distance hit implies fts_hit is
-    already true by construction, in both fts-only and hybrid mode.
+    The query is built fresh from `entity_data` (not re-read from the index
+    row), so the vector leg embeds the query text synchronously right here
+    -- no need to wait on the async embedding-fill job the write kicked off.
 
     Never raises -- advisory-only, must never affect the write outcome.
     """
     try:
-        user_id = db.current_user_id.get()
-        excluded = list(set(sections.SECTION_REGISTRY) - settings_store.enabled_sections())
-        neighbors = search_index.semantic_neighbors(user_id, entity_id,
-                                                      exclude_sections=excluded)
-        for n in neighbors:
-            if n["distance"] is None or n["distance"] <= DUPLICATE_DISTANCE_CUTOFF:
-                return (f' Possibly related to {n["entity_id"]} "{n["title"]}" '
-                        f'({n["file_type"]}) — link them with action="link"')
+        match = _find_strong_match(file_type, entity_data, same_section=False)
+        if match:
+            return (f' Possibly related to {match["entity_id"]} "{match["title"]}" '
+                    f'({match["file_type"]}) — link them with action="link"')
         return None
     except Exception:
-        logger.warning("cross-section nudge probe failed for entity_id=%s",
-                       entity_id, exc_info=True)
+        logger.warning("cross-section nudge probe failed for file_type=%s",
+                       file_type, exc_info=True)
         return None
 
 
@@ -3708,8 +3709,10 @@ def _augment_add_result(action: str, entity_lower: str, data: dict,
     so it can't match the entity against itself) if one fired, else -- only
     for a genuinely successful add of an ADVISORY_ENTITIES entity, and only
     when no duplicate note fired -- a best-effort cross-section relation
-    nudge probed AFTER the write via the just-written entity's own index
-    row. The duplicate note always wins: at most one advisory per response.
+    nudge probed via `_find_strong_match(..., same_section=False)` against
+    the same normalized `data` the write itself used (no dependence on the
+    write's assigned id or the index row it produced). The duplicate note
+    always wins: at most one advisory per response.
     """
     # A stance flip already tells the caller what changed; piling an
     # advisory on top of it is redundant noise, not new information.
@@ -3718,13 +3721,11 @@ def _augment_add_result(action: str, entity_lower: str, data: dict,
     if dup_fired:
         return result + _advisory_note(match, supports_update)
     if action == "add" and entity_lower in ADVISORY_ENTITIES and result.startswith("✅"):
-        file_type, list_key = ADVISORY_ENTITIES[entity_lower]
+        file_type, _list_key = ADVISORY_ENTITIES[entity_lower]
         try:
-            eid = _newly_written_entity_id(file_type, list_key, entity_lower, data)
-            if eid:
-                nudge = _cross_section_nudge(eid)
-                if nudge:
-                    result += nudge
+            nudge = _cross_section_nudge(file_type, normalize_data(data, entity_lower))
+            if nudge:
+                result += nudge
         except Exception:
             logger.warning("cross-section nudge lookup failed for entity=%s",
                            entity_lower, exc_info=True)
@@ -3733,28 +3734,36 @@ def _augment_add_result(action: str, entity_lower: str, data: dict,
 
 @mcp.tool()
 def persona_modify(
-    action: Literal["add", "update", "remove"],
+    action: Literal["add", "update", "remove", "link", "unlink"],
     entity: str,
     data: dict
 ) -> str:
-    """Add, update, or remove a single item from persona data.
+    """Add, update, or remove a single item from persona data. Also links/
+    unlinks any two existing entries.
     If unsure, use get_schema to discover valid entity types, required fields, and enum values.
 
     Args:
-        action: "add" | "update" | "remove"
-        entity: Entity type (use get_schema to discover valid types)
-        data: Object with identifier + fields. Always include: name, title, topic, or address
+        action: "add" | "update" | "remove" | "link" | "unlink"
+        entity: Entity type (use get_schema to discover valid types). Ignored
+            for "link"/"unlink" -- pass entity="link" by convention.
+        data: Object with identifier + fields. Always include: name, title, topic, or address.
+            For "link"/"unlink": {entity_id, related: [ids]} instead --
+            entity_id is the source entry, related is the target id(s) to
+            connect/disconnect (a single id string is also accepted).
 
     DATA REQUIREMENTS:
         - Always include identifier: name, title, topic, or address (depends on entity)
         - For update/remove: identifier matches existing item
         - For add: identifier + any optional fields
+        - For link/unlink: {entity_id, related: [ids]} (entity is ignored)
 
     EXAMPLES:
         - ADD hobby: {action: "add", entity: "hobby", data: {name: "Photography", skill_level: "beginner"}}
         - UPDATE project: {action: "update", entity: "project", data: {name: "MyApp", status: "completed"}}
         - REMOVE domain: {action: "remove", entity: "domain", data: {name: "PHP"}}
         - ADD learning_entry: {action: "add", entity: "learning_entry", data: {topic: "React Hooks", details: "...", source: "Claude"}}
+        - LINK entries: {action: "link", entity: "link", data: {entity_id: "goal_abc123", related: ["project_def456"]}}
+        - UNLINK entries: {action: "unlink", entity: "link", data: {entity_id: "goal_abc123", related: ["project_def456"]}}
 
     NESTED ITEMS (include parent identifier):
         - work_highlight: {company: "Acme", highlight: "Led migration"}

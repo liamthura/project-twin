@@ -2,6 +2,7 @@
 and get_entity's `related` (stored links, always resolved) / `similar`
 (derived neighbors, on request) surfaces. Links themselves (action="link")
 are Task 2 -- here `related` is seeded directly via persona_store.save."""
+import asyncio
 import json
 
 import db
@@ -498,6 +499,60 @@ def test_get_entity_round_trip_after_link(as_user):
 
 
 # ---------------------------------------------------------------------------
+# Critical 1 regression: action="link"/"unlink" must clear real FastMCP/
+# Pydantic schema validation, not just execute_modify's own dispatch. Every
+# other test in this file calls .fn()/execute_modify directly, which bypasses
+# the tool's Pydantic-validated `run()` entry point entirely -- these go
+# through the real one, the way an actual MCP client call would.
+# ---------------------------------------------------------------------------
+
+def test_link_action_passes_real_tool_schema_validation(as_user):
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    result = asyncio.run(server.persona_modify.run(
+        {"action": "link", "entity": "link", "data": {"entity_id": gid, "related": [pid]}}))
+
+    text = result.structured_content["result"]
+    assert text.startswith("✅")
+    assert persona_store.load("goals")["goals"][0]["related"] == [pid]
+
+
+def test_unlink_action_passes_real_tool_schema_validation(as_user):
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+    server.execute_modify("link", "link", {"entity_id": gid, "related": [pid]})
+
+    result = asyncio.run(server.persona_modify.run(
+        {"action": "unlink", "entity": "link", "data": {"entity_id": gid, "related": [pid]}}))
+
+    text = result.structured_content["result"]
+    assert "✅" in text
+    assert persona_store.load("goals")["goals"][0].get("related") in (None, [])
+
+
+def test_persona_batch_schema_tolerates_link_ops_via_real_run(as_user):
+    # persona_batch's `operations` param is an untyped list -- confirm the
+    # real tool schema (not just execute_modify) tolerates a link op inside it.
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "dash"})
+    server.execute_modify("add", "goal", {"title": "Ship it", "type": "learning"})
+    pid = server.load_json("projects.json")["projects"][0]["id"]
+    gid = server.load_json("goals.json")["goals"][0]["id"]
+
+    result = asyncio.run(server.persona_batch.run({"operations": [
+        {"action": "link", "entity": "link", "data": {"entity_id": gid, "related": [pid]}},
+    ]}))
+
+    text = result.structured_content["result"]
+    assert "1. ✅" in text
+    assert persona_store.load("goals")["goals"][0]["related"] == [pid]
+
+
+# ---------------------------------------------------------------------------
 # persona_batch passthrough for link/unlink ops
 # ---------------------------------------------------------------------------
 
@@ -589,11 +644,63 @@ def test_nudge_batch_per_op_parity(as_user, monkeypatch):
 
 
 def test_nudge_probe_failure_never_breaks_write(as_user, monkeypatch):
+    # The nudge probe now runs through _find_strong_match -> search_index.search
+    # (not semantic_neighbors, which is reserved for get_entity's `similar`).
     _seed_project_for_nudge(monkeypatch, None)
-    monkeypatch.setattr(search_index, "semantic_neighbors",
+    monkeypatch.setattr(search_index, "search",
                         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("x")))
 
     out = server.persona_modify.fn("add", "goal", {"title": "Ledger", "type": "learning"})
 
     assert "Possibly related to" not in out
     assert any(g["title"] == "Ledger" for g in persona_store.load("goals")["goals"])
+
+
+# ---------------------------------------------------------------------------
+# Critical 2 regression: the nudge must require a STRONG cross-section match
+# (routed through _find_strong_match(..., same_section=False)), not any
+# FTS-fallback neighbor -- semantic_neighbors' FTS leg OR-joins title words,
+# so a single shared word (e.g. "Factory") used to be enough to fire it.
+# ---------------------------------------------------------------------------
+
+def test_nudge_does_not_fire_on_single_shared_word(as_user, monkeypatch):
+    # Reviewer's repro: "Visit the Cheese Factory this weekend" shares only
+    # the word "Factory" with the existing "Quantum Widget Factory" project
+    # -- that alone must not fire the nudge.
+    _seed_project_for_nudge(monkeypatch, None)
+    persona_store.save("projects", {
+        "projects": [{"name": "Quantum Widget Factory",
+                      "description": "Manufacturing pipeline"}],
+        "current_learning": [], "top_of_mind": [],
+    })
+    uid = db.current_user_id.get()
+    search_index.sync_index(uid, "projects", persona_store.load("projects"), embed_sync=True)
+
+    out = server.persona_modify.fn(
+        "add", "goal", {"title": "Visit the Cheese Factory this weekend", "type": "learning"})
+
+    assert "Possibly related to" not in out
+
+
+def test_nudge_fires_on_strong_cross_section_vector_match(as_user, monkeypatch):
+    # Hybrid mode: the goal's title is deliberately unrelated ("Deep dive"
+    # vs. "Ledger") so this exercises the vector leg specifically, not the
+    # exact-title FTS fallback -- but VocabProvider's fake embedding puts
+    # both inside DUPLICATE_DISTANCE_CUTOFF because both texts mention
+    # "javascript" (mirrors the existing dupe-advisory strong-match setup
+    # in test_dupe_advisory.py). A genuinely strong match: the nudge fires.
+    monkeypatch.setattr(embeddings, "get_provider", lambda: VocabProvider())
+    persona_store.save("projects", {
+        "projects": [{"name": "Ledger", "description": "A JavaScript dashboard"}],
+        "current_learning": [], "top_of_mind": [],
+    })
+    uid = db.current_user_id.get()
+    search_index.sync_index(uid, "projects", persona_store.load("projects"), embed_sync=True)
+
+    out = server.persona_modify.fn(
+        "add", "goal", {"title": "Deep dive", "notes": "javascript patterns",
+                        "type": "learning"})
+
+    assert "Possibly related to" in out
+    assert "(projects)" in out
+    assert 'link them with action="link"' in out
