@@ -3,6 +3,7 @@
   "title": "Example",
   "description": "One-line description shown in the Sections manager",
   "core": false,
+  "default_enabled": false,
   "position": 100,
   "defaults": { "items": [] },
   "id_lists": [["items", "example"]],
@@ -10,11 +11,12 @@
   "entities": {
     "example_item": {
       "actions": ["add", "update", "remove"],
+      "list": "items",
       "required": ["name"],
       "optional": ["notes", "tags"],
       "identifier": "name"
     }
   },
   "capture_triggers": ["example phrase"],
-  "ui": { "items": { "title_field": "name", "badges": [], "detail_fields": ["notes", "tags"] } }
+  "ui": { "items": { "title_field": "name", "badges": [], "detail_fields": ["notes", "tags"], "suggestions": { "name": ["Example 1", "Example 2", "Example 3"] } } }
 }

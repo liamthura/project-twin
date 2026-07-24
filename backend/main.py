@@ -83,6 +83,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
         "https://mygist.thuradev.qzz.io",
         "http://localhost:1120",
         "http://chat.orb.local",
@@ -251,6 +253,7 @@ async def update_file(file_type: str, update: FileUpdate):
 
 class SettingsUpdate(BaseModel):
     disabled_sections: list[str]
+    enabled_sections: Optional[list[str]] = None
 
 
 @app.get("/api/settings")
@@ -258,6 +261,7 @@ async def get_settings():
     enabled = settings_store.enabled_sections()
     return {
         "disabled_sections": sorted(settings_store.get_disabled_sections()),
+        "enabled_sections": sorted(settings_store.get_enabled_optins()),
         "toggleable": sorted(sections.toggleable_sections()),
         "always_on": sorted(sections.ALWAYS_ON_SECTIONS),
         "packs": [
@@ -266,6 +270,9 @@ async def get_settings():
                 "title": meta["title"],
                 "description": meta["description"],
                 "core": meta["core"],
+                "default_enabled": meta["default_enabled"],
+                "ui": meta["ui"],
+                "entities": meta["entities"],
                 "enabled": key in enabled,
             }
             for key, meta in sections.PACK_META.items()
@@ -284,7 +291,18 @@ async def update_settings(update: SettingsUpdate):
                    f"Toggleable: {sorted(sections.toggleable_sections())}",
         )
     settings_store.set_disabled_sections(sorted(requested))
-    return {"status": "saved", "disabled_sections": sorted(requested)}
+    if update.enabled_sections is not None:
+        default_off = {k for k, on in sections.DEFAULT_ENABLED.items() if not on}
+        bad_optins = set(update.enabled_sections) - default_off
+        if bad_optins:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot opt into: {sorted(bad_optins)}. "
+                       f"Opt-in packs: {sorted(default_off)}",
+            )
+        settings_store.set_enabled_optins(sorted(set(update.enabled_sections)))
+    return {"status": "saved", "disabled_sections": sorted(requested),
+            "enabled_sections": sorted(settings_store.get_enabled_optins())}
 
 
 @app.get("/api/all")

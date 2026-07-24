@@ -14,6 +14,10 @@ import {
   Sun,
   Moon,
   Monitor,
+  Package,
+  Target,
+  Film,
+  Palette,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -40,7 +44,6 @@ import {
 } from "@/components/ui/dialog";
 import { ConnectionSettings } from "@/components/ConnectionSettings";
 import { api, getAuthToken } from "@/lib/api.js";
-import { SECTION_LABELS, SECTION_DESCRIPTIONS } from "@/lib/sections.js";
 import { WelcomeAuth } from "@/components/WelcomeAuth";
 import ProfileEditor from "@/editors/ProfileEditor";
 import KnowledgeEditor from "@/editors/KnowledgeEditor";
@@ -49,6 +52,7 @@ import ProjectsEditor from "@/editors/ProjectsEditor";
 import LifestyleEditor from "@/editors/LifestyleEditor";
 import CircleEditor from "@/editors/CircleEditor";
 import LearningLogEditor from "@/editors/LearningLogEditor";
+import GenericSectionEditor from "@/components/GenericSectionEditor";
 
 // Debounce hook
 function useDebounce(callback, delay) {
@@ -71,6 +75,11 @@ function useDebounce(callback, delay) {
 
 const TAB_TRIGGER_CLASS =
   "h-11 shrink-0 snap-start gap-2 rounded-full border md:h-9 md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent";
+
+// Sections with a bespoke, hand-built editor. Everything else that's
+// enabled gets a generic, manifest-driven tab instead.
+const BESPOKE_EDITORS = new Set(["profile", "knowledge", "preferences", "projects", "lifestyle", "circle", "learning_log"]);
+const PACK_ICONS = { goals: Target, media: Film, aesthetics: Palette };
 
 // Tracks whether a horizontally scrollable element is at its start/end edge,
 // so the tab strip only fades the side that actually has more content.
@@ -140,9 +149,11 @@ export default function App() {
   const [learningLog, setLearningLog] = useState({});
 
   const [disabledSections, setDisabledSections] = useState([]);
+  const [packs, setPacks] = useState([]);
   // Tab count changes when sections are toggled, so re-measure the strip then.
-  const [tabStripRef, tabStripEdges] = useEdgeFade([disabledSections]);
-  const [toggleable, setToggleable] = useState([]);
+  const [tabStripRef, tabStripEdges] = useEdgeFade([disabledSections, packs]);
+  // Data for enabled sections WITHOUT a bespoke editor, keyed by section key.
+  const [packData, setPackData] = useState({});
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -189,6 +200,12 @@ export default function App() {
       setLifestyle(response.data.lifestyle || {});
       setCircle(response.data.circle || {});
       setLearningLog(response.data.learning_log || {});
+      const known = new Set([...BESPOKE_EDITORS]);
+      const rest = {};
+      for (const [k, v] of Object.entries(response.data || {})) {
+        if (!known.has(k)) rest[k] = v;
+      }
+      setPackData(rest);
       setIsConnected(true);
     } catch (err) {
       setError(err.message);
@@ -202,7 +219,7 @@ export default function App() {
     try {
       const s = await api("/settings");
       setDisabledSections(s.disabled_sections || []);
-      setToggleable(s.toggleable || []);
+      setPacks(s.packs || []);
     } catch (_) {
       // non-fatal: default to all sections enabled
     }
@@ -258,6 +275,10 @@ export default function App() {
     setLearningLog(newData);
     if (isAutosaveEnabled) debouncedSave("learning_log", newData);
   };
+  const handlePackChange = (key) => (newData) => {
+    setPackData((prev) => ({ ...prev, [key]: newData }));
+    if (isAutosaveEnabled) debouncedSave(key, newData);
+  };
 
   const saveAll = async () => {
     setIsSaving(true);
@@ -272,6 +293,7 @@ export default function App() {
           lifestyle,
           circle,
           learning_log: learningLog,
+          ...packData,
         }),
       });
       setLastSaved(new Date());
@@ -287,19 +309,34 @@ export default function App() {
     }
   };
 
-  const toggleSection = async (key) => {
-    const previous = disabledSections;
-    const next = disabledSections.includes(key)
-      ? disabledSections.filter((k) => k !== key)
-      : [...disabledSections, key];
-    setDisabledSections(next); // optimistic
+  const togglePack = async (key, wantEnabled) => {
+    const previous = packs;
+    const prevDisabledSections = disabledSections;
+    const next = packs.map((p) => (p.key === key ? { ...p, enabled: wantEnabled } : p));
+    const disabled = next.filter((p) => !p.core && p.default_enabled && !p.enabled).map((p) => p.key);
+    const optins = next.filter((p) => !p.default_enabled && p.enabled).map((p) => p.key);
+    setPacks(next); // optimistic
+    setDisabledSections(disabled); // optimistic (for tab visibility)
     try {
       await api("/settings", {
         method: "PUT",
-        body: JSON.stringify({ disabled_sections: next }),
+        body: JSON.stringify({ disabled_sections: disabled, enabled_sections: optins }),
       });
+      if (wantEnabled) {
+        // Fetch fresh data but merge in ONLY the newly-enabled section —
+        // a full setState of all sections would race the debounced autosave.
+        const response = await api("/all");
+        setPackData((prev) => ({ ...prev, [key]: response.data?.[key] ?? {} }));
+      } else {
+        setPackData((prev) => {
+          const rest = { ...prev };
+          delete rest[key];
+          return rest;
+        });
+      }
     } catch (err) {
-      setDisabledSections(previous); // rollback
+      setPacks(previous); // rollback
+      setDisabledSections(prevDisabledSections); // rollback
       toast({
         title: "Failed to update section settings",
         description: err.message,
@@ -417,6 +454,8 @@ export default function App() {
       </div>
     );
   }
+
+  const dynamicPacks = packs.filter((p) => p.enabled && !BESPOKE_EDITORS.has(p.key));
 
   return (
     <div className="min-h-dvh bg-background">
@@ -562,6 +601,15 @@ export default function App() {
               <Settings className="h-4 w-4" />
               <span>Preferences</span>
             </TabsTrigger>
+            {dynamicPacks.map((p) => {
+              const Icon = PACK_ICONS[p.key] || Package;
+              return (
+                <TabsTrigger key={p.key} value={p.key} className={TAB_TRIGGER_CLASS}>
+                  <Icon className="h-4 w-4" />
+                  <span>{p.title}</span>
+                </TabsTrigger>
+              );
+            })}
             <TabsTrigger value="sections" className={TAB_TRIGGER_CLASS}>
               <SlidersHorizontal className="h-4 w-4" />
               <span>Sections</span>
@@ -630,6 +678,16 @@ export default function App() {
               onChange={handlePreferencesChange}
             />
           </TabsContent>
+          {dynamicPacks.map((p) => (
+            <TabsContent key={p.key} value={p.key}>
+              <GenericSectionEditor
+                pack={p}
+                data={packData[p.key]}
+                onChange={handlePackChange(p.key)}
+                onShowConfirmation={showConfirmation}
+              />
+            </TabsContent>
+          ))}
           <TabsContent value="sections">
             <Card>
               <CardHeader className="border-b">
@@ -641,30 +699,29 @@ export default function App() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {toggleable.length === 0 && (
+                {packs.filter((p) => !p.core).length === 0 && (
                   <EmptyState>No toggleable sections available.</EmptyState>
                 )}
-                {toggleable.map((key) => {
-                  const enabled = !disabledSections.includes(key);
+                {packs.filter((p) => !p.core).map((p) => {
                   return (
                     <div
-                      key={key}
+                      key={p.key}
                       className="flex items-center justify-between gap-6 border-b border-border py-4 first:pt-1 last:border-b-0 last:pb-1"
                     >
                       <div className="min-w-0 space-y-1">
                         <p className="text-sm font-medium leading-none">
-                          {SECTION_LABELS[key] || key}
+                          {p.title}
                         </p>
-                        {SECTION_DESCRIPTIONS[key] && (
+                        {p.description && (
                           <p className="text-xs leading-relaxed text-muted-foreground">
-                            {SECTION_DESCRIPTIONS[key]}
+                            {p.description}
                           </p>
                         )}
                       </div>
                       <Switch
-                        checked={enabled}
-                        onCheckedChange={() => toggleSection(key)}
-                        aria-label={`Toggle ${SECTION_LABELS[key] || key}`}
+                        checked={p.enabled}
+                        onCheckedChange={(next) => togglePack(p.key, next)}
+                        aria-label={`Toggle ${p.title}`}
                       />
                     </div>
                   );

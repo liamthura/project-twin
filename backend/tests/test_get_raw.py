@@ -4,6 +4,7 @@ import pytest
 
 import server
 import persona_store as store
+import settings_store
 
 # get_raw is a FastMCP FunctionTool; `.fn` is the raw callable.
 get_raw = server.get_raw.fn
@@ -12,13 +13,17 @@ get_raw = server.get_raw.fn
 @pytest.mark.parametrize("file", store.VALID_FILES)
 def test_get_raw_handles_every_registry_file(as_user, file):
     # Every file in the registry-derived VALID_FILES must resolve to real JSON,
-    # not the unknown-file error — proving the accepted set follows the registry.
+    # not the unknown-file error — proving the accepted set follows the
+    # registry. media/aesthetics are default-off, so opt in first; that's a
+    # settings concern, not something this accepted-set check should trip on.
+    settings_store.set_enabled_optins(["media", "aesthetics"])
     out = get_raw(file=file)
     data = json.loads(out)
     assert isinstance(data, dict)
 
 
 def test_get_raw_all_returns_every_registry_file(as_user):
+    settings_store.set_enabled_optins(["media", "aesthetics"])
     data = json.loads(get_raw(file="all"))
     assert set(data.keys()) == set(store.VALID_FILES)
 

@@ -26,7 +26,9 @@ def _expected_filetypes(scope: str) -> set[str]:
     """Bare file-type names a scope should load. Hardcoded (NOT derived from the
     code under test) so this characterization test can catch scope->file drift."""
     if scope == "full":
-        return set(store.VALID_FILES)
+        # media/aesthetics are default-off (opt-in); a fresh as_user has no
+        # opt-ins, so "full" excludes them same as any other disabled pack.
+        return set(store.VALID_FILES) - {"media", "aesthetics"}
     return _EXPECTED_FILES_BY_SCOPE[scope]
 
 
@@ -74,7 +76,11 @@ def test_resolve_scope_fields_preserves_legacy_key_order():
     expected = {
         "minimal": ["preferences", "profile", "goals", "projects"],
         "professional": ["preferences", "profile", "goals", "knowledge", "projects"],
-        "personal": ["preferences", "profile", "goals", "lifestyle", "knowledge", "circle"],
+        # media/aesthetics contribute to "personal" too but post-date the
+        # legacy _CONTEXT_FILE_ORDER tuple, so they land after it (in
+        # registry position order) rather than interleaved with it.
+        "personal": ["preferences", "profile", "goals", "lifestyle", "knowledge", "circle",
+                     "media", "aesthetics"],
         "learning": ["preferences", "profile", "goals", "knowledge", "projects", "learning_log"],
     }
     for scope, keys in expected.items():

@@ -1,0 +1,39 @@
+{
+  "key": "aesthetics",
+  "title": "Aesthetics",
+  "description": "Visual styles, palettes, and influences you prefer or avoid",
+  "core": false,
+  "position": 56,
+  "default_enabled": false,
+  "defaults": { "styles": [] },
+  "id_lists": [["styles", "aesthetic"]],
+  "scope_contributions": { "personal": ["styles"] },
+  "entities": {
+    "aesthetic": {
+      "actions": ["add", "update", "remove"],
+      "required": ["name"],
+      "optional": ["domain", "stance", "notes", "references"],
+      "valid_values": {
+        "domain": ["ui", "graphic", "typography", "color", "illustration", "photography", "fashion", "interior", "general"],
+        "stance": ["love", "like", "avoid"]
+      },
+      "identifier": "name",
+      "list": "styles",
+      "field_defaults": { "stance": "like" }
+    }
+  },
+  "capture_triggers": ["aesthetic", "design style", "vibe", "looks like", "color palette"],
+  "ui": {
+    "styles": {
+      "title_field": "name",
+      "badges": ["domain", "stance"],
+      "detail_fields": ["notes", "references"],
+      "array_fields": ["references"],
+      "suggestions": {
+        "name": ["Minimalist", "Maximalist", "Brutalist", "Pastel", "Monochrome",
+                 "Retro-futurism", "Art deco", "Scandinavian", "Y2K", "Editorial",
+                 "Hand-drawn", "Glassmorphism"]
+      }
+    }
+  }
+}

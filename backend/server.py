@@ -810,8 +810,8 @@ def get_scoped_context(
     
     tokens = [scope] if isinstance(scope, str) else list(scope)
     if not include_inactive:
-        # Goals hook (1/2): the goals section scope shows every status.
-        exempt = frozenset({"goals"}) if "goals" in tokens else frozenset()
+        # Goals/media hook (1/2): these section scopes show every status.
+        exempt = frozenset({"goals", "media"} & set(tokens))
         result = _filter_inactive(result, exempt)
 
     if detail == "titles":
@@ -1003,7 +1003,8 @@ def _filter_inactive(data: dict, exempt: frozenset = frozenset()) -> dict:
                 for item in value:
                     if isinstance(item, dict):
                         status = item.get("status", "active")
-                        if status in ["active", "open", "exploring", "planning", None, "completed"]:
+                        if status in ["active", "open", "exploring", "planning", None, "completed",
+                                       "want", "in_progress", "finished"]:
                             active_items.append(item)
                     else:
                         active_items.append(item)
@@ -1125,6 +1126,39 @@ def _validate_related_entries(links):
 # =============================================================================
 # EXECUTE MODIFY - Core entity modification logic
 # =============================================================================
+
+def _generic_entity_spec(entity: str):
+    """(section, list_key, entity_spec) for schema entities the generic write
+    branch can handle: top-level id-list entities with an identifier, no
+    parent, and a resolvable list (explicit `list` field, or the section's
+    sole id_list). Bespoke elif branches always win — this is only consulted
+    for entities none of them claimed."""
+    section = _section_for_entity(entity)
+    if section is None:
+        return None
+    espec = ENTITY_SCHEMA[section][entity]
+    if espec.get("parent") or not espec.get("identifier"):
+        return None
+    list_key = espec.get("list")
+    if not list_key:
+        id_lists = sections.SECTION_REGISTRY[section].id_lists
+        if len(id_lists) != 1:
+            return None
+        # Ambiguous when more than one entity in the section could plausibly
+        # own that sole id-list (no explicit `list`, no parent, has an
+        # identifier) -- e.g. lifestyle's `hobbies` id-list sits beside
+        # passion/curiosity/personality_trait/value/sleep/energy_peak, none
+        # of which actually write into `hobbies`. Only fall back to the sole
+        # id-list when exactly one such entity exists in the section.
+        candidates = [e for e, s in ENTITY_SCHEMA[section].items()
+                      if not s.get("parent") and s.get("identifier") and not s.get("list")]
+        if len(candidates) != 1:
+            return None
+        list_key = id_lists[0][0]
+    if not any(lk == list_key for lk, _ in sections.SECTION_REGISTRY[section].id_lists):
+        return None
+    return section, list_key, espec
+
 
 def execute_modify(action: str, entity: str, data: dict) -> str:
     """Execute a single modify operation. Returns result message."""
@@ -2371,7 +2405,72 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 save_json("profile.json", profile)
                 return f"✅ Removed coursework topic: {course}"
             return f"❌ Coursework topic not found"
-    
+
+    elif (_gspec := _generic_entity_spec(entity)) is not None:
+        section, list_key, espec = _gspec
+        blob = load_json(f"{section}.json")
+        items = blob.setdefault(list_key, [])
+        ident = espec["identifier"]
+        value = get_field(data, ident, "name", "title")
+
+        def _validate_enums(payload: dict):
+            for f, allowed in espec.get("valid_values", {}).items():
+                if f in payload and payload[f] not in allowed:
+                    return f"❌ Invalid {f} '{payload[f]}'. Valid: {allowed}"
+            return None
+
+        fields = [f for f in espec["required"] + espec["optional"] if f != ident]
+
+        if action == "add":
+            if not value:
+                return f"❌ {entity} requires '{ident}'"
+            idx, _ = find_in_array(items, value, ident)
+            if idx != -1:
+                return f"ℹ️ {entity} '{value}' already exists"
+            item = {ident: value}
+            for f in fields:
+                v = get_field(data, f)
+                if v is not None:
+                    item[f] = v
+            for f, default in espec.get("field_defaults", {}).items():
+                item.setdefault(f, default)
+            missing = [f for f in espec["required"] if f not in item]
+            if missing:
+                return f"❌ {entity} requires {missing}"
+            err = _validate_enums(item)
+            if err:
+                return err
+            items.append(item)
+            save_json(f"{section}.json", blob)
+            return f"✅ Added {entity}: {value}"
+
+        elif action == "update":
+            idx, item = find_in_array(items, value or "", ident)
+            if idx == -1:
+                return f"❌ {entity} '{value}' not found"
+            changes = {}
+            for f in fields:
+                v = get_field(data, f)
+                if v is not None:
+                    changes[f] = v
+            err = _validate_enums(changes)
+            if err:
+                return err
+            item.update(changes)
+            new_ident = get_field(data, f"new_{ident}")
+            if new_ident:
+                item[ident] = new_ident
+            save_json(f"{section}.json", blob)
+            return f"✅ Updated {entity}: {item[ident]}"
+
+        elif action == "remove":
+            idx, _ = find_in_array(items, value or "", ident)
+            if idx == -1:
+                return f"❌ {entity} '{value}' not found"
+            items.pop(idx)
+            save_json(f"{section}.json", blob)
+            return f"✅ Removed {entity}: {value}"
+
     return f"❌ Unknown entity type: {entity}"
 
 
@@ -3234,6 +3333,17 @@ ADVISORY_ENTITIES: dict[str, tuple[str, str]] = {
     "connection": ("circle", "connections"),
     "learning_entry": ("learning_log", "entries"),
 }
+
+# Generic pack entities (manifest-only packs) qualify automatically: any
+# top-level id-list entity the generic write branch handles gets the same
+# duplicate-advisory coverage as the hand-listed entities above.
+ADVISORY_ENTITIES.update({
+    entity: (spec[0], spec[1])
+    for section_entities in ENTITY_SCHEMA.values()
+    for entity in section_entities
+    if entity not in ADVISORY_ENTITIES
+    and (spec := _generic_entity_spec(entity)) is not None
+})
 
 
 def _find_strong_match(file_type: str, entity_data: dict) -> Optional[dict]:

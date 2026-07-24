@@ -23,7 +23,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      # Local dev talks to the local pgvector container (mygist_local DB —
+      # separate from mygist_test, which the test suite drops/recreates).
+      # Hardcoded on purpose: compose substitutes from .env, and .env's
+      # DATABASE_URL is the HOST-side URL (localhost:5433), wrong in-network.
+      - DATABASE_URL=postgresql://mygist:mygist@test-db:5432/mygist_local
       - DEBUG=true
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-voyage}
       - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}

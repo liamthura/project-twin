@@ -16,15 +16,23 @@ warning (the server still boots).
      exist in `defaults` as a list. Prefixes must be unique across all packs.
    - `entities` — the write schema (actions, required/optional fields,
      enum `valid_values`, the `identifier` field used for update/remove).
-     Entity names must be unique across all packs.
+     Entity names must be unique across all packs. Each entity should include
+     a `list` field specifying which id-list it belongs to (e.g., `"list": "items"`);
+     this is **effectively required** for the generic write path when a section
+     has multiple id-lists, as the sole-id-list fallback has an ambiguity guard
+     and may decline entities. Including `list` explicitly is recommended always.
+   - `field_defaults` (optional) — default values for optional entity fields.
    - `scope_contributions` — which fields each global scope
      (minimal/professional/personal/learning/full) pulls from this section.
      Omit a scope to stay out of it; the section always gets its own scope
      token for free.
    - `capture_triggers` — phrases that hint `suggest_persona_update`.
    - `ui` — how the generic web editor renders each list: `title_field`,
-     `badges` (fields shown as chips), `detail_fields`, and optional
-     `suggestions` (preset values rendered as tap-to-add chips).
+     `badges` (fields shown as chips), `detail_fields`, `array_fields` (array
+     fields that expand inline), and optional `suggestions` (preset values
+     rendered as tap-to-add chips).
+   - `default_enabled` (optional, defaults to true) — whether the pack starts
+     enabled or requires users to opt-in via the Sections manager.
 3. Boot the server (`python main.py`) — a schema violation is logged as a
    warning naming your pack; fix until the log is clean.
 4. Run the tests: `python -m pytest tests/test_pack_loader.py -q`.
@@ -38,3 +46,6 @@ warning (the server still boots).
 - Keep entries small: every field you add costs context tokens for every
   user who enables the pack. MyGist is a context provider — describe the
   person, don't manage their tasks.
+- Manifest-only entities are writable automatically via `persona_modify` and
+  `persona_batch` (no server code required) and rendered automatically by the
+  web editor via `GenericSectionEditor` using the `ui` configuration.

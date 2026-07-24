@@ -47,9 +47,30 @@ def set_disabled_sections(keys: list[str]) -> None:
     set_settings(blob)
 
 
+def get_enabled_optins() -> set[str]:
+    """Default-off packs the user has explicitly enabled."""
+    return set(get_settings().get("enabled_sections", []))
+
+
+def set_enabled_optins(keys: list[str]) -> None:
+    blob = get_settings()
+    blob["enabled_sections"] = list(keys)
+    set_settings(blob)
+
+
 def enabled_sections() -> set:
-    """Registry sections visible to the current user: all minus their disabled
-    set, with always-on sections force-included (a stale/hand-edited blob can
-    never hide a core section)."""
+    """Registry sections visible to the current user. Core sections are always
+    on; default-on packs are on unless disabled; default-off packs are on only
+    if explicitly opted in."""
     disabled = get_disabled_sections() - sections.ALWAYS_ON_SECTIONS
-    return set(sections.SECTION_REGISTRY) - disabled
+    optins = get_enabled_optins()
+    result = set()
+    for key in sections.SECTION_REGISTRY:
+        if key in sections.ALWAYS_ON_SECTIONS:
+            result.add(key)
+        elif not sections.DEFAULT_ENABLED.get(key, True):
+            if key in optins:
+                result.add(key)
+        elif key not in disabled:
+            result.add(key)
+    return result

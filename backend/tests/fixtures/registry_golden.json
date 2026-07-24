@@ -5,6 +5,47 @@
     "profile"
   ],
   "entity_schema": {
+    "aesthetics": {
+      "aesthetic": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "field_defaults": {
+          "stance": "like"
+        },
+        "identifier": "name",
+        "list": "styles",
+        "optional": [
+          "domain",
+          "stance",
+          "notes",
+          "references"
+        ],
+        "required": [
+          "name"
+        ],
+        "valid_values": {
+          "domain": [
+            "ui",
+            "graphic",
+            "typography",
+            "color",
+            "illustration",
+            "photography",
+            "fashion",
+            "interior",
+            "general"
+          ],
+          "stance": [
+            "love",
+            "like",
+            "avoid"
+          ]
+        }
+      }
+    },
     "circle": {
       "connection": {
         "actions": [
@@ -324,6 +365,46 @@
         "required": [
           "value"
         ]
+      }
+    },
+    "media": {
+      "media_item": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "identifier": "title",
+        "list": "items",
+        "optional": [
+          "kind",
+          "status",
+          "rating",
+          "url",
+          "notes",
+          "tags"
+        ],
+        "required": [
+          "title"
+        ],
+        "valid_values": {
+          "kind": [
+            "book",
+            "article",
+            "podcast",
+            "show",
+            "film",
+            "game",
+            "video",
+            "music"
+          ],
+          "status": [
+            "want",
+            "in_progress",
+            "finished",
+            "dropped"
+          ]
+        }
       }
     },
     "preferences": {
@@ -656,10 +737,29 @@
     "preferences",
     "projects",
     "lifestyle",
+    "media",
+    "aesthetics",
     "circle",
     "learning_log"
   ],
   "section_registry": {
+    "aesthetics": {
+      "context_fields": {
+        "personal": [
+          "styles"
+        ]
+      },
+      "default": {
+        "styles": []
+      },
+      "id_lists": [
+        [
+          "styles",
+          "aesthetic"
+        ]
+      ],
+      "key": "aesthetics"
+    },
     "circle": {
       "context_fields": {
         "personal": [
@@ -788,6 +888,23 @@
         ]
       ],
       "key": "lifestyle"
+    },
+    "media": {
+      "context_fields": {
+        "personal": [
+          "items"
+        ]
+      },
+      "default": {
+        "items": []
+      },
+      "id_lists": [
+        [
+          "items",
+          "media"
+        ]
+      ],
+      "key": "media"
     },
     "preferences": {
       "context_fields": {},

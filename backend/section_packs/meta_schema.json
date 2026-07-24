@@ -32,7 +32,8 @@
       "additionalProperties": { "$ref": "#/$defs/entity" }
     },
     "capture_triggers": { "type": "array", "items": { "type": "string" } },
-    "ui": { "type": "object" }
+    "ui": { "type": "object" },
+    "default_enabled": { "type": "boolean" }
   },
   "$defs": {
     "entity": {
@@ -54,7 +55,12 @@
         },
         "identifier": { "type": ["string", "null"] },
         "parent": { "type": "string" },
-        "description": { "type": "string" }
+        "description": { "type": "string" },
+        "list": { "type": "string" },
+        "field_defaults": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
       }
     }
   }

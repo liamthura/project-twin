@@ -33,7 +33,8 @@ def test_settings_blob_is_invisible_to_persona_get_all(as_user):
 
 def test_enabled_sections_all_by_default(as_user):
     import sections
-    assert ss.enabled_sections() == set(sections.SECTION_REGISTRY)
+    # media/aesthetics are default-off (opt-in); every other pack is on.
+    assert ss.enabled_sections() == set(sections.SECTION_REGISTRY) - {"media", "aesthetics"}
 
 
 def test_enabled_sections_drops_disabled(as_user):

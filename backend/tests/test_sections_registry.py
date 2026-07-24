@@ -28,4 +28,6 @@ def test_always_on_are_real_registry_sections():
 
 def test_toggleable_is_registry_minus_always_on():
     assert toggleable_sections() == set(SECTION_REGISTRY) - ALWAYS_ON_SECTIONS
-    assert toggleable_sections() == {"knowledge", "projects", "lifestyle", "circle", "goals"}
+    assert toggleable_sections() == {
+        "knowledge", "projects", "lifestyle", "media", "aesthetics", "circle", "goals",
+    }
