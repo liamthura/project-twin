@@ -26,11 +26,12 @@ def test_advisory_entities_rewrite_eligibility_is_derivable():
         stays earlier in priority order).
 
       - hint-only: exactly the current, explicitly-known set --
-        work_experience (identifier "company" is not title-like) and
+        work_experience (identifier "company" is not title-like),
         top_of_mind (identifier "item" is not title-like, and the entity
         has no "update" action at all). Any other entity landing here means
         either ADVISORY_ENTITIES or ENTITY_SCHEMA drifted and this test
-        needs a conscious update, not a silent pass.
+        needs a conscious update, not a silent pass. (Note: like/dislike
+        moved to rewrite-eligible when "item" was added to TITLE_FIELDS.)
     """
     expected_hint_only = {"work_experience", "top_of_mind"}
     hint_only_seen = set()

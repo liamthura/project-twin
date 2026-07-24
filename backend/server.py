@@ -313,8 +313,9 @@ ENTITY_THRESHOLDS = {
     "communication_default": {"auto": 0.80, "ask": 0.55},
     "basic_info": {"auto": 0.90, "ask": 0.70},
     "mood_override": {"auto": 0.75, "ask": 0.50},
-    "passion": {"auto": 0.72, "ask": 0.50},
-    "curiosity": {"auto": 0.70, "ask": 0.45},
+    # Phase 5 (consolidation): passion/curiosity suggestions now emit entity
+    # "interest" (kind-tagged) -- one threshold covers both former kinds.
+    "interest": {"auto": 0.71, "ask": 0.48},
     "personality_trait": {"auto": 0.80, "ask": 0.55},
 }
 
@@ -419,10 +420,15 @@ def find_in_persona(persona: dict, entity_type: str, name: str) -> dict:
         "domain": ("knowledge", "domains"),
         "hobby": ("lifestyle", "hobbies"),
         "project": ("projects", "projects"),
-        "passion": ("lifestyle", "passions"),
-        "curiosity": ("lifestyle", "curiosities"),
+        # Phase 5 (consolidation): passion/curiosity suggestions now emit
+        # entity "interest" (kind-tagged); dislike suggestions still emit
+        # entity "dislike" but the shared list moved to likes_dislikes (the
+        # emitter's data has no "name" key, so this lookup is unreachable
+        # for dislike either way -- kept pointed at the real list for
+        # documentation/hygiene, not because it fires).
+        "interest": ("lifestyle", "interests"),
         "personality_trait": ("lifestyle", "personality_traits"),
-        "dislike": ("preferences", "dislikes"),
+        "dislike": ("preferences", "likes_dislikes"),
         "connection": ("circle", "connections"),
     }
     
@@ -987,7 +993,8 @@ def _stub_titles(data: dict) -> dict:
     """Reduce every id-list entity in `data` to a `{"id", "title",
     "updated_at"}` stub (updated_at day-precision, omitted for entries the
     search index doesn't know). Applied after all other filters so stubbing
-    operates on the already-filtered result."""
+    operates on the already-filtered result. Polarity fields (stance,
+    reaction) survive stubbing — a dislike must never read as a like."""
     import search_index
 
     stub_lists = []  # (section_data, list_key)
@@ -998,11 +1005,16 @@ def _stub_titles(data: dict) -> dict:
             continue
         for list_key, _prefix in spec.id_lists:
             if list_key in section_data and isinstance(section_data[list_key], list):
-                section_data[list_key] = [
-                    {"id": e.get("id"), "title": search_index.flatten_entity(e)[0]}
-                    if isinstance(e, dict) else e
-                    for e in section_data[list_key]
-                ]
+                def _stub(e):
+                    if not isinstance(e, dict):
+                        return e
+                    stub = {"id": e.get("id"), "title": search_index.flatten_entity(e)[0]}
+                    if "stance" in e:
+                        stub["stance"] = e["stance"]
+                    if "reaction" in e:
+                        stub["reaction"] = e["reaction"]
+                    return stub
+                section_data[list_key] = [_stub(e) for e in section_data[list_key]]
                 stub_lists.append((section_data, list_key))
     all_ids = [s["id"] for sd, lk in stub_lists for s in sd[lk]
                if isinstance(s, dict) and s.get("id")]
@@ -1173,9 +1185,11 @@ def _generic_entity_spec(entity: str):
         # Ambiguous when more than one entity in the section could plausibly
         # own that sole id-list (no explicit `list`, no parent, has an
         # identifier) -- e.g. lifestyle's `hobbies` id-list sits beside
-        # passion/curiosity/personality_trait/value/sleep/energy_peak, none
-        # of which actually write into `hobbies`. Only fall back to the sole
-        # id-list when exactly one such entity exists in the section.
+        # personality_trait/value/sleep/energy_peak, none of which actually
+        # write into `hobbies` (`interest` is unambiguous regardless: it
+        # carries an explicit `list`, so it never reaches this fallback).
+        # Only fall back to the sole id-list when exactly one such entity
+        # exists in the section.
         candidates = [e for e, s in ENTITY_SCHEMA[section].items()
                       if not s.get("parent") and s.get("identifier") and not s.get("list")]
         if len(candidates) != 1:
@@ -1539,46 +1553,15 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             save_json("lifestyle.json", lifestyle)
             return f"✅ Removed hobby: {name}"
     
-    elif entity == "passion":
-        lifestyle = load_json("lifestyle.json")
-        passions = lifestyle.setdefault("passions", [])
-        item = get_field(data, "passion", "name", "interest", "topic", default="")
-        if action == "add":
-            if not item:
-                return "❌ Passion requires 'passion' or 'name'"
-            if item in passions:
-                return f"ℹ️ '{item}' already in passions"
-            passions.append(item)
-            save_json("lifestyle.json", lifestyle)
-            return f"✅ Added passion: {item}"
-        elif action == "remove":
-            found = next((p for p in passions if p.lower() == item.lower()), None)
-            if not found:
-                return f"❌ Passion not found"
-            passions.remove(found)
-            save_json("lifestyle.json", lifestyle)
-            return f"✅ Removed passion: {item}"
-    
-    elif entity == "curiosity":
-        lifestyle = load_json("lifestyle.json")
-        curiosities = lifestyle.setdefault("curiosities", [])
-        item = get_field(data, "curiosity", "topic", "subject", "interest", "name", default="")
-        if action == "add":
-            if not item:
-                return "❌ Curiosity requires 'curiosity' or 'topic'"
-            if item in curiosities:
-                return f"ℹ️ '{item}' already in curiosities"
-            curiosities.append(item)
-            save_json("lifestyle.json", lifestyle)
-            return f"✅ Added curiosity: {item}"
-        elif action == "remove":
-            found = next((c for c in curiosities if c.lower() == item.lower()), None)
-            if not found:
-                return f"❌ Curiosity not found"
-            curiosities.remove(found)
-            save_json("lifestyle.json", lifestyle)
-            return f"✅ Removed curiosity: {item}"
-    
+    elif entity in ("passion", "curiosity"):
+        name = get_field(data, "name", "passion", "topic", "curiosity", "interest")
+        if not name:
+            return f"❌ {entity} requires 'name'"
+        result = execute_modify(action, "interest", {"name": name, "kind": entity})
+        if result.startswith("✅"):
+            result += f" — {entity}s are stored as interests now; use entity 'interest'"
+        return result
+
     elif entity == "personality_trait":
         lifestyle = load_json("lifestyle.json")
         traits = lifestyle.setdefault("personality_traits", [])
@@ -1740,38 +1723,18 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             return f"✅ Removed project: {name}"
     
     elif entity == "current_learning":
-        projects = load_json("projects.json")
-        learning = projects.setdefault("current_learning", [])
-        topic = get_field(data, "topic", "name", "subject", "item", "learning")
-        context = get_field(data, "context", "description", "reason", "why", default="")
-        priority = get_field(data, "priority", "level", "importance", default="medium")
-        
-        if action == "add":
-            if not topic:
-                return "❌ Current learning requires 'topic'"
-            if any(l.get("topic", "").lower() == topic.lower() for l in learning):
-                return f"ℹ️ Learning topic '{topic}' already exists"
-            learning.append({"topic": topic, "context": context, "priority": priority})
-            save_json("projects.json", projects)
-            return f"✅ Added learning: {topic}"
-        elif action == "update":
-            idx, item = find_in_array(learning, topic or "", "topic")
-            if idx == -1:
-                return f"❌ Learning topic '{topic}' not found"
-            if context:
-                item["context"] = context
-            if priority:
-                item["priority"] = priority
-            save_json("projects.json", projects)
-            return f"✅ Updated learning: {topic}"
-        elif action == "remove":
-            idx, _ = find_in_array(learning, topic or "", "topic")
-            if idx == -1:
-                return f"❌ Learning topic '{topic}' not found"
-            learning.pop(idx)
-            save_json("projects.json", projects)
-            return f"✅ Removed learning: {topic}"
-    
+        topic = get_field(data, "topic", "name", "title")
+        if not topic:
+            return "❌ current_learning requires 'topic'"
+        payload = {"title": topic, "type": "learning"}
+        context = get_field(data, "context", "why")
+        if context:
+            payload["why"] = context
+        result = execute_modify(action, "goal", payload)
+        if result.startswith("✅"):
+            result += " — current learning is stored as a goal (type: learning) now; use entity 'goal'"
+        return result
+
     elif entity == "top_of_mind":
         projects = load_json("projects.json")
         tom = projects.setdefault("top_of_mind", [])
@@ -1799,25 +1762,41 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             return f"✅ Removed from top of mind: {item}"
     
     # === PREFERENCES ===
-    elif entity == "dislike":
-        preferences = load_json("preferences.json")
-        dislikes = preferences.setdefault("dislikes", [])
-        item = get_field(data, "dislike", "item", "thing", "name", "what", default="")
+    elif entity in ("like", "dislike"):
+        blob = load_json("preferences.json")
+        items = blob.setdefault("likes_dislikes", [])
+        item = get_field(data, "item", "name", "dislike", "like")
+        stance = entity  # entity name IS the stance
         if action == "add":
             if not item:
-                return "❌ Dislike requires 'dislike' or 'item'"
-            if any(d.lower() == item.lower() for d in dislikes):
-                return f"ℹ️ '{item}' already in dislikes"
-            dislikes.append(item)
-            save_json("preferences.json", preferences)
-            return f"✅ Added dislike: {item}"
+                return f"❌ {entity} requires 'item'"
+            idx, existing = find_in_array(items, item, "item")
+            if idx != -1:
+                if existing.get("stance") != stance:
+                    existing["stance"] = stance
+                    save_json("preferences.json", blob)
+                    return f"✅ Updated stance: {item} is now a {stance}"
+                return f"ℹ️ '{item}' already recorded as a {stance}"
+            items.append({"item": item, "stance": stance})
+            save_json("preferences.json", blob)
+            return f"✅ Added {stance}: {item}"
+        elif action == "update":
+            idx, entry = find_in_array(items, item or "", "item")
+            if idx == -1:
+                return f"❌ '{item}' not found in likes_dislikes"
+            new_item = get_field(data, "new_item")
+            if new_item:
+                entry["item"] = new_item
+            entry["stance"] = stance
+            save_json("preferences.json", blob)
+            return f"✅ Updated {stance}: {entry['item']}"
         elif action == "remove":
-            found = next((d for d in dislikes if d.lower() == item.lower()), None)
-            if not found:
-                return f"❌ Dislike '{item}' not found"
-            dislikes.remove(found)
-            save_json("preferences.json", preferences)
-            return f"✅ Removed dislike: {item}"
+            idx, _ = find_in_array(items, item or "", "item")
+            if idx == -1:
+                return f"❌ '{item}' not found in likes_dislikes"
+            items.pop(idx)
+            save_json("preferences.json", blob)
+            return f"✅ Removed: {item}"
     
     # === CIRCLE ===
     elif entity == "connection":
@@ -3000,21 +2979,21 @@ def analyze_message_for_capture(message: str, context: str = "") -> dict:
                 item = " ".join(after.split()[:4]).rstrip(".,!?")
                 if item:
                     suggestions.append({
-                        "action": "add", "entity": "passion",
-                        "data": {"passion": item},
+                        "action": "add", "entity": "interest",
+                        "data": {"name": item, "kind": "passion"},
                         "reason": f"Strong interest: {item}",
                         "confidence": 0.70
                     })
                 break
-        
+
         for phrase in ["curious about", "interested in", "fascinated by"]:
             if phrase in message_lower:
                 after = message_lower.split(phrase, 1)[1].strip()
                 item = " ".join(after.split()[:5]).rstrip(".,!?")
                 if item:
                     suggestions.append({
-                        "action": "add", "entity": "curiosity",
-                        "data": {"curiosity": item},
+                        "action": "add", "entity": "interest",
+                        "data": {"name": item, "kind": "curiosity"},
                         "reason": f"Curiosity: {item}",
                         "confidence": 0.65
                     })
@@ -3110,7 +3089,7 @@ def get_context(
 
     SECTION SCOPES: profile | knowledge | preferences | projects | lifestyle | circle | learning_log
         - A section scope returns that whole section plus your always-on
-          preferences (tone, detail_level, dislikes, learning_style).
+          preferences (tone, detail_level, likes_dislikes, learning_style).
 
     MULTIPLE: pass a list to union scopes, e.g. ["lifestyle", "circle"].
 
@@ -3125,7 +3104,7 @@ def get_context(
             browsing before pulling full detail via get_entity
 
     RETURNS:
-        Filtered persona data based on scope + user preferences (tone, detail_level, dislikes)
+        Filtered persona data based on scope + user preferences (tone, detail_level, likes_dislikes)
     """
     result = get_scoped_context(scope, topic, include_inactive, days, limit, detail)
     # Compact serialization keeps the returned string consistent with the
@@ -3148,10 +3127,10 @@ def get_raw(
     FILES:
         - all: Complete persona (all files)
         - profile: name, bio, contact, work_experience[], education[]
-        - lifestyle: hobbies[], passions[], curiosities[], values[]
+        - lifestyle: hobbies[], interests[] (kind-tagged), values[]
         - knowledge: domains[] (skills), mental_tabs[]
-        - preferences: code_style, communication, learning_style, dislikes[]
-        - projects: projects[], current_learning[], top_of_mind[]
+        - preferences: code_style, communication, learning_style, likes_dislikes[]
+        - projects: projects[], top_of_mind[]
         - circle: connections[]
         - learning_log: entries[]
 
@@ -3343,14 +3322,17 @@ DUPLICATE_DISTANCE_CUTOFF = 0.4
 # coursework, coursework_topic, education_highlight, hobby_reference,
 # hobby_specific, project_tag, project_reference, project_highlight,
 # mental_tab_reference, domain_reference) are excluded, as are
-# non-id-list top-level entities: passion/curiosity/personality_trait/value/
-# energy_peak/dislike/preference (plain-value lists, no id_lists entry),
-# the update-only singletons basic_info/communication_default/sleep, and
-# `knowledge` (writes into a caller-chosen category via `data["category"]`,
-# not one fixed list_key -- `domain` already covers the one fixed id-list,
-# `domains`). `career_aspiration` is not listed separately: it is a
-# back-compat alias that forwards straight into `goal`, so writes via the
-# career_aspiration alias get no duplicate advisory (only direct goal writes do).
+# non-id-list top-level entities: personality_trait/value/energy_peak/
+# preference (plain-value lists, no id_lists entry), the update-only
+# singletons basic_info/communication_default/sleep, and `knowledge` (writes
+# into a caller-chosen category via `data["category"]`, not one fixed
+# list_key -- `domain` already covers the one fixed id-list, `domains`).
+# `career_aspiration`/`passion`/`curiosity`/`current_learning` are not listed
+# separately: they are back-compat aliases that forward straight into
+# `goal`/`interest`, so writes via an alias get no duplicate advisory (only
+# direct goal/interest writes do). `like`/`dislike` are added by hand below
+# (not by the generic-augmentation block) because they share one bespoke
+# execute_modify branch rather than being handled by the generic write path.
 ADVISORY_ENTITIES: dict[str, tuple[str, str]] = {
     "work_experience": ("profile", "work_experience"),
     "education": ("profile", "education"),
@@ -3359,16 +3341,19 @@ ADVISORY_ENTITIES: dict[str, tuple[str, str]] = {
     "domain": ("knowledge", "domains"),
     "mental_tab": ("knowledge", "mental_tabs"),
     "project": ("projects", "projects"),
-    "current_learning": ("projects", "current_learning"),
     "top_of_mind": ("projects", "top_of_mind"),
     "hobby": ("lifestyle", "hobbies"),
     "connection": ("circle", "connections"),
     "learning_entry": ("learning_log", "entries"),
+    # Bespoke shared branch (stance-flip logic), not the generic write path.
+    "like": ("preferences", "likes_dislikes"),
+    "dislike": ("preferences", "likes_dislikes"),
 }
 
 # Generic pack entities (manifest-only packs) qualify automatically: any
 # top-level id-list entity the generic write branch handles gets the same
-# duplicate-advisory coverage as the hand-listed entities above.
+# duplicate-advisory coverage as the hand-listed entities above. `interest`
+# qualifies this way (explicit `list` field in its manifest entity).
 ADVISORY_ENTITIES.update({
     entity: (spec[0], spec[1])
     for section_entities in ENTITY_SCHEMA.values()
@@ -3487,7 +3472,9 @@ def persona_modify(
         supports_update = "update" in ENTITY_SCHEMA.get(file_type, {}).get(
             entity.lower(), {}).get("actions", [])
     result = execute_modify(action, entity, data)
-    if match and not result.startswith("❌"):
+    # A stance flip already tells the caller what changed; piling an
+    # advisory on top of it is redundant noise, not new information.
+    if match and not result.startswith("❌") and not result.startswith("✅ Updated stance:"):
         result += _advisory_note(match, supports_update)
     return result
 
@@ -3540,7 +3527,9 @@ def persona_batch(operations: list) -> str:
             supports_update = "update" in ENTITY_SCHEMA.get(file_type, {}).get(
                 entity.lower(), {}).get("actions", [])
         result = execute_modify(action, entity, data)
-        if match and not result.startswith("❌"):
+        # A stance flip already tells the caller what changed; piling an
+        # advisory on top of it is redundant noise, not new information.
+        if match and not result.startswith("❌") and not result.startswith("✅ Updated stance:"):
             result += _advisory_note(match, supports_update)
         results.append(f"{i+1}. {result}")
 

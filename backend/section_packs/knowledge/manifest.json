@@ -113,7 +113,8 @@
           "archived"
         ]
       },
-      "identifier": "title"
+      "identifier": "title",
+      "description": "Saved topics and bookmarks to revisit later — a shelf, not an inbox"
     },
     "mental_tab_reference": {
       "actions": [

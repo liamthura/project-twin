@@ -1,7 +1,7 @@
 {
   "key": "preferences",
   "title": "Preferences",
-  "description": "Communication style, code style, dislikes",
+  "description": "Communication style, code style, likes and dislikes",
   "core": true,
   "position": 30,
   "defaults": {
@@ -22,21 +22,43 @@
       "preferred": [],
       "avoid": []
     },
-    "dislikes": []
+    "likes_dislikes": []
   },
-  "id_lists": [],
+  "id_lists": [
+    [
+      "likes_dislikes",
+      "taste"
+    ]
+  ],
   "scope_contributions": {},
   "entities": {
-    "dislike": {
+    "like": {
       "actions": [
         "add",
+        "update",
         "remove"
       ],
       "required": [
-        "dislike"
+        "item"
       ],
       "optional": [],
-      "identifier": "dislike"
+      "identifier": "item",
+      "list": "likes_dislikes",
+      "description": "Something you like; stored with stance=like in the likes_dislikes list"
+    },
+    "dislike": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "item"
+      ],
+      "optional": [],
+      "identifier": "item",
+      "list": "likes_dislikes",
+      "description": "Something you dislike; stored with stance=dislike in the likes_dislikes list"
     },
     "preference": {
       "actions": [

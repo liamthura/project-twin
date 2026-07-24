@@ -170,6 +170,7 @@
           "update",
           "remove"
         ],
+        "description": "Saved topics and bookmarks to revisit later \u2014 a shelf, not an inbox",
         "identifier": "title",
         "optional": [
           "notes",
@@ -230,17 +231,6 @@
       }
     },
     "lifestyle": {
-      "curiosity": {
-        "actions": [
-          "add",
-          "remove"
-        ],
-        "identifier": "topic",
-        "optional": [],
-        "required": [
-          "topic"
-        ]
-      },
       "energy_peak": {
         "actions": [
           "add",
@@ -314,16 +304,28 @@
           "specific"
         ]
       },
-      "passion": {
+      "interest": {
         "actions": [
           "add",
+          "update",
           "remove"
         ],
+        "description": "Things you're into: kind=passion for what you love doing/following, kind=curiosity for what you want to explore",
         "identifier": "name",
-        "optional": [],
+        "list": "interests",
+        "optional": [
+          "kind",
+          "notes"
+        ],
         "required": [
           "name"
-        ]
+        ],
+        "valid_values": {
+          "kind": [
+            "passion",
+            "curiosity"
+          ]
+        }
       },
       "personality_trait": {
         "actions": [
@@ -429,12 +431,29 @@
       "dislike": {
         "actions": [
           "add",
+          "update",
           "remove"
         ],
-        "identifier": "dislike",
+        "description": "Something you dislike; stored with stance=dislike in the likes_dislikes list",
+        "identifier": "item",
+        "list": "likes_dislikes",
         "optional": [],
         "required": [
-          "dislike"
+          "item"
+        ]
+      },
+      "like": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "description": "Something you like; stored with stance=like in the likes_dislikes list",
+        "identifier": "item",
+        "list": "likes_dislikes",
+        "optional": [],
+        "required": [
+          "item"
         ]
       },
       "mood_override": {
@@ -627,28 +646,6 @@
       }
     },
     "projects": {
-      "current_learning": {
-        "actions": [
-          "add",
-          "update",
-          "remove"
-        ],
-        "identifier": "topic",
-        "optional": [
-          "context",
-          "priority"
-        ],
-        "required": [
-          "topic"
-        ],
-        "valid_values": {
-          "priority": [
-            "low",
-            "medium",
-            "high"
-          ]
-        }
-      },
       "project": {
         "actions": [
           "add",
@@ -725,6 +722,7 @@
           "add",
           "remove"
         ],
+        "description": "Inbox for fleeting ideas and current thoughts \u2014 expect entries to be pruned",
         "identifier": "item",
         "optional": [
           "note"
@@ -858,17 +856,15 @@
       "context_fields": {
         "personal": [
           "hobbies",
-          "passions",
-          "curiosities",
+          "interests",
           "personality_traits",
           "values",
           "wellness"
         ]
       },
       "default": {
-        "curiosities": [],
         "hobbies": [],
-        "passions": [],
+        "interests": [],
         "personality_traits": [],
         "values": [],
         "wellness": {
@@ -890,6 +886,10 @@
         [
           "hobbies",
           "hobby"
+        ],
+        [
+          "interests",
+          "interest"
         ]
       ],
       "key": "lifestyle"
@@ -927,13 +927,18 @@
           },
           "mood_overrides": []
         },
-        "dislikes": [],
         "learning_style": {
           "avoid": [],
           "preferred": []
-        }
+        },
+        "likes_dislikes": []
       },
-      "id_lists": [],
+      "id_lists": [
+        [
+          "likes_dislikes",
+          "taste"
+        ]
+      ],
       "key": "preferences"
     },
     "profile": {
@@ -1006,7 +1011,6 @@
     "projects": {
       "context_fields": {
         "learning": [
-          "current_learning",
           "top_of_mind"
         ],
         "minimal": [
@@ -1014,12 +1018,10 @@
         ],
         "professional": [
           "projects",
-          "current_learning",
           "top_of_mind"
         ]
       },
       "default": {
-        "current_learning": [],
         "projects": [],
         "top_of_mind": []
       },
@@ -1027,10 +1029,6 @@
         [
           "projects",
           "project"
-        ],
-        [
-          "current_learning",
-          "learning"
         ],
         [
           "top_of_mind",

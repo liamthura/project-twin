@@ -1,7 +1,7 @@
 import {
   Heart, ThumbsUp, ThumbsDown, Ban, Bookmark, Play, Check, X, Pause, CircleDot,
   BookOpen, Newspaper, Mic, Tv, Clapperboard, Gamepad2, Video, Music,
-  Archive, Lightbulb, ArrowDown, Minus, ArrowUp,
+  Archive, Lightbulb, ArrowDown, Minus, ArrowUp, Compass,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger,
@@ -35,6 +35,13 @@ export const VALUE_META = {
   liked: { icon: ThumbsUp },
   disliked: { icon: ThumbsDown, tone: "text-amber-700 dark:text-amber-400",
               chip: "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
+  // likes/dislikes stance (preferences) — "like" reuses the aesthetics
+  // stance entry above (same neutral thumbs-up semantics)
+  dislike: { icon: ThumbsDown, tone: "text-amber-700 dark:text-amber-400",
+             chip: "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
+  // interest kind (lifestyle)
+  passion: { icon: Heart },
+  curiosity: { icon: Compass },
   // media + goal status
   want: { icon: Bookmark },
   in_progress: { icon: Play },

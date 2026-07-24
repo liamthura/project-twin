@@ -31,7 +31,7 @@ def test_global_scope_output_unchanged_after_always_on(as_user):
 
 def test_preferences_section_scope_uses_canonical_always_on_order(as_user):
     prefs = server._resolve_scope_fields("preferences")["preferences"]
-    assert list(prefs) == ["code_style", "learning_style", "communication", "dislikes"]
+    assert list(prefs) == ["code_style", "learning_style", "communication", "likes_dislikes"]
     assert len(prefs) == len(set(prefs))  # no duplicate fields
 
 

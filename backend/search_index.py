@@ -14,10 +14,10 @@ import sections
 logger = logging.getLogger(__name__)
 
 TITLE_FIELDS = ("name", "title", "topic", "idea", "goal", "role",
-                "institution", "language", "degree_level", "degree")
+                "institution", "language", "degree_level", "degree", "item")
 TEXT_FIELDS = ("description", "notes", "content", "details", "role", "status",
                "relationship", "source", "level", "category", "url",
-               "company", "note", "context", "field_of_study")
+               "company", "note", "context", "field_of_study", "stance", "kind")
 NESTED_LIST_FIELDS = ("references", "highlights", "specifics", "coursework",
                       "clubs", "tags", "traits")
 

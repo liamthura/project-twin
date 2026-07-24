@@ -33,7 +33,7 @@ assert set(SCOPES) == pack_loader.GLOBAL_SCOPE_NAMES  # keep the two lists in lo
 
 # Fields included in EVERY resolved scope (global and section). This is exactly
 # the preferences slice every global scope carried before it was factored out.
-ALWAYS_ON = {"preferences": ["code_style", "learning_style", "communication", "dislikes"]}
+ALWAYS_ON = {"preferences": ["code_style", "learning_style", "communication", "likes_dislikes"]}
 
 # Core sections a corrupted/missing manifest must never silently drop.
 _REQUIRED_CORE = frozenset({"profile", "preferences", "learning_log"})

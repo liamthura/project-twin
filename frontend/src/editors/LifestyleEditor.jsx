@@ -33,6 +33,8 @@ import { InfoDialog } from "@/components/ui/info-dialog";
 import { ArrayInput } from "@/components/ArrayInput";
 import { EnumControl } from "@/components/controls";
 
+const INTEREST_KINDS = ["passion", "curiosity"];
+
 // Canonical values from backend/section_packs/lifestyle/manifest.json —
 // the manifest is the source of truth (the old UI used a different,
 // non-validated 4-value casual/enthusiast/serious/expert scale).
@@ -47,8 +49,7 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
   const [expandedReferences, setExpandedReferences] = useState({});
   const [collapsedSections, setCollapsedSections] = useState({
     hobbies: true,
-    passions: true,
-    curiosities: true,
+    interests: true,
     traits: true,
     values: true,
     wellness: true,
@@ -56,6 +57,8 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newHobbyName, setNewHobbyName] = useState("");
   const [newHobbyLevel, setNewHobbyLevel] = useState(undefined);
+  const [newInterestName, setNewInterestName] = useState("");
+  const [newInterestKind, setNewInterestKind] = useState("passion");
 
   // Info modal state
   const [infoModal, setInfoModal] = useState({
@@ -79,24 +82,14 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
         "References: Links to gear, communities, or learning resources.",
       ],
     },
-    passions: {
-      title: "Passions",
+    interests: {
+      title: "Interests",
       overview:
-        "Things you care deeply about that drive you. These aren't necessarily skills—they're what gets you excited.",
+        "Things you're into, tagged as a passion (what you love doing or following) or a curiosity (what you want to explore). AI uses this to understand your motivations and tailor suggestions.",
       tips: [
-        "Add topics, causes, or areas you're genuinely passionate about.",
-        "Examples: sustainability, design, storytelling, education, technology.",
-        "AI uses this to understand your motivations and tailor suggestions.",
-      ],
-    },
-    curiosities: {
-      title: "Curiosities",
-      overview:
-        "Topics you want to explore or learn more about. These are your 'I should look into that someday' items.",
-      tips: [
-        "Add subjects you're curious about but haven't dived into yet.",
-        "Examples: quantum computing, fermentation, urban planning, linguistics.",
-        "No pressure—these can be fleeting interests or serious research areas.",
+        "Passion: something you care deeply about that drives you — sustainability, design, storytelling, education, technology.",
+        "Curiosity: something you want to explore or learn more about but haven't dived into yet — quantum computing, fermentation, urban planning, linguistics.",
+        "No pressure on curiosities—these can be fleeting interests or serious research areas.",
       ],
     },
     traits: {
@@ -213,6 +206,33 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
         hobbies: (data.hobbies || []).filter((_, i) => i !== index),
       });
     }
+  };
+
+  const addInterest = () => {
+    if (newInterestName.trim()) {
+      onChange({
+        ...data,
+        interests: [
+          ...(data.interests || []),
+          { name: newInterestName.trim(), kind: newInterestKind },
+        ],
+      });
+      setNewInterestName("");
+      setNewInterestKind("passion");
+    }
+  };
+
+  const updateInterest = (index, field, value) => {
+    const newInterests = [...(data.interests || [])];
+    newInterests[index] = { ...newInterests[index], [field]: value };
+    onChange({ ...data, interests: newInterests });
+  };
+
+  const removeInterest = (index) => {
+    onChange({
+      ...data,
+      interests: (data.interests || []).filter((_, i) => i !== index),
+    });
   };
 
   // Filter hobbies (already in newest-first order from addHobby)
@@ -731,94 +751,102 @@ export default function LifestyleEditor({ data, onChange, onShowConfirmation }) 
         </DialogContent>
       </Dialog>
 
-      {/* Passions */}
+      {/* Interests */}
       <Card>
         <CardHeader className="border-b">
           <div
             className="-m-6 flex cursor-pointer items-center justify-between rounded-t-lg p-6 transition-colors hover:bg-muted/50"
-            onClick={() => toggleSection("passions")}
+            onClick={() => toggleSection("interests")}
           >
             <div className="flex items-center gap-2">
               <ChevronDown
                 className={`h-5 w-5 transition-transform ${
-                  collapsedSections.passions ? "-rotate-90" : ""
+                  collapsedSections.interests ? "-rotate-90" : ""
                 }`}
               />
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  Passions
+                  Interests
                   <Button
                     variant="ghost"
                     size="icon"
                     className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
-                      openInfo("passions");
+                      openInfo("interests");
                     }}
                   >
                     <Info className="h-4 w-4" />
                   </Button>
                 </CardTitle>
                 <CardDescription>
-                  Things you're deeply passionate about
+                  Things you're into — passions you love, curiosities you want to explore
                 </CardDescription>
               </div>
             </div>
           </div>
         </CardHeader>
-        {!collapsedSections.passions && (
-          <CardContent>
-            <ArrayInput
-              items={data.passions || []}
-              onChange={(items) => onChange({ ...data, passions: items })}
-              placeholder="Add passion..."
-            />
-          </CardContent>
-        )}
-      </Card>
-
-      {/* Curiosities */}
-      <Card>
-        <CardHeader className="border-b">
-          <div
-            className="-m-6 flex cursor-pointer items-center justify-between rounded-t-lg p-6 transition-colors hover:bg-muted/50"
-            onClick={() => toggleSection("curiosities")}
-          >
-            <div className="flex items-center gap-2">
-              <ChevronDown
-                className={`h-5 w-5 transition-transform ${
-                  collapsedSections.curiosities ? "-rotate-90" : ""
-                }`}
+        {!collapsedSections.interests && (
+          <CardContent className="space-y-2">
+            {(data.interests || []).length > 0 && (
+              <div className="space-y-2">
+                {(data.interests || []).map((interest, idx) => (
+                  <div
+                    key={idx}
+                    className="flex flex-wrap items-center gap-2 p-2 rounded-lg border bg-background/50"
+                  >
+                    <Input
+                      value={interest.name || ""}
+                      onChange={(e) =>
+                        updateInterest(idx, "name", e.target.value)
+                      }
+                      placeholder="Interest name"
+                      className="h-9 flex-1 min-w-[160px]"
+                    />
+                    <EnumControl
+                      options={INTEREST_KINDS}
+                      value={interest.kind}
+                      onChange={(value) => updateInterest(idx, "kind", value)}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeInterest(idx)}
+                      className="tap-target h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={newInterestName}
+                onChange={(e) => setNewInterestName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newInterestName.trim()) {
+                    e.preventDefault();
+                    addInterest();
+                  }
+                }}
+                placeholder="Add interest..."
+                className="h-9 flex-1 min-w-[160px]"
               />
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  Curiosities
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="tap-target h-7 w-7 text-muted-foreground hover:text-foreground"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openInfo("curiosities");
-                    }}
-                  >
-                    <Info className="h-4 w-4" />
-                  </Button>
-                </CardTitle>
-                <CardDescription>
-                  Topics you're curious to learn more about
-                </CardDescription>
-              </div>
+              <EnumControl
+                options={INTEREST_KINDS}
+                value={newInterestKind}
+                onChange={(value) => setNewInterestKind(value || "passion")}
+              />
+              <Button
+                onClick={addInterest}
+                size="sm"
+                variant="secondary"
+                disabled={!newInterestName.trim()}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
-          </div>
-        </CardHeader>
-        {!collapsedSections.curiosities && (
-          <CardContent>
-            <ArrayInput
-              items={data.curiosities || []}
-              onChange={(items) => onChange({ ...data, curiosities: items })}
-              placeholder="Add curiosity..."
-            />
           </CardContent>
         )}
       </Card>

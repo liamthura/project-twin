@@ -6,8 +6,7 @@
   "position": 50,
   "defaults": {
     "hobbies": [],
-    "passions": [],
-    "curiosities": [],
+    "interests": [],
     "personality_traits": [],
     "values": [],
     "wellness": {
@@ -29,13 +28,16 @@
     [
       "hobbies",
       "hobby"
+    ],
+    [
+      "interests",
+      "interest"
     ]
   ],
   "scope_contributions": {
     "personal": [
       "hobbies",
-      "passions",
-      "curiosities",
+      "interests",
       "personality_traits",
       "values",
       "wellness"
@@ -104,27 +106,28 @@
       "identifier": "specific",
       "parent": "hobby_name"
     },
-    "passion": {
+    "interest": {
       "actions": [
         "add",
+        "update",
         "remove"
       ],
       "required": [
         "name"
       ],
-      "optional": [],
-      "identifier": "name"
-    },
-    "curiosity": {
-      "actions": [
-        "add",
-        "remove"
+      "optional": [
+        "kind",
+        "notes"
       ],
-      "required": [
-        "topic"
-      ],
-      "optional": [],
-      "identifier": "topic"
+      "valid_values": {
+        "kind": [
+          "passion",
+          "curiosity"
+        ]
+      },
+      "identifier": "name",
+      "list": "interests",
+      "description": "Things you're into: kind=passion for what you love doing/following, kind=curiosity for what you want to explore"
     },
     "personality_trait": {
       "actions": [
@@ -177,6 +180,13 @@
       ],
       "optional": [],
       "identifier": "peak"
+    }
+  },
+  "ui": {
+    "interests": {
+      "title_field": "name",
+      "badges": ["kind"],
+      "detail_fields": ["notes"]
     }
   }
 }
