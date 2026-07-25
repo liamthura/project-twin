@@ -820,6 +820,11 @@ def get_scoped_context(
         exempt = frozenset({"goals", "media"} & set(tokens))
         result = _filter_inactive(result, exempt)
 
+    # `related` is stored-link bookkeeping, not context payload (like `_meta`):
+    # strip it from every id-list entry regardless of include_inactive/detail.
+    # get_entity and get_raw are the surfaces that resolve/return it.
+    result = _strip_related(result)
+
     if detail == "titles":
         result = _stub_titles(result)
 
@@ -1025,6 +1030,31 @@ def _stub_titles(data: dict) -> dict:
                 s["updated_at"] = times[s["id"]]
     return data
 
+def _strip_related(data: dict) -> dict:
+    """Strip the `related` key from every id-list entity in `data` (token
+    discipline for scope reads, like `_meta` -- stored links are surfaced
+    via get_entity/get_raw instead). Entries that carry `related` are
+    rebuilt as new dicts (`related` dropped) rather than deleted from in
+    place: `data`'s item dicts are the same objects `load_json` just handed
+    back from persona_store.load, and this mirrors `_stub_titles`'/
+    `_filter_by_topic`'s existing pattern of reassigning a fresh list rather
+    than mutating entries destructively."""
+    for ft in [k for k in data if k in sections.SECTION_REGISTRY]:
+        spec = sections.SECTION_REGISTRY[ft]
+        section_data = data.get(ft)
+        if not isinstance(section_data, dict):
+            continue
+        for list_key, _prefix in spec.id_lists:
+            items = section_data.get(list_key)
+            if isinstance(items, list):
+                section_data[list_key] = [
+                    {k: v for k, v in item.items() if k != "related"}
+                    if isinstance(item, dict) and "related" in item else item
+                    for item in items
+                ]
+    return data
+
+
 def _filter_inactive(data: dict, exempt: frozenset = frozenset()) -> dict:
     """Remove inactive/paused items from context. Sections named in `exempt`
     pass through unfiltered (the goals section scope shows every status)."""
@@ -1200,8 +1230,116 @@ def _generic_entity_spec(entity: str):
     return section, list_key, espec
 
 
+def _execute_link(action: str, data: dict) -> str:
+    """Entity-agnostic link/unlink (action="link"/"unlink" on persona_modify):
+    writes/removes ids in a source entry's `related` array. Works on any
+    id-carrying entry via search_index.entity_location, so needs no
+    per-entity code -- the `entity` argument execute_modify was called with
+    is ignored here entirely (accept anything; entity="link" is documented
+    as the convention). Links are one-directional: stored on the source
+    entry only, never mirrored onto the target(s).
+
+    data shape: {"entity_id" (or "id"/"source"): <source id>,
+                 "related" (or "targets"): [<target id>, ...] or a single id}.
+    """
+    entity_id = get_field(data, "entity_id", "id", "source")
+    if not entity_id:
+        return "❌ link/unlink requires 'entity_id' (or 'id'/'source')"
+
+    targets = data.get("related")
+    if targets is None:
+        targets = data.get("targets")
+    if targets is None:
+        targets = []
+    if isinstance(targets, str):
+        targets = [targets]
+
+    prefixes = sorted({p for p, _ in search_index._PREFIXES})
+
+    # Source resolution mirrors _resolve_entity's loop (entity_location +
+    # blob scan) -- strict: unknown prefix / not found / disabled section
+    # all reject before either action touches anything.
+    loc = search_index.entity_location(entity_id)
+    if loc is None:
+        return ("❌ Unknown entity id prefix for '" + entity_id +
+                "'. Valid prefixes: " + ", ".join(prefixes))
+    file_type, list_key = loc
+    disabled = settings_store.get_disabled_sections()
+    if file_type in disabled:
+        return f"❌ Section '{file_type}' is disabled. Enable it in settings."
+    blob = load_json(file_type)
+    entry = next((e for e in blob.get(list_key) or []
+                  if isinstance(e, dict) and e.get("id") == entity_id), None)
+    if entry is None:
+        return f"❌ Entity {entity_id} not found in {file_type}.{list_key}"
+
+    if action == "link":
+        if not targets:
+            return "❌ link requires at least one target id ('related' or 'targets')"
+
+        enabled = settings_store.enabled_sections()
+        for tid in targets:
+            if tid == entity_id:
+                return f"❌ Cannot link {entity_id} to itself"
+            tloc = search_index.entity_location(tid)
+            if tloc is None:
+                return ("❌ Unknown entity id prefix for target '" + tid +
+                        "'. Valid prefixes: " + ", ".join(prefixes))
+            t_file_type, t_list_key = tloc
+            if t_file_type not in enabled:
+                return (f"❌ Cannot link to {tid}: section '{t_file_type}' "
+                        "is disabled.")
+            t_blob = blob if t_file_type == file_type else load_json(t_file_type)
+            t_exists = any(isinstance(e, dict) and e.get("id") == tid
+                           for e in t_blob.get(t_list_key) or [])
+            if not t_exists:
+                return f"❌ Target {tid} not found in {t_file_type}.{t_list_key}"
+
+        related = entry.setdefault("related", [])
+        seen = set(related)
+        new_ids = []
+        for tid in targets:
+            if tid not in seen:
+                seen.add(tid)
+                new_ids.append(tid)
+        if len(related) + len(new_ids) > 10:
+            return "❌ related is capped at 10 links per entry"
+        if new_ids:
+            related.extend(new_ids)
+            save_json(file_type, blob)
+
+        titles_map = search_index.resolve_titles(db.current_user_id.get(), targets)
+        named = [f'{tid} "{titles_map[tid]["title"]}"' if tid in titles_map else tid
+                 for tid in targets]
+        return f"✅ Linked {entity_id} to: {', '.join(named)}"
+
+    elif action == "unlink":
+        if not targets:
+            return "❌ unlink requires at least one target id ('related' or 'targets')"
+
+        related = entry.get("related") or []
+        removed = [tid for tid in targets if tid in related]
+        missing = [tid for tid in targets if tid not in related]
+        parts = []
+        if removed:
+            remaining = [rid for rid in related if rid not in removed]
+            if remaining:
+                entry["related"] = remaining
+            else:
+                entry.pop("related", None)
+            save_json(file_type, blob)
+            parts.append(f"✅ Unlinked {entity_id} from: {', '.join(removed)}")
+        if missing:
+            parts.append(f"ℹ️ Not linked: {', '.join(missing)}")
+        return " ".join(parts)
+
+    return f"❌ Unknown link action: {action}"
+
+
 def execute_modify(action: str, entity: str, data: dict) -> str:
     """Execute a single modify operation. Returns result message."""
+    if action in ("link", "unlink"):
+        return _execute_link(action, data)
     section = _section_for_entity(entity)
     if section is not None and section not in settings_store.enabled_sections():
         return f"❌ Section '{section}' is disabled; enable it in settings to modify it."
@@ -2530,6 +2668,14 @@ _SCHEMA_USAGE = {
         "Entities with a `parent` also need the parent's identifier in `data`, "
         "e.g. project_highlight needs {project_name, highlight}."
     ),
+    "linking": (
+        "Connect any two existing entries with persona_modify(action=\"link\", "
+        "entity=\"link\", data={entity_id: <source id>, related: [<target id>, ...]}) "
+        "-- `entity` is ignored for link/unlink (entity=\"link\" is just the "
+        "convention). action=\"unlink\" removes ids the same way. Links are "
+        "one-directional (stored on the source only) and capped at 10 per entry. "
+        "get_entity's `similar` list suggests candidate ids to link."
+    ),
 }
 
 
@@ -3228,8 +3374,61 @@ def _resolve_entity(entity_id: str) -> str:
     return f"❌ Entity {entity_id} not found in {file_type}.{list_key}"
 
 
+def _attach_relations(parsed_payloads: list, include_related: bool) -> None:
+    """Mutate each resolved get_entity payload in `parsed_payloads` (dicts
+    carrying an "entity" key, as produced by _resolve_entity) in place:
+
+    - Stored `related` links are ALWAYS resolved to `{"id", "title",
+      "section"}` stubs when present (regardless of `include_related`) --
+      an id that no longer resolves (since-deleted entry) still surfaces as
+      `{"id", "title": None, "section": None}` rather than being hidden.
+      Entities with no `related` field get no "related" key at all.
+    - When `include_related` is truthy, also attach derived "similar"
+      neighbors (`[]` if none / the entry isn't indexed).
+
+    One `resolve_titles` call covers every payload's related ids combined
+    (no N+1 across a batch); neighbors are still looked up per entity via
+    semantic_neighbors, bounded by get_entity's 25-id batch cap.
+    """
+    if not parsed_payloads:
+        return
+    user_id = db.current_user_id.get()
+
+    all_related_ids = set()
+    for payload in parsed_payloads:
+        rel = payload["entity"].get("related")
+        if isinstance(rel, list) and rel:
+            all_related_ids.update(rel)
+    titles_map = (search_index.resolve_titles(user_id, list(all_related_ids))
+                  if all_related_ids else {})
+
+    enabled_sections = None
+    if include_related:
+        enabled_sections = settings_store.enabled_sections()
+        excluded_sections = list(set(sections.SECTION_REGISTRY) - enabled_sections)
+    else:
+        enabled_sections = settings_store.enabled_sections()
+
+    for payload in parsed_payloads:
+        rel = payload["entity"].get("related")
+        if isinstance(rel, list) and rel:
+            payload["related"] = [
+                {"id": rid, "title": titles_map[rid]["title"], "section": titles_map[rid]["file_type"]}
+                if rid in titles_map and titles_map[rid]["file_type"] in enabled_sections
+                else {"id": rid, "title": None, "section": None}
+                for rid in rel
+            ]
+        if include_related:
+            neighbors = search_index.semantic_neighbors(
+                user_id, payload["entity_id"], exclude_sections=excluded_sections)
+            payload["similar"] = [
+                {"id": n["entity_id"], "title": n["title"], "section": n["file_type"]}
+                for n in neighbors
+            ]
+
+
 @mcp.tool()
-def get_entity(entity_id: Union[str, List[str]]) -> str:
+def get_entity(entity_id: Union[str, List[str]], include_related: bool = False) -> str:
     """Fetch one or more persona entities in full by id (as returned by
     search_context results or embedded in get_context output).
 
@@ -3241,9 +3440,24 @@ def get_entity(entity_id: Union[str, List[str]]) -> str:
             element per id, in order: a successful lookup's parsed JSON, or
             `{"entity_id": <id>, "error": <message>}` for any id that
             failed to resolve.
+        include_related: When True, also attach derived `"similar"`
+            neighbors (cross-section, semantically close entries) to every
+            resolved entity. Stored `"related"` links (explicit, via
+            action="link") are always resolved and included when present,
+            independent of this flag; an id whose target has since been
+            deleted still appears, as `{"id", "title": None, "section":
+            None}`, rather than being silently dropped.
     """
     if isinstance(entity_id, str):
-        return _resolve_entity(entity_id)
+        result = _resolve_entity(entity_id)
+        try:
+            parsed = json.loads(result)
+        except (json.JSONDecodeError, TypeError):
+            parsed = None
+        if isinstance(parsed, dict) and "entity" in parsed:
+            _attach_relations([parsed], include_related)
+            return json.dumps(parsed, indent=2)
+        return result
 
     if not entity_id:
         return "Error: entity_id list must not be empty."
@@ -3251,6 +3465,7 @@ def get_entity(entity_id: Union[str, List[str]]) -> str:
         return "Error: at most 25 ids per call — split into multiple calls"
 
     entities = []
+    resolved_payloads = []
     for eid in entity_id:
         result = _resolve_entity(eid)
         try:
@@ -3264,8 +3479,10 @@ def get_entity(entity_id: Union[str, List[str]]) -> str:
         # `entities` as something that looks like a resolved entity.
         if isinstance(parsed, dict) and "entity" in parsed:
             entities.append(parsed)
+            resolved_payloads.append(parsed)
         else:
             entities.append({"entity_id": eid, "error": result})
+    _attach_relations(resolved_payloads, include_related)
     return json.dumps({"entities": entities}, indent=2)
 
 
@@ -3363,11 +3580,22 @@ ADVISORY_ENTITIES.update({
 })
 
 
-def _find_strong_match(file_type: str, entity_data: dict) -> Optional[dict]:
-    """Advisory-only: does `entity_data` resemble an existing same-section
-    entity closely enough to warn about? Returns
-    {"entity_id", "title", "distance"} for the top qualifying hit, else None.
-    Never raises -- this runs before the real write and must not block it.
+def _find_strong_match(file_type: str, entity_data: dict,
+                        same_section: bool = True) -> Optional[dict]:
+    """Advisory-only: does `entity_data` resemble an existing entity closely
+    enough to warn about? Returns {"entity_id", "title", "distance",
+    "file_type"} for the top qualifying hit, else None. Never raises -- this
+    runs before/around the real write and must not block it.
+
+    `same_section` controls search scope, not the strength criteria (those
+    apply identically either way):
+      - True (default; the same-section duplicate-advisory use): search is
+        confined to `file_type` itself via `section_filter=[file_type]`.
+      - False (the cross-section relation-nudge use): `file_type` itself is
+        excluded instead, and the search spans every OTHER enabled section
+        (disabled sections are excluded too -- an advisory pointing at a
+        section the user can't currently see would be actionable-looking
+        but dead).
 
     Criteria (checked per hit, so one pass covers both search modes):
       - hybrid (embeddings configured): hit distance is not None and
@@ -3389,6 +3617,11 @@ def _find_strong_match(file_type: str, entity_data: dict) -> Optional[dict]:
         # alone. OR-ing the title in front keeps that door open (title alone
         # can satisfy the FTS predicate) without weakening the vector leg,
         # which reads the whole query string regardless of the "OR" token.
+        # Crucially, this ANDs the bare words of `flattened_text` together
+        # (websearch_to_tsquery's default for adjacent bare words) rather
+        # than OR-ing them -- unlike semantic_neighbors' FTS fallback, a
+        # single shared word (e.g. "Factory") can never satisfy this query
+        # on its own; either the full phrase matches or every word does.
         if flattened_title:
             # Phrase-quote the title so websearch_to_tsquery treats it as a
             # literal adjacency requirement rather than parsing any OR/AND/
@@ -3402,14 +3635,22 @@ def _find_strong_match(file_type: str, entity_data: dict) -> Optional[dict]:
             query = f'"{safe_title}" OR {flattened_text}'
         else:
             query = flattened_text
-        hits = search_index.search(user_id, query, [file_type], limit=3)
+        if same_section:
+            section_filter, exclude_sections = [file_type], None
+        else:
+            section_filter = None
+            exclude_sections = list(
+                (set(sections.SECTION_REGISTRY) - settings_store.enabled_sections())
+                | {file_type})
+        hits = search_index.search(user_id, query, section_filter, limit=3,
+                                   exclude_sections=exclude_sections)
         for hit in hits["results"]:
             if hit["distance"] is not None and hit["distance"] <= DUPLICATE_DISTANCE_CUTOFF:
                 return {"entity_id": hit["entity_id"], "title": hit["title"],
-                        "distance": hit["distance"]}
+                        "distance": hit["distance"], "file_type": hit["section"]}
             if flattened_title and hit["title"].lower() == flattened_title.lower():
                 return {"entity_id": hit["entity_id"], "title": hit["title"],
-                        "distance": hit["distance"]}
+                        "distance": hit["distance"], "file_type": hit["section"]}
         return None
     except Exception:
         logger.warning("duplicate-advisory check failed for file_type=%s",
@@ -3432,30 +3673,102 @@ def _advisory_note(match: dict, supports_update: bool) -> str:
     return prefix + '— it may be a duplicate.'
 
 
+def _cross_section_nudge(file_type: str, entity_data: dict):
+    """Best-effort: does the item just added (`entity_data`, in `file_type`)
+    have a STRONG match in some OTHER enabled section worth nudging the
+    caller to link? Routed entirely through `_find_strong_match(...,
+    same_section=False)` -- the same tight vector cutoff and FTS strength
+    rules (exact-title match, AND-joined bare words) the same-section
+    duplicate advisory already applies, just pointed at every other enabled
+    section instead of `file_type` itself. This intentionally replaces an
+    earlier design that probed search_index.semantic_neighbors on the
+    just-written row: that helper's FTS fallback OR-joins each word of the
+    title (appropriate for "similar" surfacing, wrong for a write-time
+    advisory), so a single shared word like "Factory" was enough to fire a
+    nudge between two otherwise-unrelated entries -- a false positive fixed
+    by using `_find_strong_match`'s stricter query construction instead.
+
+    The query is built fresh from `entity_data` (not re-read from the index
+    row), so the vector leg embeds the query text synchronously right here
+    -- no need to wait on the async embedding-fill job the write kicked off.
+
+    Never raises -- advisory-only, must never affect the write outcome.
+    """
+    try:
+        match = _find_strong_match(file_type, entity_data, same_section=False)
+        if match:
+            return (f' Possibly related to {match["entity_id"]} "{match["title"]}" '
+                    f'({match["file_type"]}) — link them with action="link"')
+        return None
+    except Exception:
+        logger.warning("cross-section nudge probe failed for file_type=%s",
+                       file_type, exc_info=True)
+        return None
+
+
+def _augment_add_result(action: str, entity_lower: str, data: dict,
+                         match: Optional[dict], supports_update: bool,
+                         result: str) -> str:
+    """Append at most one advisory to a modify result: the pre-write
+    same-section duplicate note (`match`, computed before execute_modify ran
+    so it can't match the entity against itself) if one fired, else -- only
+    for a genuinely successful add of an ADVISORY_ENTITIES entity, and only
+    when no duplicate note fired -- a best-effort cross-section relation
+    nudge probed via `_find_strong_match(..., same_section=False)` against
+    the same normalized `data` the write itself used (no dependence on the
+    write's assigned id or the index row it produced). The duplicate note
+    always wins: at most one advisory per response.
+    """
+    # A stance flip already tells the caller what changed; piling an
+    # advisory on top of it is redundant noise, not new information.
+    dup_fired = (bool(match) and not result.startswith("❌")
+                 and not result.startswith("✅ Updated stance:"))
+    if dup_fired:
+        return result + _advisory_note(match, supports_update)
+    if action == "add" and entity_lower in ADVISORY_ENTITIES and result.startswith("✅") and not result.startswith("✅ Updated stance:"):
+        file_type, _list_key = ADVISORY_ENTITIES[entity_lower]
+        try:
+            nudge = _cross_section_nudge(file_type, normalize_data(data, entity_lower))
+            if nudge:
+                result += nudge
+        except Exception:
+            logger.warning("cross-section nudge lookup failed for entity=%s",
+                           entity_lower, exc_info=True)
+    return result
+
+
 @mcp.tool()
 def persona_modify(
-    action: Literal["add", "update", "remove"],
+    action: Literal["add", "update", "remove", "link", "unlink"],
     entity: str,
     data: dict
 ) -> str:
-    """Add, update, or remove a single item from persona data.
+    """Add, update, or remove a single item from persona data. Also links/
+    unlinks any two existing entries.
     If unsure, use get_schema to discover valid entity types, required fields, and enum values.
 
     Args:
-        action: "add" | "update" | "remove"
-        entity: Entity type (use get_schema to discover valid types)
-        data: Object with identifier + fields. Always include: name, title, topic, or address
+        action: "add" | "update" | "remove" | "link" | "unlink"
+        entity: Entity type (use get_schema to discover valid types). Ignored
+            for "link"/"unlink" -- pass entity="link" by convention.
+        data: Object with identifier + fields. Always include: name, title, topic, or address.
+            For "link"/"unlink": {entity_id, related: [ids]} instead --
+            entity_id is the source entry, related is the target id(s) to
+            connect/disconnect (a single id string is also accepted).
 
     DATA REQUIREMENTS:
         - Always include identifier: name, title, topic, or address (depends on entity)
         - For update/remove: identifier matches existing item
         - For add: identifier + any optional fields
+        - For link/unlink: {entity_id, related: [ids]} (entity is ignored)
 
     EXAMPLES:
         - ADD hobby: {action: "add", entity: "hobby", data: {name: "Photography", skill_level: "beginner"}}
         - UPDATE project: {action: "update", entity: "project", data: {name: "MyApp", status: "completed"}}
         - REMOVE domain: {action: "remove", entity: "domain", data: {name: "PHP"}}
         - ADD learning_entry: {action: "add", entity: "learning_entry", data: {topic: "React Hooks", details: "...", source: "Claude"}}
+        - LINK entries: {action: "link", entity: "link", data: {entity_id: "goal_abc123", related: ["project_def456"]}}
+        - UNLINK entries: {action: "unlink", entity: "link", data: {entity_id: "goal_abc123", related: ["project_def456"]}}
 
     NESTED ITEMS (include parent identifier):
         - work_highlight: {company: "Acme", highlight: "Led migration"}
@@ -3472,11 +3785,7 @@ def persona_modify(
         supports_update = "update" in ENTITY_SCHEMA.get(file_type, {}).get(
             entity.lower(), {}).get("actions", [])
     result = execute_modify(action, entity, data)
-    # A stance flip already tells the caller what changed; piling an
-    # advisory on top of it is redundant noise, not new information.
-    if match and not result.startswith("❌") and not result.startswith("✅ Updated stance:"):
-        result += _advisory_note(match, supports_update)
-    return result
+    return _augment_add_result(action, entity.lower(), data, match, supports_update, result)
 
 
 @mcp.tool()
@@ -3527,10 +3836,7 @@ def persona_batch(operations: list) -> str:
             supports_update = "update" in ENTITY_SCHEMA.get(file_type, {}).get(
                 entity.lower(), {}).get("actions", [])
         result = execute_modify(action, entity, data)
-        # A stance flip already tells the caller what changed; piling an
-        # advisory on top of it is redundant noise, not new information.
-        if match and not result.startswith("❌") and not result.startswith("✅ Updated stance:"):
-            result += _advisory_note(match, supports_update)
+        result = _augment_add_result(action, entity.lower(), data, match, supports_update, result)
         results.append(f"{i+1}. {result}")
 
     return "\n".join(results)
