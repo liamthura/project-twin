@@ -1,19 +1,44 @@
-# MyGist - Ignore files for Docker build
-node_modules/
+# MyGist -- exclusions for the root build context (see ./Dockerfile).
+#
+# Patterns must be explicit about nesting. A bare "venv/" matches only the
+# top level, so "**/venv/" is required to keep backend/venv out of the
+# context -- likewise "**/.env" for backend/.env, which holds DATABASE_URL
+# and any embedding provider key.
+
+# Secrets -- never bake these into an image
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dependencies and build output (both are rebuilt inside the image)
+**/node_modules/
+**/dist/
+**/build/
+**/venv/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.egg-info/
+
+# Dev-only, not needed at runtime
+**/.pytest_cache/
+**/.cache/
+**/coverage/
+backend/tests/
+backend/archive/
+backend/docker-compose.yml
+backend/Dockerfile
+
+# Repo metadata and docs sources (the built docs site is copied from the
+# Node stage, not from the context)
 .git/
-*.log
-.env
-.env.local
-.DS_Store
-__pycache__/
-*.pyc
-venv/
-.venv/
-*.egg-info/
-dist/
-build/
-.cache/
-coverage/
-.pytest_cache/
+.github/
+.agents/
+.claude/
+.superpowers/
+docs/
+mygist_data/
 *.md
 !README.md
+*.log
+.DS_Store
