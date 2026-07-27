@@ -1,0 +1,20 @@
+{
+  "goals": [
+    {
+      "title": "Ship MyGist v3",
+      "type": "career",
+      "status": "active",
+      "target_date": "2026-12-31",
+      "why": "The single-container merge unblocked everything else.",
+      "notes": "Section editor consolidation is the last big piece."
+    },
+    {
+      "title": "Learn Rust properly",
+      "type": "learning",
+      "status": "paused",
+      "target_date": "2027-06-30",
+      "why": "Curious whether it changes how I write Python.",
+      "notes": "Parked until the docs site is done."
+    }
+  ]
+}
