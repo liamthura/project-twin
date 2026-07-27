@@ -59,5 +59,17 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: false,
+    // Vite 7 defaults to "baseline-widely-available" (safari16, chrome107)
+    // where Vite 5 defaulted to "modules" (safari14, chrome87). Pinned so the
+    // toolchain upgrade ships no behaviour change; raising the browser floor
+    // is a separate, deliberate decision.
+    //
+    // Not the literal string "modules": Vite 5 special-cased that string to
+    // this exact esbuild target list internally (constants.js
+    // ESBUILD_MODULES_TARGET), but Vite 7 dropped that alias -- only
+    // "baseline-widely-available" is special-cased now -- so "modules"
+    // passed straight through fails as an unrecognised esbuild target.
+    // Spelling out the array is what actually reproduces Vite 5's default.
+    target: ["es2020", "edge88", "firefox78", "chrome87", "safari14"],
   },
 });
