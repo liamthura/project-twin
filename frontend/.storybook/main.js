@@ -1,7 +1,7 @@
 /** @type {import('@storybook/react-vite').StorybookConfig} */
 export default {
   stories: ["../src/**/*.stories.@(js|jsx)"],
-  addons: [],
+  addons: ["@storybook/addon-vitest"],
   framework: {
     name: "@storybook/react-vite",
     options: {},
