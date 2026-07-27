@@ -17,6 +17,7 @@ jobs:
   backend:
     name: backend (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     strategy:
       fail-fast: false
@@ -69,8 +70,9 @@ jobs:
         run: pytest -q
 
   frontend:
-    name: frontend build
+    name: frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4

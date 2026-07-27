@@ -25,12 +25,23 @@
 **/.cache/
 **/coverage/
 **/storybook-static
-**/.storybook-cache
 backend/tests/
 backend/archive/
 backend/docker-compose.yml
 backend/Dockerfile
 Dockerfile
+
+# Test and story inputs -- unreachable from the app's module graph, so
+# excluding them from the build context is harmless, but it keeps editing a
+# test or story from invalidating the `COPY frontend/ ./` layer and forcing a
+# full image rebuild.
+**/.storybook
+**/*.stories.jsx
+**/vitest.config.js
+frontend/src/test
+frontend/src/__fixtures__
+frontend/scripts
+**/test-results
 
 # Repo metadata and docs sources (the built docs site is copied from the
 # Node stage, not from the context)
