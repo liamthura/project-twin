@@ -12,7 +12,9 @@
 # context and produces an image with no static assets).
 
 # --- Stage 1: build the web assets ------------------------------------------
-FROM node:20-alpine AS web
+# Node 20 went EOL in April 2026. 22 is LTS and clears Vite's >=22.12 floor
+# with room to spare, so the tag can keep floating for security patches.
+FROM node:22-alpine AS web
 
 WORKDIR /build/frontend
 
