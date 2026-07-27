@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta_schema.json",
   "key": "profile",
   "title": "Profile",
   "description": "Identity, work, education, contact",

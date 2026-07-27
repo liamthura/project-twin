@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta_schema.json",
   "key": "aesthetics",
   "title": "Aesthetics",
   "description": "Visual styles, palettes, and influences you prefer or avoid",

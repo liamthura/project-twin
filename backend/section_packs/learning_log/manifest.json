@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta_schema.json",
   "key": "learning_log",
   "title": "Learning Log",
   "description": "What you learn, decide, and reflect on",

@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta_schema.json",
   "key": "media",
   "title": "Media",
   "description": "Favourites and what you're into right now: taste, not a log",
