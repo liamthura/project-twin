@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta_schema.json",
   "key": "preferences",
   "title": "Preferences",
   "description": "Communication style, code style, likes and dislikes",

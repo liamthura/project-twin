@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta_schema.json",
   "key": "example",
   "title": "Example",
   "description": "One-line description shown in the Sections manager",

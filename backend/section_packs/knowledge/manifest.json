@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta_schema.json",
   "key": "knowledge",
   "title": "Knowledge",
   "description": "Domains you know and topics you track",

@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta_schema.json",
   "key": "circle",
   "title": "Circle",
   "description": "People and relationships",

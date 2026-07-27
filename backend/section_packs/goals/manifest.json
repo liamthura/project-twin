@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta_schema.json",
   "key": "goals",
   "title": "Goals",
   "description": "What you're working toward — type, status, and target date",

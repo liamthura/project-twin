@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta_schema.json",
   "key": "projects",
   "title": "Projects",
   "description": "Active work and side projects",

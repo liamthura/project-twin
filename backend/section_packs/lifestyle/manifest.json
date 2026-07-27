@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta_schema.json",
   "key": "lifestyle",
   "title": "Lifestyle",
   "description": "Hobbies, values, and routines",
