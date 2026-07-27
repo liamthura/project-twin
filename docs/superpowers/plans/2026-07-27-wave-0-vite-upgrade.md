@@ -55,8 +55,6 @@ Expected: one `index-<hash>.js` and one `index-<hash>.css`. Keep this file; Task
 
 - [ ] **Step 2: Replace `__dirname` with an ESM-native equivalent**
 
-`import.meta.dirname` is available from Node 20.11, and this plan targets Node 22, so no `fileURLToPath` dance is needed.
-
 In `frontend/vite.config.js`, replace the `path` import on line 4:
 
 ```js
@@ -108,7 +106,7 @@ diff /tmp/wave0-baseline-assets.txt /tmp/wave0-after-task1-assets.txt && echo "I
 
 Expected: `IDENTICAL`. The content hashes in the asset filenames are derived from the bundle contents, so identical filenames prove the alias resolved to the same files and the output did not change.
 
-If the build fails with `Failed to resolve import "@/..."`, the alias is wrong — check that `new URL("./src", import.meta.url).pathname` points at `frontend/src` and not `frontend/src/`-relative-to-cwd.
+If the build fails with `Failed to resolve import "@/..."`, the alias is wrong — check that `fileURLToPath(new URL("./src", import.meta.url))` points at `frontend/src` and not `frontend/src/`-relative-to-cwd.
 
 - [ ] **Step 4: Verify the dev server still starts**
 
@@ -278,7 +276,7 @@ build target rather than modules. No source file changed."
 
 The single-container merge means the frontend build and the backend ship as one image, so a frontend regression blocks backend deploys. This task is the real gate on the wave.
 
-The security headers compute CSP `script-src` hashes at startup by scanning the *built* HTML. Vite minifies the inline theme script in `frontend/index.html:8-16` during build, so its hash depends on the bundler's output — which just changed. The hashing is designed to be self-correcting, but that has never been exercised across a Vite major, so it gets checked explicitly here.
+The security headers compute CSP `script-src` hashes at startup by scanning the *built* HTML. That hash is computed from the built HTML, so it would follow any change Vite made to the inline theme script in `frontend/index.html:8-17` — in practice Vite copies that script through byte-identical rather than minifying it, but the hashing is designed to be self-correcting either way, and that has never been exercised across a Vite major, so it gets checked explicitly here.
 
 **Prerequisite:** this check requires the security-headers work (PR #11) to be present in the branch. It was still unmerged when this plan was first written, and a first run of Step 2 found no CSP header at all for that reason. Confirm `grep -c "_build_csp" backend/main.py` returns non-zero before running, and rebase onto a `main` that has it if not.
 
@@ -372,7 +370,7 @@ Expected: `no-cache` on `/`; `public, max-age=31536000, immutable` on the asset;
 open http://localhost:8099/
 ```
 
-Check by eye: the app renders, the theme matches your system setting with no flash, the section tabs are present, and the version label at the bottom of the tab strip reads `v2.0.0 (<commit>)` rather than `vundefined`. Open the browser console and confirm there are no CSP violation errors.
+Check by eye: the app renders, the theme matches your system setting with no flash, the section tabs are present, and the version label at the bottom of the tab strip reads `v2.0.0 (dev)` rather than `vundefined`. `dev` is expected here: Step 1's `docker build` passes neither `--build-arg APP_COMMIT` nor `SOURCE_COMMIT`, and the `git rev-parse` fallback in `vite.config.js` has no repository inside the web stage, so it degrades to `dev` by design. A real commit hash only appears in deploys where the platform injects `SOURCE_COMMIT`. Open the browser console and confirm there are no CSP violation errors.
 
 - [ ] **Step 5: Tear down**
 

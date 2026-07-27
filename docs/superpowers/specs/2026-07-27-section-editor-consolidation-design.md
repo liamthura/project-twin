@@ -305,6 +305,11 @@ and `node-version: "20"` in CI currently float to the latest 20.x and happen to 
 this. That implicit dependency gets pinned to `20.19` in both places rather than left to
 chance.
 
+> **Superseded:** the implementation pins Node **22**, not 20.19. See the
+> wave 0 plan's "Deviation from the spec" section
+> (`docs/superpowers/plans/2026-07-27-wave-0-vite-upgrade.md`) for the
+> rationale.
+
 Wave 0 must be merged **and deployed** before wave 1 begins, so that any production build
 regression is attributable to the upgrade alone.
 
