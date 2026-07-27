@@ -258,6 +258,37 @@ natural home.
 
 This is the only place in the project where the consolidation touches stored data.
 
+### Known gaps in the wave 1 harness
+
+The whole-branch review of wave 1 (PR #14) surfaced two scope calls worth carrying into
+wave 3's plan rather than fixing retroactively in wave 1:
+
+1. **The fixtures do not yet represent the shapes waves 3-6 must migrate.** `goals`, `media`
+   and `aesthetics` are flat lists of objects. Production data for the seven legacy sections
+   contains top-level scalars beside lists, nested objects three levels deep, arrays of
+   primitives, arrays nested inside list items, and numerous fields stored but absent from
+   the manifest. Each section's own wave must ship a fixture carrying its real shape — the
+   three generic-pack fixtures from wave 1 are not a template for that shape, only for the
+   two guards.
+2. **Three untested behaviours in `GenericSectionEditor` that wave 3 must cover.**
+   - **`onChange` sibling-key preservation.** `GenericSectionEditor.jsx:274` spreads `data`,
+     but every current fixture's `data` has exactly one key, which *is* the list. A renderer
+     that rebuilt `data` from the `ui` keys alone rather than spreading the original object
+     would drop top-level scalars like `profile.name` and still pass every wave 1 test.
+   - **Add and delete are untested entirely.** `renderSection` (`frontend/src/test/harness.jsx`)
+     omits the `onShowConfirmation` prop that `App.jsx:683-687` always passes, so `removeItem`
+     takes the no-confirmation branch in every wave 1 test — a branch production never takes.
+   - **`updateItem` deletes a key whose value becomes `""`** rather than storing an empty
+     string. This is a real persistence decision (an edited-to-blank field disappears from
+     storage rather than persisting as `""`) that nothing in wave 1 pins down; a future
+     refactor could flip it either way without a test noticing.
+
+Also: `goals` declares `custom_type` in its entity's `optional` list, but no `ui` block
+references it. The completeness check this spec proposes for the generic packs (every field
+in `entities[*].required + optional` appears somewhere in that pack's `ui`) would fail on
+`goals` as it stands today. That needs resolving — either by wiring `custom_type` into the
+`goals` `ui` block or by removing it from the manifest — before that check is written.
+
 ## Testing
 
 Wave 1 establishes the harness:
