@@ -35,8 +35,18 @@ export default defineConfig({
   // VITE_API_TOKEN - Default API token (optional, can be set in UI)
   server: {
     port: 3000,
+    // In production one origin serves all of these. Proxying them in dev
+    // keeps the local shape identical to deployed.
     proxy: {
       "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
+      "/mcp": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
+      "/docs": {
         target: "http://127.0.0.1:8000",
         changeOrigin: true,
       },
