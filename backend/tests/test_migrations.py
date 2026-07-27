@@ -28,9 +28,21 @@ def test_migrations_created_every_table():
 
 
 def test_alembic_version_is_recorded_at_head():
+    """Derives head from the script directory rather than naming a revision:
+    hardcoding it means every new migration breaks this test for no reason."""
+    from pathlib import Path
+
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    here = Path(db.__file__).resolve().parent
+    cfg = Config(str(here / "alembic.ini"))
+    cfg.set_main_option("script_location", str(here / "migrations"))
+    head = ScriptDirectory.from_config(cfg).get_current_head()
+
     with db.get_pool().connection() as conn:
         rows = conn.execute("select version_num from alembic_version").fetchall()
-    assert [r["version_num"] for r in rows] == ["0001_baseline"]
+    assert [r["version_num"] for r in rows] == [head]
 
 
 def test_running_migrations_again_is_a_no_op():

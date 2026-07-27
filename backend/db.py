@@ -173,6 +173,13 @@ def check_password(password: str, password_hash: str) -> bool:
 MAX_LOGIN_ATTEMPTS = 10
 LOGIN_WINDOW_MINUTES = 15
 
+# How long a browser session token stays valid. Only sign-in mints these:
+# the token handed out at registration, and any token created explicitly from
+# Account -> API tokens, are machine credentials and never expire. The README
+# tells people to paste the registration token into Claude Desktop, so putting
+# a clock on it would break MCP clients a month after setup.
+SESSION_TOKEN_DAYS = 30
+
 
 def login_retry_after(username: str) -> Optional[int]:
     """Seconds until `username` may attempt sign-in again, or None if allowed.
@@ -270,6 +277,7 @@ def resolve_token(token: str) -> Optional[dict]:
             with t as (
                 update tokens set last_used_at = now()
                 where token_hash = %s
+                  and (expires_at is null or expires_at > now())
                 returning user_id
             )
             update users set last_seen_at = now()
@@ -283,24 +291,42 @@ def resolve_token(token: str) -> Optional[dict]:
     return user
 
 
-def create_token(user_id: str, label: str = "token") -> tuple[str, str]:
+def create_token(
+    user_id: str, label: str = "token", expires_in_days: Optional[int] = None
+) -> tuple[str, str]:
     """Issue a new named token. Returns (token_id, plaintext_token) --
-    the plaintext is shown exactly once."""
+    the plaintext is shown exactly once.
+
+    expires_in_days=None stores NULL, meaning the token never expires. That is
+    the right default for machine credentials: an MCP client configured once
+    should not stop working on a timer. Browser sessions pass a finite value --
+    see SESSION_TOKEN_DAYS.
+    """
     token = secrets.token_urlsafe(32)
     with get_pool().connection() as conn:
         row = conn.execute(
-            "insert into tokens (user_id, token_hash, label) values (%s, %s, %s)"
-            " returning id",
-            (user_id, hash_token(token), label),
+            """
+            insert into tokens (user_id, token_hash, label, expires_at)
+            values (
+                %s, %s, %s,
+                -- The cast is required: a bare parameter used only in an
+                -- `is null` test leaves Postgres unable to infer its type.
+                case when %s::int is null then null
+                     else now() + make_interval(days => %s::int) end
+            )
+            returning id
+            """,
+            (user_id, hash_token(token), label, expires_in_days, expires_in_days),
         ).fetchone()
     return str(row["id"]), token
 
 
 def list_tokens(user_id: str) -> list[dict]:
-    """The user's tokens: id, label, created_at, last_used_at. Never the hash."""
+    """The user's tokens: id, label, created_at, last_used_at, expires_at.
+    Never the hash. A null expires_at means the token does not expire."""
     with get_pool().connection() as conn:
         rows = conn.execute(
-            "select id, label, created_at, last_used_at from tokens"
+            "select id, label, created_at, last_used_at, expires_at from tokens"
             " where user_id = %s order by created_at",
             (user_id,),
         ).fetchall()
