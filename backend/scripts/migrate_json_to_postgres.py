@@ -41,7 +41,8 @@ def main():
     parser.add_argument("--data-dir", default=str(Path(__file__).parent.parent.parent / "mygist_data"))
     args = parser.parse_args()
 
-    db.ensure_schema()
+    db.run_migrations()
+    db.ensure_vector_schema()
     user_id, token = db.create_user(args.username)
 
     reset_token = db.current_user_id.set(user_id)

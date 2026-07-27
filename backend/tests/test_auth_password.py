@@ -282,11 +282,11 @@ def test_revoke_malformed_token_id_is_404(client):
 
 
 # ---------------------------------------------------------------------------
-# Startup migration: legacy users.token_hash rows get backfilled into tokens
+# Baseline migration: legacy users.token_hash rows get backfilled into tokens
 # ---------------------------------------------------------------------------
 
 
-def test_ensure_schema_backfills_legacy_token_hash_into_tokens_table():
+def test_migration_backfills_legacy_token_hash_into_tokens_table(rerun_migrations):
     plaintext = "legacy-plaintext-token-value"
     with db.get_pool().connection() as conn:
         conn.execute(
@@ -294,14 +294,14 @@ def test_ensure_schema_backfills_legacy_token_hash_into_tokens_table():
             ("legacyuser", db.hash_token(plaintext)),
         )
 
-    db.ensure_schema()
+    rerun_migrations()
 
     user = db.resolve_token(plaintext)
     assert user is not None
     assert user["username"] == "legacyuser"
 
 
-def test_revoked_token_does_not_resurrect_after_ensure_schema(client):
+def test_revoked_token_does_not_resurrect_when_migrations_replay(client, rerun_migrations):
     """users.token_hash must be cleared by the migration: otherwise revoking
     a migrated/initial token and restarting re-inserts it as 'legacy'."""
     reg = client.post("/api/auth/register", json={"username": "alice"}).json()
@@ -312,14 +312,14 @@ def test_revoked_token_does_not_resurrect_after_ensure_schema(client):
     revoke = client.delete(f"/api/auth/tokens/{tokens[0]['id']}", headers=headers)
     assert revoke.status_code == 200
 
-    db.ensure_schema()  # simulates a server restart re-running the migration
+    rerun_migrations()  # the backfill running again must not undo a revoke
 
     resp = client.get("/api/auth/whoami", headers=headers)
     assert resp.status_code == 401
     assert db.resolve_token(reg["token"]) is None
 
 
-def test_migration_clears_users_token_hash():
+def test_migration_clears_users_token_hash(rerun_migrations):
     plaintext = "legacy-plaintext-token-value-3"
     with db.get_pool().connection() as conn:
         conn.execute(
@@ -327,7 +327,7 @@ def test_migration_clears_users_token_hash():
             ("legacyuser3", db.hash_token(plaintext)),
         )
 
-    db.ensure_schema()
+    rerun_migrations()
 
     assert db.resolve_token(plaintext) is not None  # migrated into tokens
     with db.get_pool().connection() as conn:
@@ -337,7 +337,7 @@ def test_migration_clears_users_token_hash():
     assert row["token_hash"] is None  # and cleared at the source
 
 
-def test_ensure_schema_migration_is_idempotent():
+def test_migration_is_idempotent(rerun_migrations):
     plaintext = "legacy-plaintext-token-value-2"
     with db.get_pool().connection() as conn:
         conn.execute(
@@ -345,9 +345,9 @@ def test_ensure_schema_migration_is_idempotent():
             ("legacyuser2", db.hash_token(plaintext)),
         )
 
-    db.ensure_schema()
-    db.ensure_schema()
-    db.ensure_schema()
+    rerun_migrations()
+    rerun_migrations()
+    rerun_migrations()
 
     with db.get_pool().connection() as conn:
         count = conn.execute(

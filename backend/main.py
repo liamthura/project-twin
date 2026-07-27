@@ -62,8 +62,11 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
-# Ensure the users / persona_data tables exist before serving requests.
-db.ensure_schema()
+# Tables come from Alembic, applied as a deploy step (`alembic upgrade head`
+# in the Dockerfile CMD) rather than here -- schema changes should not race
+# application startup. What remains is the pgvector detection, which depends
+# on the server's capabilities and EMBEDDING_DIM rather than on a version.
+db.ensure_vector_schema()
 
 # Bearer auth middleware for /mcp and /api routes
 @app.middleware("http")
