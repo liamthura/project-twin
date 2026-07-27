@@ -28,6 +28,26 @@ def _drain_embed_executor_after(monkeypatch):
     search_index._EXECUTOR.submit(lambda: None).result(timeout=5)
 
 
+def _make_seed_searchable():
+    """Wait until the seeded row is actually searchable.
+
+    embed_sync=True is not sufficient on its own. persona_store.save has
+    already indexed the row by this point, so sync_index finds no content
+    change, has nothing in `changed`, and embeds nothing -- the embedding is
+    produced by the async job save scheduled on search_index's single-worker
+    executor. Submitting a sentinel and waiting on it drains that job, since
+    the pool processes in order.
+
+    Without the wait the advisory query can run while the seed still has no
+    embedding: the vector leg has no row to match, the FTS leg cannot match
+    deliberately-unrelated query text, and search returns [] -- an
+    intermittent "no advisory" failure of roughly one run in seven.
+    """
+    search_index._EXECUTOR.submit(lambda: None).result(timeout=10)
+    search_index.sync_index(db.current_user_id.get(), "projects",
+                            persona_store.load("projects"), embed_sync=True)
+
+
 class AngleProvider:
     """Fixed-angle fake: every document embeds to the same unit vector; the
     query embeds to a unit vector at a chosen cosine similarity to it, so the
@@ -53,9 +73,7 @@ def _seed_project(monkeypatch, provider):
         "projects": [{"name": "Ledger", "description": "A JavaScript dashboard"}],
         "current_learning": [], "top_of_mind": [],
     })
-    uid = db.current_user_id.get()
-    search_index.sync_index(uid, "projects", persona_store.load("projects"),
-                            embed_sync=True)
+    _make_seed_searchable()
 
 
 def test_add_near_dupe_gets_advisory_but_still_writes(as_user, monkeypatch):
@@ -151,9 +169,7 @@ def _seed_top_of_mind(monkeypatch, provider, idea="Switch to a monorepo"):
         "projects": [], "current_learning": [],
         "top_of_mind": [{"idea": idea, "note": ""}],
     })
-    uid = db.current_user_id.get()
-    search_index.sync_index(uid, "projects", persona_store.load("projects"),
-                            embed_sync=True)
+    _make_seed_searchable()
 
 
 def test_top_of_mind_advisory_omits_update_hint(as_user, monkeypatch):
@@ -193,9 +209,7 @@ def test_advisory_survives_title_with_embedded_quote(as_user, monkeypatch):
                       "description": "A history project about a founding father"}],
         "current_learning": [], "top_of_mind": [],
     })
-    uid = db.current_user_id.get()
-    search_index.sync_index(uid, "projects", persona_store.load("projects"),
-                            embed_sync=True)
+    _make_seed_searchable()
 
     out = server.persona_modify.fn(
         "add", "project",
