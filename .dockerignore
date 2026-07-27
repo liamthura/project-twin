@@ -24,6 +24,8 @@
 **/.pytest_cache/
 **/.cache/
 **/coverage/
+**/storybook-static
+**/.storybook-cache
 backend/tests/
 backend/archive/
 backend/docker-compose.yml
