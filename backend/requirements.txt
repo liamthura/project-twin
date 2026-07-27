@@ -36,3 +36,9 @@ httpx==0.28.1
 
 # Section pack manifest validation (boot-time)
 jsonschema==4.25.1
+
+# Schema migrations. Pulls in SQLAlchemy, which the application itself does
+# not use -- there are no ORM models and every query is raw psycopg. Alembic
+# is here for versioned, ordered, reviewable migrations; autogenerate is
+# unavailable by design and revisions are hand-written SQL.
+alembic==1.18.5

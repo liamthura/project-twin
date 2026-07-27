@@ -17,7 +17,7 @@ def test_parse_dim_respects_explicit_value():
     assert db._parse_dim({"EMBEDDING_DIM": "1536"}) == 1536
 
 
-def test_ensure_schema_survives_vector_ddl_failure(monkeypatch):
+def test_vector_schema_survives_ddl_failure(monkeypatch):
     """A broken HNSW build (old pgvector, odd server build) must not roll
     back the persona_search table or crash startup -- FTS-only degrade."""
 
@@ -25,7 +25,7 @@ def test_ensure_schema_survives_vector_ddl_failure(monkeypatch):
         raise db.psycopg.Error("simulated HNSW failure")
 
     monkeypatch.setattr(db, "_apply_vector_ddl", boom)
-    db.ensure_schema()  # must not raise
+    db.ensure_vector_schema()  # must not raise
 
     assert db.VECTOR_AVAILABLE is False
     with db.get_pool().connection() as conn:

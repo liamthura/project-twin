@@ -25,7 +25,8 @@ import search_index  # noqa: E402
 
 
 def backfill(recreate=False):
-    db.ensure_schema()
+    db.run_migrations()
+    db.ensure_vector_schema()
     if recreate and (db.VECTOR_AVAILABLE or _has_embedding_column()):
         with db.get_pool().connection() as conn:
             conn.execute("alter table persona_search drop column if exists embedding;")

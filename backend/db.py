@@ -13,6 +13,7 @@ import os
 import secrets
 import uuid
 from contextvars import ContextVar
+from pathlib import Path
 from typing import Optional
 
 import bcrypt
@@ -61,86 +62,35 @@ def get_pool() -> ConnectionPool:
     return _pool
 
 
-def ensure_schema() -> None:
-    with get_pool().connection() as conn:
-        conn.execute("""
-            create table if not exists users (
-                id uuid primary key default gen_random_uuid(),
-                username text unique not null,
-                token_hash text unique not null,
-                created_at timestamptz not null default now(),
-                last_seen_at timestamptz
-            );
-        """)
-        conn.execute("""
-            create table if not exists persona_data (
-                user_id uuid not null references users(id),
-                file_type text not null,
-                data jsonb not null,
-                updated_at timestamptz not null default now(),
-                primary key (user_id, file_type)
-            );
-        """)
-        conn.execute("alter table users add column if not exists password_hash text;")
-        conn.execute("alter table users alter column token_hash drop not null;")
-        conn.execute("""
-            create table if not exists tokens (
-                id uuid primary key default gen_random_uuid(),
-                user_id uuid not null references users(id),
-                token_hash text unique not null,
-                label text not null default 'token',
-                created_at timestamptz not null default now(),
-                last_used_at timestamptz
-            );
-        """)
-        # Migration: backfill legacy single-token users into the tokens table,
-        # then CLEAR users.token_hash. Clearing matters: if the hash stayed,
-        # revoking the migrated token and restarting would re-insert it here
-        # and resurrect the revoked credential. Idempotent and cheap, so it is
-        # safe to run on every startup.
-        conn.execute("""
-            insert into tokens (user_id, token_hash, label)
-            select id, token_hash, 'legacy' from users
-            where token_hash is not null
-            on conflict (token_hash) do nothing;
-        """)
-        conn.execute("update users set token_hash = null where token_hash is not null;")
-        # Failed sign-in counters. Keyed on the submitted username string
-        # whether or not such an account exists -- see record_failed_login().
-        conn.execute("""
-            create table if not exists login_attempts (
-                username text primary key,
-                attempt_count integer not null default 0,
-                window_start timestamptz not null default now()
-            );
-        """)
+def run_migrations() -> None:
+    """Apply pending Alembic migrations.
 
-    # --- persona_search (hybrid retrieval index; derived data) ---
-    # Table + GIN index commit in their own connection/transaction, separate
-    # from the vector DDL below: an HNSW build failure (old pgvector, odd
-    # server build) must not roll back this already-idempotent table DDL.
-    with get_pool().connection() as conn:
-        conn.execute("""
-            create table if not exists persona_search (
-                user_id uuid not null references users(id) on delete cascade,
-                file_type text not null,
-                entity_id text not null,
-                title text not null default '',
-                text text not null,
-                tsv tsvector generated always as (to_tsvector('english', text)) stored,
-                content_hash text not null,
-                updated_at timestamptz not null default now(),
-                primary key (user_id, file_type, entity_id)
-            );
-        """)
-        conn.execute(
-            "create index if not exists persona_search_tsv_idx"
-            " on persona_search using gin (tsv);"
-        )
+    Used by the test suite and handy in local development. Production runs
+    `alembic upgrade head` as a deploy step (see the Dockerfile) rather than
+    calling this at import: schema changes should not race application
+    startup, and two containers booting together should not both issue DDL.
+    """
+    from alembic import command
+    from alembic.config import Config
 
-    # Vector DDL in its OWN connection/transaction, wrapped so any
-    # psycopg.Error (e.g. an HNSW build failure on pgvector <0.5 or an odd
-    # build) degrades to FTS-only instead of crashing startup.
+    here = Path(__file__).parent
+    cfg = Config(str(here / "alembic.ini"))
+    cfg.set_main_option("script_location", str(here / "migrations"))
+    command.upgrade(cfg, "head")
+
+
+def ensure_vector_schema() -> None:
+    """Schema that cannot be a migration, applied at startup.
+
+    The embedding column's width comes from EMBEDDING_DIM, and pgvector may be
+    missing entirely -- neither fits a static, versioned migration, and both
+    must degrade to FTS-only rather than fail. Everything that does not vary
+    by deployment lives in migrations/ instead.
+
+    Runs in its own connection and swallows psycopg.Error so that an HNSW
+    build failure (old pgvector, or an unusual server build) leaves the
+    service running in FTS-only mode instead of crashing startup.
+    """
     global VECTOR_AVAILABLE
     with get_pool().connection() as conn:
         try:

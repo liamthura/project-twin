@@ -7,8 +7,8 @@ TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql://mygist:mygist@localhost:5433/mygist_test"
 )
 
-# Set before any test module runs `import main`, which calls db.ensure_schema()
-# at import time and would otherwise KeyError on a missing DATABASE_URL.
+# Set before any test module runs `import main`, which touches the database at
+# import time and would otherwise KeyError on a missing DATABASE_URL.
 os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
 
 
@@ -39,14 +39,43 @@ def clean_database(monkeypatch):
         cur.execute("drop table if exists persona_data;")
         cur.execute("drop table if exists login_attempts;")  # keyed by username, no FK
         cur.execute("drop table if exists users;")
+        # Alembic's bookkeeping must go with the tables it describes. Left
+        # behind, it would report the (now empty) database as already at head
+        # and run_migrations() would rebuild nothing.
+        cur.execute("drop table if exists alembic_version;")
     conn.close()
 
-    db_module.ensure_schema()
+    db_module.run_migrations()
+    db_module.ensure_vector_schema()
     yield
 
     if db_module._pool is not None:
         db_module._pool.close()  # close this test's pool so no threads linger
         db_module._pool = None
+
+
+@pytest.fixture
+def rerun_migrations():
+    """Replay every migration against the database as it currently stands.
+
+    Stamps back to base and upgrades again, so the real migration code runs
+    over data that already exists. That is exactly the assumption the baseline
+    revision is built on -- every statement idempotent, safe against the live
+    production database -- so exercising it here keeps that honest.
+    """
+    from pathlib import Path
+
+    from alembic import command
+    from alembic.config import Config
+
+    def _rerun():
+        here = Path(__file__).resolve().parent.parent
+        cfg = Config(str(here / "alembic.ini"))
+        cfg.set_main_option("script_location", str(here / "migrations"))
+        command.stamp(cfg, "base")
+        command.upgrade(cfg, "head")
+
+    return _rerun
 
 
 @pytest.fixture
