@@ -232,7 +232,12 @@ async def login(body: LoginRequest):
     # A correct password clears the counter, so a user who mistypes a few times
     # and then succeeds is not left throttled.
     db.clear_login_attempts(body.username)
-    _, token = db.create_token(user["id"], "web")
+    # A sign-in mints a browser session, so it expires. Machine credentials --
+    # the registration token, and anything created from Account -> API tokens --
+    # stay non-expiring; see db.SESSION_TOKEN_DAYS.
+    _, token = db.create_token(
+        user["id"], "web", expires_in_days=db.SESSION_TOKEN_DAYS
+    )
     return {"user_id": user["id"], "username": user["username"], "token": token}
 
 
