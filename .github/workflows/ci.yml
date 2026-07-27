@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A newer push to the same branch supersedes an in-flight run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: backend (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is what the production image runs (backend/Dockerfile);
+        # 3.13 is what the local dev venv runs. Both are tested so the two
+        # cannot drift apart unnoticed.
+        python-version: ["3.11", "3.13"]
+
+    services:
+      postgres:
+        # Matches backend/docker-compose.yml: the suite needs pgvector, and
+        # the image's POSTGRES_USER is a superuser so the app's
+        # "create extension if not exists vector" succeeds.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: mygist
+          POSTGRES_PASSWORD: mygist
+          POSTGRES_DB: mygist_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://mygist:mygist@localhost:5432/mygist_test
+        run: pytest -q
+
+  frontend:
+    name: frontend build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the builder stage in frontend/Dockerfile.
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # The single-container merge makes a broken frontend build block the
+      # whole image, and therefore any backend fix. This catches it here
+      # instead of at deploy time.
+      - name: Build
+        working-directory: frontend
+        run: npm run build
