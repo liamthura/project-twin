@@ -60,7 +60,12 @@ jobs:
       - name: Run tests
         working-directory: backend
         env:
-          DATABASE_URL: postgresql://mygist:mygist@localhost:5432/mygist_test
+          # TEST_DATABASE_URL, not DATABASE_URL. tests/conftest.py reads this
+          # one and then overrides DATABASE_URL from it for every test, so a
+          # DATABASE_URL set here is discarded and the suite falls back to
+          # conftest's localhost:5433 default -- which is the local dev port,
+          # not the service container's.
+          TEST_DATABASE_URL: postgresql://mygist:mygist@localhost:5432/mygist_test
         run: pytest -q
 
   frontend:
