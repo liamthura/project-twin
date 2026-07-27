@@ -49,6 +49,11 @@ service in Coolify, one URL, one deploy.
 - **`/docs` collides with FastAPI's Swagger UI.** `main.py:52` omits
   `docs_url`, so the default `/docs` and `/redoc` are live. Swagger moves to
   `/api/docs`, ReDoc to `/api/redoc`, OpenAPI to `/api/openapi.json`.
+  Moving them under `/api` puts them behind the auth middleware, which
+  guards every path starting `/api` — they were previously public at
+  `/docs`. All three (plus `/api/docs/oauth2-redirect`) are therefore added
+  to the middleware's public-path list, so the move does not silently change
+  who can read the API surface. Locking them down is a separate decision.
 - **The SPA has no client-side router.** Confirmed: no `react-router`, no
   `pushState`. Static surface is `index.html`, `/assets/*`, `favicon.svg`,
   `logo.svg`. No catch-all fallback is needed, which is what lets static

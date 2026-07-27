@@ -20,7 +20,9 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, JSONResponse
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import Response, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -49,7 +51,16 @@ from server import mcp
 mcp_app = mcp.http_app()
 
 # Initialize FastAPI
-app = FastAPI(title="MyGist API", version="1.0.0", lifespan=mcp_app.lifespan)
+# The interactive API docs move under /api: "/docs" now serves the public
+# documentation site from the static mounts near the bottom of this file.
+app = FastAPI(
+    title="MyGist API",
+    version="1.0.0",
+    lifespan=mcp_app.lifespan,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+)
 
 # Ensure the users / persona_data tables exist before serving requests.
 db.ensure_schema()
@@ -59,8 +70,21 @@ db.ensure_schema()
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
 
-    # Public routes (no auth required)
-    if path in ("/health", "/healthz", "/api/health", "/api/auth/register", "/api/auth/login"):
+    # Public routes (no auth required). The interactive API docs are listed
+    # explicitly: they used to live at /docs, outside this middleware's reach,
+    # and moving them under /api to free up /docs for the documentation site
+    # would otherwise have quietly put them behind a token.
+    if path in (
+        "/health",
+        "/healthz",
+        "/api/health",
+        "/api/auth/register",
+        "/api/auth/login",
+        "/api/docs",
+        "/api/docs/oauth2-redirect",
+        "/api/redoc",
+        "/api/openapi.json",
+    ):
         return await call_next(request)
 
     # Protected routes: /mcp/* and /api/* -- resolve the bearer token to a user
@@ -88,13 +112,17 @@ app.add_middleware(
         "https://mygist.thuradev.qzz.io",
         "http://localhost:1120",
         "http://chat.orb.local",
-        "http://147.79.18.20",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["Content-Disposition"],
 )
+
+# The web UI is same-origin now, so CORS only covers local dev and external
+# clients. Compression is ours to do: Cloudflare compresses at the edge, but
+# a request that reaches the origin directly would otherwise be uncompressed.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Health check
 @app.get("/health")
@@ -436,6 +464,70 @@ async def import_data(file: UploadFile = File(...), mode: str = "replace"):
             return {"status": "success", "mode": mode, "imported_files": imported_files}
     except zipfile.BadZipFile:
         raise HTTPException(status_code=400, detail="Invalid zip file")
+
+
+# ============================================================================
+# Static assets: the SPA, and the docs site once Phase 2 lands
+# ============================================================================
+# The root Dockerfile builds frontend/ and copies the result to backend/static
+# (and docs-site/ to backend/static/docs). Neither exists in a plain source
+# checkout, so every route here is conditional and backend-only development is
+# unaffected.
+STATIC_DIR = Path(__file__).parent / "static"
+
+
+class ImmutableStaticFiles(StaticFiles):
+    """StaticFiles that adds a one-year immutable cache header.
+
+    Only ever mounted at /assets, whose filenames Vite content-hashes -- a
+    new build produces new names, so a cached file can never go stale.
+    index.html must never be served this way: it *names* the hashed files.
+    """
+
+    def file_response(self, *args, **kwargs) -> Response:
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
+def register_static_routes(app: FastAPI, static_dir: Path) -> bool:
+    """Register the SPA and docs routes. Returns whether anything mounted.
+
+    MUST be called before the MCP app is mounted at "/" below: FastAPI
+    matches routes in registration order and a mount at "/" matches
+    everything. The SPA has no client-side router, so only these concrete
+    paths are needed -- no catch-all -- which is what lets the two coexist.
+    """
+    if not static_dir.is_dir():
+        return False
+
+    assets_dir = static_dir / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", ImmutableStaticFiles(directory=assets_dir), name="assets")
+
+    docs_dir = static_dir / "docs"
+    if docs_dir.is_dir():
+        app.mount("/docs", StaticFiles(directory=docs_dir, html=True), name="docs")
+
+    @app.get("/", include_in_schema=False)
+    async def spa_index() -> Response:
+        # The shell must not be cached: it names the hashed asset files.
+        return FileResponse(
+            static_dir / "index.html", headers={"Cache-Control": "no-cache"}
+        )
+
+    @app.get("/favicon.svg", include_in_schema=False)
+    async def favicon() -> Response:
+        return FileResponse(static_dir / "favicon.svg")
+
+    @app.get("/logo.svg", include_in_schema=False)
+    async def logo() -> Response:
+        return FileResponse(static_dir / "logo.svg")
+
+    return True
+
+
+STATIC_MOUNTED = register_static_routes(app, STATIC_DIR)
 
 
 # ============================================================================

@@ -3,8 +3,11 @@
  * Handles authentication and server connection
  */
 
-// Default hosted API base (full URL including the /api prefix).
-const CLOUD_API_URL = "https://mygist-api.thuradev.qzz.io/api";
+// Default hosted API base (full URL including the /api prefix). The hosted
+// instance serves the UI and the API from one origin, but this stays absolute:
+// it is the "cloud" preset offered to self-hosters running the UI elsewhere,
+// where a relative path would resolve against their own origin.
+const CLOUD_API_URL = "https://mygist.thuradev.qzz.io/api";
 
 // Get config from localStorage or use defaults
 function getConfig() {
