@@ -78,7 +78,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           # Matches the web build stage in the root Dockerfile.
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
