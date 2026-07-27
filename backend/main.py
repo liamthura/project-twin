@@ -203,16 +203,32 @@ async def register(body: RegisterRequest):
 
 @app.post("/api/auth/login")
 async def login(body: LoginRequest):
+    # Rate limit before checking credentials. The counter is keyed on the
+    # submitted username whether or not it exists, so a 429 says nothing about
+    # whether the account is real -- see db.login_retry_after.
+    retry_after = db.login_retry_after(body.username)
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=429,
+            detail="too many sign-in attempts, try again later",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     try:
         user = db.verify_password(body.username, body.password)
     except db.PasswordNotSetError:
+        db.record_failed_login(body.username)
         raise HTTPException(
             status_code=401, detail="password sign-in not set up for this account"
         )
     if user is None:
         # Same body for unknown username and wrong password: never reveal
         # whether the account exists.
+        db.record_failed_login(body.username)
         raise HTTPException(status_code=401, detail="invalid username or password")
+    # A correct password clears the counter, so a user who mistypes a few times
+    # and then succeeds is not left throttled.
+    db.clear_login_attempts(body.username)
     _, token = db.create_token(user["id"], "web")
     return {"user_id": user["id"], "username": user["username"], "token": token}
 

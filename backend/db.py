@@ -105,6 +105,15 @@ def ensure_schema() -> None:
             on conflict (token_hash) do nothing;
         """)
         conn.execute("update users set token_hash = null where token_hash is not null;")
+        # Failed sign-in counters. Keyed on the submitted username string
+        # whether or not such an account exists -- see record_failed_login().
+        conn.execute("""
+            create table if not exists login_attempts (
+                username text primary key,
+                attempt_count integer not null default 0,
+                window_start timestamptz not null default now()
+            );
+        """)
 
     # --- persona_search (hybrid retrieval index; derived data) ---
     # Table + GIN index commit in their own connection/transaction, separate
@@ -205,6 +214,76 @@ def check_password(password: str, password_hash: str) -> bool:
     if len(password_bytes) > MAX_PASSWORD_BYTES:
         return False  # can never be a stored password; bcrypt would raise
     return bcrypt.checkpw(password_bytes, password_hash.encode("utf-8"))
+
+
+# --- login rate limiting ----------------------------------------------------
+# Counted in Postgres rather than in-process so the limit survives a restart
+# and holds across containers -- a per-process dict resets on every deploy,
+# which is exactly when an attacker benefits.
+MAX_LOGIN_ATTEMPTS = 10
+LOGIN_WINDOW_MINUTES = 15
+
+
+def login_retry_after(username: str) -> Optional[int]:
+    """Seconds until `username` may attempt sign-in again, or None if allowed.
+
+    Called before credentials are checked, and deliberately keyed on the
+    submitted string whether or not that account exists. Limiting only real
+    accounts would turn a 429 into confirmation that a username is valid --
+    the same disclosure verify_password's timing mitigation exists to avoid.
+    """
+    with get_pool().connection() as conn:
+        row = conn.execute(
+            """
+            select attempt_count,
+                   ceil(extract(epoch from (
+                       window_start + make_interval(mins => %s) - now()
+                   )))::int as retry_after
+            from login_attempts
+            where username = %s
+              and window_start > now() - make_interval(mins => %s)
+            """,
+            (LOGIN_WINDOW_MINUTES, username, LOGIN_WINDOW_MINUTES),
+        ).fetchone()
+    if row and row["attempt_count"] >= MAX_LOGIN_ATTEMPTS:
+        return max(1, row["retry_after"])
+    return None
+
+
+def record_failed_login(username: str) -> None:
+    """Count one failed attempt, starting a fresh window if the last has expired."""
+    with get_pool().connection() as conn:
+        conn.execute(
+            """
+            insert into login_attempts (username, attempt_count, window_start)
+            values (%s, 1, now())
+            on conflict (username) do update set
+                attempt_count = case
+                    when login_attempts.window_start
+                         > now() - make_interval(mins => %s)
+                    then login_attempts.attempt_count + 1
+                    else 1
+                end,
+                window_start = case
+                    when login_attempts.window_start
+                         > now() - make_interval(mins => %s)
+                    then login_attempts.window_start
+                    else now()
+                end
+            """,
+            (username, LOGIN_WINDOW_MINUTES, LOGIN_WINDOW_MINUTES),
+        )
+        # Keep the table from growing without bound on sprayed usernames.
+        conn.execute(
+            "delete from login_attempts where window_start < now() - make_interval(mins => %s)",
+            (LOGIN_WINDOW_MINUTES * 2,),
+        )
+
+
+def clear_login_attempts(username: str) -> None:
+    """Drop the counter after a successful sign-in."""
+    with get_pool().connection() as conn:
+        conn.execute("delete from login_attempts where username = %s", (username,))
 
 
 def create_user(username: str, password: Optional[str] = None) -> tuple[str, str]:

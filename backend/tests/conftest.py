@@ -37,6 +37,7 @@ def clean_database(monkeypatch):
         cur.execute("drop table if exists persona_search;")  # references users
         cur.execute("drop table if exists tokens;")  # references users
         cur.execute("drop table if exists persona_data;")
+        cur.execute("drop table if exists login_attempts;")  # keyed by username, no FK
         cur.execute("drop table if exists users;")
     conn.close()
 
