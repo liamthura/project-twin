@@ -4,7 +4,7 @@
     "title": "Profile",
     "description": "Identity, work, education, contact",
     "core": true,
-    "position": 10,
+    "default_enabled": true,
     "enabled": true,
     "entities": {
       "email": {
@@ -170,7 +170,7 @@
     "title": "Goals",
     "description": "What you're working toward — type, status, and target date",
     "core": false,
-    "position": 15,
+    "default_enabled": true,
     "enabled": true,
     "entities": {
       "goal": {
@@ -230,7 +230,7 @@
     "title": "Knowledge",
     "description": "Domains you know and topics you track",
     "core": false,
-    "position": 20,
+    "default_enabled": true,
     "enabled": true,
     "entities": {
       "domain": {
@@ -343,7 +343,7 @@
     "title": "Preferences",
     "description": "Communication style, code style, likes and dislikes",
     "core": true,
-    "position": 30,
+    "default_enabled": true,
     "enabled": true,
     "entities": {
       "like": {
@@ -426,7 +426,7 @@
     "title": "Projects",
     "description": "Active work and side projects",
     "core": false,
-    "position": 40,
+    "default_enabled": true,
     "enabled": true,
     "entities": {
       "project": {
@@ -522,7 +522,7 @@
     "title": "Lifestyle",
     "description": "Hobbies, values, and routines",
     "core": false,
-    "position": 50,
+    "default_enabled": true,
     "enabled": true,
     "entities": {
       "hobby": {
@@ -680,7 +680,7 @@
     "title": "Media",
     "description": "Favourites and what you're into right now: taste, not a log",
     "core": false,
-    "position": 55,
+    "default_enabled": false,
     "enabled": true,
     "entities": {
       "media_item": {
@@ -751,7 +751,7 @@
     "title": "Aesthetics",
     "description": "Visual styles, palettes, and influences you prefer or avoid",
     "core": false,
-    "position": 56,
+    "default_enabled": false,
     "enabled": true,
     "entities": {
       "aesthetic": {
@@ -832,7 +832,7 @@
     "title": "Circle",
     "description": "People and relationships",
     "core": false,
-    "position": 60,
+    "default_enabled": true,
     "enabled": true,
     "entities": {
       "connection": {
@@ -860,7 +860,7 @@
     "title": "Learning Log",
     "description": "What you learn, decide, and reflect on",
     "core": true,
-    "position": 70,
+    "default_enabled": true,
     "enabled": true,
     "entities": {
       "learning_entry": {
