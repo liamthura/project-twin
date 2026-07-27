@@ -7,9 +7,12 @@ Single entry point serving:
 - Health check at /health
 """
 
+import base64
 import copy
+import hashlib
 import json
 import os
+import re
 import secrets
 import sys
 import zipfile
@@ -126,6 +129,88 @@ app.add_middleware(
 # clients. Compression is ours to do: Cloudflare compresses at the edge, but
 # a request that reaches the origin directly would otherwise be uncompressed.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+# ============================================================================
+# Security headers
+# ============================================================================
+# Reduces the chance of an XSS bug existing at all, which is the cheaper half
+# of the problem an httpOnly session cookie would address after the fact.
+
+# Matches <script> elements with no src attribute, i.e. inline ones.
+_INLINE_SCRIPT_RE = re.compile(r"<script(?![^>]*\ssrc=)[^>]*>(.*?)</script>", re.S | re.I)
+
+
+def _inline_script_hashes(static_dir: Path) -> list[str]:
+    """CSP source expressions for every inline script we serve.
+
+    Computed from the built HTML at startup rather than hardcoded. index.html
+    carries a deliberate inline script that applies the saved theme before
+    first paint -- hardcoding its hash would mean a silent theme regression
+    the day someone edits it, because CSP would block the script while the
+    page still rendered. Scanning covers the docs site too, whose generated
+    pages ship their own inline scripts.
+
+    A hash is what makes this CSP worth having: 'unsafe-inline' on script-src
+    would permit exactly the injection the policy exists to stop.
+    """
+    if not static_dir.is_dir():
+        return []
+    hashes: set[str] = set()
+    for path in sorted(static_dir.rglob("*.html")):
+        try:
+            html = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for body in _INLINE_SCRIPT_RE.findall(html):
+            digest = hashlib.sha256(body.encode("utf-8")).digest()
+            hashes.add(f"'sha256-{base64.b64encode(digest).decode()}'")
+    return sorted(hashes)
+
+
+def _build_csp(static_dir: Path) -> str:
+    script_src = " ".join(["'self'", *_inline_script_hashes(static_dir)])
+    return "; ".join([
+        "default-src 'self'",
+        f"script-src {script_src}",
+        # Tailwind and Radix set element styles at runtime, and the Google
+        # Fonts <link> is a stylesheet from that origin.
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com data:",
+        "img-src 'self' data: blob:",
+        # Not 'self': the connection settings let someone point this UI at a
+        # different MyGist server, so the browser must be allowed to reach
+        # other hosts. Restricted to https so it cannot be downgraded.
+        "connect-src 'self' https:",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+    ])
+
+
+STATIC_DIR = Path(__file__).parent / "static"
+CONTENT_SECURITY_POLICY = _build_csp(STATIC_DIR)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Applied to every response, including the auth middleware's 401s.
+
+    Registered last, so it is the outermost layer and sees responses the
+    inner middleware short-circuits.
+    """
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault(
+        "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+    )
+    # CSP only governs documents; sending it on JSON is noise.
+    if response.headers.get("content-type", "").startswith("text/html"):
+        response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+    return response
 
 # Health check
 @app.get("/health")
@@ -496,8 +581,8 @@ async def import_data(file: UploadFile = File(...), mode: str = "replace"):
 # The root Dockerfile builds frontend/ and copies the result to backend/static
 # (and docs-site/ to backend/static/docs). Neither exists in a plain source
 # checkout, so every route here is conditional and backend-only development is
-# unaffected.
-STATIC_DIR = Path(__file__).parent / "static"
+# unaffected. STATIC_DIR is defined above, where the CSP scans it for inline
+# script hashes.
 
 
 class ImmutableStaticFiles(StaticFiles):
