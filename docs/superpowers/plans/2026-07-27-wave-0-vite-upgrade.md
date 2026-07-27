@@ -232,7 +232,9 @@ ls -1 dist/assets/ | sort > /tmp/wave0-after-vite7-assets.txt
 diff /tmp/wave0-baseline-assets.txt /tmp/wave0-after-vite7-assets.txt || true
 ```
 
-Expected: the build succeeds and emits one JS and one CSS asset. **The hashes will differ from the baseline, and that is correct** — Vite 7's default build target is `baseline-widely-available`, where Vite 5's was `modules`, so the emitted code genuinely changes. What matters is that the file *count* and *kinds* match. A new chunk appearing, or the CSS vanishing, is a real problem.
+Expected: the build succeeds and emits one JS and one CSS asset. **The hashes will differ from the baseline, and that is correct** — esbuild moves from 0.21 to 0.28 with Vite 7, so the emitted code genuinely changes even at an identical browser target. What matters is that the file *count* and *kinds* match. A new chunk appearing, or the CSS vanishing, is a real problem.
+
+Note that Vite 7 also changes the *default* `build.target` from `modules` to `baseline-widely-available`, raising the browser floor from safari14/chrome87 to safari16/chrome107. Because this wave must ship no behaviour change, `vite.config.js` pins the old floor explicitly. Vite 7 removed the `"modules"` string alias, so the pin must be spelled out as the array that alias expanded to in Vite 5: `["es2020", "edge88", "firefox78", "chrome87", "safari14"]`.
 
 - [ ] **Step 4: Verify the version stamp and API defaults survived**
 
@@ -266,8 +268,8 @@ Required by Vitest 4 (peer: vite ^6 || ^7 || ^8), which wave 1 needs for
 Storybook's addon-vitest. Not Vite 8 -- it moves to Rolldown and requires
 plugin-react 6, which is more change than this needs.
 
-Asset hashes shift because Vite 7 defaults to the baseline-widely-available
-build target rather than modules. No source file changed."
+Asset hashes shift because esbuild moves from 0.21 to 0.28. No source file
+changed."
 ```
 
 ---
@@ -420,9 +422,12 @@ Three changes, no source file touched:
   the spec called for pinning 20.19, but that is one patch above Vite 7's
   floor on an unsupported runtime.
 - Vite 5 → 7.3.6. Not 8, which moves to Rolldown and needs plugin-react 6.
+- `build.target` pinned to Vite 5's old floor. Vite 7 would otherwise
+  default to `baseline-widely-available`, raising the browser floor from
+  safari14/chrome87 to safari16/chrome107 — a behaviour change this wave
+  is not supposed to make.
 
-Asset hashes change because Vite 7 defaults to the
-`baseline-widely-available` build target rather than `modules`. Output is
+Asset hashes change because esbuild moves from 0.21 to 0.28. Output is
 still one JS and one CSS chunk.
 
 Verified against the built container: CSP `script-src` still covers the
