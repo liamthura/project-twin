@@ -1,0 +1,21 @@
+{
+  "styles": [
+    {
+      "id": "aesthetic_2c4e6f8a",
+      "name": "Scandinavian",
+      "domain": "interior",
+      "stance": "love",
+      "notes": "Light wood, muted tones, nothing shouting for attention.",
+      "references": ["Kinfolk magazine", "Dieter Rams"],
+      "related": ["aesthetic_9b1d3f5c"]
+    },
+    {
+      "id": "aesthetic_9b1d3f5c",
+      "name": "Y2K",
+      "domain": "graphic",
+      "stance": "avoid",
+      "notes": "Too busy for anything I want to live with long-term.",
+      "references": ["Frutiger Aero moodboards"]
+    }
+  ]
+}
