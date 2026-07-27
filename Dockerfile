@@ -52,7 +52,13 @@ COPY --from=web /build/frontend/dist ./static
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+# start-period matches backend/docker-compose.yml, and is what makes a deploy
+# go healthy promptly: during the start period Docker probes at --start-interval
+# (5s by default) instead of waiting a full --interval. Measured on this image,
+# with a local database: healthy at ~10s with it, 31s without (a single probe at
+# 30s). That difference is a window where a working container is still reported
+# unhealthy, and an orchestrator gating routing on health answers 502 throughout.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
