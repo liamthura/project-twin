@@ -278,7 +278,9 @@ build target rather than modules. No source file changed."
 
 The single-container merge means the frontend build and the backend ship as one image, so a frontend regression blocks backend deploys. This task is the real gate on the wave.
 
-The security headers added in PR #11 compute CSP `script-src` hashes at startup by scanning the *built* HTML. Vite minifies the inline theme script in `frontend/index.html:8-16` during build, so its hash depends on the bundler's output — which just changed. The hashing is designed to be self-correcting, but that has never been exercised across a Vite major, so it gets checked explicitly here.
+The security headers compute CSP `script-src` hashes at startup by scanning the *built* HTML. Vite minifies the inline theme script in `frontend/index.html:8-16` during build, so its hash depends on the bundler's output — which just changed. The hashing is designed to be self-correcting, but that has never been exercised across a Vite major, so it gets checked explicitly here.
+
+**Prerequisite:** this check requires the security-headers work (PR #11) to be present in the branch. It was still unmerged when this plan was first written, and a first run of Step 2 found no CSP header at all for that reason. Confirm `grep -c "_build_csp" backend/main.py` returns non-zero before running, and rebase onto a `main` that has it if not.
 
 **Files:**
 - No files modified. This is verification only.
@@ -339,15 +341,23 @@ Expected: `inline scripts found: 1`, one `OK` line, `RESULT: PASS`.
 
 - [ ] **Step 3: Verify caching, compression and the API**
 
+Use GET with a discarded body (`-o /dev/null -D -`), not `curl -I`. A HEAD request
+gives false negatives here on two counts: the SPA route is registered GET-only, so
+`HEAD /` returns 404 and no `cache-control`; and GZip does not compress a bodyless
+response, so no `content-encoding` appears either.
+
 ```bash
 echo "--- SPA shell should not be cached ---"
-curl -sI http://localhost:8099/ | grep -i 'cache-control'
+curl -s -o /dev/null -D - http://localhost:8099/ | grep -i 'cache-control'
 echo "--- hashed asset should be immutable ---"
 ASSET=$(curl -s http://localhost:8099/ | grep -o '/assets/[^"]*\.js' | head -1)
 echo "asset: $ASSET"
-curl -sI "http://localhost:8099$ASSET" | grep -i 'cache-control'
+curl -s -o /dev/null -D - "http://localhost:8099$ASSET" | grep -i 'cache-control'
 echo "--- gzip ---"
-curl -sI -H 'Accept-Encoding: gzip' "http://localhost:8099$ASSET" | grep -i 'content-encoding'
+curl -s -o /dev/null -D - -H 'Accept-Encoding: gzip' "http://localhost:8099$ASSET" | grep -i 'content-encoding'
+echo "--- baseline security headers ---"
+curl -s -o /dev/null -D - http://localhost:8099/api/health \
+  | grep -iE 'x-content-type-options|referrer-policy|x-frame-options|permissions-policy'
 echo "--- api ---"
 curl -s -o /dev/null -w 'health:%{http_code}\n' http://localhost:8099/api/health
 curl -s -o /dev/null -w 'files(401 expected):%{http_code}\n' http://localhost:8099/api/files
