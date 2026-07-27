@@ -1,6 +1,7 @@
 {
   "goals": [
     {
+      "id": "goal_3f9a21c4",
       "title": "Ship MyGist v3",
       "type": "career",
       "status": "active",
@@ -9,6 +10,7 @@
       "notes": "Section editor consolidation is the last big piece."
     },
     {
+      "id": "goal_7be48d02",
       "title": "Learn Rust properly",
       "type": "learning",
       "status": "paused",

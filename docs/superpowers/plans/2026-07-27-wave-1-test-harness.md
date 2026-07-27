@@ -17,7 +17,7 @@
 - Exact versions: `vitest@^4.1.10`, `@vitest/browser@^4.1.10`, `@vitest/browser-playwright@^4.1.10`, `@testing-library/react@^16.3.2`, `@testing-library/jest-dom@^7.0.0`, `@testing-library/user-event@^14.6.1`, `jsdom@^30.0.0`, `playwright@^1.62.0`, `storybook@^10.5.5`, `@storybook/react-vite@^10.5.5`, `@storybook/addon-vitest@^10.5.5`.
 - Storybook is **local and CI only**. It is never deployed, and no Storybook build output may enter the Docker image.
 - Branch: `feature/wave-1-test-harness`, branched from `main`. Pushes use the `liamthura` account.
-- Wave 0 is merged and deployed; `main` is on Vite 7.3.6 / Node 22.
+- Wave 0 is merged and deployed; `main` is on Vite 7.3.6. `frontend/package.json`'s `engines.node` floor is `^22.22.2 || >=24.15.0` (raised in Task 2 from `^20.19.0 || >=22.12.0`, which had zero overlap with what `jsdom@30` actually supports — jsdom 30 does not run on Node 20 at all, and Node 20 went EOL in April 2026, which is why wave 0 moved the build off it in the first place).
 
 ## Deviation from the spec
 
@@ -121,12 +121,13 @@ Expected: `ui.goals` with `title_field: "title"`, `badges: ["type","status"]`, `
 
 - [ ] **Step 4: Write the goals data fixture**
 
-Create `frontend/src/__fixtures__/data/goals.json`. Every field the `goals` `ui` block renders must be populated — that is what makes it useful as a coverage guard:
+Create `frontend/src/__fixtures__/data/goals.json`. Every field the `goals` `ui` block renders must be populated — that is what makes it useful as a coverage guard. Include an `id` on each goal: `backend/section_packs/goals/manifest.json` declares `id_lists: [["goals","goal"]]`, so real stored goals always carry one (assigned by `persona_store.generate_entity_id`, format `f"{prefix}_{uuid.uuid4().hex[:8]}"`, e.g. `goal_3f9a21c4`), and `GenericSectionEditor.jsx` uses `item.id` as its React key. `id` is also the one field in this fixture that the `ui` block's `badges`/`detail_fields` never expose, which is what makes the round-trip guard in Task 2 an actual test of drop-on-write rather than only of sibling-field preservation:
 
 ```json
 {
   "goals": [
     {
+      "id": "goal_3f9a21c4",
       "title": "Ship MyGist v3",
       "type": "career",
       "status": "active",
@@ -135,6 +136,7 @@ Create `frontend/src/__fixtures__/data/goals.json`. Every field the `goals` `ui`
       "notes": "Section editor consolidation is the last big piece."
     },
     {
+      "id": "goal_7be48d02",
       "title": "Learn Rust properly",
       "type": "learning",
       "status": "paused",
