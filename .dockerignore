@@ -28,6 +28,7 @@ backend/tests/
 backend/archive/
 backend/docker-compose.yml
 backend/Dockerfile
+Dockerfile
 
 # Repo metadata and docs sources (the built docs site is copied from the
 # Node stage, not from the context)
