@@ -92,3 +92,18 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npm run build
+
+      # frontend/.env.production once compiled
+      # VITE_API_URL="https://<api-server-path>/api" into every build, which
+      # silently defeated the same-origin default in getApiBase(). Nothing
+      # failed loudly -- App.jsx's mount effect just fetched a nonexistent host
+      # whenever no serverUrl was saved. This asserts on the build output
+      # because the bug lives in what Vite inlines, not in any component.
+      - name: Assert no placeholder URL in the bundle
+        working-directory: frontend
+        run: |
+          if grep -rIE 'https?://<[^>]+>' dist/; then
+            echo "::error::placeholder URL compiled into the build output"
+            exit 1
+          fi
+          echo "no placeholder URLs in dist/"
