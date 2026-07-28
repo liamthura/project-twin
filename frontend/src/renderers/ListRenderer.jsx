@@ -21,17 +21,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { VALUE_META, FOCUS_RING, ValueIcon } from "@/components/controls";
 import { ScalarField, LONG_TEXT_FIELDS } from "./ScalarField";
 
-// `field_defaults` is static JSON in a manifest, so a created-at stamp has to
-// be expressed as a token the renderer resolves at add time. Exact-match only:
-// a value that merely starts with "@" is real user data, not a token.
-function resolveDefaults(defaults) {
-  const out = {};
-  for (const [k, v] of Object.entries(defaults)) {
-    out[k] = v === "@now" ? new Date().toISOString() : v;
-  }
-  return out;
-}
-
 export default function ListRenderer({ node, entity, items, onItems, onShowConfirmation }) {
   const [expanded, setExpanded] = useState({});
   const [addOpen, setAddOpen] = useState(false);
@@ -66,9 +55,15 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
     // forward for any field with no control of its own (e.g. a token like
     // "@now" that was never rendered), so resolving `fieldDefaults` alone
     // and spreading `base` on top would let that stale raw token win.
-    // Resolve after merging instead, so a literal "@now" is replaced no
-    // matter which side of the merge it came from.
-    const item = resolveDefaults({ ...fieldDefaults, ...base });
+    // Resolve after merging instead -- but only for keys the manifest
+    // actually declared as the token AND whose value in the merged item is
+    // still that untouched token. A user who types the literal string
+    // "@now" into a real control (e.g. the title field) is entering data,
+    // not invoking the token, and must not have it silently overwritten.
+    const item = { ...fieldDefaults, ...base };
+    for (const [k, v] of Object.entries(fieldDefaults)) {
+      if (v === "@now" && item[k] === "@now") item[k] = new Date().toISOString();
+    }
     if (!item[titleField]) return;
     if (existingTitles.has(item[titleField].toLowerCase())) return;
     onItems([item, ...items]);

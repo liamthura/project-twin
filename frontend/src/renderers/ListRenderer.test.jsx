@@ -282,4 +282,25 @@ describe("@now in field_defaults", () => {
 
     expect(onItems.mock.calls[0][0][0].source).toBe("@channel");
   });
+
+  it("does not overwrite a user-typed literal '@now' in an unrelated field", async () => {
+    // The title field has no declared default at all -- typing the token's
+    // exact text there is real user data entering a real control, not the
+    // token firing. Only a key the manifest itself declared as "@now" (and
+    // still holding that value) may be resolved.
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[]} onItems={onItems} />);
+
+    await user.click(screen.getByRole("button", { name: /add/i }));
+    const dialog = screen.getByRole("dialog");
+    const titleInput = within(dialog).getAllByRole("textbox")[0];
+    await user.type(titleInput, "@now");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    const [[added]] = onItems.mock.calls;
+    expect(added[0].topic).toBe("@now");
+    // The declared token in `timestamp` still resolves as normal.
+    expect(added[0].timestamp).not.toBe("@now");
+  });
 });
