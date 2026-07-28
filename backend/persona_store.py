@@ -184,8 +184,44 @@ def _normalize(file_type: str, data: dict) -> dict:
                     # this only ever ADDS a key, never removes or overwrites.
                     # setdefault is not enough: a tab carrying `title: ""` is
                     # just as nameless as one carrying no title at all.
+                    #
+                    # Read-neutral does NOT mean collision-neutral. All four
+                    # fallback sites resolve by `title` first via
+                    # find_in_array, which compares case-insensitively
+                    # (item.get(id_field, "").lower() == identifier.lower())
+                    # and returns the FIRST match. If some other tab already
+                    # has that same title, backfilling this one would give
+                    # two tabs an identical title, and being earlier or later
+                    # in the list would silently decide which one every
+                    # title-keyed lookup (including a remove) resolves to --
+                    # exactly the divergence from yesterday's behaviour this
+                    # normalisation must not introduce. So: skip the backfill
+                    # when the candidate title collides, case-insensitively,
+                    # with another tab's title as it currently stands. The
+                    # tab keeps rendering blank -- reachable only via `topic`
+                    # -- rather than taking over another entry's identity.
+                    #
+                    # "As it stands" deliberately includes a title backfilled
+                    # earlier in this same pass, not just titles that existed
+                    # before _normalize ran: since the list is scanned and
+                    # mutated in order, two tabs that both carry only
+                    # {topic: "X"} would otherwise both backfill to the same
+                    # title in one pass, recreating the identical hazard this
+                    # guard exists to prevent. Instead the earlier tab claims
+                    # the title and the later one collides with it, exactly
+                    # as it would against a pre-existing title -- and stays
+                    # collided on every later pass, since the earlier tab's
+                    # title is no longer a backfill candidate itself.
                     if not tab.get("title") and tab.get("topic"):
-                        tab["title"] = tab["topic"]
+                        candidate = tab["topic"]
+                        collides = any(
+                            other is not tab
+                            and isinstance(other, dict)
+                            and (other.get("title") or "").lower() == candidate.lower()
+                            for other in mental_tabs
+                        )
+                        if not collides:
+                            tab["title"] = candidate
         # Phase 5 (consolidation): proficiency_levels retired; strip it so old
         # backups/imports can't resurrect an invisible orphan key.
         data.pop("proficiency_levels", None)

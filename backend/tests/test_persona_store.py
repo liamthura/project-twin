@@ -160,3 +160,102 @@ def test_backfilled_mental_tab_is_found_by_the_title_lookup(as_user):
     idx, tab = find_in_array(tabs, "Old bookmarks", "title")
     assert idx == 0
     assert tab["topic"] == "Old bookmarks"
+
+
+def test_backfill_skips_a_topic_that_collides_with_another_tabs_title(as_user):
+    """A tab stored as {topic: "X"} earlier in the list than a tab already
+    holding {title: "X"} used to be read-neutral: find_in_array(tabs, "X",
+    "title") resolved only the second tab, since the first had no `title` at
+    all. Backfilling the first tab's title from its topic would make it match
+    too, and -- being earlier in the list -- it would now win that lookup,
+    silently taking over the second tab's identity. A remove-by-title MCP
+    call would then delete the wrong tab.
+
+    The guard: skip the backfill when the candidate title would collide
+    (case-insensitively, matching find_in_array's own comparison) with
+    another tab's current title. The colliding tab keeps rendering blank --
+    reachable only via `topic` -- rather than hijacking another entry's name."""
+    from server import find_in_array
+
+    store.save("knowledge", {
+        "domains": [],
+        "mental_tabs": [
+            {"topic": "X", "notes": "legacy, collides"},
+            {"title": "X", "notes": "the real owner of this name"},
+        ],
+    })
+    tabs = store.load("knowledge")["mental_tabs"]
+
+    # The colliding tab is left exactly as it was: no title backfilled.
+    assert "title" not in tabs[0]
+    assert tabs[0]["topic"] == "X"
+
+    # The lookup a remove/update action would actually run still resolves
+    # the real owner, exactly as it did before the backfill existed.
+    idx, tab = find_in_array(tabs, "X", "title")
+    assert idx == 1
+    assert tab["notes"] == "the real owner of this name"
+
+
+def test_backfill_collision_check_is_case_insensitive_like_find_in_array(as_user):
+    """find_in_array compares with .lower(), so a topic that collides only
+    by case ("x" vs "X") must be treated as a collision too -- otherwise the
+    guard and the lookup it protects would disagree about what counts as a
+    match."""
+    store.save("knowledge", {
+        "domains": [],
+        "mental_tabs": [
+            {"topic": "x"},
+            {"title": "X"},
+        ],
+    })
+    tabs = store.load("knowledge")["mental_tabs"]
+    assert "title" not in tabs[0]
+    assert tabs[0]["topic"] == "x"
+
+
+def test_collision_guarded_backfill_is_idempotent(as_user):
+    """Running _normalize twice on a blob that already hit the collision
+    guard must not change it further -- the skipped tab stays skipped."""
+    store.save("knowledge", {
+        "domains": [],
+        "mental_tabs": [
+            {"topic": "X"},
+            {"title": "X"},
+        ],
+    })
+    once = store.load("knowledge")
+    twice = store._normalize("knowledge", copy.deepcopy(once))
+    assert twice == once
+    assert "title" not in once["mental_tabs"][0]
+
+
+def test_same_pass_backfill_counts_as_collision_for_a_later_entry(as_user):
+    """Decision: a title backfilled earlier in the *same* normalisation pass
+    counts as a collision for a later entry with the same legacy topic. Two
+    tabs that only ever carried {topic: "X"} (neither had a real title
+    before) are processed in list order; the earlier one claims the title,
+    and the later one is treated exactly like colliding with a pre-existing
+    title -- it is left unbackfilled rather than both ending up with the
+    identical title "X", which would just recreate the same ambiguous-lookup
+    hazard the guard exists to prevent.
+
+    This also keeps the outcome stable under repeated normalisation: once
+    the earlier tab holds a real title, the later one collides with it on
+    every subsequent pass the same way it did on the first."""
+    store.save("knowledge", {
+        "domains": [],
+        "mental_tabs": [
+            {"topic": "X", "notes": "first, claims the name"},
+            {"topic": "X", "notes": "second, loses the race"},
+        ],
+    })
+    tabs = store.load("knowledge")["mental_tabs"]
+
+    assert tabs[0]["title"] == "X"
+    assert "title" not in tabs[1]
+    assert tabs[1]["topic"] == "X"
+
+    # Idempotent: a second pass makes no further change.
+    twice = store._normalize("knowledge", copy.deepcopy({"domains": [], "mental_tabs": tabs}))
+    assert twice["mental_tabs"] == tabs
