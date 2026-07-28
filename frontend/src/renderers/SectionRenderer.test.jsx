@@ -166,23 +166,30 @@ describe("SectionRenderer", () => {
     // clicked "React Server Components" (entry 1) but then looked for
     // entry 2's source value ("article") -- an element that is never on
     // screen because entry 2 was never expanded, so it fails to locate the
-    // input regardless of whether preservation actually works. Expanding
-    // "Postgres full-text search" (entry 2, whose source really is
-    // "article") and editing it there, then asserting entry 1 -- the one
-    // that carries id/timestamp/related_entries/conversation_metadata --
-    // comes back byte-for-byte unchanged, is the version that can actually
-    // fail on broken preservation and pass on correct preservation.
-    it("preserves a sibling entry's id, timestamp, related_entries and conversation_metadata across an edit", async () => {
+    // input regardless of whether preservation actually works.
+    //
+    // The name promises entry 1's own unmodelled fields survive an edit to
+    // entry 1, so the edit has to land on entry 1: expand it and type into
+    // its own source value ("conversation", unique on screen -- entry 2's is
+    // "article"). Editing a sibling instead (as an earlier version of this
+    // test did) only proves cross-item isolation, which is a real property
+    // but not the one this test's name claims, and it would stay green even
+    // if the renderer dropped conversation_metadata from the entry actually
+    // being edited.
+    it("preserves its own id, timestamp, related_entries and conversation_metadata when a different field is edited", async () => {
       const { user, latest, initial } = renderSection({
         pack: learningLogPack, initial: learningLogData,
       });
-      await user.click(screen.getByText("Postgres full-text search"));
-      await user.type(screen.getByDisplayValue("article"), "s");
+      await user.click(screen.getByText("React Server Components"));
+      await user.type(screen.getByDisplayValue("conversation"), "s");
 
       const after = latest();
       const entry = after.entries.find((e) => e.id === "learn_20260115_a1b2c3");
       const before = initial.entries.find((e) => e.id === "learn_20260115_a1b2c3");
-      expect(entry).toEqual(before);
+      expect(entry.source).toBe("conversations");
+      expect(entry.timestamp).toBe(before.timestamp);
+      expect(entry.related_entries).toEqual(before.related_entries);
+      expect(entry.conversation_metadata).toEqual(before.conversation_metadata);
     });
   });
 

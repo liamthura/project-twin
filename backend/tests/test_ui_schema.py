@@ -24,7 +24,14 @@ import pytest
 
 import pack_loader
 
-GENERIC_PACKS = ["goals", "media", "aesthetics"]
+# Packs whose manifest `ui` field names happen to equal their storage keys --
+# the constraint this check actually verifies (ui fields subset of
+# entity.required + entity.optional) only holds for those. Later waves
+# migrate sections where a node's fields deliberately diverge from the
+# entity vocabulary (e.g. `projects`, `knowledge`, `profile`), and this test
+# will need reworking to account for that divergence rather than those packs
+# simply being left out of this list to keep it green.
+GENERIC_PACKS = ["goals", "media", "aesthetics", "learning_log"]
 
 BASE_GOALS_MANIFEST = {
     "key": "goals",
