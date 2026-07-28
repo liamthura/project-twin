@@ -36,6 +36,25 @@ describe("setAt", () => {
   it("replaces the whole object for an empty path", () => {
     expect(setAt({ a: 1 }, [], { b: 2 })).toEqual({ b: 2 });
   });
+  it("writes through an array index without converting the array to an object", () => {
+    const before = { list: [1, 2, 3] };
+    const after = setAt(before, ["list", 1], 99);
+    expect(Array.isArray(after.list)).toBe(true);
+    expect(after.list).toEqual([1, 99, 3]);
+    expect(before.list).toEqual([1, 2, 3]);
+  });
+  it("writes a nested path inside an array element, preserving the array and sharing untouched siblings", () => {
+    const before = { items: [{ id: 1, notes: "a" }, { id: 2, notes: "b" }] };
+    const after = setAt(before, ["items", 0, "notes"], "x");
+    expect(Array.isArray(after.items)).toBe(true);
+    expect(after.items[0]).toEqual({ id: 1, notes: "x" });
+    expect(after.items[1]).toBe(before.items[1]);
+  });
+  it("creates a missing intermediate as a plain object, never guessing array-ness from a numeric key", () => {
+    const result = setAt({}, ["a", 0], 1);
+    expect(Array.isArray(result.a)).toBe(false);
+    expect(result).toEqual({ a: { 0: 1 } });
+  });
 });
 
 describe("removeAt", () => {
@@ -49,6 +68,20 @@ describe("removeAt", () => {
   });
   it("is a no-op when the path is absent", () => {
     expect(removeAt({ a: 1 }, ["nope", "deep"])).toEqual({ a: 1 });
+  });
+  it("deletes a key inside an array element, preserving the array", () => {
+    const before = { items: [{ id: 1, note: "a" }, { id: 2, note: "b" }] };
+    const after = removeAt(before, ["items", 0, "note"]);
+    expect(Array.isArray(after.items)).toBe(true);
+    expect(after.items).toEqual([{ id: 1 }, { id: 2, note: "b" }]);
+    expect(after.items[1]).toBe(before.items[1]);
+  });
+  it("removes an array element itself by splicing (shortening the array, not leaving a hole)", () => {
+    const before = { items: [{ id: 1 }, { id: 2 }, { id: 3 }] };
+    const after = removeAt(before, ["items", 1]);
+    expect(Array.isArray(after.items)).toBe(true);
+    expect(after.items).toEqual([{ id: 1 }, { id: 3 }]);
+    expect(after.items).toHaveLength(2);
   });
 });
 
