@@ -11,14 +11,14 @@
 //     entity's, for sections whose manifest field names are not their
 //     storage keys (unused by today's packs, needed by waves 3-6)
 import { useState } from "react";
-import { Plus, Trash2, ChevronDown, Info } from "lucide-react";
+import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { InfoDialog } from "@/components/ui/info-dialog";
+import { InfoButton } from "@/components/ui/info-button";
 import { VALUE_META, FOCUS_RING, ValueIcon, SEGMENTED_MAX, EnumControl } from "@/components/controls";
 import { ScalarField, LONG_TEXT_FIELDS, ISO_DATE } from "./ScalarField";
 import { buildOrder, filterVisible, applyFacets } from "./listPipeline";
@@ -82,7 +82,6 @@ export default function ListRenderer({
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState({});
   const [query, setQuery] = useState("");
-  const [infoOpen, setInfoOpen] = useState(false);
   // Facet state lives here, not in listPipeline: it's per-field UI selection,
   // not derived data. Keyed by storage key; a field absent from this map (or
   // holding `undefined`) means that facet's "All" state -- no row is excluded
@@ -106,7 +105,7 @@ export default function ListRenderer({
   // heading only; the header button said a bare "Add", which reads fine beside
   // a populated list and says nothing on an empty screen where it is the only
   // thing to act on.
-  const addLabel = (node.title ?? node.entity ?? "item").replace(/_/g, " ");
+  const addLabel = (node.entity ?? node.title ?? "item").replace(/_/g, " ");
   // Opening the dialog and seeding the draft, extracted because the empty
   // state opens the same dialog from outside Radix's trigger. Both paths must
   // seed identically or a manifest default would apply invisibly on one route
@@ -267,17 +266,6 @@ export default function ListRenderer({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">
-          {node.info && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              aria-label={node.title ? `About ${node.title}` : "About this section"}
-              onClick={() => setInfoOpen(true)}
-            >
-              <Info className="h-4 w-4" />
-            </Button>
-          )}
           <div className="text-sm text-muted-foreground">
             {q || facetsActive ? `${visible.length} of ${items.length}` : items.length}{" "}
             {items.length === 1 ? "entry" : "entries"}
@@ -609,7 +597,10 @@ export default function ListRenderer({
                       className="space-y-2 px-4 pb-3 sm:px-9"
                     >
                       {child.title && (
-                        <Label className="text-xs capitalize">{child.title}</Label>
+                        <div className="flex items-center gap-1.5">
+                          <Label className="text-xs capitalize">{child.title}</Label>
+                          <InfoButton info={child.info} title={child.title} />
+                        </div>
                       )}
                       {rendered}
                     </div>
@@ -623,27 +614,6 @@ export default function ListRenderer({
         </div>
       )}
 
-      {node.info && (
-        <InfoDialog
-          open={infoOpen}
-          onOpenChange={setInfoOpen}
-          title={node.title ?? "About this section"}
-          description={node.info.overview}
-        >
-          <p className="font-medium text-foreground">Tips for filling this section:</p>
-          <ul className="space-y-2 text-muted-foreground">
-            {(node.info.tips || []).map((tip, i) => (
-              <li key={i} className="flex gap-2">
-                <span className="text-primary">•</span>
-                <span>{tip}</span>
-              </li>
-            ))}
-          </ul>
-          <DialogFooter>
-            <Button onClick={() => setInfoOpen(false)}>Got it</Button>
-          </DialogFooter>
-        </InfoDialog>
-      )}
     </div>
   );
 }

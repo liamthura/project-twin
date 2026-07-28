@@ -15,6 +15,7 @@
 //     node.title heading, the React key, and binding each node's path
 //     against the section's own `data`
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { InfoButton } from "@/components/ui/info-button";
 import { getAt, setAt, normalizeUi } from "./paths";
 import { renderNode } from "./renderNode";
 
@@ -24,7 +25,19 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{pack.title}</CardTitle>
+        <CardTitle className="flex items-center gap-1.5">
+          {pack.title}
+          {/* A node with no title of its own is the section's main list, so
+              the heading that describes it is the Card's. Its "i" belongs
+              here rather than buried in the list body -- and a section whose
+              lists are all titled (knowledge) correctly shows none here,
+              because each list carries its own beside its own h3. */}
+          {sections
+            .filter((n) => !n.title && n.info)
+            .map((n, i) => (
+              <InfoButton key={i} info={n.info} title={pack.title} />
+            ))}
+        </CardTitle>
         <CardDescription>{pack.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -48,7 +61,10 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
           return (
             <div key={key} className="space-y-3">
               {node.title && (
-                <h3 className="text-sm font-semibold text-foreground">{node.title}</h3>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-sm font-semibold text-foreground">{node.title}</h3>
+                  <InfoButton info={node.info} title={node.title} />
+                </div>
               )}
               {rendered}
             </div>

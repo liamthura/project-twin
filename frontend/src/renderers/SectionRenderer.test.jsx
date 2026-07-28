@@ -335,7 +335,7 @@ describe("SectionRenderer", () => {
 
     it("offers the info dialog carried by the manifest", async () => {
       const { user } = renderSection({ pack: circlePack, initial: circleData });
-      await user.click(screen.getByRole("button", { name: /about this section/i }));
+      await user.click(screen.getByRole("button", { name: "About Circle" }));
       expect(screen.getByText(/Track the important people/)).toBeInTheDocument();
       expect(screen.getByText(/The person's full name/)).toBeInTheDocument();
     });
@@ -423,7 +423,7 @@ describe("SectionRenderer", () => {
     // The wrapper SectionRenderer draws around a node that declares a
     // `title`: <div><h3>Top of Mind</h3>{list}</div>. Located by the heading
     // rather than by DOM position so it survives a reordering of sections.
-    const topOfMindBlock = () => screen.getByText("Top of Mind").parentElement;
+    const topOfMindBlock = () => screen.getByText("Top of Mind").parentElement.parentElement;
 
     // ---- the top_of_mind trap: stored key is `idea`, manifest says `item` ---
 
@@ -594,7 +594,7 @@ describe("SectionRenderer", () => {
       // Two info blocks in one section: if both fell back to the generic
       // name, `getByRole` here would throw on finding two matches -- which is
       // the ambiguity a screen-reader user would hear.
-      await user.click(screen.getByRole("button", { name: "About this section" }));
+      await user.click(screen.getByRole("button", { name: "About Projects" }));
       expect(screen.getByText(/Track your active work/)).toBeInTheDocument();
       expect(screen.getByText(/Clear, descriptive title/)).toBeInTheDocument();
     });
@@ -654,8 +654,8 @@ describe("SectionRenderer", () => {
       });
     });
 
-    const domainsBlock = () => screen.getByText("Skills & Domains").parentElement;
-    const mentalTabsBlock = () => screen.getByText("Mental Tabs").parentElement;
+    const domainsBlock = () => screen.getByText("Skills & Domains").parentElement.parentElement;
+    const mentalTabsBlock = () => screen.getByText("Mental Tabs").parentElement.parentElement;
     const tabsNode = () =>
       normalizeUi(knowledgePack).sections.find((s) => s.path[0] === "mental_tabs");
     const domainsNode = () =>
@@ -1199,5 +1199,50 @@ describe("SectionRenderer", () => {
 
       errorSpy.mockRestore();
     });
+  });
+});
+
+// Two UI changes requested after wave 4 shipped: the info "i" belongs beside
+// the heading that explains it rather than inside the list body, and Top of
+// Mind reads better as a named sub-section above Projects than as an
+// afterthought below it.
+describe("section headings and info placement", () => {
+  it("puts Top of Mind above Projects, each under its own heading", () => {
+    renderSection({ pack: projectsPack, initial: projectsData });
+
+    const headings = screen.getAllByRole("heading").map((h) => h.textContent);
+    // The Card title comes first, then the two sub-sections in manifest order.
+    expect(headings.indexOf("Top of Mind")).toBeGreaterThan(-1);
+    expect(headings.indexOf("Top of Mind")).toBeLessThan(headings.indexOf("Projects", 1));
+  });
+
+  it("puts each list's info button beside its own heading, not in the list body", () => {
+    renderSection({ pack: projectsPack, initial: projectsData });
+
+    for (const title of ["Top of Mind", "Projects"]) {
+      const heading = screen.getAllByRole("heading", { name: title }).at(-1);
+      const button = screen.getByRole("button", { name: `About ${title}` });
+      // Same heading row, so the icon reads as belonging to that heading.
+      expect(heading.parentElement).toBe(button.parentElement);
+    }
+  });
+
+  it("keeps an untitled section's info beside the card title, where its only heading is", () => {
+    renderSection({ pack: circlePack, initial: circleData });
+
+    const button = screen.getByRole("button", { name: "About Circle" });
+    expect(screen.getByRole("heading", { name: /Circle/ })).toContainElement(button);
+  });
+
+  it("labels each Add button with the singular entity, not the plural heading", () => {
+    // Empty, because the labelled Add lives in the empty panel -- the header
+    // button stays a bare "Add" beside a populated list.
+    renderSection({ pack: knowledgePack, initial: {} });
+
+    // The headings are "Skills & Domains" and "Mental Tabs"; the buttons add
+    // one thing each, so they name the entity.
+    expect(screen.getByRole("button", { name: "Add domain" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add mental tab" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add Skills & Domains/ })).not.toBeInTheDocument();
   });
 });

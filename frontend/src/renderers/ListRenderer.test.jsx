@@ -952,71 +952,24 @@ describe("title field also listed in detail_fields", () => {
   });
 });
 
-describe("info", () => {
-  const info = { overview: "Who matters to you.", tips: ["Name: their name.", "Notes: context."] };
-  const node = { kind: "list", path: ["items"], title_field: "name", info };
-
-  it("renders no info button when the node declares none", () => {
-    render(<ListRenderer node={{ ...node, info: undefined }} items={[]} onItems={vi.fn()} />);
-    expect(screen.queryByRole("button", { name: /about this section/i })).not.toBeInTheDocument();
-  });
-
-  it("opens a dialog showing the overview and every tip", async () => {
-    const user = userEvent.setup();
-    render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
-
-    await user.click(screen.getByRole("button", { name: /about this section/i }));
-    expect(screen.getByText("Who matters to you.")).toBeInTheDocument();
-    for (const tip of info.tips) expect(screen.getByText(tip)).toBeInTheDocument();
-  });
-
-  // "About this section" was hardcoded, so a section packing two list nodes
-  // -- projects is the first, and wave 5's lifestyle packs four -- produced
-  // buttons that screen-reader users could not tell apart, and that tests
-  // could only separate by DOM order. The node's own title is the name the
-  // user already sees above the list, so it is the one to announce.
-  it("names each info button after its node, so two in one section are distinguishable", () => {
-    render(
-      <div>
-        <ListRenderer node={{ ...node, title: "Projects" }} items={[]} onItems={vi.fn()} />
-        <ListRenderer node={{ ...node, title: "Top of Mind" }} items={[]} onItems={vi.fn()} />
-      </div>
-    );
-
-    expect(screen.getByRole("button", { name: "About Projects" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "About Top of Mind" })).toBeInTheDocument();
-    // The generic name is gone once a title exists, rather than sitting
-    // alongside as a second way to match the same two buttons ambiguously.
-    expect(screen.queryByRole("button", { name: /about this section/i })).not.toBeInTheDocument();
-  });
-
-  it("falls back to the generic name for a node with no title", () => {
-    render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "About this section" })).toBeInTheDocument();
-  });
-
-  it("gives a row's delete button a name distinct from the info button, since both are icon-only and the info button renders first in DOM order", async () => {
-    // Before this row had an accessible name, both buttons were icon-only
-    // with empty textContent -- a selector like
-    // getAllByRole("button").find(b => b.textContent === "") would silently
-    // grab the info button (it's first in DOM) instead of the row's delete
-    // button. Selecting by name must land on the right one.
+describe("row delete button naming", () => {
+  // Both the row delete and (before it moved to the heading) the info button
+  // were icon-only with empty textContent, so a selector like
+  // getAllByRole("button").find(b => b.textContent === "") could silently
+  // grab the wrong one. Selecting by accessible name must land on the row.
+  it("names a row's delete button after the row", async () => {
     const onShowConfirmation = vi.fn();
     const user = userEvent.setup();
     render(
       <ListRenderer
-        node={node}
+        node={{ kind: "list", path: ["items"], title_field: "name" }}
         items={[{ name: "Ada" }]}
         onItems={vi.fn()}
         onShowConfirmation={onShowConfirmation}
       />
     );
 
-    const infoButton = screen.getByRole("button", { name: /about this section/i });
-    const deleteButton = screen.getByRole("button", { name: "Remove Ada" });
-    expect(deleteButton).not.toBe(infoButton);
-
-    await user.click(deleteButton);
+    await user.click(screen.getByRole("button", { name: "Remove Ada" }));
     expect(onShowConfirmation).toHaveBeenCalledWith(
       "Remove Ada?",
       "This can't be undone.",
@@ -1025,11 +978,6 @@ describe("info", () => {
   });
 });
 
-// A grid column on a 1152px desktop is only ~386px wide (see needsFullRow in
-// ListRenderer.jsx for the arithmetic), and a four-option segmented control
-// needs roughly 400px -- so it wrapped after three options while the column
-// beside it sat empty. jsdom has no layout engine, so this pins the class
-// contract that gives such a field the whole row.
 describe("detail-grid column spans", () => {
   const base = { kind: "list", path: ["items"], title_field: "name" };
   const item = { name: "Row", status: "want", stance: "love", notes: "n", tags: ["t"] };
@@ -1156,7 +1104,11 @@ describe("children", () => {
 
   // The wrapper a child list renders inside, located by the child's own
   // title label rather than by DOM position.
-  const childBlock = (title) => screen.getByText(title).parentElement;
+  // The child's label now sits in its own heading row (label + optional info
+  // button) inside the child block, so the block is two levels up rather than
+  // one. Explicit rather than a class selector: if the structure changes
+  // again this fails loudly instead of silently scoping to the wrong element.
+  const childBlock = (title) => screen.getByText(title).parentElement.parentElement;
 
   function renderStatefulParent(initialItems, node = parentNode) {
     let seen = initialItems;
@@ -1752,7 +1704,7 @@ describe("empty state offers a way in", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={{ ...node, title: "Mental tab" }} items={[]} onItems={vi.fn()} />);
 
-    const cta = screen.getByRole("button", { name: "Add Mental tab" });
+    const cta = screen.getByRole("button", { name: "Add thing" });
     await user.click(cta);
 
     // Opens the same dialog the header trigger does -- one dialog, not two.

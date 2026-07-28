@@ -664,9 +664,36 @@
         {
           "kind": "list",
           "path": [
+            "top_of_mind"
+          ],
+          "entity": "top_of_mind",
+          "title": "Top of Mind",
+          "title_field": "idea",
+          "detail_fields": [
+            "idea",
+            "note"
+          ],
+          "fields_outside_entity": [
+            "idea"
+          ],
+          "searchable": true,
+          "info": {
+            "overview": "Capture quick ideas, thoughts, or things you want to explore. Think of it as a scratchpad for inspiration before it becomes a full project.",
+            "tips": [
+              "Idea: A short phrase or sentence describing what you're thinking about.",
+              "Note: Optional context — why this idea excites you, potential next steps, or related thoughts.",
+              "Use this for: half-baked concepts, 'what if' questions, problems you want to solve, things to research later.",
+              "When an idea matures, you can promote it to a full project with more details."
+            ]
+          }
+        },
+        {
+          "kind": "list",
+          "path": [
             "projects"
           ],
           "entity": "project",
+          "title": "Projects",
           "title_field": "name",
           "badges": [
             "status"
@@ -729,32 +756,6 @@
               ]
             }
           ]
-        },
-        {
-          "kind": "list",
-          "path": [
-            "top_of_mind"
-          ],
-          "entity": "top_of_mind",
-          "title": "Top of Mind",
-          "title_field": "idea",
-          "detail_fields": [
-            "idea",
-            "note"
-          ],
-          "fields_outside_entity": [
-            "idea"
-          ],
-          "searchable": true,
-          "info": {
-            "overview": "Capture quick ideas, thoughts, or things you want to explore. Think of it as a scratchpad for inspiration before it becomes a full project.",
-            "tips": [
-              "Idea: A short phrase or sentence describing what you're thinking about.",
-              "Note: Optional context — why this idea excites you, potential next steps, or related thoughts.",
-              "Use this for: half-baked concepts, 'what if' questions, problems you want to solve, things to research later.",
-              "When an idea matures, you can promote it to a full project with more details."
-            ]
-          }
         }
       ]
     }
