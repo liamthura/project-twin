@@ -916,3 +916,383 @@ describe("detail-grid column spans", () => {
     expect(cellFor("tags").className).toContain("sm:col-span-2");
   });
 });
+
+// ---------------------------------------------------------------------------
+// children -- nested child lists (wave 4, Task 2)
+//
+// A `ui` list node may carry `children[]`, each child another node whose
+// `path` resolves against the LIST ITEM rather than the section root. All the
+// tests below expand the parent row first: a child list only exists inside an
+// expanded row, so an assertion made against a collapsed row cannot fail for
+// the reason it claims.
+//
+// Selector note: with a nested list there are now delete buttons and Add
+// buttons at two levels. `Remove <title>` names the row, so parent and child
+// buttons only collide when a child item shares its parent's title (see the
+// last test in this block, which documents that). The child's Add button is
+// scoped through the child's own `title` label, whose parent element is the
+// wrapper the child list renders inside.
+// ---------------------------------------------------------------------------
+describe("children", () => {
+  const childNode = {
+    kind: "list",
+    path: ["references"],
+    entity: "reference",
+    title: "References",
+    title_field: "name",
+    detail_fields: ["url", "notes"],
+  };
+  const parentNode = {
+    kind: "list",
+    path: ["projects"],
+    entity: "project",
+    title_field: "name",
+    detail_fields: ["status"],
+    children: [childNode],
+  };
+  const entities = {
+    project: { optional: [] },
+    reference: { optional: [] },
+  };
+  // Two parents, so every write assertion can check the row that was NOT
+  // edited as well as the one that was.
+  const alpha = {
+    id: "p1",
+    name: "Alpha",
+    status: "active",
+    references: [{ name: "Ref A1", url: "https://a1", notes: "first" }],
+  };
+  const beta = {
+    id: "p2",
+    name: "Beta",
+    status: "idea",
+    references: [
+      { name: "Ref B1", url: "https://b1" },
+      { name: "Ref B2", url: "https://b2" },
+    ],
+  };
+  const items = [alpha, beta];
+
+  // The wrapper a child list renders inside, located by the child's own
+  // title label rather than by DOM position.
+  const childBlock = (title) => screen.getByText(title).parentElement;
+
+  function renderStatefulParent(initialItems, node = parentNode) {
+    let seen = initialItems;
+    function Harness() {
+      const [state, setState] = useState(initialItems);
+      return (
+        <ListRenderer
+          node={node}
+          entities={entities}
+          entity={entities.project}
+          packKey="wave4_test"
+          items={state}
+          onItems={(next) => {
+            seen = next;
+            setState(next);
+          }}
+        />
+      );
+    }
+    const utils = render(<Harness />);
+    return { ...utils, user: userEvent.setup(), latest: () => seen };
+  }
+
+  it("renders a child list inside an expanded row, and not inside a collapsed one", async () => {
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={parentNode}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={[alpha]}
+        onItems={vi.fn()}
+      />
+    );
+
+    // Collapsed: neither the child's title nor any of its rows exist.
+    expect(screen.queryByText("References")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ref A1")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Alpha"));
+
+    expect(screen.getByText("References")).toBeInTheDocument();
+    expect(screen.getByText("Ref A1")).toBeInTheDocument();
+  });
+
+  it("edits the correct stored parent index and child index, leaving every other row byte-identical", async () => {
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={parentNode}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={items}
+        onItems={onItems}
+      />
+    );
+
+    // Beta is stored at index 1; Ref B2 is its child index 1.
+    await user.click(screen.getByText("Beta"));
+    await user.click(screen.getByText("Ref B2"));
+    await user.type(screen.getByDisplayValue("https://b2"), "!");
+
+    const [[next]] = onItems.mock.calls;
+    expect(next).toEqual([
+      alpha,
+      {
+        id: "p2",
+        name: "Beta",
+        status: "idea",
+        references: [
+          { name: "Ref B1", url: "https://b1" },
+          { name: "Ref B2", url: "https://b2!" },
+        ],
+      },
+    ]);
+    // Structural sharing: the untouched parent and the untouched sibling
+    // child are the very same objects, not equal copies.
+    expect(next[0]).toBe(alpha);
+    expect(next[1].references[0]).toBe(beta.references[0]);
+  });
+
+  it("adds a child item to row 1 without touching row 0", async () => {
+    const { user, latest } = renderStatefulParent(items);
+
+    await user.click(screen.getByText("Beta"));
+    await user.click(within(childBlock("References")).getByRole("button", { name: "Add" }));
+
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getAllByRole("textbox")[0], "Ref B3");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    expect(latest()).toEqual([
+      alpha,
+      {
+        id: "p2",
+        name: "Beta",
+        status: "idea",
+        references: [
+          { name: "Ref B3" },
+          { name: "Ref B1", url: "https://b1" },
+          { name: "Ref B2", url: "https://b2" },
+        ],
+      },
+    ]);
+    expect(latest()[0]).toBe(alpha);
+    expect(screen.getByText("Ref B3")).toBeInTheDocument();
+  });
+
+  it("removes a child item, routes it through the parent's confirmation, and leaves every other key on the parent item untouched", async () => {
+    const onItems = vi.fn();
+    const confirmations = [];
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={parentNode}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={items}
+        onItems={onItems}
+        onShowConfirmation={(title, body, confirm) => {
+          confirmations.push(title);
+          confirm();
+        }}
+      />
+    );
+
+    await user.click(screen.getByText("Beta"));
+    await user.click(screen.getByRole("button", { name: "Remove Ref B1" }));
+
+    // The child's delete went through the parent's confirmation prop, not
+    // straight to the data.
+    expect(confirmations).toEqual(["Remove Ref B1?"]);
+    const [[next]] = onItems.mock.calls;
+    expect(next).toEqual([
+      alpha,
+      {
+        id: "p2",
+        name: "Beta",
+        status: "idea",
+        references: [{ name: "Ref B2", url: "https://b2" }],
+      },
+    ]);
+    expect(next[0]).toBe(alpha);
+  });
+
+  it("edits the right child while the parent list is sorted, since the parent index comes from the row, not its display position", async () => {
+    const sorted = { ...parentNode, sort: { field: "rank", dir: "desc" } };
+    const ranked = [
+      { ...alpha, rank: 1 },
+      { ...beta, rank: 2 },
+    ];
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={sorted}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={ranked}
+        onItems={onItems}
+      />
+    );
+
+    // Beta displays first (rank 2, desc) but is stored at index 1.
+    const rows = screen.getAllByText(/Alpha|Beta/);
+    expect(rows.map((r) => r.textContent)).toEqual(["Beta", "Alpha"]);
+
+    await user.click(screen.getByText("Beta"));
+    await user.click(screen.getByText("Ref B1"));
+    await user.type(screen.getByDisplayValue("https://b1"), "!");
+
+    const [[next]] = onItems.mock.calls;
+    expect(next).toEqual([
+      { ...alpha, rank: 1 },
+      {
+        ...beta,
+        rank: 2,
+        references: [
+          { name: "Ref B1", url: "https://b1!" },
+          { name: "Ref B2", url: "https://b2" },
+        ],
+      },
+    ]);
+  });
+
+  it("edits the right child while a search filter is active", async () => {
+    const searchable = { ...parentNode, searchable: true };
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={searchable}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={items}
+        onItems={onItems}
+      />
+    );
+
+    // Filter down to Beta only -- it is now the only row on screen, but is
+    // still stored at index 1.
+    await user.type(screen.getAllByRole("searchbox")[0], "beta");
+    expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Beta"));
+    await user.click(screen.getByText("Ref B2"));
+    await user.type(screen.getByDisplayValue("https://b2"), "!");
+
+    const [[next]] = onItems.mock.calls;
+    expect(next).toEqual([
+      alpha,
+      {
+        ...beta,
+        references: [
+          { name: "Ref B1", url: "https://b1" },
+          { name: "Ref B2", url: "https://b2!" },
+        ],
+      },
+    ]);
+    expect(next[0]).toBe(alpha);
+  });
+
+  it("logs a child node of an unsupported kind (naming the pack) and still renders the parent row's own fields", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // No `path` either: an unsupported kind carries no guarantee of a
+    // well-formed path, and neither the value read nor the React key may
+    // assume one.
+    const node = { ...parentNode, children: [{ kind: "fields", title: "Meta" }] };
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={node}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={[alpha]}
+        onItems={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByText("Alpha"));
+
+    // The parent row is intact.
+    expect(screen.getByDisplayValue("active")).toBeInTheDocument();
+    // Nothing was rendered for the rejected child -- not even its heading.
+    expect(screen.queryByText("Meta")).not.toBeInTheDocument();
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('unsupported node kind "fields"')
+    );
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("wave4_test"));
+    spy.mockRestore();
+  });
+
+  it("renders an empty child list, without logging, for an item that has no value at the child path", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const gamma = { id: "p3", name: "Gamma", status: "idea" };
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={parentNode}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={[gamma]}
+        onItems={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByText("Gamma"));
+
+    expect(screen.getByText("References")).toBeInTheDocument();
+    expect(screen.getByText(/nothing here yet/i)).toBeInTheDocument();
+    // A fresh parent is not corruption.
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("writes into a parent item that has no key at the child path at all, without disturbing its other keys", async () => {
+    const gamma = { id: "p3", name: "Gamma", status: "idea" };
+    const { user, latest } = renderStatefulParent([gamma]);
+
+    await user.click(screen.getByText("Gamma"));
+    await user.click(within(childBlock("References")).getByRole("button", { name: "Add" }));
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getAllByRole("textbox")[0], "First ref");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    expect(latest()).toEqual([
+      { id: "p3", name: "Gamma", status: "idea", references: [{ name: "First ref" }] },
+    ]);
+  });
+
+  it("gives a child row's delete button an accessible name that collides with the parent's when the titles match -- scope by row, not by name alone", async () => {
+    // Documented hazard, not an endorsement: `Remove <title>` names the row's
+    // title, and nothing namespaces it by level. A test that selects a nested
+    // delete button by name alone must be sure the titles differ.
+    const twin = { id: "p9", name: "Alpha", references: [{ name: "Alpha" }] };
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={parentNode}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={[twin]}
+        onItems={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getAllByText("Alpha")[0]);
+
+    expect(screen.getAllByRole("button", { name: "Remove Alpha" })).toHaveLength(2);
+  });
+});

@@ -226,6 +226,7 @@
         },
         "children": {
           "type": "array",
+          "description": "Nodes rendered inside an expanded list row. A child's `path` resolves against the ROW'S ITEM, not the section root -- e.g. `[\"references\"]` on a list of projects addresses `project.references`. Children are full uiSection nodes (this $ref is recursive), so a child list must name its own `entity` like any other list node.",
           "items": {
             "$ref": "#/$defs/uiSection"
           }

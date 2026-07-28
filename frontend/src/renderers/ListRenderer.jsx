@@ -22,11 +22,17 @@ import { InfoDialog } from "@/components/ui/info-dialog";
 import { VALUE_META, FOCUS_RING, ValueIcon, SEGMENTED_MAX } from "@/components/controls";
 import { ScalarField, LONG_TEXT_FIELDS } from "./ScalarField";
 import { buildOrder, filterVisible } from "./listPipeline";
-// setAt is unused today -- wave 4's Task 2 needs it to write a nested child
-// node's edit back into its parent list item. Importing it now (inert) so
-// this task's prop-threading and Task 2's actual write share one commit
-// shape instead of splitting an import across two.
-import { setAt } from "./paths";
+import { getAt, setAt } from "./paths";
+// Circular by construction: renderNode imports ListRenderer to dispatch a
+// "list" node, and ListRenderer imports renderNode to dispatch a node's
+// `children` against one of its own items. It resolves because neither
+// reference is read at module-evaluation time -- renderNode's ListRenderer
+// reference and this file's renderNode reference are both only dereferenced
+// inside a render call, by which point both modules have finished
+// initialising. Do not move either into module scope (a default-value
+// expression, a memo built at import time) -- that is what would turn this
+// into an undefined-component error.
+import { renderNode } from "./renderNode";
 
 // Read-only display of a machine-written key (a created-at stamp, an id).
 // Local time and locale-free: the stored value is UTC, showing it raw would
@@ -45,11 +51,12 @@ function formatDisplay(value, format) {
   return format === "date" ? date : `${date} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// `entities` (the whole map) and `packKey` are accepted but not yet consumed
-// here -- wave 4's Task 2 uses them to dispatch a child node (via renderNode)
-// against the resolved item and its own entity, the same way SectionRenderer
-// dispatches a section's own top-level nodes today. `entity` stays the
-// pre-resolved object it always was, for every existing call site and test.
+// `entities` (the whole map) and `packKey` are passed straight back into
+// renderNode when dispatching `node.children` against a row's item, the same
+// way SectionRenderer dispatches a section's own top-level nodes -- the child
+// resolves its own entity out of the map, and packKey names the pack in any
+// log the child's dispatch emits. `entity` stays the pre-resolved object it
+// always was, for every existing call site and test.
 export default function ListRenderer({
   node, entity, entities, packKey, items, onItems, onShowConfirmation,
 }) {
@@ -151,6 +158,24 @@ export default function ListRenderer({
       if (value === undefined || value === "") delete next[idx][field];
       else next[idx][field] = value;
     }
+    onItems(next);
+  };
+
+  // Writes `value` at an item-relative `path` inside the item stored at
+  // `idx`. `updateItem` above takes a flat field map and cannot reach inside
+  // an item, which is exactly what a child node needs. Uses the same
+  // immutable setAt the section root uses, so the item is replaced rather
+  // than mutated and every sibling key survives by reference.
+  //
+  // Deliberately NOT reproducing updateItem's delete-on-empty-string rule: a
+  // child writes whatever its own renderer produced (for a child list, an
+  // array), and an empty array is the honest record of "the user removed the
+  // last entry" -- the same thing the section root leaves behind when the
+  // last row of a top-level list is deleted. Blanking a scalar inside a child
+  // item is the child renderer's own concern and is handled by ITS updateItem.
+  const updateItemAt = (idx, path, value) => {
+    const next = [...items];
+    next[idx] = setAt(next[idx] ?? {}, path, value);
     onItems(next);
   };
 
@@ -370,10 +395,11 @@ export default function ListRenderer({
                 </Button>
               </div>
               {expanded[idx] && (
-                // px-9 aligns detail fields under the row title (px-3 + a
-                // 16px chevron + an 8px gap). That indent is worth 72px of a
-                // 375px screen, which is most of why an enum control had
-                // nowhere to go -- so it only applies from sm up.
+                <>
+                {/* px-9 aligns detail fields under the row title (px-3 + a
+                    16px chevron + an 8px gap). That indent is worth 72px of a
+                    375px screen, which is most of why an enum control had
+                    nowhere to go -- so it only applies from sm up. */}
                 <div className="grid gap-3 px-4 pb-3 sm:grid-cols-2 sm:px-9">
                   {editFields.map((f) => (
                     <div key={f} className={needsFullRow(f) ? "sm:col-span-2" : ""}>
@@ -393,6 +419,45 @@ export default function ListRenderer({
                     </div>
                   ))}
                 </div>
+                {/* Child nodes, dispatched through the same seam the section
+                    root uses -- but bound to THIS item: the child's `path`
+                    resolves against `item`, and its writes go back through
+                    `updateItemAt(idx, ...)`. `idx` is the row's own stored
+                    index (from `visible`), never a display position: `order`
+                    and `visible` mean the row on screen is not the row at
+                    that array position. */}
+                {(node.children || []).map((child, ci) => {
+                  // Only a well-formed path can be read or written. A child of
+                  // an unsupported kind carries no such guarantee, and getAt
+                  // throws on a non-iterable path -- so guard before reading,
+                  // exactly as SectionRenderer guards at the root.
+                  const hasPath = Array.isArray(child.path);
+                  const rendered = renderNode({
+                    node: child,
+                    value: hasPath ? getAt(item, child.path) : undefined,
+                    onValue: (next) => updateItemAt(idx, child.path, next),
+                    entities,
+                    packKey,
+                    onShowConfirmation,
+                  });
+                  // renderNode returns null (after logging) for a node it
+                  // rejects. Bail before the wrapper so a rejected child
+                  // contributes nothing -- not an empty div, and not a
+                  // heading floating over nothing.
+                  if (!rendered) return null;
+                  return (
+                    <div
+                      key={`${ci}:${hasPath ? child.path.join(".") : ""}`}
+                      className="space-y-2 px-4 pb-3 sm:px-9"
+                    >
+                      {child.title && (
+                        <Label className="text-xs capitalize">{child.title}</Label>
+                      )}
+                      {rendered}
+                    </div>
+                  );
+                })}
+                </>
               )}
             </div>
             );
