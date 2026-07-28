@@ -1273,11 +1273,50 @@ Expected: PASS.
 - If that guard collects `display_fields` into the set it checks, it will **fail** on `timestamp`. The correct fix is to exclude `display_fields` from that check with a comment explaining why — never to drop `timestamp` from the manifest to make the test green.
 - If the guard does not know about `display_fields` (most likely, since the property is new), it will pass silently, and `display_fields` is then **unguarded** against a phantom key. Say so in your report rather than treating a green run as coverage.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 9: Make the title field editable on both packs**
+
+Found by Task 6's review. `ListRenderer` computes `editFields` as `badges ∪ detail_fields`. Neither manifest lists its `title_field` there, so the title renders as a plain `<span>` in the row header and as an input **only in the Add dialog**. Both bespoke editors being deleted in Task 7 have a real edit control for it — `LearningLogEditor.jsx` labels it "Topic", `CircleEditor.jsx` labels it "Name".
+
+Failure scenario without this: a user adds "Ada Lovelacce", spots the typo, expands the row, and finds no Name field. The only recourse is delete-and-re-add, which discards the row's `id` — and `id` is what `execute_link` (`server.py:1298`) points `related` entries at, so every cross-section link to that person breaks. Data loss on the workaround path.
+
+Fix is manifest-only, no renderer change. Add the title field to `detail_fields` in both:
+
+- `backend/section_packs/learning_log/manifest.json` → `"detail_fields": ["topic", "details", "source", "tags", "key_decisions", "followup_items"]`
+- `backend/section_packs/circle/manifest.json` → `"detail_fields": ["name", "relationship", "traits", "notes"]`
+
+Put it first so the expanded row leads with the title, as both bespoke editors do.
+
+Regenerate fixtures, then add one test per pack in `SectionRenderer.test.jsx` asserting the title is editable in place and that editing it changes only that field:
+
+```jsx
+it("lets the title field be corrected in place, without a delete and re-add", async () => {
+  const { user, latest, initial } = renderSection({ pack: circlePack, initial: circleData });
+  await user.click(screen.getByText("Ada Lovelace"));
+  const input = screen.getByDisplayValue("Ada Lovelace");
+  await user.type(input, "!");
+
+  const after = latest();
+  const expected = structuredClone(initial);
+  expected.connections[0].name = "Ada Lovelace!";
+  expect(after).toEqual(expected);
+  // The id must survive -- it is what related links point at.
+  expect(after.connections[0].id).toBe(initial.connections[0].id);
+});
+```
+
+Write the equivalent for `learning_log` against `topic`.
+
+Note the `describeGuards` coverage guard will now also cover the title field, since `covered` is `badges ∪ detail_fields`. That is intended.
+
+- [ ] **Step 10: Run both suites**
+
+Run: `cd frontend && npm test`, then `cd backend && ./venv/bin/python -m pytest -q` with an explicit Bash timeout of at least 400000 ms.
+
+- [ ] **Step 11: Commit**
 
 ```bash
-git add frontend/src/renderers backend/section_packs frontend/src/__fixtures__
-git commit -m "feat: read-only display fields; show each learning log entry's timestamp"
+git add frontend/src backend/section_packs
+git commit -m "feat: read-only display fields, learning log timestamp, editable title fields"
 ```
 
 ---
