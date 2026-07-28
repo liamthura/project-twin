@@ -7,6 +7,15 @@ import { Label } from "@/components/ui/label";
 import { segmentClass } from "@/components/ui/segmented-control";
 import { saveConfig, loginAccount, registerAccount, CLOUD_API_URL } from "@/lib/api.js";
 
+// The API served by whatever origin handed us this page. Computed once at
+// module scope rather than per render: it cannot change while the page is
+// open, and jsdom gives it a real value so tests exercise the same branch a
+// browser does. Guarded for any non-browser import.
+const ORIGIN_API_URL =
+  typeof window !== "undefined" && window.location?.origin
+    ? `${window.location.origin}/api`
+    : CLOUD_API_URL;
+
 // Welcome / sign-in form: username + password, with a "Create account"
 // toggle. Lives on the first-run welcome screen (see the `error &&
 // !getAuthToken()` branch below). On success it saves the config and hands
@@ -19,8 +28,25 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState(null);
   const [showServer, setShowServer] = useState(false);
-  const [connectionType, setConnectionType] = useState("cloud"); // "cloud" | "self-hosted"
-  const [selfHostedUrl, setSelfHostedUrl] = useState("");
+  // MyGist ships as one container serving both this page and /api, so the
+  // server that handed you this form is almost always the one you want to
+  // authenticate against -- and `getApiBase()` already defaults to the
+  // same origin for every other request. This screen used to hardcode the
+  // cloud preset instead, so a self-hosted instance sent its own users'
+  // sign-ups to mygist.thuradev.qzz.io, where the browser rejects the
+  // cross-origin preflight and registration fails with no way to tell why.
+  //
+  // On the hosted instance the serving origin IS the cloud URL, so this
+  // resolves to "cloud" there and nothing changes for its users. Anywhere
+  // else it prefills the origin you are already on. The cloud preset stays
+  // one click away for the case its comment in api.js describes: running
+  // this UI somewhere other than the server it talks to.
+  const [connectionType, setConnectionType] = useState(
+    ORIGIN_API_URL === CLOUD_API_URL ? "cloud" : "self-hosted"
+  );
+  const [selfHostedUrl, setSelfHostedUrl] = useState(
+    ORIGIN_API_URL === CLOUD_API_URL ? "" : ORIGIN_API_URL
+  );
 
   const serverUrl =
     connectionType === "cloud" ? CLOUD_API_URL : selfHostedUrl.trim();
