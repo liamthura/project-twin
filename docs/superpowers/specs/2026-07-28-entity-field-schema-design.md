@@ -1,7 +1,7 @@
 # Entity field schema
 
 **Date:** 2026-07-28
-**Status:** Approved, not started
+**Status:** Approved as the design of record. Deliberately NOT scheduled as a project — see "Sequencing". Accretes across waves 4-6.
 **Sequel to:** `2026-07-27-section-editor-consolidation-design.md`, which deferred this as "reconciling `entities` with storage"
 
 ## Problem
@@ -218,15 +218,41 @@ and are documented as deliberate exceptions rather than quietly skipped.
 
 ## Sequencing
 
-**Phases A and B land before wave 4. Phase C runs after, incrementally.**
+**Revised 2026-07-28, before any work started. This does not run before wave 4.**
 
-Phase A is the expensive part, but it is the same reading every wave already performs as its
-mandated first step. Done once centrally it is close to cost-neutral across waves 4–6, and
-wave 4 alone covers three sections.
+The original recommendation was Phases A and B ahead of wave 4. Checking guard coverage per
+wave showed that was wrong, and the reasoning is recorded here so it is not relitigated.
 
-What wave 4 gains: `ui` blocks for `projects` and `knowledge` machine-checked against reality
-rather than hand-verified, and `profile`'s `kind: "fields"` section — currently guarded by
-nothing — covered like everything else.
+| Wave | Alias-guard coverage after the wave 4 prerequisites |
+| --- | --- |
+| 4 — `projects`, `knowledge` | Main list entities **covered**: `project`, `top_of_mind`, `domain`, `mental_tab` — including the two that broke the alias heuristic. Child entities and `knowledge` itself are not |
+| 5 — `lifestyle`, `preferences` | Near-total gap. `preferences` has no covered entity at all |
+| 6 — `profile` | `work_experience`, `education` and `basic_info` uncovered |
+
+Wave 4 is the best-covered wave remaining, so blocking it on this project buys the least.
+
+Two further facts weigh against front-loading it:
+
+- **No guard has yet caught a real bug.** Every trap found — `contact`, `new_topic`,
+  `mental_tab` storing `title`, `top_of_mind` storing `idea` — was found by a human reading
+  `execute_modify`, which the consolidation spec already mandates as each wave's first step.
+  The guards are regression protection against future edits, not discovery tools. The checks
+  that have repeatedly caught real defects are the frontend round-trip and coverage guards,
+  which already exist and are cheap.
+- **The reading is not avoidable work this project eliminates.** It happens every wave either
+  way. Phase A only moves it earlier and adds the differential harness on top.
+
+**Revised plan: accrete, do not detour.**
+
+1. Waves 4–6 proceed as planned. Each wave's mandated reading of `execute_modify` now also
+   **writes down what it found** as `fields` on the entities it touched, instead of
+   discarding it. Cost per wave is near zero — the reading is happening regardless.
+2. Build the Phase A differential harness once, when enough is declared to justify it.
+   Revisit before wave 5, where the coverage gap is genuinely severe.
+3. Phases B and C follow only if the accreted declaration proves its worth.
+
+Stopping at any point loses nothing: a partial `fields` declaration is still accurate
+documentation of what was read, verified by whatever harness exists at the time.
 
 ## Non-goals
 
