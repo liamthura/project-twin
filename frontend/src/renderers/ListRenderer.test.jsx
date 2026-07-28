@@ -304,3 +304,72 @@ describe("@now in field_defaults", () => {
     expect(added[0].timestamp).not.toBe("@now");
   });
 });
+
+describe("sort", () => {
+  const node = {
+    kind: "list",
+    path: ["entries"],
+    title_field: "topic",
+    detail_fields: ["source"],
+    sort: { field: "timestamp", dir: "desc" },
+  };
+  const items = [
+    { topic: "Oldest", source: "a", timestamp: "2026-01-01T00:00:00.000Z" },
+    { topic: "Newest", source: "b", timestamp: "2026-06-01T00:00:00.000Z" },
+    { topic: "Middle", source: "c", timestamp: "2026-03-01T00:00:00.000Z" },
+  ];
+
+  it("renders rows newest-first without reordering the stored array", async () => {
+    const onItems = vi.fn();
+    render(<ListRenderer node={node} items={items} onItems={onItems} />);
+
+    const rows = screen.getAllByText(/Oldest|Newest|Middle/);
+    expect(rows.map((r) => r.textContent)).toEqual(["Newest", "Middle", "Oldest"]);
+    expect(onItems).not.toHaveBeenCalled(); // rendering never writes
+  });
+
+  it("edits the row the user actually clicked, not the array position", async () => {
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={onItems} />);
+
+    // "Newest" displays first but is stored at index 1.
+    await user.click(screen.getByText("Newest"));
+    await user.type(screen.getByDisplayValue("b"), "X");
+
+    const [[next]] = onItems.mock.calls;
+    expect(next[1].source).toBe("bX");
+    expect(next[0].source).toBe("a");
+    expect(next[2].source).toBe("c");
+  });
+
+  it("removes the row the user actually clicked", async () => {
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={onItems} />);
+
+    // Delete buttons are icon-only with no accessible name -- this is the
+    // selector convention already used at ListRenderer.test.jsx:99-102. The
+    // first one on screen belongs to "Newest", which is stored at index 1.
+    const deleteButtons = screen.getAllByRole("button").filter((b) => b.textContent === "");
+    await user.click(deleteButtons[0]);
+
+    const [[next]] = onItems.mock.calls;
+    expect(next.map((i) => i.topic)).toEqual(["Oldest", "Middle"]);
+  });
+
+  it("keeps stored order when no sort is declared", () => {
+    render(<ListRenderer node={{ ...node, sort: undefined }} items={items} onItems={vi.fn()} />);
+    const rows = screen.getAllByText(/Oldest|Newest|Middle/);
+    expect(rows.map((r) => r.textContent)).toEqual(["Oldest", "Newest", "Middle"]);
+  });
+
+  it("puts items missing the sort field last rather than dropping them", () => {
+    const withGap = [...items, { topic: "Undated", source: "d" }];
+    render(<ListRenderer node={node} items={withGap} onItems={vi.fn()} />);
+    const rows = screen.getAllByText(/Oldest|Newest|Middle|Undated/);
+    expect(rows.map((r) => r.textContent)).toEqual([
+      "Newest", "Middle", "Oldest", "Undated",
+    ]);
+  });
+});

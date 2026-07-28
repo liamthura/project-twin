@@ -90,6 +90,26 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
     } else doRemove();
   };
 
+  // Display order only. The indexes are sorted, never the array, because
+  // updateItem/removeItem address the real stored position -- sorting a copy and
+  // handing them display positions would edit the wrong row.
+  const order = items.map((_, i) => i);
+  if (node.sort?.field) {
+    const { field, dir = "asc" } = node.sort;
+    const sign = dir === "desc" ? -1 : 1;
+    order.sort((a, b) => {
+      const av = items[a]?.[field];
+      const bv = items[b]?.[field];
+      // A missing key sorts last in both directions: an undated row is not
+      // "oldest", it is unknown, and dropping it off the top of a desc list
+      // would hide it.
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return sign * String(av).localeCompare(String(bv));
+    });
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -196,7 +216,9 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
         <EmptyState>Nothing here yet. Use Add, or tap a suggestion.</EmptyState>
       ) : (
         <div className="rounded-md border">
-          {items.map((item, idx) => (
+          {order.map((idx) => {
+            const item = items[idx];
+            return (
             <div key={item.id || `${item[titleField]}-${idx}`}
               className="border-b border-border last:border-b-0">
               <div className="flex cursor-pointer items-center gap-2 px-3 py-2.5 hover:bg-muted/40"
@@ -246,7 +268,8 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

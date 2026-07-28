@@ -219,6 +219,16 @@
           "items": {
             "$ref": "#/$defs/uiSection"
           }
+        },
+        "sort": {
+          "type": "object",
+          "required": ["field"],
+          "additionalProperties": false,
+          "description": "Display order only. Rows are sorted by this storage key; the stored array is never reordered. Items missing the key sort last.",
+          "properties": {
+            "field": { "type": "string" },
+            "dir": { "enum": ["asc", "desc"] }
+          }
         }
       }
     },
