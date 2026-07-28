@@ -51,6 +51,11 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
   const arrayFields = node.array_fields || [];
   const suggestions = node.suggestions?.[titleField] || [];
   const existingTitles = new Set(items.map((i) => (i[titleField] || "").toLowerCase()));
+  // Same case-insensitive comparison addItem itself uses to reject a
+  // collision -- computed here too so the dialog can surface it instead of
+  // letting addItem silently no-op and close on a title the user already has.
+  const titleCollides =
+    !!draft[titleField] && existingTitles.has(draft[titleField].toLowerCase());
   const editFields = [...new Set([...badges, ...detailFields])];
   const fieldDefaults = node.field_defaults ?? entity?.field_defaults ?? {};
   // A node-declared long_text (schema: array of storage keys) takes
@@ -87,6 +92,18 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
     if (!item[titleField]) return;
     if (existingTitles.has(item[titleField].toLowerCase())) return;
     onItems([item, ...items]);
+    // The new item is prepended, so every previously-stored index shifts up
+    // by one. `expanded` is keyed by array index -- left unshifted, a key
+    // like {0: true} would now point at the brand-new row instead of the one
+    // the user had open, silently collapsing it. Mirrors the shift removeItem
+    // already does (down, there; up, here). Deliberately not also seeding an
+    // entry for the new row's own index -- the Add dialog already collected
+    // its fields, so auto-expanding it would just be noise.
+    setExpanded((prev) => {
+      const next = {};
+      for (const [k, v] of Object.entries(prev)) next[Number(k) + 1] = v;
+      return next;
+    });
     // A stale query re-filters the newly-added row out of `visible`, so the
     // only sign anything happened is the header count ticking up -- clear it
     // on the path that actually writes, so Add lands the user back on the
@@ -124,7 +141,7 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
     };
     if (onShowConfirmation) {
       onShowConfirmation(
-        `Remove ${items[idx][titleField]}?`,
+        `Remove ${items[idx][titleField] || "Untitled entry"}?`,
         "This can't be undone.",
         doRemove
       );
@@ -224,7 +241,7 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                   value={draft[titleField] || ""}
                   onChange={(e) => setDraft({ ...draft, [titleField]: e.target.value })}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && draft[titleField]) {
+                    if (e.key === "Enter" && draft[titleField] && !titleCollides) {
                       addItem(draft);
                       setAddOpen(false);
                       setDraft({});
@@ -232,6 +249,11 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                   }}
                   autoFocus
                 />
+                {titleCollides && (
+                  <p className="text-xs text-destructive">
+                    "{draft[titleField]}" already exists.
+                  </p>
+                )}
                 {suggestions.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {suggestions
@@ -270,13 +292,19 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
             </div>
             <DialogFooter>
               <Button onClick={() => { addItem(draft); setAddOpen(false); setDraft({}); }}
-                disabled={!draft[titleField]}>Add</Button>
+                disabled={!draft[titleField] || titleCollides}>Add</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-      {node.searchable && items.length > 0 && (
+      {/* Keep the box mounted whenever a query is active, even if it filtered
+          every row out of existence -- otherwise deleting the last match(es)
+          unmounts the only control that can clear `query`, stranding the user
+          on an empty state that tells them to "clear the search" with nothing
+          left to clear it with. Still absent when there's genuinely nothing
+          to search (no items, no active query). */}
+      {node.searchable && (items.length > 0 || q) && (
         <Input
           type="search"
           aria-label="Search"

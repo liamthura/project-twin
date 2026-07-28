@@ -129,7 +129,7 @@ describe("ListRenderer", () => {
     expect(latest()[0]).toMatchObject({ name: "Y2K", stance: "like" });
   });
 
-  it("is a no-op when the added title duplicates an existing one, case-insensitively", async () => {
+  it("disables Add and surfaces an inline message when the typed title collides, case-insensitively, instead of silently discarding the draft", async () => {
     const initial = [scandinavian];
     const { user, latest } = renderStateful(initial);
 
@@ -137,11 +137,35 @@ describe("ListRenderer", () => {
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "scandinavian");
-    await user.click(within(dialog).getByRole("button", { name: "Add" }));
 
-    // onItems is never called, so the harness's seen reference is still the
-    // exact array we rendered with.
+    expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
+    expect(screen.getByText(/already exists/i)).toBeInTheDocument();
+
+    // The button is disabled, so clicking it must do nothing -- onItems is
+    // never called, the dialog stays open, and the harness's seen reference
+    // is still the exact array we rendered with.
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
     expect(latest()).toBe(initial);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("keeps the rest of the draft on screen when the title collides, so a duplicate name doesn't discard everything else the user typed", async () => {
+    const { user } = renderStateful([scandinavian]);
+
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    const dialog = screen.getByRole("dialog");
+    const titleInput = within(dialog).getAllByRole("textbox")[0];
+    await user.type(titleInput, "Scandinavian");
+
+    // Index 1: title Input is index 0; domain/stance are EnumControls (no
+    // textbox role); notes is the next textbox (a Textarea, "notes" is in
+    // the default long-text set).
+    const notesInput = within(dialog).getAllByRole("textbox")[1];
+    await user.type(notesInput, "met at a conference");
+
+    expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
+    // The collision message did not wipe the field the user already filled in.
+    expect(within(dialog).getByDisplayValue("met at a conference")).toBeInTheDocument();
   });
 
   it("a suggestion chip adds an item, and chips for already-present titles are not offered", async () => {
@@ -250,6 +274,57 @@ describe("ListRenderer", () => {
     rerender(<ListRenderer node={simpleNode} items={current} onItems={vi.fn()} />);
 
     expect(screen.getByDisplayValue("note-2")).toBeInTheDocument();
+  });
+
+  it("keeps the expanded row expanded after adding a new item, since addItem prepends and shifts every stored index up by one", async () => {
+    // `expanded` is keyed by array index. addItem prepends (`[item, ...items]`),
+    // so the row the user had open at index 0 is now at index 1 -- if
+    // `expanded` isn't remapped alongside it, the stale key (0) addresses the
+    // brand-new row instead, and the row the user was reading collapses.
+    const simpleNode = { kind: "list", path: ["items"], title_field: "name", detail_fields: ["note"] };
+    function Harness() {
+      const [state, setState] = useState([
+        { name: "React Server Components", note: "note-1" },
+      ]);
+      return <ListRenderer node={simpleNode} items={state} onItems={setState} />;
+    }
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.click(screen.getByText("React Server Components"));
+    expect(screen.getByDisplayValue("note-1")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    const dialog = screen.getByRole("dialog");
+    const titleInput = within(dialog).getAllByRole("textbox")[0];
+    await user.type(titleInput, "New Entry");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    // The originally-expanded row (now shifted to index 1) is still open.
+    expect(screen.getByDisplayValue("note-1")).toBeInTheDocument();
+  });
+
+  it('falls back to a neutral "Untitled entry" confirmation instead of "Remove undefined?" for a row with no title', async () => {
+    const onShowConfirmation = vi.fn();
+    const titlelessNode = { kind: "list", path: ["items"], title_field: "name" };
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={titlelessNode}
+        items={[{}]}
+        onItems={vi.fn()}
+        onShowConfirmation={onShowConfirmation}
+      />
+    );
+
+    const deleteButton = screen.getAllByRole("button").find((b) => b.textContent === "");
+    await user.click(deleteButton);
+
+    expect(onShowConfirmation).toHaveBeenCalledWith(
+      "Remove Untitled entry?",
+      "This can't be undone.",
+      expect.any(Function)
+    );
   });
 });
 
@@ -533,6 +608,32 @@ describe("search", () => {
 
     expect(screen.getByText("Bob Smith")).toBeInTheDocument();
     expect(screen.getByRole("searchbox")).toHaveValue("");
+  });
+
+  it("keeps the search box mounted after deleting every visible match, so the stranding query can still be cleared", async () => {
+    // Regression: the box only rendered on `items.length > 0`. Filtering to
+    // both rows and deleting them both drops items to 0, unmounting the box
+    // while `query` survives in state -- leaving the empty state stuck on
+    // "Clear the search" with no control left to do it.
+    function Harness() {
+      const [state, setState] = useState(items);
+      return <ListRenderer node={node} items={state} onItems={setState} />;
+    }
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.type(screen.getByRole("searchbox"), "a");
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    expect(screen.getByText("Grace Hopper")).toBeInTheDocument();
+
+    const deleteButtons = () => screen.getAllByRole("button").filter((b) => b.textContent === "");
+    await user.click(deleteButtons()[0]);
+    await user.click(deleteButtons()[0]);
+
+    expect(screen.getByText(/no matches/i)).toBeInTheDocument();
+    // The box is still here, still holding the query that stranded the user --
+    // clearing it (not switching tabs or reloading) is the recovery path.
+    expect(screen.getByRole("searchbox")).toHaveValue("a");
   });
 });
 
