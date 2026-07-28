@@ -4,6 +4,7 @@ import packs from "@/__fixtures__/packs.json";
 import goalsData from "@/__fixtures__/data/goals.json";
 import mediaData from "@/__fixtures__/data/media.json";
 import aestheticsData from "@/__fixtures__/data/aesthetics.json";
+import learningLogData from "@/__fixtures__/data/learning_log.json";
 import { renderSection } from "@/test/harness";
 import { SEGMENTED_MAX } from "@/components/controls";
 import { normalizeUi } from "@/renderers/paths";
@@ -11,6 +12,7 @@ import { normalizeUi } from "@/renderers/paths";
 const goalsPack = packs.find((p) => p.key === "goals");
 const mediaPack = packs.find((p) => p.key === "media");
 const aestheticsPack = packs.find((p) => p.key === "aesthetics");
+const learningLogPack = packs.find((p) => p.key === "learning_log");
 
 // The coverage guard and the round-trip guard, factored so every pack with a
 // generic item list gets both without copying the test bodies. A ui block
@@ -145,6 +147,43 @@ describe("SectionRenderer", () => {
 
   describe("aesthetics", () => {
     describeGuards({ pack: aestheticsPack, listKey: "styles", data: aestheticsData });
+  });
+
+  describe("learning_log", () => {
+    describeGuards({ pack: learningLogPack, listKey: "entries", data: learningLogData });
+
+    it("renders newest first even though the stored array is oldest first", () => {
+      renderSection({ pack: learningLogPack, initial: learningLogData });
+      const rows = screen.getAllByText(/React Server Components|Postgres full-text search/);
+      expect(rows.map((r) => r.textContent)).toEqual([
+        "Postgres full-text search",
+        "React Server Components",
+      ]);
+    });
+
+    // `expanded` is keyed per row (ListRenderer.jsx), so expanding one entry
+    // does not reveal another's fields. The brief's version of this test
+    // clicked "React Server Components" (entry 1) but then looked for
+    // entry 2's source value ("article") -- an element that is never on
+    // screen because entry 2 was never expanded, so it fails to locate the
+    // input regardless of whether preservation actually works. Expanding
+    // "Postgres full-text search" (entry 2, whose source really is
+    // "article") and editing it there, then asserting entry 1 -- the one
+    // that carries id/timestamp/related_entries/conversation_metadata --
+    // comes back byte-for-byte unchanged, is the version that can actually
+    // fail on broken preservation and pass on correct preservation.
+    it("preserves a sibling entry's id, timestamp, related_entries and conversation_metadata across an edit", async () => {
+      const { user, latest, initial } = renderSection({
+        pack: learningLogPack, initial: learningLogData,
+      });
+      await user.click(screen.getByText("Postgres full-text search"));
+      await user.type(screen.getByDisplayValue("article"), "s");
+
+      const after = latest();
+      const entry = after.entries.find((e) => e.id === "learn_20260115_a1b2c3");
+      const before = initial.entries.find((e) => e.id === "learn_20260115_a1b2c3");
+      expect(entry).toEqual(before);
+    });
   });
 
   // node.title is accepted by the schema but wasn't rendered anywhere.

@@ -1,0 +1,24 @@
+{
+  "entries": [
+    {
+      "id": "learn_20260115_a1b2c3",
+      "topic": "React Server Components",
+      "details": "Rendering on the server removes the client bundle cost for data-only components.",
+      "source": "conversation",
+      "tags": ["react", "architecture"],
+      "key_decisions": ["Adopt RSC for the docs site only"],
+      "followup_items": ["Read the migration guide"],
+      "timestamp": "2026-01-15T09:30:00.000Z",
+      "related_entries": [{ "type": "project", "id": "proj_mygist" }],
+      "conversation_metadata": { "model": "claude-opus-4", "turns": 12 }
+    },
+    {
+      "id": "learn_20260320_d4e5f6",
+      "topic": "Postgres full-text search",
+      "details": "tsvector plus a GIN index beats trigram for prefix-heavy queries.",
+      "source": "article",
+      "tags": ["postgres"],
+      "timestamp": "2026-03-20T14:05:00.000Z"
+    }
+  ]
+}
