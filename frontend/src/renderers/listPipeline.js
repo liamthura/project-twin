@@ -52,3 +52,26 @@ export function filterVisible(order, items, query, fields) {
         });
       });
 }
+
+// Display filter only, same contract as filterVisible -- `order` (here,
+// already-searched) holds stored indexes in and out. `selected` maps a facet
+// field to the one value currently chosen for it, or leaves it absent/
+// undefined for "no filter on this field" (the facet's "All" state). A row
+// survives only if it matches every active facet -- facets narrow the same
+// visible set the search box does, they don't offer alternate results.
+//
+// Deliberately reads `items[i][field]` rather than trusting some upstream
+// enum validation: nothing stops a stored value from being a legacy value no
+// longer in the option list (ScalarField/EnumControl call this "legacy" and
+// still render it dashed) -- such a row simply matches no facet selection
+// other than "All", the same way it would if a user filtered by hand.
+export function applyFacets(order, items, facets, selected) {
+  if (!facets || facets.length === 0) return order;
+  return order.filter((i) => {
+    const item = items[i];
+    return facets.every((f) => {
+      const v = selected?.[f];
+      return v === undefined || item?.[f] === v;
+    });
+  });
+}

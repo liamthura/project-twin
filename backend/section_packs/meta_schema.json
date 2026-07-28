@@ -248,6 +248,13 @@
           "type": "boolean",
           "description": "Renders a search box filtering rows on the title field, badges, detail fields and array-field entries."
         },
+        "facets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Storage keys with enum values, rendered as a filter above the list. Display only; never writes."
+        },
         "info": {
           "type": "object",
           "required": ["overview", "tips"],

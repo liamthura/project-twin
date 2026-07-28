@@ -19,9 +19,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfoDialog } from "@/components/ui/info-dialog";
-import { VALUE_META, FOCUS_RING, ValueIcon, SEGMENTED_MAX } from "@/components/controls";
+import { VALUE_META, FOCUS_RING, ValueIcon, SEGMENTED_MAX, EnumControl } from "@/components/controls";
 import { ScalarField, LONG_TEXT_FIELDS } from "./ScalarField";
-import { buildOrder, filterVisible } from "./listPipeline";
+import { buildOrder, filterVisible, applyFacets } from "./listPipeline";
 import { getAt, setAt } from "./paths";
 // Circular by construction: renderNode imports ListRenderer to dispatch a
 // "list" node, and ListRenderer imports renderNode to dispatch a node's
@@ -77,6 +77,12 @@ export default function ListRenderer({
   const [draft, setDraft] = useState({});
   const [query, setQuery] = useState("");
   const [infoOpen, setInfoOpen] = useState(false);
+  // Facet state lives here, not in listPipeline: it's per-field UI selection,
+  // not derived data. Keyed by storage key; a field absent from this map (or
+  // holding `undefined`) means that facet's "All" state -- no row is excluded
+  // on its account. Never fed back through `onItems` -- see applyFacets in
+  // listPipeline.js and the facet bar below, neither of which touches items.
+  const [facetValues, setFacetValues] = useState({});
   const titleField = node.title_field;
   const badges = node.badges || [];
   const detailFields = node.detail_fields || [];
@@ -220,7 +226,23 @@ export default function ListRenderer({
   const order = buildOrder(items, node.sort);
   const searchFields = [...new Set([titleField, ...badges, ...detailFields, ...arrayFields])];
   const q = query.trim().toLowerCase();
-  const visible = filterVisible(order, items, q, searchFields);
+  const searched = filterVisible(order, items, q, searchFields);
+  // Facets narrow the search box's own output -- same stored indexes in,
+  // same stored indexes out -- so the two compose instead of racing: a query
+  // and an active facet both hide a row, neither can un-hide what the other
+  // excluded. `facetOptions` resolves per field with the same precedence
+  // ScalarField uses (node.enum wins over the entity's), so a node with an
+  // inline enum still gets a facet instead of one silently rendering no
+  // options. A facet field with no resolvable options is skipped entirely
+  // below rather than narrowing on a value that could never be selected.
+  const facetOptions = (field) => node.enum?.[field] ?? entity?.valid_values?.[field];
+  const visible = applyFacets(searched, items, node.facets, facetValues);
+  // Whether the header's "N of M" count needs to account for something
+  // narrowing `visible` -- previously only the search query, now a selected
+  // facet too. Reads the same facetValues map applyFacets already consumed;
+  // an entry present but `undefined` is a field left on "All" and does not
+  // count as active.
+  const facetsActive = (node.facets || []).some((f) => facetValues[f] !== undefined);
 
   return (
     <div className="space-y-3">
@@ -238,7 +260,7 @@ export default function ListRenderer({
             </Button>
           )}
           <div className="text-sm text-muted-foreground">
-            {q ? `${visible.length} of ${items.length}` : items.length}{" "}
+            {q || facetsActive ? `${visible.length} of ${items.length}` : items.length}{" "}
             {items.length === 1 ? "entry" : "entries"}
           </div>
         </div>
@@ -341,6 +363,47 @@ export default function ListRenderer({
         />
       )}
 
+      {/* Facets: display-only row filters, drawn above the list. Each entry
+          in node.facets names an enum storage key; `facetOptions` above
+          resolves that field's option set. A field with no resolvable
+          options is skipped -- a control with zero real values to pick would
+          only ever be able to show "All". Every EnumControl here is fed an
+          extra leading "All" pseudo-option so the reset affordance is always
+          visible rather than relying on the click-the-active-value-again
+          toggle EnumControl uses elsewhere; the mapping back to `undefined`
+          (== no filter on this field) happens in the onChange below, never
+          stored, never threaded through onItems. */}
+      {(node.facets || []).length > 0 && (
+        <div role="group" aria-label="Filters" className="flex flex-wrap gap-x-4 gap-y-2">
+          {node.facets.map((f) => {
+            const options = facetOptions(f);
+            if (!options || options.length === 0) return null;
+            return (
+              <div
+                key={f}
+                role="group"
+                aria-label={`Filter by ${f.replace(/_/g, " ")}`}
+                className="flex items-center gap-1.5"
+              >
+                <span className="text-xs font-medium capitalize text-muted-foreground">
+                  {f.replace(/_/g, " ")}
+                </span>
+                <EnumControl
+                  options={["All", ...options]}
+                  value={facetValues[f] ?? "All"}
+                  onChange={(v) =>
+                    setFacetValues((prev) => ({
+                      ...prev,
+                      [f]: v === "All" || v === undefined ? undefined : v,
+                    }))
+                  }
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {suggestions.length > 0 && (
         <div className="space-y-1.5">
           <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -364,6 +427,8 @@ export default function ListRenderer({
         <EmptyState>
           {q
             ? "No matches. Clear the search to see everything."
+            : facetsActive
+            ? "No matches. Clear a filter to see everything."
             : "Nothing here yet. Use Add, or tap a suggestion."}
         </EmptyState>
       ) : (

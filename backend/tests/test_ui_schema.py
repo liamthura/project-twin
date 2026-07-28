@@ -132,7 +132,12 @@ CANONICAL_STORED_KEY = {
 # `suggestions` and `optional` sit outside the spelling check and are
 # unguarded by it on the same terms. Guarding any of them properly needs an
 # authority on what `execute_modify` writes, which this repo does not have.
-_SUBSET_CHECKED_KEYS = ("badges", "detail_fields", "array_fields")
+#
+# `facets` (wave 4, Task 3) IS checked here, alongside badges/detail_fields:
+# like them it names a real, editable-looking storage key (the filter reads
+# `item[f]` for live data, not a machine stamp), so a misspelled facet field
+# is exactly the same class of bug this check exists to catch.
+_SUBSET_CHECKED_KEYS = ("badges", "detail_fields", "array_fields", "facets")
 
 BASE_GOALS_MANIFEST = {
     "key": "goals",
@@ -201,7 +206,8 @@ def _fields_named_by(node):
     is sound for machine-written keys too, so it covers `display_fields`."""
     named = set()
     for list_key in ("fields", "badges", "detail_fields", "array_fields",
-                     "date_fields", "long_text", "optional", "display_fields"):
+                     "date_fields", "long_text", "optional", "display_fields",
+                     "facets"):
         named |= set(node.get(list_key) or [])
     for map_key in ("suggestions", "enum", "field_defaults", "display_formats"):
         named |= set((node.get(map_key) or {}).keys())
@@ -439,6 +445,51 @@ def test_well_formed_enum_is_accepted():
         }
     )
     pack_loader.validate_manifest(manifest)  # must not raise
+
+
+def test_well_formed_facets_is_accepted():
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {
+                    "kind": "list",
+                    "path": ["goals"],
+                    "entity": "goal",
+                    "detail_fields": ["status"],
+                    "enum": {"status": ["want", "in_progress", "finished"]},
+                    "facets": ["status"],
+                }
+            ]
+        }
+    )
+    pack_loader.validate_manifest(manifest)  # must not raise
+
+
+def test_malformed_facets_is_rejected():
+    """`facets` is an array of storage-key strings (each naming a field with
+    enum values), the same shape as `badges`/`detail_fields` -- not a bare
+    string and not an array of anything but strings. A wrong shape here
+    reaches `node.facets.map` in ListRenderer at runtime instead of failing
+    at authoring time."""
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {"kind": "list", "path": ["goals"], "entity": "goal", "facets": "status"}
+            ]
+        }
+    )
+    with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(manifest)
+
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {"kind": "list", "path": ["goals"], "entity": "goal", "facets": [1, 2]}
+            ]
+        }
+    )
+    with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(manifest)
 
 
 def test_legacy_flat_ui_map_is_still_accepted():

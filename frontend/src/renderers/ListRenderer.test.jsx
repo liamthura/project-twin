@@ -1300,3 +1300,160 @@ describe("children", () => {
   });
 
 });
+
+// ---------------------------------------------------------------------------
+// facets -- wave 4, Task 3
+//
+// A facet is display-only: it narrows `visible` but must never reach
+// `onItems`. The facet control and a row's own enum control for the SAME
+// field (here, "status") both render on screen once a row is expanded --
+// they'd collide under a name-only selector (`getByRole("button", { name:
+// "active" })` alone is ambiguous once a row's own status control is on
+// screen too). Every facet assertion below scopes into the facet's own
+// `role="group"` wrapper (`aria-label="Filter by status"`) rather than
+// relying on name uniqueness, and the one test that also expands a row
+// selects the facet BEFORE expanding, so no row-level control is on screen
+// yet to collide with.
+// ---------------------------------------------------------------------------
+describe("facets", () => {
+  const facetNode = {
+    kind: "list",
+    path: ["projects"],
+    title_field: "name",
+    detail_fields: ["status", "notes"],
+    searchable: true,
+    facets: ["status"],
+    // Deliberately different from entity.valid_values below -- proves the
+    // facet resolves options with node.enum taking precedence, the same
+    // precedence ScalarField uses (node.enum ?? entity?.valid_values).
+    enum: { status: ["active", "paused", "completed"] },
+  };
+  const entity = { valid_values: { status: ["wrong_one", "wrong_two"] } };
+  const items = [
+    { name: "Alpha", status: "active", notes: "team review" },
+    { name: "Bravo", status: "paused", notes: "team retro" },
+    { name: "Charlie", status: "active", notes: "solo work" },
+  ];
+
+  function facetGroup() {
+    return screen.getByRole("group", { name: "Filter by status" });
+  }
+
+  it("renders one option per enum value plus an All, using node.enum in preference to entity.valid_values", () => {
+    render(
+      <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
+    );
+    const buttons = within(facetGroup()).getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      "All", "active", "paused", "completed",
+    ]);
+    // The entity's (wrong) options must not have leaked in anywhere.
+    expect(screen.queryByText("wrong_one")).not.toBeInTheDocument();
+    expect(screen.queryByText("wrong_two")).not.toBeInTheDocument();
+  });
+
+  it("selecting a facet value narrows the visible rows", async () => {
+    const user = userEvent.setup();
+    render(
+      <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
+    );
+
+    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Charlie")).toBeInTheDocument();
+    expect(screen.queryByText("Bravo")).not.toBeInTheDocument();
+  });
+
+  it("composes with the search box -- both active narrows further than either alone", async () => {
+    const user = userEvent.setup();
+    render(
+      <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
+    );
+
+    // "team" matches Alpha and Bravo's notes, not Charlie's.
+    await user.type(screen.getByRole("searchbox"), "team");
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Bravo")).toBeInTheDocument();
+    expect(screen.queryByText("Charlie")).not.toBeInTheDocument();
+
+    // Facet "active" then drops Bravo (paused) from that search result too.
+    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.queryByText("Bravo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Charlie")).not.toBeInTheDocument();
+  });
+
+  it("clearing the facet (via All) returns every row", async () => {
+    const user = userEvent.setup();
+    render(
+      <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
+    );
+
+    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+    expect(screen.queryByText("Bravo")).not.toBeInTheDocument();
+
+    await user.click(within(facetGroup()).getByRole("button", { name: "All" }));
+
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Bravo")).toBeInTheDocument();
+    expect(screen.getByText("Charlie")).toBeInTheDocument();
+  });
+
+  it("renders nothing extra for a node that declares no facets", () => {
+    const { container } = render(
+      <ListRenderer
+        node={{ ...facetNode, facets: undefined }}
+        entity={entity}
+        items={items}
+        onItems={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole("group", { name: "Filters" })).not.toBeInTheDocument();
+    expect(container.querySelectorAll('[aria-label^="Filter by"]')).toHaveLength(0);
+  });
+
+  it("never calls onItems when a facet value is selected or cleared", async () => {
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(<ListRenderer node={facetNode} entity={entity} items={items} onItems={onItems} />);
+
+    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+    await user.click(within(facetGroup()).getByRole("button", { name: "All" }));
+
+    expect(onItems).not.toHaveBeenCalled();
+  });
+
+  it("edits the correct stored row when a facet is active and the list is sorted, so the row's stored index -- not its display position -- receives the write", async () => {
+    // Stored order is Charlie(0), Alpha(1), Bravo(2). Sorted ascending by
+    // name, the display order is Alpha, Bravo, Charlie. Filtering to
+    // status "active" (Alpha, Charlie) hides Bravo, leaving Alpha displayed
+    // first even though it is stored at index 1, not 0.
+    const sortedNode = { ...facetNode, sort: { field: "name" } };
+    const stored = [
+      { name: "Charlie", status: "active", notes: "team review" },
+      { name: "Alpha", status: "active", notes: "team retro" },
+      { name: "Bravo", status: "paused", notes: "solo work" },
+    ];
+    const before = JSON.stringify(stored);
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ListRenderer node={sortedNode} entity={entity} items={stored} onItems={onItems} />
+    );
+
+    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+    expect(screen.queryByText("Bravo")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Alpha"));
+    await user.type(screen.getByDisplayValue("team retro"), "!");
+
+    const [[next]] = onItems.mock.calls;
+    expect(next[1]).toMatchObject({ name: "Alpha", notes: "team retro!" });
+    expect(next[0]).toMatchObject({ name: "Charlie", notes: "team review" });
+    expect(next[2]).toMatchObject({ name: "Bravo", notes: "solo work" });
+    // The stored fixture itself was replaced, never mutated in place.
+    expect(JSON.stringify(stored)).toBe(before);
+  });
+});
