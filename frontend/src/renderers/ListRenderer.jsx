@@ -27,21 +27,15 @@ import { getAt, setAt } from "./paths";
 // "list" node, and ListRenderer imports renderNode to dispatch a node's
 // `children` against one of its own items.
 //
-// It resolves because BOTH exports are hoisted function declarations --
-// `export default function ListRenderer` here, `export function renderNode`
-// there. A function declaration is initialised when its module's scope is
-// created, before any statement in it runs, so neither binding is ever in a
-// temporal dead zone no matter which module the cycle enters first.
-//
-// The hazard is therefore not "where is the reference read" -- it is the
-// binding FORM. Turning either export into a `const` binding reintroduces the
-// TDZ across the cycle: whichever module is evaluated second sees `undefined`,
-// React renders an undefined component, and every section blanks. Concretely,
-// any of these breaks it:
-//   - `export default memo(ListRenderer)`
-//   - `export const renderNode = (...) => ...`
-//   - `const X = ...; export default X` (or `export { X as default }`)
-//   - any `let`/`const` reassignment wrapping either export
+// The rule that actually matters: neither module may dereference the other's
+// export at module-initialisation time, and today neither does -- both sides
+// only call into the other from inside a function body (ListRenderer's
+// render, renderNode's own function), by which point the whole cycle has
+// finished loading. Concretely, "dereference at module-initialisation time"
+// means a top-level call (e.g. `export default memo(ListRenderer)` sitting
+// at module scope) or a module-scope constant computed from the other
+// module's export (`const X = renderNode(...)`) -- either would run while
+// the other module is still mid-evaluation, before its export is assigned.
 // If one of those is genuinely wanted, break the cycle first (e.g. move the
 // dispatch into a third module both import).
 import { renderNode } from "./renderNode";
