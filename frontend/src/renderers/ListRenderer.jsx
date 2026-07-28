@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfoDialog } from "@/components/ui/info-dialog";
-import { VALUE_META, FOCUS_RING, ValueIcon } from "@/components/controls";
+import { VALUE_META, FOCUS_RING, ValueIcon, SEGMENTED_MAX } from "@/components/controls";
 import { ScalarField, LONG_TEXT_FIELDS } from "./ScalarField";
 
 // Read-only display of a machine-written key (a created-at stamp, an id).
@@ -73,6 +73,25 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
     // profile.education and `bedtime` on lifestyle.sleep read like dates and
     // are not, so a name heuristic would turn free text into a lossy picker.
     date_fields: node.date_fields ?? [],
+  };
+
+  // Which fields need the whole row rather than one of the two grid columns.
+  //
+  // On a 1152px desktop a column is only ~386px wide: 1152 - 32 (page px-4)
+  // - 192 (tab sidebar) - 24 (gap-6) - 48 (card p-6) - 72 (grid sm:px-9),
+  // then halved less the 12px gap. A four-option segmented control needs
+  // roughly 400px, so it wrapped after three options while the column beside
+  // it sat empty. Giving it the full row is the same treatment long text and
+  // array inputs already get.
+  //
+  // Only segmented enums qualify: more than SEGMENTED_MAX options renders a
+  // ~170px dropdown instead, which fits a column comfortably. Three or fewer
+  // options also fit, and stretching those across the row would just leave a
+  // gap where the neighbouring field used to be.
+  const needsFullRow = (f) => {
+    if (longText.has(f) || arrayFields.includes(f)) return true;
+    const options = meta.valid_values?.[f];
+    return Boolean(options) && options.length > 3 && options.length <= SEGMENTED_MAX;
   };
 
   const addItem = (base) => {
@@ -386,7 +405,7 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                 // nowhere to go -- so it only applies from sm up.
                 <div className="grid gap-3 px-4 pb-3 sm:grid-cols-2 sm:px-9">
                   {editFields.map((f) => (
-                    <div key={f} className={longText.has(f) || arrayFields.includes(f) ? "sm:col-span-2" : ""}>
+                    <div key={f} className={needsFullRow(f) ? "sm:col-span-2" : ""}>
                       <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
                       <ScalarField
                         field={f}

@@ -810,3 +810,69 @@ describe("info", () => {
     for (const tip of info.tips) expect(screen.getByText(tip)).toBeInTheDocument();
   });
 });
+
+// A grid column on a 1152px desktop is only ~386px wide (see needsFullRow in
+// ListRenderer.jsx for the arithmetic), and a four-option segmented control
+// needs roughly 400px -- so it wrapped after three options while the column
+// beside it sat empty. jsdom has no layout engine, so this pins the class
+// contract that gives such a field the whole row.
+describe("detail-grid column spans", () => {
+  const base = { kind: "list", path: ["items"], title_field: "name" };
+  const item = { name: "Row", status: "want", stance: "love", notes: "n", tags: ["t"] };
+
+  function cellFor(label) {
+    // Each cell is the Label's parent div; the span class lives there.
+    return screen.getByText(label).parentElement;
+  }
+
+  it("gives a four-option segmented enum the full row", async () => {
+    const node = {
+      ...base,
+      detail_fields: ["status"],
+      enum: { status: ["want", "in_progress", "finished", "dropped"] },
+    };
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[item]} onItems={vi.fn()} />);
+    await user.click(screen.getByText("Row"));
+
+    expect(cellFor("status").className).toContain("sm:col-span-2");
+  });
+
+  it("leaves a three-option enum in its column, where it already fits", async () => {
+    const node = {
+      ...base,
+      detail_fields: ["stance"],
+      enum: { stance: ["love", "like", "avoid"] },
+    };
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[item]} onItems={vi.fn()} />);
+    await user.click(screen.getByText("Row"));
+
+    expect(cellFor("stance").className).not.toContain("sm:col-span-2");
+  });
+
+  it("leaves a large enum in its column, because it renders as a compact dropdown", async () => {
+    const node = {
+      ...base,
+      detail_fields: ["kind"],
+      enum: {
+        kind: ["book", "article", "podcast", "show", "film", "game", "video", "music"],
+      },
+    };
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[{ ...item, kind: "book" }]} onItems={vi.fn()} />);
+    await user.click(screen.getByText("Row"));
+
+    expect(cellFor("kind").className).not.toContain("sm:col-span-2");
+  });
+
+  it("still gives long text and array fields the full row", async () => {
+    const node = { ...base, detail_fields: ["notes", "tags"], array_fields: ["tags"] };
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[item]} onItems={vi.fn()} />);
+    await user.click(screen.getByText("Row"));
+
+    expect(cellFor("notes").className).toContain("sm:col-span-2");
+    expect(cellFor("tags").className).toContain("sm:col-span-2");
+  });
+});
