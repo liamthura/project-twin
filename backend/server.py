@@ -1706,7 +1706,15 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         name = get_field(data, "name", "hobby", "hobby_name", "title", "activity")
         skill_level = get_field(data, "skill_level", "level", "proficiency")
         status = get_field(data, "status", "state", "is_active", default="active")
-        if status in ["inactive", "stopped", "paused", "not_active", "false", False]:
+        # "paused" is a status in its own right: the manifest declares it, the
+        # editor offers it, and _filter_inactive has always treated it as
+        # distinct (INACTIVE_STATUSES, :1074). It used to be folded into
+        # "inactive" here, so a user's "paused" -- which the frontend PUTs
+        # directly and therefore stores fine -- survived only until the next
+        # AI edit to that hobby silently rewrote it.
+        if status in ["paused", "on_hold"]:
+            status = "paused"
+        elif status in ["inactive", "stopped", "not_active", "false", False]:
             status = "inactive"
         else:
             status = "active"
