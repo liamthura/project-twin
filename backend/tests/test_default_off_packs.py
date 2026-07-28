@@ -25,7 +25,8 @@ def test_default_enabled_map_covers_all_packs(clean_database):
 def test_pack_meta_carries_ui_and_entities(clean_database):
     meta = sections.PACK_META["goals"]
     assert meta["default_enabled"] is True
-    assert meta["ui"]["goals"]["title_field"] == "title"
+    # goals was migrated to the explicit ui.sections form in Task 5.
+    assert meta["ui"]["sections"][0]["title_field"] == "title"
     assert "goal" in meta["entities"]
 
 

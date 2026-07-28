@@ -25,16 +25,21 @@
   },
   "capture_triggers": ["aesthetic", "design style", "vibe", "looks like", "color palette"],
   "ui": {
-    "styles": {
-      "title_field": "name",
-      "badges": ["domain", "stance"],
-      "detail_fields": ["notes", "references"],
-      "array_fields": ["references"],
-      "suggestions": {
-        "name": ["Minimalist", "Maximalist", "Brutalist", "Pastel", "Monochrome",
-                 "Retro-futurism", "Art deco", "Scandinavian", "Y2K", "Editorial",
-                 "Hand-drawn", "Glassmorphism"]
+    "sections": [
+      {
+        "kind": "list",
+        "path": ["styles"],
+        "entity": "aesthetic",
+        "title_field": "name",
+        "badges": ["domain", "stance"],
+        "detail_fields": ["notes", "references"],
+        "array_fields": ["references"],
+        "suggestions": {
+          "name": ["Minimalist", "Maximalist", "Brutalist", "Pastel", "Monochrome",
+                   "Retro-futurism", "Art deco", "Scandinavian", "Y2K", "Editorial",
+                   "Hand-drawn", "Glassmorphism"]
+        }
       }
-    }
+    ]
   }
 }

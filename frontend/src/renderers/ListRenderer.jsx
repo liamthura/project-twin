@@ -1,61 +1,53 @@
+// Renders a `kind: "list"` node -- a list of objects with a title field,
+// optional badges, expandable detail fields, an Add dialog, and suggestion
+// chips. Lifted from GenericSectionEditor's module-private `PackList`
+// (frontend/src/components/GenericSectionEditor.jsx:45-244), with these
+// changes and no others:
+//   - takes `node` instead of `uiSpec` + `listKey`
+//   - takes a pre-resolved `entity` spec object (or undefined)
+//   - delegates every field control to ScalarField via a `meta` built from
+//     `node` and `entity`
+//   - `node.enum` and `node.field_defaults` take precedence over the
+//     entity's, for sections whose manifest field names are not their
+//     storage keys (unused by today's packs, needed by waves 3-6)
 import { useState } from "react";
 import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ArrayInput } from "@/components/ArrayInput";
-import { VALUE_META, FOCUS_RING, ValueIcon, EnumControl } from "@/components/controls";
+import { VALUE_META, FOCUS_RING, ValueIcon } from "@/components/controls";
+import { ScalarField, LONG_TEXT_FIELDS } from "./ScalarField";
 
-const LONG_TEXT_FIELDS = new Set(["notes", "why", "description"]);
-
-function FieldInput({ field, value, onChange, entity, arrayFields, customValue, onCustomChange }) {
-  const enums = entity.valid_values?.[field];
-  if (enums) {
-    const customField = `custom_${field}`;
-    const hasCustom = (entity.optional || []).includes(customField);
-    return (
-      <div className="space-y-2">
-        <EnumControl options={enums} value={value} onChange={onChange} />
-        {hasCustom && value === "other" && (
-          <Input
-            value={customValue || ""}
-            onChange={(e) => onCustomChange?.(e.target.value)}
-            placeholder={`Custom ${field.replace(/_/g, " ")}…`}
-            className="h-8 max-w-[240px]"
-            autoFocus
-          />
-        )}
-      </div>
-    );
-  }
-  if (arrayFields.includes(field)) {
-    return <ArrayInput items={value || []} onChange={onChange} placeholder={`Add ${field}…`} />;
-  }
-  if (LONG_TEXT_FIELDS.has(field)) {
-    return <Textarea value={value || ""} onChange={(e) => onChange(e.target.value)} rows={2} />;
-  }
-  return <Input value={value || ""} onChange={(e) => onChange(e.target.value)} />;
-}
-
-function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowConfirmation }) {
+export default function ListRenderer({ node, entity, items, onItems, onShowConfirmation }) {
   const [expanded, setExpanded] = useState({});
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState({});
-  const titleField = uiSpec.title_field;
-  const badges = uiSpec.badges || [];
-  const detailFields = uiSpec.detail_fields || [];
-  const arrayFields = uiSpec.array_fields || [];
-  const suggestions = uiSpec.suggestions?.[titleField] || [];
+  const titleField = node.title_field;
+  const badges = node.badges || [];
+  const detailFields = node.detail_fields || [];
+  const arrayFields = node.array_fields || [];
+  const suggestions = node.suggestions?.[titleField] || [];
   const existingTitles = new Set(items.map((i) => (i[titleField] || "").toLowerCase()));
   const editFields = [...new Set([...badges, ...detailFields])];
+  const fieldDefaults = node.field_defaults ?? entity?.field_defaults ?? {};
+  // A node-declared long_text (schema: array of storage keys) takes
+  // precedence over the entity-agnostic default set, same as enum and
+  // field_defaults above -- normalised to a Set once here so both the
+  // custom_* grid layout below and ScalarField's own (defensive) normalising
+  // agree on what "long text" means for this node.
+  const longText = node.long_text ? new Set(node.long_text) : LONG_TEXT_FIELDS;
+  const meta = {
+    valid_values: node.enum ?? entity?.valid_values,
+    optional: node.optional ?? entity?.optional ?? [],
+    array_fields: arrayFields,
+    long_text: longText,
+  };
 
   const addItem = (base) => {
-    const item = { ...(entity.field_defaults || {}), ...base };
+    const item = { ...fieldDefaults, ...base };
     if (!item[titleField]) return;
     if (existingTitles.has(item[titleField].toLowerCase())) return;
     onItems([item, ...items]);
@@ -94,14 +86,18 @@ function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowC
             setAddOpen(o);
             // Preselect manifest defaults (e.g. stance: like) so the controls
             // show the real initial state instead of applying it invisibly.
-            setDraft(o ? { ...(entity.field_defaults || {}) } : {});
+            setDraft(o ? { ...fieldDefaults } : {});
           }}
         >
           <DialogTrigger asChild>
             <Button size="sm" variant="outline"><Plus className="mr-1 h-4 w-4" />Add</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Add {entityName.replace(/_/g, " ")}</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>
+                Add {(node.title ?? node.entity ?? "item").replace(/_/g, " ")}
+              </DialogTitle>
+            </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label className="text-xs capitalize">{titleField}</Label>
@@ -138,11 +134,10 @@ function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowC
               {editFields.map((f) => (
                 <div key={f} className="space-y-1.5">
                   <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
-                  <FieldInput
+                  <ScalarField
                     field={f}
                     value={draft[f]}
-                    entity={entity}
-                    arrayFields={arrayFields}
+                    meta={meta}
                     customValue={draft[`custom_${f}`]}
                     onChange={(v) => {
                       const next = { ...draft, [f]: v };
@@ -216,13 +211,12 @@ function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowC
               {expanded[idx] && (
                 <div className="grid gap-3 px-9 pb-3 sm:grid-cols-2">
                   {editFields.map((f) => (
-                    <div key={f} className={LONG_TEXT_FIELDS.has(f) || arrayFields.includes(f) ? "sm:col-span-2" : ""}>
+                    <div key={f} className={longText.has(f) || arrayFields.includes(f) ? "sm:col-span-2" : ""}>
                       <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
-                      <FieldInput
+                      <ScalarField
                         field={f}
                         value={item[f]}
-                        entity={entity}
-                        arrayFields={arrayFields}
+                        meta={meta}
                         customValue={item[`custom_${f}`]}
                         onChange={(v) =>
                           updateItem(idx, v !== "other"
@@ -240,43 +234,5 @@ function PackList({ listKey, uiSpec, entityName, entity, items, onItems, onShowC
         </div>
       )}
     </div>
-  );
-}
-
-export default function GenericSectionEditor({ pack, data, onChange, onShowConfirmation }) {
-  const ui = pack.ui || {};
-  const entityByList = {};
-  for (const [entityName, espec] of Object.entries(pack.entities || {})) {
-    if (espec.list) entityByList[espec.list] = { entityName, espec };
-  }
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{pack.title}</CardTitle>
-        <CardDescription>{pack.description}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {Object.entries(ui).map(([listKey, uiSpec]) => {
-          const entityNames = Object.keys(pack.entities || {});
-          const mapping = entityByList[listKey] ||
-            (entityNames.length === 1
-              ? { entityName: entityNames[0], espec: pack.entities[entityNames[0]] }
-              : null);
-          if (!mapping) return null;
-          return (
-            <PackList
-              key={listKey}
-              listKey={listKey}
-              uiSpec={uiSpec}
-              entityName={mapping.entityName}
-              entity={mapping.espec}
-              items={Array.isArray(data?.[listKey]) ? data[listKey] : []}
-              onItems={(next) => onChange({ ...(data || {}), [listKey]: next })}
-              onShowConfirmation={onShowConfirmation}
-            />
-          );
-        })}
-      </CardContent>
-    </Card>
   );
 }

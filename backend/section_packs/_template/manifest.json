@@ -19,5 +19,17 @@
     }
   },
   "capture_triggers": ["example phrase"],
-  "ui": { "items": { "title_field": "name", "badges": [], "detail_fields": ["notes", "tags"], "suggestions": { "name": ["Example 1", "Example 2", "Example 3"] } } }
+  "ui": {
+    "sections": [
+      {
+        "kind": "list",
+        "path": ["items"],
+        "entity": "example_item",
+        "title_field": "name",
+        "badges": [],
+        "detail_fields": ["notes", "tags"],
+        "suggestions": { "name": ["Example 1", "Example 2", "Example 3"] }
+      }
+    ]
+  }
 }

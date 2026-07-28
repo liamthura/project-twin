@@ -211,18 +211,25 @@
       }
     },
     "ui": {
-      "goals": {
-        "title_field": "title",
-        "badges": [
-          "type",
-          "status"
-        ],
-        "detail_fields": [
-          "target_date",
-          "why",
-          "notes"
-        ]
-      }
+      "sections": [
+        {
+          "kind": "list",
+          "path": [
+            "goals"
+          ],
+          "entity": "goal",
+          "title_field": "title",
+          "badges": [
+            "type",
+            "status"
+          ],
+          "detail_fields": [
+            "target_date",
+            "why",
+            "notes"
+          ]
+        }
+      ]
     }
   },
   {
@@ -728,22 +735,29 @@
       }
     },
     "ui": {
-      "items": {
-        "title_field": "title",
-        "badges": [
-          "kind",
-          "status",
-          "reaction"
-        ],
-        "detail_fields": [
-          "url",
-          "notes",
-          "tags"
-        ],
-        "array_fields": [
-          "tags"
-        ]
-      }
+      "sections": [
+        {
+          "kind": "list",
+          "path": [
+            "items"
+          ],
+          "entity": "media_item",
+          "title_field": "title",
+          "badges": [
+            "kind",
+            "status",
+            "reaction"
+          ],
+          "detail_fields": [
+            "url",
+            "notes",
+            "tags"
+          ],
+          "array_fields": [
+            "tags"
+          ]
+        }
+      ]
     }
   },
   {
@@ -795,36 +809,43 @@
       }
     },
     "ui": {
-      "styles": {
-        "title_field": "name",
-        "badges": [
-          "domain",
-          "stance"
-        ],
-        "detail_fields": [
-          "notes",
-          "references"
-        ],
-        "array_fields": [
-          "references"
-        ],
-        "suggestions": {
-          "name": [
-            "Minimalist",
-            "Maximalist",
-            "Brutalist",
-            "Pastel",
-            "Monochrome",
-            "Retro-futurism",
-            "Art deco",
-            "Scandinavian",
-            "Y2K",
-            "Editorial",
-            "Hand-drawn",
-            "Glassmorphism"
-          ]
+      "sections": [
+        {
+          "kind": "list",
+          "path": [
+            "styles"
+          ],
+          "entity": "aesthetic",
+          "title_field": "name",
+          "badges": [
+            "domain",
+            "stance"
+          ],
+          "detail_fields": [
+            "notes",
+            "references"
+          ],
+          "array_fields": [
+            "references"
+          ],
+          "suggestions": {
+            "name": [
+              "Minimalist",
+              "Maximalist",
+              "Brutalist",
+              "Pastel",
+              "Monochrome",
+              "Retro-futurism",
+              "Art deco",
+              "Scandinavian",
+              "Y2K",
+              "Editorial",
+              "Hand-drawn",
+              "Glassmorphism"
+            ]
+          }
         }
-      }
+      ]
     }
   },
   {

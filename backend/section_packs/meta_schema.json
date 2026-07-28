@@ -36,10 +36,64 @@
       "additionalProperties": { "$ref": "#/$defs/entity" }
     },
     "capture_triggers": { "type": "array", "items": { "type": "string" } },
-    "ui": { "type": "object" },
+    "ui": { "$ref": "#/$defs/ui" },
     "default_enabled": { "type": "boolean" }
   },
   "$defs": {
+    "ui": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["sections"],
+          "additionalProperties": false,
+          "properties": {
+            "sections": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/uiSection" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Legacy flat map: { <listKey>: <uiSpec> }. Kept so third-party packs still validate.",
+          "additionalProperties": { "type": "object" }
+        }
+      ]
+    },
+    "uiSection": {
+      "type": "object",
+      "required": ["kind", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["list", "fields", "strings"] },
+        "path": { "type": "array", "items": { "type": "string" } },
+        "entity": { "type": "string" },
+        "title": { "type": "string" },
+        "title_field": { "type": "string" },
+        "fields": { "type": "array", "items": { "type": "string" } },
+        "badges": { "type": "array", "items": { "type": "string" } },
+        "detail_fields": { "type": "array", "items": { "type": "string" } },
+        "array_fields": { "type": "array", "items": { "type": "string" } },
+        "long_text": { "type": "array", "items": { "type": "string" } },
+        "suggestions": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "enum": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "optional": { "type": "array", "items": { "type": "string" } },
+        "field_defaults": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/uiSection" }
+        }
+      }
+    },
     "entity": {
       "type": "object",
       "required": ["actions", "required", "optional", "identifier"],
