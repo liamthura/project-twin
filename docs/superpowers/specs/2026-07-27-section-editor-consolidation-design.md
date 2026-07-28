@@ -103,7 +103,7 @@ in would place the MCP contract that AI clients depend on inside a frontend refa
 | Field binding | **`ui` declares storage keys** | `entities` stays the MCP vocabulary. See the constraint above. |
 | Test net | **Vitest + Testing Library + Storybook** | Stories run as tests via `@storybook/addon-vitest`, so a story cannot drift from what is verified. |
 | Vite upgrade | **Vite 5 → 7 first, separate PR** | Required by Vitest 4. Kept apart so a build-tool failure never gets tangled with a rendering failure. |
-| New UI primitives | **shadcn CLI; Watermelon UI as a design reference** | Both optional, taken only where they beat hand-rolling on quality *and* speed. See "Sourcing UI primitives". |
+| New UI primitives | **Adapt a registry component before hand-rolling** | shadcn CLI is the route; components land as editable source, so tweaking beats maintaining bespoke. Optional and conditional — see "Sourcing UI primitives". |
 
 ## Architecture
 
@@ -323,10 +323,16 @@ stops a future manifest from declaring two sibling nodes over the same list eith
 
 Convergence means every migrated section funnels through one small set of controls, so the
 few primitives the renderer kit still needs are worth getting right rather than hand-rolling.
-Two shortcuts are sanctioned, both **optional** — reach for them only where they produce a
-better result *and* land faster than writing the control by hand. Neither is a reason to add
-a dependency this project would not otherwise carry; the point of the consolidation is
-deleting code.
+
+**Default to adapting a ready-made component over writing one from scratch.** A component
+pulled from a shadcn-compatible registry and then tweaked is cheaper to build and cheaper to
+maintain than a bespoke one: it arrives with the accessibility behaviour, keyboard handling
+and dark-mode tokens already worked out, and the next person can diff it against its source.
+Hand-rolling is the fallback for when nothing off the shelf fits the repo's stack.
+
+That said, this is **optional** and conditional — take a registry component only where it
+produces a better result *and* lands faster. It is never a reason to add a dependency this
+project would not otherwise carry; the point of the consolidation is deleting code.
 
 ### shadcn CLI
 
@@ -345,24 +351,32 @@ Run it, diff it, and keep only the `components.json` it generates plus whatever 
 component genuinely needs. Anything it changes underneath the existing primitives is a
 regression, not an upgrade.
 
-### Watermelon UI as a design reference
+### Third-party registries
 
-[Watermelon UI](https://ui.watermelon.sh/installation) is a shadcn-registry-compatible set of
-React components and blocks, installable as
-`npx shadcn@latest add "https://registry.watermelon.sh/<component>.json"`. Its layouts are
-worth borrowing from when a renderer node needs a shape the current primitives do not
-cover — the list rows, empty states and detail panels in particular.
+Any registry that speaks the shadcn registry protocol installs through the same CLI —
+`npx shadcn@latest add "<registry-url>/<component>.json"` — and lands as source in
+`frontend/src/components/ui/`, where it can be edited like anything else already there.
+That is the property worth optimising for: the component becomes ours on arrival, so
+tweaking it is normal work rather than fighting a library.
 
-It is **not** a drop-in here. It targets **Tailwind 4**, which this spec lists as a non-goal,
-and ships TypeScript with Framer Motion. So:
+Two filters decide whether a given registry is usable here:
 
-- Treat it as a source of markup and layout to adapt, not a dependency to install.
-- Port to JSX and Tailwind 3 utility classes; anything relying on Tailwind 4's `@theme` or
-  its v4-only utilities has to be rewritten, not pasted.
-- Do not pull Framer Motion into the bundle for an animation the section editors do not need.
+1. **Tailwind 3.** Most current registries target Tailwind 4. Tailwind 4 is a standing
+   non-goal in this spec, so a v4-only component is markup to adapt by hand — its `@theme`
+   blocks and v4-only utilities have to be rewritten, not pasted.
+2. **No new runtime dependency.** A component that drags in an animation or styling runtime
+   the section editors do not otherwise need is not worth it. Take the layout, drop the
+   dependency.
 
-If a component can only be had by adopting Tailwind 4 or Framer Motion, that is a signal to
-write the simpler control by hand and revisit after the deferred Tailwind 4 upgrade.
+Fail either filter and the answer is the simpler hand-written control, revisited after the
+deferred Tailwind 4 upgrade.
+
+**[gluestack](https://gluestack.io/llms.txt)** — worth tracking, not usable yet. It is a
+universal React / React Native library on Tailwind 4, installed through its own CLI
+(`npx gluestack-ui@alpha add <component>`) rather than the shadcn registry protocol, and its
+current alpha has **no web support at all** — that waits on NativeWind v5 shipping web. Its
+older line supports Next.js, not Vite. Revisit once web support lands and this repo is on
+Tailwind 4; until then it is a design reference only.
 
 ## Testing
 
