@@ -239,6 +239,13 @@ def test_every_in_repo_manifest_validates():
     for key, manifest in packs.items():
         pack_loader.validate_manifest(copy.deepcopy(manifest))  # must not raise
 
+    # `_template` itself is excluded from `on_disk`/`packs` above (leading
+    # underscore, never loaded by load_packs()) but it's the exact shape
+    # third-party authors copy to start a new pack. If it drifts out of
+    # schema unnoticed, every pack cloned from it fails validation and is
+    # silently skipped by load_packs() -- so validate it directly here too.
+    pack_loader.validate_manifest(_load("_template"))  # must not raise
+
 
 def test_unknown_kind_is_rejected():
     manifest = _manifest_with_ui(
@@ -273,6 +280,32 @@ def test_list_node_missing_entity_is_rejected():
         }
     )
     with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(manifest)
+
+
+def test_missing_entity_error_names_entity():
+    """`$defs.ui` is a `oneOf`: a list node missing `entity` fails BOTH
+    branches (the explicit-sections branch via the `if`/`then` above, and the
+    legacy-flat-map branch because a manifest with `sections` at all doesn't
+    match that shape either), so the naive "first error sorted by path" picks
+    the top-level `oneOf` failure at `ui`, which just dumps the whole block
+    ("... is not valid under any of the given schemas") and never says what's
+    actually wrong. A third-party author told to "fix until the log is clean"
+    (docs/CONTRIBUTING-PACKS.md) needs the message to actually name the
+    missing key, not just the block it's in."""
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {
+                    "kind": "list",
+                    "path": ["goals"],
+                    "title_field": "title",
+                    "detail_fields": ["notes"],
+                }
+            ]
+        }
+    )
+    with pytest.raises(pack_loader.PackError, match="entity"):
         pack_loader.validate_manifest(manifest)
 
 
