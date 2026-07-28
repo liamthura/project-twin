@@ -47,6 +47,8 @@ export function renderNode({ node, value, onValue, entities, packKey, onShowConf
     <ListRenderer
       node={node}
       entity={entities?.[node.entity]}
+      entities={entities}
+      packKey={packKey}
       items={Array.isArray(value) ? value : []}
       onItems={onValue}
       onShowConfirmation={onShowConfirmation}

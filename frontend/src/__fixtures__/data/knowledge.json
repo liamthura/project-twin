@@ -1,0 +1,66 @@
+{
+  "_note": "JSON has no comment syntax, so this key carries one. Three shapes here are deliberate and none of them is a typo. (1) `domains[0]` is what the `domain` entity writes: id, no dates. `domains[1]` is what the `knowledge` entity writes into the SAME list (its `category` defaults to \"domains\"): added_date/last_updated and NO id -- persona_store._assign_ids would backfill the id on the next backend save, which is exactly why the renderer must not depend on one. (2) `mental_tabs[2]` carries the legacy `topic` key with no `title`: never written by any current code path, still read as a fallback in four places in server.py. It renders with a blank title on purpose -- the manifest binds `title` and nothing else -- and the test beside it asserts that `topic` and every other key survive an edit regardless. persona_store._normalize backfills `title` from `topic` on load, so a blob that has been through the backend does not look like this; this entry is the renderer's own guard against key loss, independent of that repair. (3) `related` appears on two entries and is bound by nothing: it is the link graph, written only by _execute_link and rendered nowhere, so the only thing asked of it is that it survives. This key itself is inert -- no ui node addresses it.",
+  "domains": [
+    {
+      "id": "domain_a1b2c3d4",
+      "name": "Python",
+      "level": "advanced",
+      "notes": "Backend services and the MCP server; comfortable with asyncio and typing.",
+      "references": [
+        {
+          "name": "Fluent Python",
+          "url": "https://example.invalid/fluent-python",
+          "notes": "The idiomatic half, not the syntax half."
+        },
+        {
+          "name": "asyncio docs",
+          "url": "https://example.invalid/asyncio",
+          "notes": "Re-read the task-group section before touching the pool."
+        }
+      ],
+      "related": ["tab_11223344"]
+    },
+    {
+      "name": "Postgres",
+      "level": "intermediate",
+      "notes": "Full-text search and pgvector, mostly through psycopg.",
+      "references": [],
+      "added_date": "2026-01-12",
+      "last_updated": "2026-07-20"
+    }
+  ],
+  "mental_tabs": [
+    {
+      "id": "tab_11223344",
+      "title": "Places to eat in Newcastle",
+      "notes": "Kept for when someone asks where to go. Ordered by how often I go back.",
+      "tags": ["food", "newcastle"],
+      "status": "open",
+      "references": [
+        {
+          "name": "Cafe list",
+          "url": "https://example.invalid/newcastle-cafes",
+          "notes": "The three near the quayside are the good ones."
+        }
+      ],
+      "created_at": "2026-03-04T09:15:00.000Z",
+      "related": ["domain_a1b2c3d4"]
+    },
+    {
+      "id": "tab_55667788",
+      "title": "Gift ideas",
+      "notes": "",
+      "tags": [],
+      "status": "closed",
+      "references": [],
+      "created_at": "2026-05-19T18:02:00.000Z"
+    },
+    {
+      "id": "tab_99aabbcc",
+      "topic": "Old bookmarks",
+      "notes": "Written before the title rename; still addressable over MCP by its topic.",
+      "tags": ["legacy"],
+      "references": []
+    }
+  ]
+}

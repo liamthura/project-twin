@@ -46,9 +46,7 @@ import { ConnectionSettings } from "@/components/ConnectionSettings";
 import { api, getAuthToken } from "@/lib/api.js";
 import { WelcomeAuth } from "@/components/WelcomeAuth";
 import ProfileEditor from "@/editors/ProfileEditor";
-import KnowledgeEditor from "@/editors/KnowledgeEditor";
 import PreferencesEditor from "@/editors/PreferencesEditor";
-import ProjectsEditor from "@/editors/ProjectsEditor";
 import LifestyleEditor from "@/editors/LifestyleEditor";
 import SectionRenderer from "@/renderers/SectionRenderer";
 
@@ -76,8 +74,16 @@ const TAB_TRIGGER_CLASS =
 
 // Sections with a bespoke, hand-built editor. Everything else that's
 // enabled gets a generic, manifest-driven tab instead.
-const BESPOKE_EDITORS = new Set(["profile", "knowledge", "preferences", "projects", "lifestyle"]);
-const PACK_ICONS = { goals: Target, media: Film, aesthetics: Palette, circle: Users, learning_log: BookOpen };
+const BESPOKE_EDITORS = new Set(["profile", "preferences", "lifestyle"]);
+const PACK_ICONS = {
+  goals: Target,
+  media: Film,
+  aesthetics: Palette,
+  circle: Users,
+  learning_log: BookOpen,
+  knowledge: Brain,
+  projects: FolderKanban,
+};
 
 // Tracks whether a horizontally scrollable element is at its start/end edge,
 // so the tab strip only fades the side that actually has more content.
@@ -139,9 +145,7 @@ export default function App() {
   const { toast } = useToast();
 
   const [profile, setProfile] = useState({});
-  const [knowledge, setKnowledge] = useState({});
   const [preferences, setPreferences] = useState({});
-  const [projects, setProjects] = useState({});
   const [lifestyle, setLifestyle] = useState({});
 
   const [disabledSections, setDisabledSections] = useState([]);
@@ -190,9 +194,7 @@ export default function App() {
     try {
       const response = await api("/all");
       setProfile(response.data.profile || {});
-      setKnowledge(response.data.knowledge || {});
       setPreferences(response.data.preferences || {});
-      setProjects(response.data.projects || {});
       setLifestyle(response.data.lifestyle || {});
       const known = new Set([...BESPOKE_EDITORS]);
       const rest = {};
@@ -245,17 +247,9 @@ export default function App() {
     setProfile(newData);
     if (isAutosaveEnabled) debouncedSave("profile", newData);
   };
-  const handleKnowledgeChange = (newData) => {
-    setKnowledge(newData);
-    if (isAutosaveEnabled) debouncedSave("knowledge", newData);
-  };
   const handlePreferencesChange = (newData) => {
     setPreferences(newData);
     if (isAutosaveEnabled) debouncedSave("preferences", newData);
-  };
-  const handleProjectsChange = (newData) => {
-    setProjects(newData);
-    if (isAutosaveEnabled) debouncedSave("projects", newData);
   };
   const handleLifestyleChange = (newData) => {
     setLifestyle(newData);
@@ -273,9 +267,7 @@ export default function App() {
         method: "PUT",
         body: JSON.stringify({
           profile,
-          knowledge,
           preferences,
-          projects,
           lifestyle,
           ...packData,
         }),
@@ -553,18 +545,6 @@ export default function App() {
               <User className="h-4 w-4" />
               <span>Profile</span>
             </TabsTrigger>
-            {!disabledSections.includes("knowledge") && (
-              <TabsTrigger value="knowledge" className={TAB_TRIGGER_CLASS}>
-                <Brain className="h-4 w-4" />
-                <span>Knowledge</span>
-              </TabsTrigger>
-            )}
-            {!disabledSections.includes("projects") && (
-              <TabsTrigger value="projects" className={TAB_TRIGGER_CLASS}>
-                <FolderKanban className="h-4 w-4" />
-                <span>Projects</span>
-              </TabsTrigger>
-            )}
             {!disabledSections.includes("lifestyle") && (
               <TabsTrigger value="lifestyle" className={TAB_TRIGGER_CLASS}>
                 <Heart className="h-4 w-4" />
@@ -603,24 +583,6 @@ export default function App() {
               onShowConfirmation={showConfirmation}
             />
           </TabsContent>
-          {!disabledSections.includes("knowledge") && (
-            <TabsContent value="knowledge">
-              <KnowledgeEditor
-                data={knowledge}
-                onChange={handleKnowledgeChange}
-                onShowConfirmation={showConfirmation}
-              />
-            </TabsContent>
-          )}
-          {!disabledSections.includes("projects") && (
-            <TabsContent value="projects">
-              <ProjectsEditor
-                data={projects}
-                onChange={handleProjectsChange}
-                onShowConfirmation={showConfirmation}
-              />
-            </TabsContent>
-          )}
           {!disabledSections.includes("lifestyle") && (
             <TabsContent value="lifestyle">
               <LifestyleEditor

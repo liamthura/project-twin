@@ -122,6 +122,28 @@ def _normalize(file_type: str, data: dict) -> dict:
                     project.setdefault("references", [])
                     project.setdefault("notes", "")
                     project.setdefault("highlights", [])
+        # Legacy top_of_mind entries were bare strings. Two consumers coerce
+        # them on read and therefore hid the problem -- execute_modify
+        # (server.py's get_idea_text) and ProjectsEditor.jsx -- but nothing
+        # else does: _assign_ids below skips non-dicts so a string entry never
+        # gets an `id`, search_index skips id-less entries so it is
+        # unsearchable, the staleness advisory (server.py) skips it, and a
+        # generic list renderer keyed on `idea` shows a row with no reachable
+        # content. Coercing here, on load, repairs every consumer at once
+        # rather than the one that happens to render.
+        #
+        # Idempotent, like every other case in this function: a dict entry is
+        # returned untouched, so re-normalising an already-normalised blob is
+        # a no-op. Only `idea` is written -- `note` is genuinely absent on a
+        # legacy entry, and inventing `note: ""` would be a value the user
+        # never entered (and one ListRenderer.updateItem deletes on the first
+        # edit anyway, producing a spurious diff).
+        top_of_mind = data.get("top_of_mind")
+        if isinstance(top_of_mind, list):
+            data["top_of_mind"] = [
+                {"idea": entry} if isinstance(entry, str) else entry
+                for entry in top_of_mind
+            ]
         # Phase 5 (consolidation): current_learning folds into goals (type=learning);
         # strip it so old backups/imports can't resurrect an invisible orphan key.
         data.pop("current_learning", None)
@@ -136,6 +158,70 @@ def _normalize(file_type: str, data: dict) -> dict:
             for tab in mental_tabs:
                 if isinstance(tab, dict):
                     tab.setdefault("references", [])
+                    # Legacy mental tabs stored their name under `topic`.
+                    # Nothing has written that key since the rename to
+                    # `title`, but four places in server.py still READ it as a
+                    # fallback -- the add-time dedupe, the update lookup, the
+                    # remove lookup, and mental_tab_reference's parent lookup
+                    # -- and those fallbacks are what hid the problem, exactly
+                    # as get_idea_text hid the bare-string top_of_mind entries
+                    # above. Everything that does NOT fall back sees a tab
+                    # with no name at all: get_context's title, and a generic
+                    # list renderer keyed on `title`, which shows a blank row
+                    # and then -- on the first edit -- writes a `title`
+                    # alongside the orphaned `topic`, leaving one entry with
+                    # two names and no rule about which wins.
+                    #
+                    # Backfilling here repairs every consumer at once, and is
+                    # read-neutral by construction: each of those four sites
+                    # already computes `title or topic`, so after the backfill
+                    # they compute the same value from the first branch.
+                    #
+                    # `topic` is deliberately NOT popped. Where the two keys
+                    # differ (title present, topic present) the entry is
+                    # addressable over MCP by either name today, and dropping
+                    # one would remove an address rather than add one -- so
+                    # this only ever ADDS a key, never removes or overwrites.
+                    # setdefault is not enough: a tab carrying `title: ""` is
+                    # just as nameless as one carrying no title at all.
+                    #
+                    # Read-neutral does NOT mean collision-neutral. All four
+                    # fallback sites resolve by `title` first via
+                    # find_in_array, which compares case-insensitively
+                    # (item.get(id_field, "").lower() == identifier.lower())
+                    # and returns the FIRST match. If some other tab already
+                    # has that same title, backfilling this one would give
+                    # two tabs an identical title, and being earlier or later
+                    # in the list would silently decide which one every
+                    # title-keyed lookup (including a remove) resolves to --
+                    # exactly the divergence from yesterday's behaviour this
+                    # normalisation must not introduce. So: skip the backfill
+                    # when the candidate title collides, case-insensitively,
+                    # with another tab's title as it currently stands. The
+                    # tab keeps rendering blank -- reachable only via `topic`
+                    # -- rather than taking over another entry's identity.
+                    #
+                    # "As it stands" deliberately includes a title backfilled
+                    # earlier in this same pass, not just titles that existed
+                    # before _normalize ran: since the list is scanned and
+                    # mutated in order, two tabs that both carry only
+                    # {topic: "X"} would otherwise both backfill to the same
+                    # title in one pass, recreating the identical hazard this
+                    # guard exists to prevent. Instead the earlier tab claims
+                    # the title and the later one collides with it, exactly
+                    # as it would against a pre-existing title -- and stays
+                    # collided on every later pass, since the earlier tab's
+                    # title is no longer a backfill candidate itself.
+                    if not tab.get("title") and tab.get("topic"):
+                        candidate = tab["topic"]
+                        collides = any(
+                            other is not tab
+                            and isinstance(other, dict)
+                            and (other.get("title") or "").lower() == candidate.lower()
+                            for other in mental_tabs
+                        )
+                        if not collides:
+                            tab["title"] = candidate
         # Phase 5 (consolidation): proficiency_levels retired; strip it so old
         # backups/imports can't resurrect an invisible orphan key.
         data.pop("proficiency_levels", None)

@@ -377,6 +377,36 @@ is visible rather than rediscovered: field placeholders (`"e.g. React Server Com
 the `"Untitled entry"` / `"Untitled connection"` fallbacks, and `circle`'s fifth info tip. The
 date badge *was* restored, as `display_fields`.
 
+### Stored-data exception, taken in wave 4
+
+This spec's non-goals forbid changing stored JSON, with `preferences` normalisation as the sole
+exception. Wave 4 took two more, deliberately and with the user's approval, both in
+`persona_store._normalize` and both of the same kind: **backfilling a legacy shape so that
+deleting a bespoke editor does not make existing rows unreachable.**
+
+- A bare-string `top_of_mind` entry becomes `{idea: "<string>"}`. Left alone it renders as
+  "Untitled entry" with no reachable content once `ProjectsEditor` is gone, and being a string
+  it could never carry an `id`, be linked, or be indexed.
+- A `mental_tabs` entry carrying only the legacy `topic` gains a `title`. Left alone it renders
+  blank once `KnowledgeEditor` is gone. `topic` is never removed — where the two differ the
+  entry is MCP-addressable by either, and dropping one removes an address.
+
+Both are idempotent, neither clobbers an existing value, and the `topic` backfill is
+read-neutral because all four `server.py` read sites already compute `title or topic`, so they
+now reach the same value through the first branch. `search_index` already ranks `title` above
+`topic`, so the indexed title is unchanged.
+
+**One guard was needed.** The backfill is *not* read-neutral under a name collision: if tab A
+stores `{topic: "X"}` and tab B stores `{title: "X"}`, backfilling makes a title lookup resolve
+A rather than B, so an MCP `remove` deletes the wrong tab. The backfill therefore skips any
+entry whose `topic` matches another tab's title — including a title backfilled earlier in the
+same pass, so two topic-only duplicates cannot both claim the same name. Such a tab keeps
+rendering blank and stays addressable by `topic`. A visible gap beats a wrong deletion.
+
+The principle worth carrying to waves 5 and 6: a migration that only *enables* an editor
+deletion is in scope for the wave doing that deletion. Restructuring stored data for any other
+reason is not, and still belongs to the deferred backend reconciliation.
+
 ### State after the wave 4 prerequisites
 
 The three items above are addressed, with one exception and one carry-forward.
@@ -527,7 +557,7 @@ Each wave is a PR. `main` stays deployable throughout.
 | 1 | Vitest + Testing Library + Storybook + addon-vitest; fixtures | — |
 | 2 | Renderer kit at current capability; `ui.sections` schema and normalisation; `meta_schema` validation; move `goals`/`media`/`aesthetics` to the explicit form | `GenericSectionEditor` (282) |
 | 3 | `learning_log`, `circle`; plus `@now` defaults, display `sort`, `searchable`, `info`, `display_fields` | 802 ✅ |
-| 4 | Child-list support; `projects`, `knowledge` | 2,159 |
+| 4 | Child-list support (`children`), `facets`, `count_badges`; `projects`, `knowledge` | 2,159 ✅ |
 | 5 | `strings` and `fields` nodes; backend `preferences` normalisation; `lifestyle`, `preferences` | 1,643 |
 | 6 | `profile` — singleton plus two lists plus two levels of child list | 1,446 |
 

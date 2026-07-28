@@ -362,7 +362,7 @@ describe("@now in field_defaults", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[]} onItems={onItems} />);
 
-    await user.click(screen.getByRole("button", { name: /add/i }));
+    await user.click(screen.getByRole("button", { name: "Add" }));
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "React Server Components");
@@ -379,7 +379,7 @@ describe("@now in field_defaults", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: /add/i }));
+    await user.click(screen.getByRole("button", { name: "Add" }));
     // `timestamp` has no control of its own, but `source` proves defaults still
     // preselect; a literal "@now" anywhere on screen means the token escaped.
     expect(screen.getByDisplayValue("manual")).toBeInTheDocument();
@@ -397,7 +397,7 @@ describe("@now in field_defaults", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: /add/i }));
+    await user.click(screen.getByRole("button", { name: "Add" }));
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "T");
@@ -415,7 +415,7 @@ describe("@now in field_defaults", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[]} onItems={onItems} />);
 
-    await user.click(screen.getByRole("button", { name: /add/i }));
+    await user.click(screen.getByRole("button", { name: "Add" }));
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "@now");
@@ -730,6 +730,66 @@ describe("display_fields", () => {
     expect(screen.getByText(expected.slice(0, 10))).toBeInTheDocument();
   });
 
+  // A stored yyyy-mm-dd is a CALENDAR DATE, not an instant. `new Date` parses
+  // the date-only form as UTC midnight, so formatting it through local-time
+  // getters rolls it back a day in every negative-offset zone. The suite is
+  // pinned to America/New_York (vitest.config.js) precisely so this is
+  // observable: under the pre-fix formatDisplay these render "2026-01-11" and
+  // "2025-12-31", and at UTC they would have rendered correctly by accident.
+  describe("a calendar date, which carries no instant to convert", () => {
+    const dateOnly = [{ topic: "Proj", details: "d", timestamp: "2026-01-12" }];
+
+    it("renders verbatim under the date format, not shifted into local time", () => {
+      // Proof the environment can actually see the bug -- without this the
+      // assertion below is only as strong as whoever's timezone ran it.
+      expect(new Date("2026-01-12").getDate()).toBe(11);
+
+      render(
+        <ListRenderer
+          node={{ ...node, display_formats: { timestamp: "date" } }}
+          items={dateOnly}
+          onItems={vi.fn()}
+        />
+      );
+      expect(screen.getByText("2026-01-12")).toBeInTheDocument();
+      expect(screen.queryByText("2026-01-11")).not.toBeInTheDocument();
+    });
+
+    it("does not roll a new-year date back into the previous year", () => {
+      render(
+        <ListRenderer
+          node={{ ...node, display_formats: { timestamp: "date" } }}
+          items={[{ topic: "NY", timestamp: "2026-01-01" }]}
+          onItems={vi.fn()}
+        />
+      );
+      expect(screen.getByText("2026-01-01")).toBeInTheDocument();
+      expect(screen.queryByText("2025-12-31")).not.toBeInTheDocument();
+    });
+
+    it("shows no invented midnight under the datetime format either", () => {
+      render(
+        <ListRenderer
+          node={{ ...node, display_formats: { timestamp: "datetime" } }}
+          items={dateOnly}
+          onItems={vi.fn()}
+        />
+      );
+      // There is no time in the stored value, so there is none to display.
+      expect(screen.getByText("2026-01-12")).toBeInTheDocument();
+      expect(screen.queryByText(/19:00|00:00/)).not.toBeInTheDocument();
+    });
+
+    it("still converts a value that really does carry a time", () => {
+      // The exemption is on the value's shape, not on the format, so an
+      // instant must be unaffected -- this is learning_log's `timestamp`.
+      render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+      expect(screen.getByText(expected)).toBeInTheDocument();
+      // 09:30Z is 04:30 in the pinned zone: converted, not passed through.
+      expect(expected).toBe("2026-01-15 04:30");
+    });
+  });
+
   it("is read-only -- expanding the row exposes no control bound to it", async () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
@@ -762,6 +822,95 @@ describe("display_fields", () => {
     );
     expect(screen.getByText("No date")).toBeInTheDocument();
     expect(screen.getAllByText(expected)).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// count_badges -- wave 4, Task 4
+//
+// Opt-in "N <field>" chips for array-valued storage keys, rendered after
+// display_fields and before badges. Read-only: unlike `badges`, nothing here
+// should ever bind an editable control. The three fields this wave actually
+// uses -- references, tags, highlights -- all singularise correctly by
+// trimming a trailing "s" (reference/tag/highlight), so that's what's tested
+// below rather than an invented irregular noun.
+// ---------------------------------------------------------------------------
+describe("count_badges", () => {
+  const node = {
+    kind: "list",
+    path: ["entries"],
+    title_field: "topic",
+    detail_fields: ["notes"],
+    count_badges: ["references", "tags", "highlights"],
+  };
+
+  it("renders 'N <field>' for a field with multiple entries", () => {
+    const items = [{ topic: "RSC", references: ["a", "b", "c"] }];
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.getByText("3 references")).toBeInTheDocument();
+  });
+
+  it("singularises to '1 <field>' (trimming the trailing s), not '1 <field>s'", () => {
+    const items = [{ topic: "RSC", tags: ["solo"] }];
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.getByText("1 tag")).toBeInTheDocument();
+    expect(screen.queryByText("1 tags")).not.toBeInTheDocument();
+  });
+
+  it("renders every field's own count independently on the same row", () => {
+    const items = [
+      { topic: "RSC", references: ["a", "b"], tags: ["x"], highlights: ["h1", "h2", "h3"] },
+    ];
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.getByText("2 references")).toBeInTheDocument();
+    expect(screen.getByText("1 tag")).toBeInTheDocument();
+    expect(screen.getByText("3 highlights")).toBeInTheDocument();
+  });
+
+  it("renders no badge for an empty array -- a '0 x' chip is noise, not a real count", () => {
+    const items = [{ topic: "RSC", references: [] }];
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.queryByText(/references/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^0/)).not.toBeInTheDocument();
+  });
+
+  it("renders no badge for a field the item doesn't have at all", () => {
+    const items = [{ topic: "RSC" }];
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.queryByText(/references|tags|highlights/)).not.toBeInTheDocument();
+  });
+
+  it("renders no badge, and does not throw, when the field holds a non-array value", () => {
+    const items = [{ topic: "RSC", references: "not-an-array" }];
+    expect(() =>
+      render(<ListRenderer node={node} items={items} onItems={vi.fn()} />)
+    ).not.toThrow();
+    expect(screen.queryByText(/references/)).not.toBeInTheDocument();
+    expect(screen.getByText("RSC")).toBeInTheDocument();
+  });
+
+  it("is read-only -- expanding the row exposes no control bound to it beyond what detail_fields declares", async () => {
+    const items = [{ topic: "RSC", notes: "n", references: ["a", "b"] }];
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.getByText("2 references")).toBeInTheDocument();
+
+    await user.click(screen.getByText("RSC"));
+
+    // `notes` proves the row really expanded.
+    expect(screen.getByDisplayValue("n")).toBeInTheDocument();
+    // No control anywhere shows the raw array value or field name as an
+    // editable input -- only detail_fields (here, "notes") get a control.
+    expect(screen.queryByDisplayValue("a,b")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^references$/i)).not.toBeInTheDocument();
+  });
+
+  it("renders nothing extra for a node that declares no count_badges", () => {
+    const items = [{ topic: "RSC", references: ["a", "b", "c"] }];
+    render(
+      <ListRenderer node={{ ...node, count_badges: undefined }} items={items} onItems={vi.fn()} />
+    );
+    expect(screen.queryByText(/references|tags|highlights/)).not.toBeInTheDocument();
   });
 });
 
@@ -819,6 +968,31 @@ describe("info", () => {
     await user.click(screen.getByRole("button", { name: /about this section/i }));
     expect(screen.getByText("Who matters to you.")).toBeInTheDocument();
     for (const tip of info.tips) expect(screen.getByText(tip)).toBeInTheDocument();
+  });
+
+  // "About this section" was hardcoded, so a section packing two list nodes
+  // -- projects is the first, and wave 5's lifestyle packs four -- produced
+  // buttons that screen-reader users could not tell apart, and that tests
+  // could only separate by DOM order. The node's own title is the name the
+  // user already sees above the list, so it is the one to announce.
+  it("names each info button after its node, so two in one section are distinguishable", () => {
+    render(
+      <div>
+        <ListRenderer node={{ ...node, title: "Projects" }} items={[]} onItems={vi.fn()} />
+        <ListRenderer node={{ ...node, title: "Top of Mind" }} items={[]} onItems={vi.fn()} />
+      </div>
+    );
+
+    expect(screen.getByRole("button", { name: "About Projects" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About Top of Mind" })).toBeInTheDocument();
+    // The generic name is gone once a title exists, rather than sitting
+    // alongside as a second way to match the same two buttons ambiguously.
+    expect(screen.queryByRole("button", { name: /about this section/i })).not.toBeInTheDocument();
+  });
+
+  it("falls back to the generic name for a node with no title", () => {
+    render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "About this section" })).toBeInTheDocument();
   });
 
   it("gives a row's delete button a name distinct from the info button, since both are icon-only and the info button renders first in DOM order", async () => {
@@ -914,5 +1088,709 @@ describe("detail-grid column spans", () => {
 
     expect(cellFor("notes").className).toContain("sm:col-span-2");
     expect(cellFor("tags").className).toContain("sm:col-span-2");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// children -- nested child lists (wave 4, Task 2)
+//
+// A `ui` list node may carry `children[]`, each child another node whose
+// `path` resolves against the LIST ITEM rather than the section root. All the
+// tests below expand the parent row first: a child list only exists inside an
+// expanded row, so an assertion made against a collapsed row cannot fail for
+// the reason it claims.
+//
+// Selector note: with a nested list there are now delete buttons and Add
+// buttons at two levels, and neither accessible name is namespaced by level.
+// `Remove <title>` names the row's title, so a child item whose title equals
+// its parent's yields TWO buttons named `Remove Alpha` -- a nested test must
+// use distinct titles or scope by row, never select by name alone. Same for
+// `Add` (the parent's and the expanded row's child list both have one) and,
+// if both levels are `searchable`, for `searchbox`. The child's Add button is
+// scoped below through the child's own `title` label, whose parent element is
+// the wrapper the child list renders inside.
+//
+// That collision is documented here rather than asserted in a test: the only
+// way such a test could fail is if someone made the names distinct, i.e. it
+// would block the very improvement it describes.
+// ---------------------------------------------------------------------------
+describe("children", () => {
+  const childNode = {
+    kind: "list",
+    path: ["references"],
+    entity: "reference",
+    title: "References",
+    title_field: "name",
+    detail_fields: ["url", "notes"],
+  };
+  const parentNode = {
+    kind: "list",
+    path: ["projects"],
+    entity: "project",
+    title_field: "name",
+    detail_fields: ["status"],
+    children: [childNode],
+  };
+  const entities = {
+    project: { optional: [] },
+    reference: { optional: [] },
+  };
+  // Two parents, so every write assertion can check the row that was NOT
+  // edited as well as the one that was.
+  const alpha = {
+    id: "p1",
+    name: "Alpha",
+    status: "active",
+    references: [{ name: "Ref A1", url: "https://a1", notes: "first" }],
+  };
+  const beta = {
+    id: "p2",
+    name: "Beta",
+    status: "idea",
+    references: [
+      { name: "Ref B1", url: "https://b1" },
+      { name: "Ref B2", url: "https://b2" },
+    ],
+  };
+  const items = [alpha, beta];
+
+  // The wrapper a child list renders inside, located by the child's own
+  // title label rather than by DOM position.
+  const childBlock = (title) => screen.getByText(title).parentElement;
+
+  function renderStatefulParent(initialItems, node = parentNode) {
+    let seen = initialItems;
+    function Harness() {
+      const [state, setState] = useState(initialItems);
+      return (
+        <ListRenderer
+          node={node}
+          entities={entities}
+          entity={entities.project}
+          packKey="wave4_test"
+          items={state}
+          onItems={(next) => {
+            seen = next;
+            setState(next);
+          }}
+        />
+      );
+    }
+    const utils = render(<Harness />);
+    return { ...utils, user: userEvent.setup(), latest: () => seen };
+  }
+
+  it("renders a child list inside an expanded row, and not inside a collapsed one", async () => {
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={parentNode}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={[alpha]}
+        onItems={vi.fn()}
+      />
+    );
+
+    // Collapsed: neither the child's title nor any of its rows exist.
+    expect(screen.queryByText("References")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ref A1")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Alpha"));
+
+    expect(screen.getByText("References")).toBeInTheDocument();
+    expect(screen.getByText("Ref A1")).toBeInTheDocument();
+  });
+
+  it("edits the correct stored parent index and child index, leaving every other row byte-identical", async () => {
+    const onItems = vi.fn();
+    const before = JSON.stringify(items);
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={parentNode}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={items}
+        onItems={onItems}
+      />
+    );
+
+    // Beta is stored at index 1; Ref B2 is its child index 1.
+    await user.click(screen.getByText("Beta"));
+    await user.click(screen.getByText("Ref B2"));
+    await user.type(screen.getByDisplayValue("https://b2"), "!");
+
+    const [[next]] = onItems.mock.calls;
+    expect(next).toEqual([
+      alpha,
+      {
+        id: "p2",
+        name: "Beta",
+        status: "idea",
+        references: [
+          { name: "Ref B1", url: "https://b1" },
+          { name: "Ref B2", url: "https://b2!" },
+        ],
+      },
+    ]);
+    // The input is untouched -- the write replaced, it did not mutate.
+    // Neither assertion above can establish that: `toEqual` compares against
+    // the same fixture objects the write would have mutated, and `toBe` on an
+    // untouched row is satisfied by a mutated object too (it is still the
+    // same object). Only a snapshot taken before the interaction catches it.
+    expect(JSON.stringify(items)).toBe(before);
+    // Structural sharing, a separate property: the untouched parent and the
+    // untouched sibling child are the very same objects, not equal copies.
+    expect(next[0]).toBe(alpha);
+    expect(next[1].references[0]).toBe(beta.references[0]);
+  });
+
+  it("adds a child item to row 1 without touching row 0", async () => {
+    const before = JSON.stringify(items);
+    const { user, latest } = renderStatefulParent(items);
+
+    await user.click(screen.getByText("Beta"));
+    await user.click(within(childBlock("References")).getByRole("button", { name: "Add" }));
+
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getAllByRole("textbox")[0], "Ref B3");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    expect(latest()).toEqual([
+      alpha,
+      {
+        id: "p2",
+        name: "Beta",
+        status: "idea",
+        references: [
+          { name: "Ref B3" },
+          { name: "Ref B1", url: "https://b1" },
+          { name: "Ref B2", url: "https://b2" },
+        ],
+      },
+    ]);
+    expect(JSON.stringify(items)).toBe(before); // replaced, never mutated
+    expect(latest()[0]).toBe(alpha);
+    expect(screen.getByText("Ref B3")).toBeInTheDocument();
+  });
+
+  it("removes a child item, routes it through the parent's confirmation, and leaves every other key on the parent item untouched", async () => {
+    const onItems = vi.fn();
+    const confirmations = [];
+    const before = JSON.stringify(items);
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={parentNode}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={items}
+        onItems={onItems}
+        onShowConfirmation={(title, body, confirm) => {
+          confirmations.push(title);
+          confirm();
+        }}
+      />
+    );
+
+    await user.click(screen.getByText("Beta"));
+    await user.click(screen.getByRole("button", { name: "Remove Ref B1" }));
+
+    // The child's delete went through the parent's confirmation prop, not
+    // straight to the data.
+    expect(confirmations).toEqual(["Remove Ref B1?"]);
+    const [[next]] = onItems.mock.calls;
+    expect(next).toEqual([
+      alpha,
+      {
+        id: "p2",
+        name: "Beta",
+        status: "idea",
+        references: [{ name: "Ref B2", url: "https://b2" }],
+      },
+    ]);
+    expect(JSON.stringify(items)).toBe(before); // replaced, never mutated
+    expect(next[0]).toBe(alpha);
+  });
+
+  it("edits the right child while the parent list is sorted, since the parent index comes from the row, not its display position", async () => {
+    const sorted = { ...parentNode, sort: { field: "rank", dir: "desc" } };
+    const ranked = [
+      { ...alpha, rank: 1 },
+      { ...beta, rank: 2 },
+    ];
+    const onItems = vi.fn();
+    const before = JSON.stringify(ranked);
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={sorted}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={ranked}
+        onItems={onItems}
+      />
+    );
+
+    // Beta displays first (rank 2, desc) but is stored at index 1.
+    const rows = screen.getAllByText(/Alpha|Beta/);
+    expect(rows.map((r) => r.textContent)).toEqual(["Beta", "Alpha"]);
+
+    await user.click(screen.getByText("Beta"));
+    await user.click(screen.getByText("Ref B1"));
+    await user.type(screen.getByDisplayValue("https://b1"), "!");
+
+    const [[next]] = onItems.mock.calls;
+    expect(next).toEqual([
+      { ...alpha, rank: 1 },
+      {
+        ...beta,
+        rank: 2,
+        references: [
+          { name: "Ref B1", url: "https://b1!" },
+          { name: "Ref B2", url: "https://b2" },
+        ],
+      },
+    ]);
+    // Matters more here than anywhere: the expected value above is spread
+    // from the same fixtures, so an in-place mutation would appear on both
+    // sides of the comparison and pass.
+    expect(JSON.stringify(ranked)).toBe(before);
+  });
+
+  it("edits the right child while a search filter is active", async () => {
+    const searchable = { ...parentNode, searchable: true };
+    const onItems = vi.fn();
+    const before = JSON.stringify(items);
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={searchable}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={items}
+        onItems={onItems}
+      />
+    );
+
+    // Filter down to Beta only -- it is now the only row on screen, but is
+    // still stored at index 1.
+    await user.type(screen.getAllByRole("searchbox")[0], "beta");
+    expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Beta"));
+    await user.click(screen.getByText("Ref B2"));
+    await user.type(screen.getByDisplayValue("https://b2"), "!");
+
+    const [[next]] = onItems.mock.calls;
+    expect(next).toEqual([
+      alpha,
+      {
+        ...beta,
+        references: [
+          { name: "Ref B1", url: "https://b1" },
+          { name: "Ref B2", url: "https://b2!" },
+        ],
+      },
+    ]);
+    expect(JSON.stringify(items)).toBe(before); // replaced, never mutated
+    expect(next[0]).toBe(alpha);
+  });
+
+  it("logs a child node of an unsupported kind (naming the pack) and still renders the parent row's own fields", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // No `path` either: an unsupported kind carries no guarantee of a
+    // well-formed path, and neither the value read nor the React key may
+    // assume one.
+    const node = { ...parentNode, children: [{ kind: "fields", title: "Meta" }] };
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={node}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={[alpha]}
+        onItems={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByText("Alpha"));
+
+    // The parent row is intact.
+    expect(screen.getByDisplayValue("active")).toBeInTheDocument();
+    // Nothing was rendered for the rejected child -- not even its heading.
+    expect(screen.queryByText("Meta")).not.toBeInTheDocument();
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('unsupported node kind "fields"')
+    );
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("wave4_test"));
+    spy.mockRestore();
+  });
+
+  it("renders an empty child list, without logging, for an item that has no value at the child path", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const gamma = { id: "p3", name: "Gamma", status: "idea" };
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={parentNode}
+        entities={entities}
+        entity={entities.project}
+        packKey="wave4_test"
+        items={[gamma]}
+        onItems={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByText("Gamma"));
+
+    expect(screen.getByText("References")).toBeInTheDocument();
+    expect(screen.getByText(/nothing here yet/i)).toBeInTheDocument();
+    // A fresh parent is not corruption.
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("writes into a parent item that has no key at the child path at all, without disturbing its other keys", async () => {
+    const gamma = { id: "p3", name: "Gamma", status: "idea" };
+    const { user, latest } = renderStatefulParent([gamma]);
+
+    await user.click(screen.getByText("Gamma"));
+    await user.click(within(childBlock("References")).getByRole("button", { name: "Add" }));
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getAllByRole("textbox")[0], "First ref");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    expect(latest()).toEqual([
+      { id: "p3", name: "Gamma", status: "idea", references: [{ name: "First ref" }] },
+    ]);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// facets -- wave 4, Task 3
+//
+// A facet is display-only: it narrows `visible` but must never reach
+// `onItems`. The facet control and a row's own enum control for the SAME
+// field (here, "status") both render on screen once a row is expanded --
+// they'd collide under a name-only selector (`getByRole("button", { name:
+// "active" })` alone is ambiguous once a row's own status control is on
+// screen too). Every facet assertion below scopes into the facet's own
+// `role="group"` wrapper (`aria-label="Filter by status"`) rather than
+// relying on name uniqueness, and the one test that also expands a row
+// selects the facet BEFORE expanding, so no row-level control is on screen
+// yet to collide with.
+// ---------------------------------------------------------------------------
+describe("facets", () => {
+  const facetNode = {
+    kind: "list",
+    path: ["projects"],
+    title_field: "name",
+    detail_fields: ["status", "notes"],
+    searchable: true,
+    facets: ["status"],
+    // Deliberately different from entity.valid_values below -- proves the
+    // facet resolves options with node.enum taking precedence, the same
+    // precedence ScalarField uses (node.enum ?? entity?.valid_values).
+    enum: { status: ["active", "paused", "completed"] },
+  };
+  const entity = { valid_values: { status: ["wrong_one", "wrong_two"] } };
+  const items = [
+    { name: "Alpha", status: "active", notes: "team review" },
+    { name: "Bravo", status: "paused", notes: "team retro" },
+    { name: "Charlie", status: "active", notes: "solo work" },
+  ];
+
+  function facetGroup() {
+    return screen.getByRole("group", { name: "Filter by status" });
+  }
+
+  it("renders one option per enum value plus an All, using node.enum in preference to entity.valid_values", () => {
+    render(
+      <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
+    );
+    const buttons = within(facetGroup()).getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      "All", "active", "paused", "completed",
+    ]);
+    // The entity's (wrong) options must not have leaked in anywhere.
+    expect(screen.queryByText("wrong_one")).not.toBeInTheDocument();
+    expect(screen.queryByText("wrong_two")).not.toBeInTheDocument();
+  });
+
+  it("selecting a facet value narrows the visible rows", async () => {
+    const user = userEvent.setup();
+    render(
+      <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
+    );
+
+    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Charlie")).toBeInTheDocument();
+    expect(screen.queryByText("Bravo")).not.toBeInTheDocument();
+  });
+
+  it("composes with the search box -- both active narrows further than either alone", async () => {
+    const user = userEvent.setup();
+    render(
+      <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
+    );
+
+    // "team" matches Alpha and Bravo's notes, not Charlie's.
+    await user.type(screen.getByRole("searchbox"), "team");
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Bravo")).toBeInTheDocument();
+    expect(screen.queryByText("Charlie")).not.toBeInTheDocument();
+
+    // Facet "active" then drops Bravo (paused) from that search result too.
+    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.queryByText("Bravo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Charlie")).not.toBeInTheDocument();
+  });
+
+  it("clearing the facet (via All) returns every row", async () => {
+    const user = userEvent.setup();
+    render(
+      <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
+    );
+
+    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+    expect(screen.queryByText("Bravo")).not.toBeInTheDocument();
+
+    await user.click(within(facetGroup()).getByRole("button", { name: "All" }));
+
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Bravo")).toBeInTheDocument();
+    expect(screen.getByText("Charlie")).toBeInTheDocument();
+  });
+
+  it("renders nothing extra for a node that declares no facets", () => {
+    const { container } = render(
+      <ListRenderer
+        node={{ ...facetNode, facets: undefined }}
+        entity={entity}
+        items={items}
+        onItems={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole("group", { name: "Filters" })).not.toBeInTheDocument();
+    expect(container.querySelectorAll('[aria-label^="Filter by"]')).toHaveLength(0);
+  });
+
+  it("never calls onItems when a facet value is selected or cleared", async () => {
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(<ListRenderer node={facetNode} entity={entity} items={items} onItems={onItems} />);
+
+    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+    await user.click(within(facetGroup()).getByRole("button", { name: "All" }));
+
+    expect(onItems).not.toHaveBeenCalled();
+  });
+
+  it("edits the correct stored row when a facet is active and the list is sorted, so the row's stored index -- not its display position -- receives the write", async () => {
+    // Stored order is Charlie(0), Alpha(1), Bravo(2). Sorted ascending by
+    // name, the display order is Alpha, Bravo, Charlie. Filtering to
+    // status "active" (Alpha, Charlie) hides Bravo, leaving Alpha displayed
+    // first even though it is stored at index 1, not 0.
+    const sortedNode = { ...facetNode, sort: { field: "name" } };
+    const stored = [
+      { name: "Charlie", status: "active", notes: "team review" },
+      { name: "Alpha", status: "active", notes: "team retro" },
+      { name: "Bravo", status: "paused", notes: "solo work" },
+    ];
+    const before = JSON.stringify(stored);
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ListRenderer node={sortedNode} entity={entity} items={stored} onItems={onItems} />
+    );
+
+    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+    expect(screen.queryByText("Bravo")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Alpha"));
+    await user.type(screen.getByDisplayValue("team retro"), "!");
+
+    const [[next]] = onItems.mock.calls;
+    expect(next[1]).toMatchObject({ name: "Alpha", notes: "team retro!" });
+    expect(next[0]).toMatchObject({ name: "Charlie", notes: "team review" });
+    expect(next[2]).toMatchObject({ name: "Bravo", notes: "solo work" });
+    // The stored fixture itself was replaced, never mutated in place.
+    expect(JSON.stringify(stored)).toBe(before);
+  });
+});
+
+// Every reference child list in the real packs (project_reference,
+// domain_reference, mental_tab_reference) is permanently id-less: none of
+// them appear in any manifest's id_lists, so persona_store._assign_ids never
+// reaches them. knowledge's `domains` list is legitimately id-less too, per
+// its own manifest $comment, until the next save backfills an id. And
+// addItem itself never writes an id for a brand-new row. Before this row was
+// keyed by its stored index, editing a title field on any of these rows
+// remounted the row -- and therefore the input DOM node -- on every single
+// keystroke, because the key (`item.id || `${item[titleField]}-${idx}`)
+// changed along with the value being typed. The user kept typing into a node
+// that was no longer in the document, so only the first keystroke's worth of
+// change ever reached the screen. No existing test above catches this
+// because every child-edit test types into `url`, never into the title
+// field itself.
+describe("row identity for a title edit when the row has no stored id", () => {
+  function renderStatefulGeneric(node, initialItems) {
+    let seen = initialItems;
+    function Harness() {
+      const [state, setState] = useState(initialItems);
+      return (
+        <ListRenderer
+          node={node}
+          items={state}
+          onItems={(next) => {
+            seen = next;
+            setState(next);
+          }}
+        />
+      );
+    }
+    const utils = render(<Harness />);
+    return { ...utils, user: userEvent.setup(), latest: () => seen };
+  }
+
+  it("keeps every keystroke, not just the first, typed into a top-level row's title field", async () => {
+    const node = {
+      kind: "list",
+      path: ["entries"],
+      title_field: "topic",
+      detail_fields: ["topic", "source"],
+    };
+    // No `id` -- the shape addItem itself produces, and the shape every
+    // id-less real-pack row has.
+    const { user } = renderStatefulGeneric(node, [{ topic: "RSC", source: "conversation" }]);
+
+    await user.click(screen.getByText("RSC"));
+    await user.type(screen.getByDisplayValue("RSC"), "sitory");
+
+    expect(screen.getByDisplayValue("RSCsitory")).toBeInTheDocument();
+  });
+
+  it("keeps every keystroke typed into a child reference row's name field, mirroring project_reference/domain_reference/mental_tab_reference -- all permanently id-less", async () => {
+    const childNode = {
+      kind: "list",
+      path: ["references"],
+      entity: "project_reference",
+      title: "References",
+      title_field: "name",
+      detail_fields: ["name", "url", "notes"],
+    };
+    const parentNode = {
+      kind: "list",
+      path: ["projects"],
+      entity: "project",
+      title_field: "name",
+      detail_fields: ["status"],
+      children: [childNode],
+    };
+    const entities = { project: { optional: [] }, project_reference: { optional: [] } };
+    const alpha = {
+      id: "p1",
+      name: "Alpha",
+      status: "active",
+      // No `id` on the reference -- exactly what project_reference rows look
+      // like, since they never appear in any manifest's id_lists.
+      references: [{ name: "Repo", url: "https://example.com/repo" }],
+    };
+
+    let seen = [alpha];
+    function Harness() {
+      const [state, setState] = useState([alpha]);
+      return (
+        <ListRenderer
+          node={parentNode}
+          entities={entities}
+          entity={entities.project}
+          packKey="wave4_test"
+          items={state}
+          onItems={(next) => {
+            seen = next;
+            setState(next);
+          }}
+        />
+      );
+    }
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.click(screen.getByText("Alpha"));
+    await user.click(screen.getByText("Repo"));
+    await user.type(screen.getByDisplayValue("Repo"), "sitory");
+
+    expect(screen.getByDisplayValue("Repository")).toBeInTheDocument();
+    expect(seen[0].references[0].name).toBe("Repository");
+  });
+});
+
+// A genuinely empty list is where a new user starts, and until this was fixed
+// the panel they were looking at offered no way forward: it told them to "tap
+// a suggestion" when only `aesthetics` ships any, and the sole way in was a
+// small outline button up in the header. Reported from production for
+// projects, knowledge, circle and learning_log -- which is every pack that has
+// no suggestions.
+describe("empty state offers a way in", () => {
+  const node = { kind: "list", path: ["items"], title_field: "name", entity: "thing" };
+
+  it("offers an Add action inside the empty panel, naming what it adds", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={{ ...node, title: "Mental tab" }} items={[]} onItems={vi.fn()} />);
+
+    const cta = screen.getByRole("button", { name: "Add Mental tab" });
+    await user.click(cta);
+
+    // Opens the same dialog the header trigger does -- one dialog, not two.
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  });
+
+  it("seeds field_defaults identically whether opened from the panel or the header", async () => {
+    const withDefaults = { ...node, detail_fields: ["stance"], field_defaults: { stance: "like" } };
+    const user = userEvent.setup();
+    render(<ListRenderer node={withDefaults} items={[]} onItems={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Add thing" }));
+    expect(within(screen.getByRole("dialog")).getByDisplayValue("like")).toBeInTheDocument();
+  });
+
+  it("does not mention suggestions when the node has none", () => {
+    render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
+    expect(screen.getByText("Nothing here yet.")).toBeInTheDocument();
+    expect(screen.queryByText(/suggestion/i)).not.toBeInTheDocument();
+  });
+
+  it("does mention them when the node has some", () => {
+    const withSuggestions = { ...node, suggestions: { name: ["Minimalist"] } };
+    render(<ListRenderer node={withSuggestions} items={[]} onItems={vi.fn()} />);
+    expect(screen.getByText(/tap a suggestion below/)).toBeInTheDocument();
+  });
+
+  it("shows the no-matches wording instead when a search hides every row", async () => {
+    const searchable = { ...node, searchable: true };
+    const user = userEvent.setup();
+    render(<ListRenderer node={searchable} items={[{ name: "Alpha" }]} onItems={vi.fn()} />);
+
+    await user.type(screen.getByRole("searchbox"), "zzz");
+
+    expect(screen.getByText(/No matches/)).toBeInTheDocument();
+    // The Add call to action is for an empty list, not a filtered-empty one --
+    // offering it here would suggest adding is the way to see hidden rows.
+    expect(screen.queryByRole("button", { name: /^Add thing$/ })).not.toBeInTheDocument();
   });
 });
