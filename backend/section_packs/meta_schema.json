@@ -137,6 +137,10 @@
         }
       ],
       "properties": {
+        "$comment": {
+          "type": "string",
+          "description": "Authoring note about this node, carried in the manifest because JSON has no comment syntax. Ignored by the loader and by every renderer. Use it for a fact a later author must not rediscover the hard way -- e.g. a legacy storage key the node deliberately does not bind. NOT user-facing: `info` is what the UI shows."
+        },
         "kind": {
           "enum": [
             "list",

@@ -158,6 +158,34 @@ def _normalize(file_type: str, data: dict) -> dict:
             for tab in mental_tabs:
                 if isinstance(tab, dict):
                     tab.setdefault("references", [])
+                    # Legacy mental tabs stored their name under `topic`.
+                    # Nothing has written that key since the rename to
+                    # `title`, but four places in server.py still READ it as a
+                    # fallback -- the add-time dedupe, the update lookup, the
+                    # remove lookup, and mental_tab_reference's parent lookup
+                    # -- and those fallbacks are what hid the problem, exactly
+                    # as get_idea_text hid the bare-string top_of_mind entries
+                    # above. Everything that does NOT fall back sees a tab
+                    # with no name at all: get_context's title, and a generic
+                    # list renderer keyed on `title`, which shows a blank row
+                    # and then -- on the first edit -- writes a `title`
+                    # alongside the orphaned `topic`, leaving one entry with
+                    # two names and no rule about which wins.
+                    #
+                    # Backfilling here repairs every consumer at once, and is
+                    # read-neutral by construction: each of those four sites
+                    # already computes `title or topic`, so after the backfill
+                    # they compute the same value from the first branch.
+                    #
+                    # `topic` is deliberately NOT popped. Where the two keys
+                    # differ (title present, topic present) the entry is
+                    # addressable over MCP by either name today, and dropping
+                    # one would remove an address rather than add one -- so
+                    # this only ever ADDS a key, never removes or overwrites.
+                    # setdefault is not enough: a tab carrying `title: ""` is
+                    # just as nameless as one carrying no title at all.
+                    if not tab.get("title") and tab.get("topic"):
+                        tab["title"] = tab["topic"]
         # Phase 5 (consolidation): proficiency_levels retired; strip it so old
         # backups/imports can't resurrect an invisible orphan key.
         data.pop("proficiency_levels", None)

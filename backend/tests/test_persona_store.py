@@ -104,3 +104,59 @@ def test_coerced_top_of_mind_entries_become_id_addressable(as_user):
     entry = store.load("projects")["top_of_mind"][0]
     assert entry["idea"] == "Ship the CLI"
     assert entry["id"].startswith("top_")
+
+
+def test_load_backfills_a_legacy_mental_tab_title_from_topic(as_user):
+    """`mental_tabs[].topic` is the pre-rename name key: read by four
+    fallbacks in server.py, written by nothing since. Those fallbacks hid it
+    from the two consumers that have none -- get_context's title and a generic
+    list renderer keyed on `title`, both of which see a nameless tab.
+
+    Backfilling is additive: `topic` stays (it is still a live MCP address for
+    the entry) and an existing `title` is never overwritten."""
+    store.save("knowledge", {
+        "domains": [],
+        "mental_tabs": [
+            {"topic": "Old bookmarks", "notes": "kept"},
+            {"title": "Current", "topic": "Superseded", "notes": "both keys"},
+            {"title": "", "topic": "Blank title counts as nameless"},
+        ],
+    })
+    loaded = store.load("knowledge")["mental_tabs"]
+
+    assert loaded[0]["title"] == "Old bookmarks"
+    assert loaded[0]["topic"] == "Old bookmarks"  # not popped
+    assert loaded[0]["notes"] == "kept"
+    # An existing title wins; the divergent legacy key is left exactly as is.
+    assert loaded[1]["title"] == "Current"
+    assert loaded[1]["topic"] == "Superseded"
+    # "" is as nameless as absent -- setdefault would have left this one blank.
+    assert loaded[2]["title"] == "Blank title counts as nameless"
+
+
+def test_mental_tab_title_backfill_is_idempotent(as_user):
+    """load() runs on every read, so a second pass must be a no-op."""
+    store.save("knowledge", {
+        "domains": [],
+        "mental_tabs": [{"topic": "Old bookmarks"}],
+    })
+    once = store.load("knowledge")
+    twice = store._normalize("knowledge", copy.deepcopy(once))
+    assert twice == once
+
+
+def test_backfilled_mental_tab_is_found_by_the_title_lookup(as_user):
+    """The read-neutrality claim, executably: every server.py site that reads
+    `topic` does so as `title or topic`, so after the backfill it resolves the
+    same entry from the first branch. find_in_array on "title" is the lookup
+    those sites use and the one that missed a topic-only tab before."""
+    from server import find_in_array
+
+    store.save("knowledge", {
+        "domains": [],
+        "mental_tabs": [{"topic": "Old bookmarks"}],
+    })
+    tabs = store.load("knowledge")["mental_tabs"]
+    idx, tab = find_in_array(tabs, "Old bookmarks", "title")
+    assert idx == 0
+    assert tab["topic"] == "Old bookmarks"

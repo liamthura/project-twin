@@ -554,6 +554,35 @@ def test_legacy_flat_ui_map_is_still_accepted():
     pack_loader.validate_manifest(manifest)  # must not raise
 
 
+def test_authoring_comment_is_accepted_and_is_not_a_field_name():
+    """`additionalProperties: false` means a manifest cannot carry a note about
+    a node unless the schema names one -- and JSON has no comment syntax, so
+    without `$comment` the only places left for "this node deliberately does
+    NOT bind key X" are a code comment nowhere near the manifest or `info`,
+    which is user-facing dialog copy. `knowledge` needs one: `mental_tabs`
+    binds `title` and must never bind the legacy `topic`, which is invisible
+    from the block itself.
+
+    It must also stay outside both field checks -- prose is not a storage key
+    -- which is why `_fields_named_by` does not read it."""
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {
+                    "kind": "list",
+                    "path": ["goals"],
+                    "entity": "goal",
+                    "$comment": "target_date is not bound here: it renders as a picker.",
+                    "detail_fields": ["notes"],
+                }
+            ]
+        }
+    )
+    pack_loader.validate_manifest(manifest)  # must not raise
+    node = manifest["ui"]["sections"][0]
+    assert _fields_named_by(node) == {"notes"}
+
+
 def test_declared_divergence_is_accepted_by_the_schema():
     """`fields_outside_entity` is the per-node opt-out from the spelling
     check. It has to validate, or a divergent pack's only way to stay green is
