@@ -1,5 +1,5 @@
 import { useState } from "react";
-import GenericSectionEditor from "@/components/GenericSectionEditor";
+import SectionRenderer from "@/renderers/SectionRenderer";
 import packs from "@/__fixtures__/packs.json";
 import goalsData from "@/__fixtures__/data/goals.json";
 
@@ -9,12 +9,12 @@ const goalsPack = packs.find((p) => p.key === "goals");
 // make every control appear frozen when someone tries the story by hand.
 function Stateful({ pack, initial }) {
   const [data, setData] = useState(initial);
-  return <GenericSectionEditor pack={pack} data={data} onChange={setData} />;
+  return <SectionRenderer pack={pack} data={data} onChange={setData} />;
 }
 
 export default {
-  title: "Sections/GenericSectionEditor",
-  component: GenericSectionEditor,
+  title: "Sections/SectionRenderer",
+  component: SectionRenderer,
 };
 
 export const Populated = {

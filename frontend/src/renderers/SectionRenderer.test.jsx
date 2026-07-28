@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import packs from "@/__fixtures__/packs.json";
 import goalsData from "@/__fixtures__/data/goals.json";
@@ -6,6 +6,7 @@ import mediaData from "@/__fixtures__/data/media.json";
 import aestheticsData from "@/__fixtures__/data/aesthetics.json";
 import { renderSection } from "@/test/harness";
 import { SEGMENTED_MAX } from "@/components/controls";
+import { normalizeUi } from "@/renderers/paths";
 
 const goalsPack = packs.find((p) => p.key === "goals");
 const mediaPack = packs.find((p) => p.key === "media");
@@ -14,7 +15,7 @@ const aestheticsPack = packs.find((p) => p.key === "aesthetics");
 // The entity that owns a given ui list: either the one entity whose manifest
 // `list` names it explicitly, or -- when a pack has exactly one entity and no
 // `list` is given at all (goals) -- that sole entity by fallback. Mirrors
-// GenericSectionEditor's own entityByList resolution.
+// normalizeUi's own entity resolution.
 function entityFor(pack, listKey) {
   const names = Object.keys(pack.entities);
   const named = names.find((n) => pack.entities[n].list === listKey);
@@ -34,10 +35,10 @@ function entityFor(pack, listKey) {
 // hand-copied list, so a renderer that stops wiring up a field fails this
 // even if nobody updates the test.
 function describeGuards({ pack, listKey, data }) {
-  const uiSpec = pack.ui[listKey];
+  const node = normalizeUi(pack).sections.find((s) => s.path[0] === listKey);
   const entity = entityFor(pack, listKey);
-  const arrayFields = uiSpec.array_fields || [];
-  const covered = [...new Set([...(uiSpec.badges || []), ...(uiSpec.detail_fields || [])])];
+  const arrayFields = node.array_fields || [];
+  const covered = [...new Set([...(node.badges || []), ...(node.detail_fields || [])])];
   const item = data[listKey][0];
 
   function expectFieldOnScreen(field) {
@@ -85,7 +86,7 @@ function describeGuards({ pack, listKey, data }) {
 
   it(`exposes every detail field of an expanded item (${pack.key})`, async () => {
     const { user } = renderSection({ pack, initial: data });
-    await user.click(screen.getByText(item[uiSpec.title_field]));
+    await user.click(screen.getByText(item[node.title_field]));
     for (const field of covered) expectFieldOnScreen(field);
   });
 
@@ -95,7 +96,7 @@ function describeGuards({ pack, listKey, data }) {
   // to survive an edit untouched too).
   it(`preserves every other field when one is edited (${pack.key})`, async () => {
     const { user, latest, initial } = renderSection({ pack, initial: data });
-    await user.click(screen.getByText(item[uiSpec.title_field]));
+    await user.click(screen.getByText(item[node.title_field]));
 
     const editableField = covered.find(
       (f) => !entity.valid_values?.[f] && !arrayFields.includes(f) && item[f]
@@ -113,7 +114,7 @@ function describeGuards({ pack, listKey, data }) {
   });
 }
 
-describe("GenericSectionEditor", () => {
+describe("SectionRenderer", () => {
   it("renders every item's title", () => {
     renderSection({ pack: goalsPack, initial: goalsData });
     expect(screen.getByText("Ship MyGist v3")).toBeInTheDocument();
@@ -133,5 +134,38 @@ describe("GenericSectionEditor", () => {
 
   describe("aesthetics", () => {
     describeGuards({ pack: aestheticsPack, listKey: "styles", data: aestheticsData });
+  });
+
+  // A node kind other than "list" is unimplemented in this wave. It must not
+  // throw (one bad node shouldn't blank an entire section) and must not fail
+  // silently either -- a silently skipped node is how a migrated section
+  // loses a whole list without anyone noticing. So it logs loudly (naming
+  // both the offending kind and the pack key) while its sibling nodes still
+  // render normally.
+  describe("an unknown node kind", () => {
+    it("logs an error naming the kind and pack key, and still renders sibling list nodes", () => {
+      const pack = {
+        key: "mixed",
+        title: "Mixed",
+        description: "",
+        entities: { goal: { list: "goals" } },
+        ui: {
+          sections: [
+            { kind: "fields", path: ["profile"] },
+            { kind: "list", path: ["goals"], entity: "goal", title_field: "title" },
+          ],
+        },
+      };
+      const data = { profile: { name: "irrelevant" }, goals: [{ title: "Ship it" }] };
+
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderSection({ pack, initial: data });
+
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("fields"));
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("mixed"));
+      expect(screen.getByText("Ship it")).toBeInTheDocument();
+
+      errorSpy.mockRestore();
+    });
   });
 });

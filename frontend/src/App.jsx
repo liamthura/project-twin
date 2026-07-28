@@ -52,7 +52,7 @@ import ProjectsEditor from "@/editors/ProjectsEditor";
 import LifestyleEditor from "@/editors/LifestyleEditor";
 import CircleEditor from "@/editors/CircleEditor";
 import LearningLogEditor from "@/editors/LearningLogEditor";
-import GenericSectionEditor from "@/components/GenericSectionEditor";
+import SectionRenderer from "@/renderers/SectionRenderer";
 
 // Debounce hook
 function useDebounce(callback, delay) {
@@ -680,7 +680,7 @@ export default function App() {
           </TabsContent>
           {dynamicPacks.map((p) => (
             <TabsContent key={p.key} value={p.key}>
-              <GenericSectionEditor
+              <SectionRenderer
                 pack={p}
                 data={packData[p.key]}
                 onChange={handlePackChange(p.key)}
