@@ -211,13 +211,48 @@
           "type": "object",
           "additionalProperties": {
             "type": "string"
-          }
+          },
+          "description": "Values preselected on a new item. The exact value \"@now\" is replaced by an ISO 8601 timestamp at add time; every other value is used literally."
         },
         "children": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/uiSection"
           }
+        },
+        "sort": {
+          "type": "object",
+          "required": ["field"],
+          "additionalProperties": false,
+          "description": "Display order only. Rows are sorted by this storage key; the stored array is never reordered. Two numbers compare numerically; everything else compares as text. Items where the key is missing or an empty string sort last, regardless of direction.",
+          "properties": {
+            "field": { "type": "string" },
+            "dir": { "enum": ["asc", "desc"] }
+          }
+        },
+        "searchable": {
+          "type": "boolean",
+          "description": "Renders a search box filtering rows on the title field, badges, detail fields and array-field entries."
+        },
+        "info": {
+          "type": "object",
+          "required": ["overview", "tips"],
+          "additionalProperties": false,
+          "description": "Content for the section's info dialog.",
+          "properties": {
+            "overview": { "type": "string", "minLength": 1 },
+            "tips": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "display_fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Storage keys shown read-only as badges on the collapsed row. Unlike `badges`, these are never rendered as editable controls -- use for machine-written values such as a created-at stamp."
+        },
+        "display_formats": {
+          "type": "object",
+          "additionalProperties": { "enum": ["date", "datetime"] },
+          "description": "Optional per-field formatting for `display_fields`. Values are parsed as dates and rendered in local time; an unparseable value is shown verbatim."
         }
       }
     },
@@ -283,7 +318,8 @@
           "type": "object",
           "additionalProperties": {
             "type": "string"
-          }
+          },
+          "description": "Values preselected on a new item. The exact value \"@now\" is replaced by an ISO 8601 timestamp at add time; every other value is used literally."
         }
       }
     }

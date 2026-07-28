@@ -103,6 +103,7 @@ in would place the MCP contract that AI clients depend on inside a frontend refa
 | Field binding | **`ui` declares storage keys** | `entities` stays the MCP vocabulary. See the constraint above. |
 | Test net | **Vitest + Testing Library + Storybook** | Stories run as tests via `@storybook/addon-vitest`, so a story cannot drift from what is verified. |
 | Vite upgrade | **Vite 5 → 7 first, separate PR** | Required by Vitest 4. Kept apart so a build-tool failure never gets tangled with a rendering failure. |
+| New UI primitives | **Adapt a shadcn-registry component before hand-rolling** | Don't reinvent the wheel: components land as editable source on the same Radix base, so tweaking beats maintaining bespoke. Non-shadcn libraries are out regardless of looks, and anything adopted is converted to the existing design tokens. See "Sourcing UI primitives". |
 
 ## Architecture
 
@@ -318,6 +319,139 @@ Also noted in passing: `key={node.path.join(".")}` (`SectionRenderer.jsx`) colli
 two nodes that happen to share a path — nothing in today's three packs does, but nothing
 stops a future manifest from declaring two sibling nodes over the same list either.
 
+### Known gaps after wave 3
+
+Wave 3 migrated `learning_log` and `circle` and added six capabilities to `ListRenderer`
+(`@now` field defaults, display `sort`, `searchable`, `info`, read-only `display_fields`, and
+an `expanded` remap across add and remove). Data safety was verified against `server.py`
+directly: no phantom fields, no unreachable editable key, every unmodelled key round-trips.
+Four items are carried forward rather than fixed.
+
+**The backend ui-field guard is anti-correlated with the risk it appears to cover.**
+`backend/tests/test_ui_schema.py::test_ui_fields_are_covered_by_the_entity` asserts a `ui`
+block's fields are a subset of `entity.required + entity.optional`. That is the wrong
+direction on both sides. It *accepts* MCP-only input aliases — `contact` is in
+`connection.optional`, so a `ui` block declaring the exact trap this spec warns about would
+pass green — and it *rejects* legitimate storage keys absent from the entity vocabulary, which
+is why `display_fields` had to be left out of the check for `timestamp` to be declarable at
+all. The only thing actually guarding the phantom case is one frontend test per pack. Before
+wave 4 migrates `projects`, `knowledge` and `profile` — the sections where manifest names and
+storage keys deliberately diverge — this guard must be reworked against a real source of truth
+for storage keys, not merely have the divergent packs omitted from its list to keep it green.
+
+**`display_fields` is unguarded.** No test asserts that a key declared there is real. The
+`learning_log` case is covered incidentally, because its section test derives the expected
+badge text from the fixture's own `timestamp`. A cheap general guard does not exist for the
+same reason as above: there is no authority on storage keys short of the deferred backend
+reconciliation.
+
+**`ListRenderer` has breached the file-size budget.** This spec promised no file above ~200
+lines; `ListRenderer.jsx` is now past 400 — one component, five `useState` hooks and a
+four-stage derived pipeline (`order` → `visible` → badge strip → `editFields`), before wave 4
+adds `children` recursion. It has **not** become what it replaced: there is no `pack.key`
+branch anywhere and every capability is manifest-driven and optional-guarded. But the
+order/filter pipeline and the badge strip should be extracted alongside the `renderNode`
+dispatch refactor above, in the same wave-4 prerequisite commit.
+
+**Test-selector fragility.** Row delete buttons are icon-only with no accessible name, and
+existing tests select them with `getAllByRole("button").filter(b => b.textContent === "")`.
+The info button added in wave 3 is also icon-only and renders *before* the rows, so the first
+wave-4 test that needs a delete button on a node declaring `info` will click Info instead —
+failing confusingly, or passing for the wrong reason. Giving the delete button an
+`aria-label` fixes it without breaking the `textContent` filter.
+
+Convergence losses in wave 3 that were not on the original drop list, recorded so the pattern
+is visible rather than rediscovered: field placeholders (`"e.g. React Server Components"`),
+the `"Untitled entry"` / `"Untitled connection"` fallbacks, and `circle`'s fifth info tip. The
+date badge *was* restored, as `display_fields`.
+
+## Sourcing UI primitives
+
+Convergence means every migrated section funnels through one small set of controls, so the
+few primitives the renderer kit still needs are worth getting right rather than hand-rolling.
+
+**Default to adapting a ready-made component over writing one from scratch.** A component
+pulled from a shadcn-compatible registry and then tweaked is cheaper to build and cheaper to
+maintain than a bespoke one: it arrives with the accessibility behaviour, keyboard handling
+and dark-mode tokens already worked out, and the next person can diff it against its source.
+Hand-rolling is the fallback for when nothing off the shelf fits the repo's stack.
+
+That said, this is **optional** and conditional — take a registry component only where it
+produces a better result *and* lands faster. It is never a reason to add a dependency this
+project would not otherwise carry; the point of the consolidation is deleting code.
+
+### shadcn CLI
+
+`frontend/src/components/ui/*.jsx` are shadcn components that were added by hand — there is
+no `components.json`, so `npx shadcn@latest add …` does not work in this repo today. A wave
+that needs a new primitive should run `npx shadcn@latest init` first, configured to match
+what already exists:
+
+- `"tsx": false` — this frontend is JavaScript, and the CLI emits `.tsx` by default
+- Tailwind **3** config at `frontend/tailwind.config.js`, CSS variables enabled (the existing
+  components use them)
+- `@/*` → `./src/*`, matching `frontend/jsconfig.json`
+
+`init` overwrites `lib/utils` and can rewrite `tailwind.config.js` and the global stylesheet.
+Run it, diff it, and keep only the `components.json` it generates plus whatever the new
+component genuinely needs. Anything it changes underneath the existing primitives is a
+regression, not an upgrade.
+
+### Third-party registries
+
+**Only registries that extend shadcn qualify.** A shadcn-registry-protocol component installs
+through the same CLI — `npx shadcn@latest add "<registry-url>/<component>.json"` — lands as
+source in `frontend/src/components/ui/`, is built on the same Radix primitives, and already
+speaks the same semantic tokens as everything else in this codebase. It becomes ours on
+arrival, so tweaking it is normal work rather than fighting a library.
+
+A library that merely *looks* good but is built on some other foundation is out of scope, no
+matter how good it looks. Adopting it would mean maintaining two styling systems, which costs
+more than the hand-rolled control it was meant to save.
+
+Three filters, all of which must pass:
+
+1. **shadcn registry protocol.** Installs via `npx shadcn@latest add <url>`, emits editable
+   source, built on Radix. A library with its own CLI and its own runtime does not qualify.
+2. **Tailwind 3.** Most current registries target Tailwind 4, which is a standing non-goal
+   here. A v4-only component is markup to adapt by hand — its `@theme` blocks and v4-only
+   utilities have to be rewritten, not pasted.
+3. **No new runtime dependency.** A component that drags in an animation or styling runtime
+   the section editors do not otherwise need is not worth it. Take the layout, drop the
+   dependency.
+
+Fail any of the three and the answer is the simpler hand-written control, revisited after the
+deferred Tailwind 4 upgrade.
+
+### The design language is non-negotiable
+
+Whatever the source, the result has to look like the rest of MyGist. A component that arrives
+carrying its own palette, radii or focus treatment is not finished until it has been converted
+to the tokens below — and converting it is part of the cost when judging whether it was
+worth taking.
+
+- **Semantic colour tokens only** — `background`, `foreground`, `muted`, `muted-foreground`,
+  `card`, `border`, `input`, `primary`, `destructive`, plus this project's own `success` and
+  `warning`. All defined in `frontend/tailwind.config.js` against CSS variables in
+  `frontend/src/globals.css`. No raw hex, and no arbitrary Tailwind palette colours except the
+  deliberate per-value chips already in `VALUE_META` (`frontend/src/components/controls.jsx`).
+- **Dark mode is a `class` strategy** — every colour must resolve in both themes. A semantic
+  token does this for free; a literal one needs an explicit `dark:` counterpart.
+- **Radius comes from `--radius`** (`0.5rem`) via `rounded-lg` / `rounded-md` / `rounded-sm`.
+  Full-round is reserved for chips and suggestion pills.
+- **Type is Geist / Geist Mono.** Labels are `text-xs capitalize`, secondary copy is
+  `text-sm text-muted-foreground`.
+- **Focus rings come from `FOCUS_RING`** (`frontend/src/components/controls.jsx:82`). Any
+  interactive element that is not already a shadcn primitive spreads that constant rather
+  than writing its own ring.
+- **Icons are `lucide-react`**, sized in the `h-3.5`/`h-4` range and `aria-hidden` when
+  decorative.
+- **`tailwindcss-animate` is the only animation dependency.** No second one gets added for a
+  section editor.
+
+The point is not to reinvent the wheel — but a wheel that does not match the rest of the car
+is its own kind of rework.
+
 ## Testing
 
 Wave 1 establishes the harness:
@@ -341,7 +475,7 @@ Each wave is a PR. `main` stays deployable throughout.
 | 0 | Vite 5 → 7; pin Node 20.19 in `Dockerfile` and CI | — |
 | 1 | Vitest + Testing Library + Storybook + addon-vitest; fixtures | — |
 | 2 | Renderer kit at current capability; `ui.sections` schema and normalisation; `meta_schema` validation; move `goals`/`media`/`aesthetics` to the explicit form | `GenericSectionEditor` (282) |
-| 3 | `learning_log`, `circle` | 802 |
+| 3 | `learning_log`, `circle`; plus `@now` defaults, display `sort`, `searchable`, `info`, `display_fields` | 802 ✅ |
 | 4 | Child-list support; `projects`, `knowledge` | 2,159 |
 | 5 | `strings` and `fields` nodes; backend `preferences` normalisation; `lifestyle`, `preferences` | 1,643 |
 | 6 | `profile` — singleton plus two lists plus two levels of child list | 1,446 |

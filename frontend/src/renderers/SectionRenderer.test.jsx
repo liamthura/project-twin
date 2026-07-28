@@ -4,6 +4,8 @@ import packs from "@/__fixtures__/packs.json";
 import goalsData from "@/__fixtures__/data/goals.json";
 import mediaData from "@/__fixtures__/data/media.json";
 import aestheticsData from "@/__fixtures__/data/aesthetics.json";
+import learningLogData from "@/__fixtures__/data/learning_log.json";
+import circleData from "@/__fixtures__/data/circle.json";
 import { renderSection } from "@/test/harness";
 import { SEGMENTED_MAX } from "@/components/controls";
 import { normalizeUi } from "@/renderers/paths";
@@ -11,6 +13,8 @@ import { normalizeUi } from "@/renderers/paths";
 const goalsPack = packs.find((p) => p.key === "goals");
 const mediaPack = packs.find((p) => p.key === "media");
 const aestheticsPack = packs.find((p) => p.key === "aesthetics");
+const learningLogPack = packs.find((p) => p.key === "learning_log");
+const circlePack = packs.find((p) => p.key === "circle");
 
 // The coverage guard and the round-trip guard, factored so every pack with a
 // generic item list gets both without copying the test bodies. A ui block
@@ -145,6 +149,118 @@ describe("SectionRenderer", () => {
 
   describe("aesthetics", () => {
     describeGuards({ pack: aestheticsPack, listKey: "styles", data: aestheticsData });
+  });
+
+  describe("learning_log", () => {
+    describeGuards({ pack: learningLogPack, listKey: "entries", data: learningLogData });
+
+    it("renders newest first even though the stored array is oldest first", () => {
+      renderSection({ pack: learningLogPack, initial: learningLogData });
+      const rows = screen.getAllByText(/React Server Components|Postgres full-text search/);
+      expect(rows.map((r) => r.textContent)).toEqual([
+        "Postgres full-text search",
+        "React Server Components",
+      ]);
+    });
+
+    // `expanded` is keyed per row (ListRenderer.jsx), so expanding one entry
+    // does not reveal another's fields. The brief's version of this test
+    // clicked "React Server Components" (entry 1) but then looked for
+    // entry 2's source value ("article") -- an element that is never on
+    // screen because entry 2 was never expanded, so it fails to locate the
+    // input regardless of whether preservation actually works.
+    //
+    // The name promises entry 1's own unmodelled fields survive an edit to
+    // entry 1, so the edit has to land on entry 1: expand it and type into
+    // its own source value ("conversation", unique on screen -- entry 2's is
+    // "article"). Editing a sibling instead (as an earlier version of this
+    // test did) only proves cross-item isolation, which is a real property
+    // but not the one this test's name claims, and it would stay green even
+    // if the renderer dropped conversation_metadata from the entry actually
+    // being edited.
+    it("preserves its own id, timestamp, related_entries and conversation_metadata when a different field is edited", async () => {
+      const { user, latest, initial } = renderSection({
+        pack: learningLogPack, initial: learningLogData,
+      });
+      await user.click(screen.getByText("React Server Components"));
+      await user.type(screen.getByDisplayValue("conversation"), "s");
+
+      const after = latest();
+      const entry = after.entries.find((e) => e.id === "learn_20260115_a1b2c3");
+      const before = initial.entries.find((e) => e.id === "learn_20260115_a1b2c3");
+      expect(entry.source).toBe("conversations");
+      expect(entry.timestamp).toBe(before.timestamp);
+      expect(entry.related_entries).toEqual(before.related_entries);
+      expect(entry.conversation_metadata).toEqual(before.conversation_metadata);
+    });
+
+    it("shows each entry's timestamp, the field it is sorted by", () => {
+      renderSection({ pack: learningLogPack, initial: learningLogData });
+      for (const entry of learningLogData.entries) {
+        const d = new Date(entry.timestamp);
+        const p = (n) => String(n).padStart(2, "0");
+        const shown =
+          `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+          `${p(d.getHours())}:${p(d.getMinutes())}`;
+        expect(screen.getByText(shown)).toBeInTheDocument();
+      }
+    });
+
+    it("lets the title field be corrected in place, without a delete and re-add", async () => {
+      const { user, latest, initial } = renderSection({
+        pack: learningLogPack, initial: learningLogData,
+      });
+      await user.click(screen.getByText("React Server Components"));
+      const input = screen.getByDisplayValue("React Server Components");
+      await user.type(input, "!");
+
+      const after = latest();
+      const expected = structuredClone(initial);
+      expected.entries[0].topic = "React Server Components!";
+      expect(after).toEqual(expected);
+      // The id must survive -- it is what related links point at.
+      expect(after.entries[0].id).toBe(initial.entries[0].id);
+    });
+  });
+
+  describe("circle", () => {
+    describeGuards({ pack: circlePack, listKey: "connections", data: circleData });
+
+    it("offers the info dialog carried by the manifest", async () => {
+      const { user } = renderSection({ pack: circlePack, initial: circleData });
+      await user.click(screen.getByRole("button", { name: /about this section/i }));
+      expect(screen.getByText(/Track the important people/)).toBeInTheDocument();
+      expect(screen.getByText(/The person's full name/)).toBeInTheDocument();
+    });
+
+    // The brief's version of this test rendered the section unexpanded and
+    // checked for the text "contact" -- but detail_fields (where a mistaken
+    // "contact" entry would land) only render once an item is expanded, so
+    // that version would pass identically whether or not the manifest
+    // declared `contact` as a detail field. It cannot tell correct from
+    // broken. Expanding the item first makes it a real guard: with `contact`
+    // wrongly included, a "Contact" label (rendered via
+    // `f.replace(/_/g, " ")` + CSS `capitalize`, so its DOM text is lowercase
+    // "contact") would appear here and fail this assertion.
+    it("does not expose `contact`, which is an MCP alias for name and not a stored key", async () => {
+      const { user } = renderSection({ pack: circlePack, initial: circleData });
+      await user.click(screen.getByText(circleData.connections[0].name));
+      expect(screen.queryByText(/^contact$/i)).not.toBeInTheDocument();
+    });
+
+    it("lets the title field be corrected in place, without a delete and re-add", async () => {
+      const { user, latest, initial } = renderSection({ pack: circlePack, initial: circleData });
+      await user.click(screen.getByText("Ada Lovelace"));
+      const input = screen.getByDisplayValue("Ada Lovelace");
+      await user.type(input, "!");
+
+      const after = latest();
+      const expected = structuredClone(initial);
+      expected.connections[0].name = "Ada Lovelace!";
+      expect(after).toEqual(expected);
+      // The id must survive -- it is what related links point at.
+      expect(after.connections[0].id).toBe(initial.connections[0].id);
+    });
   });
 
   // node.title is accepted by the schema but wasn't rendered anywhere.

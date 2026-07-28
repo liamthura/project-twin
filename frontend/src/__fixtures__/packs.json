@@ -877,7 +877,40 @@
         "identifier": "name"
       }
     },
-    "ui": {}
+    "ui": {
+      "sections": [
+        {
+          "kind": "list",
+          "path": [
+            "connections"
+          ],
+          "entity": "connection",
+          "title_field": "name",
+          "detail_fields": [
+            "name",
+            "relationship",
+            "traits",
+            "notes"
+          ],
+          "array_fields": [
+            "traits"
+          ],
+          "long_text": [
+            "notes"
+          ],
+          "searchable": true,
+          "info": {
+            "overview": "Track the important people in your life and your relationships with them. This helps AI understand your social context and tailor suggestions accordingly.",
+            "tips": [
+              "Name: The person's full name or preferred name.",
+              "Relationship: How you know them - e.g., 'Friend from university', 'Colleague at Google', 'Mentor', 'Family member'.",
+              "Traits: Key characteristics or tags that describe them - personality, interests, expertise, etc.",
+              "Notes: Context about your relationship, shared experiences, important details to remember."
+            ]
+          }
+        }
+      ]
+    }
   },
   {
     "key": "learning_log",
@@ -909,6 +942,51 @@
         "identifier": "topic"
       }
     },
-    "ui": {}
+    "ui": {
+      "sections": [
+        {
+          "kind": "list",
+          "path": [
+            "entries"
+          ],
+          "entity": "learning_entry",
+          "title_field": "topic",
+          "badges": [
+            "source"
+          ],
+          "detail_fields": [
+            "topic",
+            "details",
+            "source",
+            "tags",
+            "key_decisions",
+            "followup_items"
+          ],
+          "array_fields": [
+            "tags",
+            "key_decisions",
+            "followup_items"
+          ],
+          "long_text": [
+            "details"
+          ],
+          "field_defaults": {
+            "source": "manual",
+            "timestamp": "@now"
+          },
+          "sort": {
+            "field": "timestamp",
+            "dir": "desc"
+          },
+          "searchable": true,
+          "display_fields": [
+            "timestamp"
+          ],
+          "display_formats": {
+            "timestamp": "datetime"
+          }
+        }
+      ]
+    }
   }
 ]

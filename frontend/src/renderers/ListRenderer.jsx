@@ -11,26 +11,51 @@
 //     entity's, for sections whose manifest field names are not their
 //     storage keys (unused by today's packs, needed by waves 3-6)
 import { useState } from "react";
-import { Plus, Trash2, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { InfoDialog } from "@/components/ui/info-dialog";
 import { VALUE_META, FOCUS_RING, ValueIcon } from "@/components/controls";
 import { ScalarField, LONG_TEXT_FIELDS } from "./ScalarField";
+
+// Read-only display of a machine-written key (a created-at stamp, an id).
+// Local time and locale-free: the stored value is UTC, showing it raw would
+// be wrong by the offset, and a locale-formatted string would make the same
+// log read differently on two machines. An unparseable value is shown
+// verbatim rather than dropped -- nothing validates these on write, and
+// hiding a value the user can see in their own JSON is worse than an odd
+// looking badge.
+function formatDisplay(value, format) {
+  const raw = String(value);
+  if (!format) return raw;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return raw;
+  const p = (n) => String(n).padStart(2, "0");
+  const date = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  return format === "date" ? date : `${date} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 export default function ListRenderer({ node, entity, items, onItems, onShowConfirmation }) {
   const [expanded, setExpanded] = useState({});
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState({});
+  const [query, setQuery] = useState("");
+  const [infoOpen, setInfoOpen] = useState(false);
   const titleField = node.title_field;
   const badges = node.badges || [];
   const detailFields = node.detail_fields || [];
   const arrayFields = node.array_fields || [];
   const suggestions = node.suggestions?.[titleField] || [];
   const existingTitles = new Set(items.map((i) => (i[titleField] || "").toLowerCase()));
+  // Same case-insensitive comparison addItem itself uses to reject a
+  // collision -- computed here too so the dialog can surface it instead of
+  // letting addItem silently no-op and close on a title the user already has.
+  const titleCollides =
+    !!draft[titleField] && existingTitles.has(draft[titleField].toLowerCase());
   const editFields = [...new Set([...badges, ...detailFields])];
   const fieldDefaults = node.field_defaults ?? entity?.field_defaults ?? {};
   // A node-declared long_text (schema: array of storage keys) takes
@@ -51,10 +76,40 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
   };
 
   const addItem = (base) => {
+    // `base` (the dialog draft) already carries the raw field_defaults
+    // forward for any field with no control of its own (e.g. a token like
+    // "@now" that was never rendered), so resolving `fieldDefaults` alone
+    // and spreading `base` on top would let that stale raw token win.
+    // Resolve after merging instead -- but only for keys the manifest
+    // actually declared as the token AND whose value in the merged item is
+    // still that untouched token. A user who types the literal string
+    // "@now" into a real control (e.g. the title field) is entering data,
+    // not invoking the token, and must not have it silently overwritten.
     const item = { ...fieldDefaults, ...base };
+    for (const [k, v] of Object.entries(fieldDefaults)) {
+      if (v === "@now" && item[k] === "@now") item[k] = new Date().toISOString();
+    }
     if (!item[titleField]) return;
     if (existingTitles.has(item[titleField].toLowerCase())) return;
     onItems([item, ...items]);
+    // The new item is prepended, so every previously-stored index shifts up
+    // by one. `expanded` is keyed by array index -- left unshifted, a key
+    // like {0: true} would now point at the brand-new row instead of the one
+    // the user had open, silently collapsing it. Mirrors the shift removeItem
+    // already does (down, there; up, here). Deliberately not also seeding an
+    // entry for the new row's own index -- the Add dialog already collected
+    // its fields, so auto-expanding it would just be noise.
+    setExpanded((prev) => {
+      const next = {};
+      for (const [k, v] of Object.entries(prev)) next[Number(k) + 1] = v;
+      return next;
+    });
+    // A stale query re-filters the newly-added row out of `visible`, so the
+    // only sign anything happened is the header count ticking up -- clear it
+    // on the path that actually writes, so Add lands the user back on the
+    // unfiltered list with the new row on top, rather than looking like it
+    // silently failed.
+    setQuery("");
   };
 
   const updateItem = (idx, changes) => {
@@ -68,21 +123,98 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
   };
 
   const removeItem = (idx) => {
-    const doRemove = () => onItems(items.filter((_, i) => i !== idx));
+    const doRemove = () => {
+      onItems(items.filter((_, i) => i !== idx));
+      // `expanded` is keyed by array index, so every index above the removed
+      // one now addresses a different item. Shift them down to follow their
+      // rows, rather than leaving a stale key pointing at nothing and the
+      // shifted-up row falling back to collapsed.
+      setExpanded((prev) => {
+        const next = {};
+        for (const [k, v] of Object.entries(prev)) {
+          const i = Number(k);
+          if (i < idx) next[i] = v;
+          else if (i > idx) next[i - 1] = v;
+        }
+        return next;
+      });
+    };
     if (onShowConfirmation) {
       onShowConfirmation(
-        `Remove ${items[idx][titleField]}?`,
+        `Remove ${items[idx][titleField] || "Untitled entry"}?`,
         "This can't be undone.",
         doRemove
       );
     } else doRemove();
   };
 
+  // Display order only. The indexes are sorted, never the array, because
+  // updateItem/removeItem address the real stored position -- sorting a copy and
+  // handing them display positions would edit the wrong row.
+  const order = items.map((_, i) => i);
+  if (node.sort?.field) {
+    const { field, dir = "asc" } = node.sort;
+    const sign = dir === "desc" ? -1 : 1;
+    // An empty string looks blank to the user exactly like a missing key
+    // does, so both must be treated as absent -- otherwise "" (not == null)
+    // falls through to the localeCompare branch, where it sorts before any
+    // non-empty string on an ascending list instead of trailing like a
+    // missing key does.
+    const missing = (v) => v == null || v === "";
+    order.sort((a, b) => {
+      const av = items[a]?.[field];
+      const bv = items[b]?.[field];
+      // A missing (or blank) key sorts last in both directions: an undated
+      // row is not "oldest", it is unknown, and dropping it off the top of a
+      // desc list would hide it.
+      if (missing(av) && missing(bv)) return 0;
+      if (missing(av)) return 1;
+      if (missing(bv)) return -1;
+      // Two real numbers compare numerically (so 2 sorts before 10); every
+      // other case -- including numeric strings like "10" -- compares as
+      // text, since JSON gives no signal that a string was meant as a number.
+      if (typeof av === "number" && typeof bv === "number") return sign * (av - bv);
+      return sign * String(av).localeCompare(String(bv));
+    });
+  }
+
+  // Display filter only, applied after sorting -- like `order`, this holds
+  // stored indexes, never display positions, so updateItem/removeItem still
+  // address the real row while a filter is active.
+  // The union of what both deleted editors searched: title, badges, detail
+  // fields, and every entry of an array field.
+  const searchFields = [...new Set([titleField, ...badges, ...detailFields, ...arrayFields])];
+  const q = query.trim().toLowerCase();
+  const visible = !q
+    ? order
+    : order.filter((i) => {
+        const item = items[i];
+        return searchFields.some((f) => {
+          const v = item?.[f];
+          if (Array.isArray(v)) return v.some((e) => String(e).toLowerCase().includes(q));
+          return v != null && String(v).toLowerCase().includes(q);
+        });
+      });
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          {items.length} {items.length === 1 ? "entry" : "entries"}
+        <div className="flex items-center gap-1">
+          {node.info && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              aria-label="About this section"
+              onClick={() => setInfoOpen(true)}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+          )}
+          <div className="text-sm text-muted-foreground">
+            {q ? `${visible.length} of ${items.length}` : items.length}{" "}
+            {items.length === 1 ? "entry" : "entries"}
+          </div>
         </div>
         <Dialog
           open={addOpen}
@@ -109,7 +241,7 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                   value={draft[titleField] || ""}
                   onChange={(e) => setDraft({ ...draft, [titleField]: e.target.value })}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && draft[titleField]) {
+                    if (e.key === "Enter" && draft[titleField] && !titleCollides) {
                       addItem(draft);
                       setAddOpen(false);
                       setDraft({});
@@ -117,6 +249,11 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                   }}
                   autoFocus
                 />
+                {titleCollides && (
+                  <p className="text-xs text-destructive">
+                    "{draft[titleField]}" already exists.
+                  </p>
+                )}
                 {suggestions.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {suggestions
@@ -135,7 +272,7 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                   </div>
                 )}
               </div>
-              {editFields.map((f) => (
+              {editFields.filter((f) => f !== titleField).map((f) => (
                 <div key={f} className="space-y-1.5">
                   <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
                   <ScalarField
@@ -155,11 +292,28 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
             </div>
             <DialogFooter>
               <Button onClick={() => { addItem(draft); setAddOpen(false); setDraft({}); }}
-                disabled={!draft[titleField]}>Add</Button>
+                disabled={!draft[titleField] || titleCollides}>Add</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Keep the box mounted whenever a query is active, even if it filtered
+          every row out of existence -- otherwise deleting the last match(es)
+          unmounts the only control that can clear `query`, stranding the user
+          on an empty state that tells them to "clear the search" with nothing
+          left to clear it with. Still absent when there's genuinely nothing
+          to search (no items, no active query). */}
+      {node.searchable && (items.length > 0 || q) && (
+        <Input
+          type="search"
+          aria-label="Search"
+          placeholder="Search…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="h-9"
+        />
+      )}
 
       {suggestions.length > 0 && (
         <div className="space-y-1.5">
@@ -180,11 +334,17 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
         </div>
       )}
 
-      {items.length === 0 ? (
-        <EmptyState>Nothing here yet. Use Add, or tap a suggestion.</EmptyState>
+      {visible.length === 0 ? (
+        <EmptyState>
+          {q
+            ? "No matches. Clear the search to see everything."
+            : "Nothing here yet. Use Add, or tap a suggestion."}
+        </EmptyState>
       ) : (
         <div className="rounded-md border">
-          {items.map((item, idx) => (
+          {visible.map((idx) => {
+            const item = items[idx];
+            return (
             <div key={item.id || `${item[titleField]}-${idx}`}
               className="border-b border-border last:border-b-0">
               <div className="flex cursor-pointer items-center gap-2 px-3 py-2.5 hover:bg-muted/40"
@@ -192,6 +352,13 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                 <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expanded[idx] ? "" : "-rotate-90"}`} />
                 <span className="truncate text-sm font-medium">{item[titleField]}</span>
                 <span className="flex flex-1 items-center gap-1.5">
+                  {(node.display_fields || [])
+                    .filter((f) => item[f] != null && item[f] !== "")
+                    .map((f) => (
+                      <Badge key={f} variant="secondary" className="gap-1 text-[10px] font-mono">
+                        {formatDisplay(item[f], node.display_formats?.[f])}
+                      </Badge>
+                    ))}
                   {badges.filter((b) => item[b]).map((b) => {
                     const value = String(item[b]);
                     const chip = VALUE_META[value]?.chip;
@@ -234,8 +401,31 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
+      )}
+
+      {node.info && (
+        <InfoDialog
+          open={infoOpen}
+          onOpenChange={setInfoOpen}
+          title={node.title ?? "About this section"}
+          description={node.info.overview}
+        >
+          <p className="font-medium text-foreground">Tips for filling this section:</p>
+          <ul className="space-y-2 text-muted-foreground">
+            {(node.info.tips || []).map((tip, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-primary">•</span>
+                <span>{tip}</span>
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button onClick={() => setInfoOpen(false)}>Got it</Button>
+          </DialogFooter>
+        </InfoDialog>
       )}
     </div>
   );
