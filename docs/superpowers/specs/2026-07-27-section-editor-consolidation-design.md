@@ -103,6 +103,7 @@ in would place the MCP contract that AI clients depend on inside a frontend refa
 | Field binding | **`ui` declares storage keys** | `entities` stays the MCP vocabulary. See the constraint above. |
 | Test net | **Vitest + Testing Library + Storybook** | Stories run as tests via `@storybook/addon-vitest`, so a story cannot drift from what is verified. |
 | Vite upgrade | **Vite 5 → 7 first, separate PR** | Required by Vitest 4. Kept apart so a build-tool failure never gets tangled with a rendering failure. |
+| New UI primitives | **shadcn CLI; Watermelon UI as a design reference** | Both optional, taken only where they beat hand-rolling on quality *and* speed. See "Sourcing UI primitives". |
 
 ## Architecture
 
@@ -317,6 +318,51 @@ wave 4 starts, not be improvised inside it under that wave's own deadline pressu
 Also noted in passing: `key={node.path.join(".")}` (`SectionRenderer.jsx`) collides for any
 two nodes that happen to share a path — nothing in today's three packs does, but nothing
 stops a future manifest from declaring two sibling nodes over the same list either.
+
+## Sourcing UI primitives
+
+Convergence means every migrated section funnels through one small set of controls, so the
+few primitives the renderer kit still needs are worth getting right rather than hand-rolling.
+Two shortcuts are sanctioned, both **optional** — reach for them only where they produce a
+better result *and* land faster than writing the control by hand. Neither is a reason to add
+a dependency this project would not otherwise carry; the point of the consolidation is
+deleting code.
+
+### shadcn CLI
+
+`frontend/src/components/ui/*.jsx` are shadcn components that were added by hand — there is
+no `components.json`, so `npx shadcn@latest add …` does not work in this repo today. A wave
+that needs a new primitive should run `npx shadcn@latest init` first, configured to match
+what already exists:
+
+- `"tsx": false` — this frontend is JavaScript, and the CLI emits `.tsx` by default
+- Tailwind **3** config at `frontend/tailwind.config.js`, CSS variables enabled (the existing
+  components use them)
+- `@/*` → `./src/*`, matching `frontend/jsconfig.json`
+
+`init` overwrites `lib/utils` and can rewrite `tailwind.config.js` and the global stylesheet.
+Run it, diff it, and keep only the `components.json` it generates plus whatever the new
+component genuinely needs. Anything it changes underneath the existing primitives is a
+regression, not an upgrade.
+
+### Watermelon UI as a design reference
+
+[Watermelon UI](https://ui.watermelon.sh/installation) is a shadcn-registry-compatible set of
+React components and blocks, installable as
+`npx shadcn@latest add "https://registry.watermelon.sh/<component>.json"`. Its layouts are
+worth borrowing from when a renderer node needs a shape the current primitives do not
+cover — the list rows, empty states and detail panels in particular.
+
+It is **not** a drop-in here. It targets **Tailwind 4**, which this spec lists as a non-goal,
+and ships TypeScript with Framer Motion. So:
+
+- Treat it as a source of markup and layout to adapt, not a dependency to install.
+- Port to JSX and Tailwind 3 utility classes; anything relying on Tailwind 4's `@theme` or
+  its v4-only utilities has to be rewritten, not pasted.
+- Do not pull Framer Motion into the bundle for an animation the section editors do not need.
+
+If a component can only be had by adopting Tailwind 4 or Framer Motion, that is a signal to
+write the simpler control by hand and revisit after the deferred Tailwind 4 upgrade.
 
 ## Testing
 
