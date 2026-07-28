@@ -164,8 +164,17 @@ describe("ListRenderer", () => {
     await user.type(notesInput, "met at a conference");
 
     expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
-    // The collision message did not wipe the field the user already filled in.
-    expect(within(dialog).getByDisplayValue("met at a conference")).toBeInTheDocument();
+
+    // Press Enter, the natural submit for the autoFocus'd title input. This is
+    // the path that actually discards: the handler used to call addItem (which
+    // no-ops on a collision), then close the dialog and setDraft({})
+    // unconditionally. Asserting the field's value without submitting proves
+    // only that ScalarField binds -- it cannot fail if the guard is removed.
+    await user.type(titleInput, "{enter}");
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).getByDisplayValue("met at a conference"))
+      .toBeInTheDocument();
   });
 
   it("a suggestion chip adds an item, and chips for already-present titles are not offered", async () => {
