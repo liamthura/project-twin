@@ -137,7 +137,13 @@ CANONICAL_STORED_KEY = {
 # like them it names a real, editable-looking storage key (the filter reads
 # `item[f]` for live data, not a machine stamp), so a misspelled facet field
 # is exactly the same class of bug this check exists to catch.
-_SUBSET_CHECKED_KEYS = ("badges", "detail_fields", "array_fields", "facets")
+#
+# `count_badges` (wave 4, Task 4) is checked on the same terms: it names a
+# real, live storage key too (the renderer reads `item[f].length`), not a
+# machine-written stamp like `display_fields` -- a misspelled count_badges
+# entry would render a permanently-absent chip, exactly the class of phantom
+# key this check exists to catch.
+_SUBSET_CHECKED_KEYS = ("badges", "detail_fields", "array_fields", "facets", "count_badges")
 
 BASE_GOALS_MANIFEST = {
     "key": "goals",
@@ -207,7 +213,7 @@ def _fields_named_by(node):
     named = set()
     for list_key in ("fields", "badges", "detail_fields", "array_fields",
                      "date_fields", "long_text", "optional", "display_fields",
-                     "facets"):
+                     "facets", "count_badges"):
         named |= set(node.get(list_key) or [])
     for map_key in ("suggestions", "enum", "field_defaults", "display_formats"):
         named |= set((node.get(map_key) or {}).keys())
@@ -485,6 +491,49 @@ def test_malformed_facets_is_rejected():
         {
             "sections": [
                 {"kind": "list", "path": ["goals"], "entity": "goal", "facets": [1, 2]}
+            ]
+        }
+    )
+    with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(manifest)
+
+
+def test_well_formed_count_badges_is_accepted():
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {
+                    "kind": "list",
+                    "path": ["goals"],
+                    "entity": "goal",
+                    "detail_fields": ["notes"],
+                    "count_badges": ["notes"],
+                }
+            ]
+        }
+    )
+    pack_loader.validate_manifest(manifest)  # must not raise
+
+
+def test_malformed_count_badges_is_rejected():
+    """`count_badges` is an array of storage-key strings, the same shape as
+    `badges`/`facets` -- not a bare string and not an array of anything but
+    strings. A wrong shape here reaches `node.count_badges.map` in
+    ListRenderer at runtime instead of failing at authoring time."""
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {"kind": "list", "path": ["goals"], "entity": "goal", "count_badges": "notes"}
+            ]
+        }
+    )
+    with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(manifest)
+
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {"kind": "list", "path": ["goals"], "entity": "goal", "count_badges": [1, 2]}
             ]
         }
     )

@@ -450,6 +450,30 @@ export default function ListRenderer({
                         {formatDisplay(item[f], node.display_formats?.[f])}
                       </Badge>
                     ))}
+                  {/* count_badges: opt-in "N <field>" chips for array-valued
+                      storage keys, e.g. "3 references". Read-only, like
+                      display_fields above -- no control renders for these in
+                      the expanded row beyond whatever detail_fields
+                      independently declares. A field that is absent, empty,
+                      or not an array renders no badge at all: a "0 x" chip on
+                      every row that has never used a feature is noise, not
+                      information, and a non-array value here must not throw
+                      on `.length`. Singularised by trimming a trailing "s"
+                      only at count 1 -- good enough for every field this wave
+                      actually names (references/tags/highlights); a plural
+                      that doesn't just add "s" (e.g. an irregular noun) would
+                      read oddly singular, but no such field exists yet. */}
+                  {(node.count_badges || [])
+                    .filter((f) => Array.isArray(item[f]) && item[f].length > 0)
+                    .map((f) => {
+                      const n = item[f].length;
+                      const label = f.replace(/_/g, " ");
+                      return (
+                        <Badge key={`count:${f}`} variant="secondary" className="gap-1 text-[10px] font-mono">
+                          {n} {n === 1 ? label.replace(/s$/, "") : label}
+                        </Badge>
+                      );
+                    })}
                   {badges.filter((b) => item[b]).map((b) => {
                     const value = String(item[b]);
                     const chip = VALUE_META[value]?.chip;

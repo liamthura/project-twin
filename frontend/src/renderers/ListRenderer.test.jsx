@@ -765,6 +765,95 @@ describe("display_fields", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// count_badges -- wave 4, Task 4
+//
+// Opt-in "N <field>" chips for array-valued storage keys, rendered after
+// display_fields and before badges. Read-only: unlike `badges`, nothing here
+// should ever bind an editable control. The three fields this wave actually
+// uses -- references, tags, highlights -- all singularise correctly by
+// trimming a trailing "s" (reference/tag/highlight), so that's what's tested
+// below rather than an invented irregular noun.
+// ---------------------------------------------------------------------------
+describe("count_badges", () => {
+  const node = {
+    kind: "list",
+    path: ["entries"],
+    title_field: "topic",
+    detail_fields: ["notes"],
+    count_badges: ["references", "tags", "highlights"],
+  };
+
+  it("renders 'N <field>' for a field with multiple entries", () => {
+    const items = [{ topic: "RSC", references: ["a", "b", "c"] }];
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.getByText("3 references")).toBeInTheDocument();
+  });
+
+  it("singularises to '1 <field>' (trimming the trailing s), not '1 <field>s'", () => {
+    const items = [{ topic: "RSC", tags: ["solo"] }];
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.getByText("1 tag")).toBeInTheDocument();
+    expect(screen.queryByText("1 tags")).not.toBeInTheDocument();
+  });
+
+  it("renders every field's own count independently on the same row", () => {
+    const items = [
+      { topic: "RSC", references: ["a", "b"], tags: ["x"], highlights: ["h1", "h2", "h3"] },
+    ];
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.getByText("2 references")).toBeInTheDocument();
+    expect(screen.getByText("1 tag")).toBeInTheDocument();
+    expect(screen.getByText("3 highlights")).toBeInTheDocument();
+  });
+
+  it("renders no badge for an empty array -- a '0 x' chip is noise, not a real count", () => {
+    const items = [{ topic: "RSC", references: [] }];
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.queryByText(/references/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^0/)).not.toBeInTheDocument();
+  });
+
+  it("renders no badge for a field the item doesn't have at all", () => {
+    const items = [{ topic: "RSC" }];
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.queryByText(/references|tags|highlights/)).not.toBeInTheDocument();
+  });
+
+  it("renders no badge, and does not throw, when the field holds a non-array value", () => {
+    const items = [{ topic: "RSC", references: "not-an-array" }];
+    expect(() =>
+      render(<ListRenderer node={node} items={items} onItems={vi.fn()} />)
+    ).not.toThrow();
+    expect(screen.queryByText(/references/)).not.toBeInTheDocument();
+    expect(screen.getByText("RSC")).toBeInTheDocument();
+  });
+
+  it("is read-only -- expanding the row exposes no control bound to it beyond what detail_fields declares", async () => {
+    const items = [{ topic: "RSC", notes: "n", references: ["a", "b"] }];
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.getByText("2 references")).toBeInTheDocument();
+
+    await user.click(screen.getByText("RSC"));
+
+    // `notes` proves the row really expanded.
+    expect(screen.getByDisplayValue("n")).toBeInTheDocument();
+    // No control anywhere shows the raw array value or field name as an
+    // editable input -- only detail_fields (here, "notes") get a control.
+    expect(screen.queryByDisplayValue("a,b")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^references$/i)).not.toBeInTheDocument();
+  });
+
+  it("renders nothing extra for a node that declares no count_badges", () => {
+    const items = [{ topic: "RSC", references: ["a", "b", "c"] }];
+    render(
+      <ListRenderer node={{ ...node, count_badges: undefined }} items={items} onItems={vi.fn()} />
+    );
+    expect(screen.queryByText(/references|tags|highlights/)).not.toBeInTheDocument();
+  });
+});
+
 describe("title field also listed in detail_fields", () => {
   // Step 9 of wave 3 task 8 put the title field into detail_fields so it
   // renders editable in the expanded row -- but editFields is badges union

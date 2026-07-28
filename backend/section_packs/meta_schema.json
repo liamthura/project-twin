@@ -270,6 +270,11 @@
           "items": { "type": "string" },
           "description": "Storage keys shown read-only as badges on the collapsed row. Unlike `badges`, these are never rendered as editable controls -- use for machine-written values such as a created-at stamp."
         },
+        "count_badges": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Array-valued storage keys shown read-only as \"N <field>\" chips on the collapsed row (e.g. \"3 references\"), rendered after display_fields and before badges. Never rendered as an editable control. A key that is absent, empty, or not an array on a given item renders no chip for that item -- a \"0 x\" chip would be noise on every row that has not used the feature."
+        },
         "display_formats": {
           "type": "object",
           "additionalProperties": { "enum": ["date", "datetime"] },
