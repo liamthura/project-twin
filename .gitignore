@@ -105,3 +105,7 @@ coverage/
 .turbo
 mygist_data/
 backend/archive/
+
+# Storybook / Playwright test artifacts
+frontend/storybook-static
+frontend/test-results

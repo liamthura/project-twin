@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "id": "media_1a2b3c4d",
+      "title": "The Left Hand of Darkness",
+      "kind": "book",
+      "status": "finished",
+      "reaction": "loved",
+      "url": "https://openlibrary.org/works/OL864277W",
+      "notes": "Reread every couple of years for the pacing.",
+      "tags": ["sci-fi", "ursula-le-guin"],
+      "related": ["goal_7be48d02"]
+    },
+    {
+      "id": "media_5e6f7a8b",
+      "title": "Severance",
+      "kind": "show",
+      "status": "in_progress",
+      "reaction": "liked",
+      "url": "https://www.imdb.com/title/tt11280740/",
+      "notes": "Watching with my sister.",
+      "tags": ["thriller", "apple-tv"]
+    }
+  ]
+}

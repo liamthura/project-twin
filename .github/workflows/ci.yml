@@ -17,6 +17,7 @@ jobs:
   backend:
     name: backend (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     strategy:
       fail-fast: false
@@ -69,8 +70,9 @@ jobs:
         run: pytest -q
 
   frontend:
-    name: frontend build
+    name: frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -85,6 +87,23 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
+
+      # packs.json is generated from backend/section_packs/*/manifest.json.
+      # If a manifest changes and the fixture is not regenerated, the tests
+      # would be checking a shape that no longer exists.
+      - name: Check pack fixtures are current
+        working-directory: frontend
+        run: |
+          npm run fixtures
+          git diff --exit-code src/__fixtures__/packs.json
+
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Test
+        working-directory: frontend
+        run: npm test
 
       # The single-container merge makes a broken frontend build block the
       # whole image, and therefore any backend fix. This catches it here
