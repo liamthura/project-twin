@@ -377,6 +377,45 @@ is visible rather than rediscovered: field placeholders (`"e.g. React Server Com
 the `"Untitled entry"` / `"Untitled connection"` fallbacks, and `circle`'s fifth info tip. The
 date badge *was* restored, as `display_fields`.
 
+### State after the wave 4 prerequisites
+
+The three items above are addressed, with one exception and one carry-forward.
+
+**The `renderNode` seam exists and is half ready.** `frontend/src/renderers/renderNode.jsx` takes
+`value` and `onValue` as arguments rather than deriving them from a section root, so a caller
+*can* resolve a child's path against a list item. That was the part that mattered. But its only
+future caller cannot supply two of its six parameters: `ListRenderer` receives a single
+**resolved** `entity` object and no `packKey`, while `renderNode` needs the whole `entities` map
+and the pack key. Calling it from inside a row today would pass `entities: undefined`, so every
+child node's `valid_values`, `field_defaults` and `optional` would silently degrade — an enum
+rendering as a free-text box, which is the exact silent-binding failure this project exists to
+prevent — and its error logs would read `pack "undefined"`.
+
+So wave 4's first step is three small edits, not a one-liner: thread `entities` and `packKey`
+through `ListRenderer` into its `renderNode` call and `SectionRenderer`'s. `ListRenderer` will
+also need `setAt`, because `updateItem(idx, changes)` takes a flat field map and cannot express
+a nested child path. **Put this in the wave 4 plan rather than leaving it to be discovered.**
+
+The `ListRenderer → renderNode → ListRenderer` import cycle is still unexercised, because
+`children` is not implemented. It should survive — both sides reference the import only inside
+a render-time function body, never at module init — but nothing proves it yet.
+
+**The residual hole is now the largest risk, and it is unchanged.** `display_fields`,
+`sort.field`, `field_defaults` keys and every field on a `kind: "fields"` or `kind: "strings"`
+node are asserted by a human and checked by nothing. The alias guard added in these
+prerequisites has real teeth only where `FIELD_ALIASES` names the entity — today that is
+exactly one node (`circle`'s `connection`). It becomes load-bearing when wave 4 migrates
+`knowledge` (`mental_tab`, which persists `title`, not the `name` or `topic` its alias list
+starts with) and `projects` (`top_of_mind`, which persists `idea`, a key absent from its alias
+list entirely).
+
+`profile` is a `kind: "fields"` shape, so its top-level bindings — `name`, `preferred_name`,
+`bio` — would ship guarded by nothing at all. Closing this needs a machine-readable authority
+on what the 37 `execute_modify` branches actually write, which is the backend reconciliation
+this spec deferred as a sequel. That deferral is now doing real work rather than being
+theoretical, and it is worth deciding whether to pull it forward **before** wave 4 rather than
+after.
+
 ## Sourcing UI primitives
 
 Convergence means every migrated section funnels through one small set of controls, so the
