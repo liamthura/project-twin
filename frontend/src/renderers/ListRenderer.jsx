@@ -352,6 +352,7 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                   })}
                 </span>
                 <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0"
+                  aria-label={`Remove ${item[titleField] || "Untitled entry"}`}
                   onClick={(e) => { e.stopPropagation(); removeItem(idx); }}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>

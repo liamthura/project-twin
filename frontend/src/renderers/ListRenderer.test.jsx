@@ -96,9 +96,10 @@ describe("ListRenderer", () => {
       />
     );
 
-    // The delete button is icon-only (no accessible name), unlike the Add
-    // trigger and any suggestion chips, which both carry visible text.
-    const deleteButton = screen.getAllByRole("button").find((b) => b.textContent === "");
+    // The delete button is icon-only (no visible text), but carries an
+    // aria-label naming this row -- select by that accessible name rather
+    // than by empty textContent.
+    const deleteButton = screen.getByRole("button", { name: "Remove Scandinavian" });
     await user.click(deleteButton);
 
     expect(onShowConfirmation).toHaveBeenCalledTimes(1);
@@ -278,8 +279,7 @@ describe("ListRenderer", () => {
     expect(screen.getByDisplayValue("note-2")).toBeInTheDocument();
 
     // Remove "First" (index 0). "Second" shifts to index 0 and must stay open.
-    const deleteButtons = screen.getAllByRole("button").filter((b) => b.textContent === "");
-    await user.click(deleteButtons[0]);
+    await user.click(screen.getByRole("button", { name: "Remove First" }));
     rerender(<ListRenderer node={simpleNode} items={current} onItems={vi.fn()} />);
 
     expect(screen.getByDisplayValue("note-2")).toBeInTheDocument();
@@ -326,7 +326,7 @@ describe("ListRenderer", () => {
       />
     );
 
-    const deleteButton = screen.getAllByRole("button").find((b) => b.textContent === "");
+    const deleteButton = screen.getByRole("button", { name: "Remove Untitled entry" });
     await user.click(deleteButton);
 
     expect(onShowConfirmation).toHaveBeenCalledWith(
@@ -334,6 +334,17 @@ describe("ListRenderer", () => {
       "This can't be undone.",
       expect.any(Function)
     );
+  });
+
+  it("gives the row delete button an accessible name derived from the row's title", () => {
+    render(
+      <ListRenderer node={node} entity={entity} items={[scandinavian]} onItems={() => {}} />
+    );
+    // Icon-only (no visible text), but must be announced as more than
+    // "button" -- and named after this row specifically, not a generic label
+    // every row would share.
+    const deleteButton = screen.getByRole("button", { name: "Remove Scandinavian" });
+    expect(deleteButton.textContent).toBe("");
   });
 });
 
@@ -460,11 +471,10 @@ describe("sort", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={items} onItems={onItems} />);
 
-    // Delete buttons are icon-only with no accessible name -- this is the
-    // selector convention already used at ListRenderer.test.jsx:99-102. The
-    // first one on screen belongs to "Newest", which is stored at index 1.
-    const deleteButtons = screen.getAllByRole("button").filter((b) => b.textContent === "");
-    await user.click(deleteButtons[0]);
+    // "Newest" displays first (sorted) despite being stored at index 1 --
+    // select it by its accessible name, which names the row rather than
+    // its position.
+    await user.click(screen.getByRole("button", { name: "Remove Newest" }));
 
     const [[next]] = onItems.mock.calls;
     expect(next.map((i) => i.topic)).toEqual(["Oldest", "Middle"]);
@@ -635,9 +645,10 @@ describe("search", () => {
     expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
     expect(screen.getByText("Grace Hopper")).toBeInTheDocument();
 
-    const deleteButtons = () => screen.getAllByRole("button").filter((b) => b.textContent === "");
-    await user.click(deleteButtons()[0]);
-    await user.click(deleteButtons()[0]);
+    // Both rows are visible under the "a" filter, in stored order -- select
+    // each delete button by its row's accessible name rather than position.
+    await user.click(screen.getByRole("button", { name: "Remove Ada Lovelace" }));
+    await user.click(screen.getByRole("button", { name: "Remove Grace Hopper" }));
 
     expect(screen.getByText(/no matches/i)).toBeInTheDocument();
     // The box is still here, still holding the query that stranded the user --
@@ -808,6 +819,35 @@ describe("info", () => {
     await user.click(screen.getByRole("button", { name: /about this section/i }));
     expect(screen.getByText("Who matters to you.")).toBeInTheDocument();
     for (const tip of info.tips) expect(screen.getByText(tip)).toBeInTheDocument();
+  });
+
+  it("gives a row's delete button a name distinct from the info button, since both are icon-only and the info button renders first in DOM order", async () => {
+    // Before this row had an accessible name, both buttons were icon-only
+    // with empty textContent -- a selector like
+    // getAllByRole("button").find(b => b.textContent === "") would silently
+    // grab the info button (it's first in DOM) instead of the row's delete
+    // button. Selecting by name must land on the right one.
+    const onShowConfirmation = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={node}
+        items={[{ name: "Ada" }]}
+        onItems={vi.fn()}
+        onShowConfirmation={onShowConfirmation}
+      />
+    );
+
+    const infoButton = screen.getByRole("button", { name: /about this section/i });
+    const deleteButton = screen.getByRole("button", { name: "Remove Ada" });
+    expect(deleteButton).not.toBe(infoButton);
+
+    await user.click(deleteButton);
+    expect(onShowConfirmation).toHaveBeenCalledWith(
+      "Remove Ada?",
+      "This can't be undone.",
+      expect.any(Function)
+    );
   });
 });
 
