@@ -362,7 +362,7 @@ describe("@now in field_defaults", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[]} onItems={onItems} />);
 
-    await user.click(screen.getByRole("button", { name: /add/i }));
+    await user.click(screen.getByRole("button", { name: "Add" }));
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "React Server Components");
@@ -379,7 +379,7 @@ describe("@now in field_defaults", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: /add/i }));
+    await user.click(screen.getByRole("button", { name: "Add" }));
     // `timestamp` has no control of its own, but `source` proves defaults still
     // preselect; a literal "@now" anywhere on screen means the token escaped.
     expect(screen.getByDisplayValue("manual")).toBeInTheDocument();
@@ -397,7 +397,7 @@ describe("@now in field_defaults", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: /add/i }));
+    await user.click(screen.getByRole("button", { name: "Add" }));
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "T");
@@ -415,7 +415,7 @@ describe("@now in field_defaults", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[]} onItems={onItems} />);
 
-    await user.click(screen.getByRole("button", { name: /add/i }));
+    await user.click(screen.getByRole("button", { name: "Add" }));
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "@now");
@@ -1736,5 +1736,61 @@ describe("row identity for a title edit when the row has no stored id", () => {
 
     expect(screen.getByDisplayValue("Repository")).toBeInTheDocument();
     expect(seen[0].references[0].name).toBe("Repository");
+  });
+});
+
+// A genuinely empty list is where a new user starts, and until this was fixed
+// the panel they were looking at offered no way forward: it told them to "tap
+// a suggestion" when only `aesthetics` ships any, and the sole way in was a
+// small outline button up in the header. Reported from production for
+// projects, knowledge, circle and learning_log -- which is every pack that has
+// no suggestions.
+describe("empty state offers a way in", () => {
+  const node = { kind: "list", path: ["items"], title_field: "name", entity: "thing" };
+
+  it("offers an Add action inside the empty panel, naming what it adds", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={{ ...node, title: "Mental tab" }} items={[]} onItems={vi.fn()} />);
+
+    const cta = screen.getByRole("button", { name: "Add Mental tab" });
+    await user.click(cta);
+
+    // Opens the same dialog the header trigger does -- one dialog, not two.
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  });
+
+  it("seeds field_defaults identically whether opened from the panel or the header", async () => {
+    const withDefaults = { ...node, detail_fields: ["stance"], field_defaults: { stance: "like" } };
+    const user = userEvent.setup();
+    render(<ListRenderer node={withDefaults} items={[]} onItems={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Add thing" }));
+    expect(within(screen.getByRole("dialog")).getByDisplayValue("like")).toBeInTheDocument();
+  });
+
+  it("does not mention suggestions when the node has none", () => {
+    render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
+    expect(screen.getByText("Nothing here yet.")).toBeInTheDocument();
+    expect(screen.queryByText(/suggestion/i)).not.toBeInTheDocument();
+  });
+
+  it("does mention them when the node has some", () => {
+    const withSuggestions = { ...node, suggestions: { name: ["Minimalist"] } };
+    render(<ListRenderer node={withSuggestions} items={[]} onItems={vi.fn()} />);
+    expect(screen.getByText(/tap a suggestion below/)).toBeInTheDocument();
+  });
+
+  it("shows the no-matches wording instead when a search hides every row", async () => {
+    const searchable = { ...node, searchable: true };
+    const user = userEvent.setup();
+    render(<ListRenderer node={searchable} items={[{ name: "Alpha" }]} onItems={vi.fn()} />);
+
+    await user.type(screen.getByRole("searchbox"), "zzz");
+
+    expect(screen.getByText(/No matches/)).toBeInTheDocument();
+    // The Add call to action is for an empty list, not a filtered-empty one --
+    // offering it here would suggest adding is the way to see hidden rows.
+    expect(screen.queryByRole("button", { name: /^Add thing$/ })).not.toBeInTheDocument();
   });
 });

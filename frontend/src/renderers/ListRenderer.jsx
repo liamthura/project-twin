@@ -102,6 +102,19 @@ export default function ListRenderer({
     !!draft[titleField] && existingTitles.has(draft[titleField].toLowerCase());
   const editFields = [...new Set([...badges, ...detailFields])];
   const fieldDefaults = node.field_defaults ?? entity?.field_defaults ?? {};
+  // What this list holds, for the Add affordances. Was inline in the dialog
+  // heading only; the header button said a bare "Add", which reads fine beside
+  // a populated list and says nothing on an empty screen where it is the only
+  // thing to act on.
+  const addLabel = (node.title ?? node.entity ?? "item").replace(/_/g, " ");
+  // Opening the dialog and seeding the draft, extracted because the empty
+  // state opens the same dialog from outside Radix's trigger. Both paths must
+  // seed identically or a manifest default would apply invisibly on one route
+  // and visibly on the other.
+  const openAdd = () => {
+    setAddOpen(true);
+    setDraft({ ...fieldDefaults });
+  };
   // A node-declared long_text (schema: array of storage keys) takes
   // precedence over the entity-agnostic default set, same as enum and
   // field_defaults above -- normalised to a Set once here so both the
@@ -431,11 +444,37 @@ export default function ListRenderer({
 
       {visible.length === 0 ? (
         <EmptyState>
-          {q
-            ? "No matches. Clear the search to see everything."
-            : facetsActive
-            ? "No matches. Clear a filter to see everything."
-            : "Nothing here yet. Use Add, or tap a suggestion."}
+          {q ? (
+            "No matches. Clear the search to see everything."
+          ) : facetsActive ? (
+            "No matches. Clear a filter to see everything."
+          ) : (
+            // A genuinely empty list, which is where a new user starts. The
+            // only way in used to be the small outline Add button up in the
+            // header, while this panel -- the thing they are actually looking
+            // at -- told them to "tap a suggestion". Only `aesthetics` ships
+            // any suggestions, so for every other pack that sentence pointed
+            // at nothing and the panel offered no way forward at all.
+            //
+            // So the call to action lives here, where the eye already is, and
+            // the suggestion wording appears only when there is something to
+            // tap. This is a plain button rather than a second DialogTrigger
+            // because Radix requires a trigger to sit inside its Dialog, and
+            // this panel is a sibling of the header that owns it -- opening
+            // via the same state the trigger sets keeps one dialog and one
+            // draft-seeding path.
+            <div className="space-y-3">
+              <p>
+                {suggestions.length > 0
+                  ? "Nothing here yet. Add one, or tap a suggestion below."
+                  : "Nothing here yet."}
+              </p>
+              <Button size="sm" onClick={openAdd}>
+                <Plus className="mr-1 h-4 w-4" />
+                Add {addLabel}
+              </Button>
+            </div>
+          )}
         </EmptyState>
       ) : (
         <div className="rounded-md border">

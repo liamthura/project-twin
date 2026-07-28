@@ -1186,7 +1186,7 @@ describe("SectionRenderer", () => {
         expect.stringContaining("corrupted")
       );
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("goals"));
-      expect(screen.getByText("Nothing here yet. Use Add, or tap a suggestion.")).toBeInTheDocument();
+      expect(screen.getByText("Nothing here yet.")).toBeInTheDocument();
 
       errorSpy.mockRestore();
     });
