@@ -730,6 +730,66 @@ describe("display_fields", () => {
     expect(screen.getByText(expected.slice(0, 10))).toBeInTheDocument();
   });
 
+  // A stored yyyy-mm-dd is a CALENDAR DATE, not an instant. `new Date` parses
+  // the date-only form as UTC midnight, so formatting it through local-time
+  // getters rolls it back a day in every negative-offset zone. The suite is
+  // pinned to America/New_York (vitest.config.js) precisely so this is
+  // observable: under the pre-fix formatDisplay these render "2026-01-11" and
+  // "2025-12-31", and at UTC they would have rendered correctly by accident.
+  describe("a calendar date, which carries no instant to convert", () => {
+    const dateOnly = [{ topic: "Proj", details: "d", timestamp: "2026-01-12" }];
+
+    it("renders verbatim under the date format, not shifted into local time", () => {
+      // Proof the environment can actually see the bug -- without this the
+      // assertion below is only as strong as whoever's timezone ran it.
+      expect(new Date("2026-01-12").getDate()).toBe(11);
+
+      render(
+        <ListRenderer
+          node={{ ...node, display_formats: { timestamp: "date" } }}
+          items={dateOnly}
+          onItems={vi.fn()}
+        />
+      );
+      expect(screen.getByText("2026-01-12")).toBeInTheDocument();
+      expect(screen.queryByText("2026-01-11")).not.toBeInTheDocument();
+    });
+
+    it("does not roll a new-year date back into the previous year", () => {
+      render(
+        <ListRenderer
+          node={{ ...node, display_formats: { timestamp: "date" } }}
+          items={[{ topic: "NY", timestamp: "2026-01-01" }]}
+          onItems={vi.fn()}
+        />
+      );
+      expect(screen.getByText("2026-01-01")).toBeInTheDocument();
+      expect(screen.queryByText("2025-12-31")).not.toBeInTheDocument();
+    });
+
+    it("shows no invented midnight under the datetime format either", () => {
+      render(
+        <ListRenderer
+          node={{ ...node, display_formats: { timestamp: "datetime" } }}
+          items={dateOnly}
+          onItems={vi.fn()}
+        />
+      );
+      // There is no time in the stored value, so there is none to display.
+      expect(screen.getByText("2026-01-12")).toBeInTheDocument();
+      expect(screen.queryByText(/19:00|00:00/)).not.toBeInTheDocument();
+    });
+
+    it("still converts a value that really does carry a time", () => {
+      // The exemption is on the value's shape, not on the format, so an
+      // instant must be unaffected -- this is learning_log's `timestamp`.
+      render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+      expect(screen.getByText(expected)).toBeInTheDocument();
+      // 09:30Z is 04:30 in the pinned zone: converted, not passed through.
+      expect(expected).toBe("2026-01-15 04:30");
+    });
+  });
+
   it("is read-only -- expanding the row exposes no control bound to it", async () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
@@ -908,6 +968,31 @@ describe("info", () => {
     await user.click(screen.getByRole("button", { name: /about this section/i }));
     expect(screen.getByText("Who matters to you.")).toBeInTheDocument();
     for (const tip of info.tips) expect(screen.getByText(tip)).toBeInTheDocument();
+  });
+
+  // "About this section" was hardcoded, so a section packing two list nodes
+  // -- projects is the first, and wave 5's lifestyle packs four -- produced
+  // buttons that screen-reader users could not tell apart, and that tests
+  // could only separate by DOM order. The node's own title is the name the
+  // user already sees above the list, so it is the one to announce.
+  it("names each info button after its node, so two in one section are distinguishable", () => {
+    render(
+      <div>
+        <ListRenderer node={{ ...node, title: "Projects" }} items={[]} onItems={vi.fn()} />
+        <ListRenderer node={{ ...node, title: "Top of Mind" }} items={[]} onItems={vi.fn()} />
+      </div>
+    );
+
+    expect(screen.getByRole("button", { name: "About Projects" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About Top of Mind" })).toBeInTheDocument();
+    // The generic name is gone once a title exists, rather than sitting
+    // alongside as a second way to match the same two buttons ambiguously.
+    expect(screen.queryByRole("button", { name: /about this section/i })).not.toBeInTheDocument();
+  });
+
+  it("falls back to the generic name for a node with no title", () => {
+    render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "About this section" })).toBeInTheDocument();
   });
 
   it("gives a row's delete button a name distinct from the info button, since both are icon-only and the info button renders first in DOM order", async () => {

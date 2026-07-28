@@ -122,6 +122,28 @@ def _normalize(file_type: str, data: dict) -> dict:
                     project.setdefault("references", [])
                     project.setdefault("notes", "")
                     project.setdefault("highlights", [])
+        # Legacy top_of_mind entries were bare strings. Two consumers coerce
+        # them on read and therefore hid the problem -- execute_modify
+        # (server.py's get_idea_text) and ProjectsEditor.jsx -- but nothing
+        # else does: _assign_ids below skips non-dicts so a string entry never
+        # gets an `id`, search_index skips id-less entries so it is
+        # unsearchable, the staleness advisory (server.py) skips it, and a
+        # generic list renderer keyed on `idea` shows a row with no reachable
+        # content. Coercing here, on load, repairs every consumer at once
+        # rather than the one that happens to render.
+        #
+        # Idempotent, like every other case in this function: a dict entry is
+        # returned untouched, so re-normalising an already-normalised blob is
+        # a no-op. Only `idea` is written -- `note` is genuinely absent on a
+        # legacy entry, and inventing `note: ""` would be a value the user
+        # never entered (and one ListRenderer.updateItem deletes on the first
+        # edit anyway, producing a spurious diff).
+        top_of_mind = data.get("top_of_mind")
+        if isinstance(top_of_mind, list):
+            data["top_of_mind"] = [
+                {"idea": entry} if isinstance(entry, str) else entry
+                for entry in top_of_mind
+            ]
         # Phase 5 (consolidation): current_learning folds into goals (type=learning);
         # strip it so old backups/imports can't resurrect an invisible orphan key.
         data.pop("current_learning", None)

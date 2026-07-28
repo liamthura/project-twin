@@ -276,10 +276,12 @@ describe("SectionRenderer", () => {
   //     inside an expanded project row (the References child). None of the
   //     three accessible names is namespaced by level, so anything selecting
   //     one of them scopes by block first -- see `topOfMindBlock` below.
-  //   - The info button's aria-label is hardcoded to "About this section" in
-  //     ListRenderer, so with two `info` blocks in one section there are two
-  //     identically-named buttons. They are distinguished by DOM order, which
-  //     is section order: [0] projects, [1] top_of_mind.
+  //   - Both list nodes declare `info`, and this is the first section in the
+  //     repo with two. ListRenderer names each info button after its node's
+  //     `title`, so they are selectable by name rather than by DOM order --
+  //     "About Top of Mind" for the titled node, and the generic "About this
+  //     section" for the projects node, which deliberately has no title
+  //     (the Card header already reads "Projects").
   //   - Child rows and detail controls only exist once a row is EXPANDED, so
   //     every assertion about them clicks the row first.
   // -------------------------------------------------------------------------
@@ -456,14 +458,22 @@ describe("SectionRenderer", () => {
 
     // ---- info dialogs ----
 
-    it("carries both bespoke-editor info dialogs, one per list", async () => {
+    it("carries both bespoke-editor info dialogs, each reachable by its own name", async () => {
       const { user } = renderSection({ pack: projectsPack, initial: projectsData });
-      const buttons = screen.getAllByRole("button", { name: /about this section/i });
-      expect(buttons).toHaveLength(2);
 
-      await user.click(buttons[1]); // top_of_mind is the second section node
+      await user.click(screen.getByRole("button", { name: "About Top of Mind" }));
       expect(screen.getByText(/Capture quick ideas/)).toBeInTheDocument();
       expect(screen.getByText(/A short phrase or sentence/)).toBeInTheDocument();
+    });
+
+    it("keeps the projects info dialog on a distinct name, not a second `About this section`", async () => {
+      const { user } = renderSection({ pack: projectsPack, initial: projectsData });
+      // Two info blocks in one section: if both fell back to the generic
+      // name, `getByRole` here would throw on finding two matches -- which is
+      // the ambiguity a screen-reader user would hear.
+      await user.click(screen.getByRole("button", { name: "About this section" }));
+      expect(screen.getByText(/Track your active work/)).toBeInTheDocument();
+      expect(screen.getByText(/Clear, descriptive title/)).toBeInTheDocument();
     });
   });
 

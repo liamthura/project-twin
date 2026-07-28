@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfoDialog } from "@/components/ui/info-dialog";
 import { VALUE_META, FOCUS_RING, ValueIcon, SEGMENTED_MAX, EnumControl } from "@/components/controls";
-import { ScalarField, LONG_TEXT_FIELDS } from "./ScalarField";
+import { ScalarField, LONG_TEXT_FIELDS, ISO_DATE } from "./ScalarField";
 import { buildOrder, filterVisible, applyFacets } from "./listPipeline";
 import { getAt, setAt } from "./paths";
 // Circular by construction: renderNode imports ListRenderer to dispatch a
@@ -47,15 +47,27 @@ import { getAt, setAt } from "./paths";
 import { renderNode } from "./renderNode";
 
 // Read-only display of a machine-written key (a created-at stamp, an id).
-// Local time and locale-free: the stored value is UTC, showing it raw would
-// be wrong by the offset, and a locale-formatted string would make the same
-// log read differently on two machines. An unparseable value is shown
+// Local time and locale-free: an instant is stored as UTC, showing it raw
+// would be wrong by the offset, and a locale-formatted string would make the
+// same log read differently on two machines. An unparseable value is shown
 // verbatim rather than dropped -- nothing validates these on write, and
 // hiding a value the user can see in their own JSON is worse than an odd
 // looking badge.
+//
+// A CALENDAR DATE is the exception, and it is why the early return below
+// exists. "2026-01-12" is not an instant: `new Date` parses a bare
+// yyyy-mm-dd as UTC midnight (per the spec's date-only form), and the
+// local-time getters below then roll it back a day in every negative-offset
+// zone -- TZ=America/New_York rendered projects' `added_date` of 2026-01-12
+// as "2026-01-11". There is no offset to correct for, because there is no
+// instant; the honest rendering is the stored string itself, which already
+// has exactly the shape this function would produce. Tested on the value's
+// shape rather than on `format` so a "datetime" format asks nothing of a
+// date-only value either -- there is no time in it to show.
 function formatDisplay(value, format) {
   const raw = String(value);
   if (!format) return raw;
+  if (ISO_DATE.test(raw)) return raw;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return raw;
   const p = (n) => String(n).padStart(2, "0");
@@ -253,7 +265,7 @@ export default function ListRenderer({
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              aria-label="About this section"
+              aria-label={node.title ? `About ${node.title}` : "About this section"}
               onClick={() => setInfoOpen(true)}
             >
               <Info className="h-4 w-4" />

@@ -16,7 +16,13 @@ export const LONG_TEXT_FIELDS = new Set(["notes", "why", "description"]);
 
 // What <input type="date"> will accept and round-trip. Anything else it
 // discards on render, showing an empty picker.
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+//
+// Exported because ListRenderer's `display_formats` needs the same test: a
+// value matching this is a CALENDAR DATE, not an instant, and the two
+// renderers have to agree on which values that means or the same string
+// could round-trip through a picker one way and be reinterpreted through a
+// timezone the other.
+export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function ScalarField({ field, value, meta, onChange, customValue, onCustomChange }) {
   // meta.long_text is documented as a Set (that's what every caller inside

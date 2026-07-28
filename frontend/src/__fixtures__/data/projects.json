@@ -1,4 +1,5 @@
 {
+  "_note": "JSON has no comment syntax, so this key carries one. `challenges` and `goals` on the first project have a GUESSED shape: server.py's project update loop assigns data[field] verbatim with no coercion or validation, and nothing in the codebase reads them back, so nothing here is authority for them being strings. They are not bound by the manifest's ui block -- the only thing any test asks of them is that an edit elsewhere does not drop them, which is true whatever shape they hold. Confirm against a real blob before treating this file as a schema. This key itself is inert: no ui node addresses it, and it exists to survive round-trips alongside the rest.",
   "projects": [
     {
       "id": "project_a1b2c3d4",
