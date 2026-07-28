@@ -27,10 +27,15 @@
   },
   "capture_triggers": ["goal is", "aiming to", "planning to", "hoping to", "want to", "working toward"],
   "ui": {
-    "goals": {
-      "title_field": "title",
-      "badges": ["type", "status"],
-      "detail_fields": ["target_date", "why", "notes"]
-    }
+    "sections": [
+      {
+        "kind": "list",
+        "path": ["goals"],
+        "entity": "goal",
+        "title_field": "title",
+        "badges": ["type", "status"],
+        "detail_fields": ["target_date", "why", "notes"]
+      }
+    ]
   }
 }

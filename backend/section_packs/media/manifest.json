@@ -72,21 +72,26 @@
     "finished playing"
   ],
   "ui": {
-    "items": {
-      "title_field": "title",
-      "badges": [
-        "kind",
-        "status",
-        "reaction"
-      ],
-      "detail_fields": [
-        "url",
-        "notes",
-        "tags"
-      ],
-      "array_fields": [
-        "tags"
-      ]
-    }
+    "sections": [
+      {
+        "kind": "list",
+        "path": ["items"],
+        "entity": "media_item",
+        "title_field": "title",
+        "badges": [
+          "kind",
+          "status",
+          "reaction"
+        ],
+        "detail_fields": [
+          "url",
+          "notes",
+          "tags"
+        ],
+        "array_fields": [
+          "tags"
+        ]
+      }
+    ]
   }
 }
