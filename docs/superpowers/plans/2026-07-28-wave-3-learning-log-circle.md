@@ -20,6 +20,8 @@
 - `timeout(1)` does not exist on this macOS shell. Do not wrap commands in it.
 - Fixtures are generated, never hand-edited: `cd frontend && npm run fixtures`.
 
+**Line references in this plan are from `main` at the time of writing.** Tasks 1–4 all edit `frontend/src/renderers/ListRenderer.jsx`, so every line number in a later task's **Files** block has already drifted by the time that task runs. Locate code by reading the file and matching on the named symbol (`addItem`, `removeItem`, the item loop, the header row), never by jumping to a line number. The `App.jsx` references in Task 7 are the exception — nothing before Task 7 touches that file.
+
 **Test selector conventions in `ListRenderer.test.jsx`** — follow them; deviating is what breaks these tests:
 
 - The add-dialog title input has **no label association**. `getByLabelText("topic")` throws. Use `within(screen.getByRole("dialog")).getAllByRole("textbox")[0]`.
