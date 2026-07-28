@@ -45,6 +45,16 @@ branches write -- so a `ui` field that is neither in the entity vocabulary nor
 in an alias list is unguarded. Closing that needs such an authority to exist
 first.
 
+Both checks work per node and both need `node.entity` to have anything to
+check against, so a node without one is SKIPPED WHOLESALE by both -- every
+field it names is unguarded. That is `kind: "fields"` and `kind: "strings"`
+nodes, which bind top-level storage keys (profile's name/bio/location) against
+no entity vocabulary at all. `kind: "list"` nodes are the ones that must never
+slip through this way, so meta_schema.json requires `entity` on them -- the
+renderer tolerates its absence, which would otherwise turn a whole editable
+node into a blind spot at exactly the point this module exists to cover. The
+tests below re-assert that rather than trusting the schema alone.
+
 The reject/accept tests below build their own manifests (based on the `goals`
 shape) rather than depending on what's currently on disk, so they exercise the
 schema regardless of whether the real manifests have been migrated to the
@@ -108,14 +118,20 @@ CANONICAL_STORED_KEY = {
 # keys that are machine-written and therefore absent from the tool contract --
 # `learning_log` displays `timestamp`, which server.py stamps on every add and
 # which `entities.learning_entry` does not list. Including it here would fail
-# a correct manifest. The consequence is that `display_fields` is unguarded by
-# the spelling check (the alias check below does still cover it). Guarding it
-# properly needs an authority on what `execute_modify` writes, which this repo
-# does not have.
+# a correct manifest.
+#
+# Be precise about what that costs, because it is easy to over-read: the alias
+# check does inspect `display_fields`, but it only ever fires on entities
+# `FIELD_ALIASES` names, and it can only ever flag a name that appears in that
+# entity's alias list. `learning_entry` is not in `FIELD_ALIASES` at all, so
+# `learning_log`'s `timestamp` -- the example above -- is checked by NOTHING.
+# It is correct today because someone read server.py. Treat a `display_fields`
+# binding as unverified unless you have read the write path yourself.
 #
 # `long_text`, `date_fields`, `sort.field`, `field_defaults`, `enum`,
-# `suggestions` and `optional` are likewise outside the spelling check and
-# likewise unguarded by it, for the same reason.
+# `suggestions` and `optional` sit outside the spelling check and are
+# unguarded by it on the same terms. Guarding any of them properly needs an
+# authority on what `execute_modify` writes, which this repo does not have.
 _SUBSET_CHECKED_KEYS = ("badges", "detail_fields", "array_fields")
 
 BASE_GOALS_MANIFEST = {
@@ -236,6 +252,42 @@ def test_list_node_missing_path_is_rejected():
     manifest = _manifest_with_ui({"sections": [{"kind": "list", "entity": "goal"}]})
     with pytest.raises(pack_loader.PackError):
         pack_loader.validate_manifest(manifest)
+
+
+def test_list_node_missing_entity_is_rejected():
+    """A list node binds editable controls to stored keys. `entity` is what
+    both guards in this module resolve those keys against, and the renderer
+    happily renders without one (falling back to node-level
+    field_defaults/enum/optional), so an author who omits it gets a working
+    section whose field names nothing checks. Rejected at authoring time."""
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {
+                    "kind": "list",
+                    "path": ["goals"],
+                    "title_field": "title",
+                    "detail_fields": ["notes"],
+                }
+            ]
+        }
+    )
+    with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(manifest)
+
+
+def test_fields_and_strings_nodes_may_omit_entity():
+    """The converse: only `list` requires it. A `fields` node names top-level
+    keys and a `strings` node names none, so neither has an entity to bind."""
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {"kind": "fields", "path": [], "fields": ["name"]},
+                {"kind": "strings", "path": ["tags"]},
+            ]
+        }
+    )
+    pack_loader.validate_manifest(manifest)  # must not raise
 
 
 def test_unknown_key_on_section_node_is_rejected():
@@ -427,7 +479,18 @@ def test_shipped_ui_blocks_name_no_mcp_input_alias(key):
     for node in _walk_sections(manifest["ui"]["sections"]):
         entity = node.get("entity")
         if not entity:
-            continue  # a `fields` node has no entity -- see module docstring
+            # A `fields`/`strings` node has no entity, so this check has
+            # nothing to resolve aliases against and skips it wholesale --
+            # see module docstring. A `list` node must never reach here: it
+            # binds editable controls, and skipping it would make this guard
+            # silently inert on the node it exists for. meta_schema.json
+            # rejects that shape; asserted again so the test does not depend
+            # on the schema staying strict.
+            assert node.get("kind") != "list", (
+                f"{key}: a list node bound to path {node.get('path')} declares "
+                f"no entity, so every field it names is unchecked"
+            )
+            continue
         offenders = ui_fields_that_are_aliases(entity, _fields_named_by(node))
         assert not offenders, (
             f"{key}: ui node for entity '{entity}' names {sorted(offenders)}, "
@@ -454,7 +517,14 @@ def test_ui_field_names_are_spelled_like_the_entity_vocabulary(key):
     for node in _walk_sections(sections):
         entity_key = node.get("entity")
         if not entity_key:
-            continue  # a `fields` node names top-level keys; no vocabulary to check
+            # No entity means no vocabulary to compare against, so the node is
+            # skipped wholesale -- see module docstring. A `list` node must
+            # never take this branch; meta_schema.json rejects that shape.
+            assert node.get("kind") != "list", (
+                f"{key}: a list node bound to path {node.get('path')} declares "
+                f"no entity, so every field it names is unchecked"
+            )
+            continue
         assert entity_key in entities, (
             f"{key}: ui node binds entity '{entity_key}' which the manifest "
             f"does not declare"
@@ -487,4 +557,13 @@ def test_ui_field_names_are_spelled_like_the_entity_vocabulary(key):
             f"'{entity_key}'. If those are real storage keys the tool contract "
             f"does not carry, declare them in this node's fields_outside_entity."
         )
-    assert checked_any, f"{key}: no ui node bound an entity -- nothing was checked"
+    if not checked_any:
+        # A pack whose sections are all `fields`/`strings` legitimately has no
+        # entity to check against (profile's top-level scalars are that
+        # shape). Any other kind reaching here means nodes were checked by
+        # nothing, which is what this assertion is for.
+        kinds = sorted({node.get("kind") for node in _walk_sections(sections)})
+        assert all(k in ("fields", "strings") for k in kinds), (
+            f"{key}: no ui node bound an entity, so nothing was checked, and "
+            f"the section kinds present are {kinds}"
+        )

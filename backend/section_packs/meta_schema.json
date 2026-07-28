@@ -123,6 +123,16 @@
         "path"
       ],
       "additionalProperties": false,
+      "allOf": [
+        {
+          "$comment": "A list node binds editable controls to an entity's stored keys, so it must name that entity. Without it the renderer still renders (falling back to node-level field_defaults/enum/optional) but tests/test_ui_schema.py has no entity to check the field names against, and a control bound to a key nothing stores would ship unnoticed.",
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "const": "list" } }
+          },
+          "then": { "required": ["entity"] }
+        }
+      ],
       "properties": {
         "kind": {
           "enum": [
