@@ -253,6 +253,11 @@
           "type": "object",
           "additionalProperties": { "enum": ["date", "datetime"] },
           "description": "Optional per-field formatting for `display_fields`. Values are parsed as dates and rendered in local time; an unparseable value is shown verbatim."
+        },
+        "fields_outside_entity": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Storage keys this node binds that the entity's tool-contract vocabulary (required + optional) deliberately does not carry. Documentation only -- the renderer ignores it. Declaring them here is how a pack whose ui names diverge from its entity names opts that node out of the spelling check in tests/test_ui_schema.py, so the divergence is stated in the manifest instead of the pack being dropped from a test list."
         }
       }
     },
