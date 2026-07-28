@@ -224,3 +224,62 @@ describe("ListRenderer", () => {
     expect(screen.queryByPlaceholderText("Custom stance…")).not.toBeInTheDocument();
   });
 });
+
+describe("@now in field_defaults", () => {
+  const node = {
+    kind: "list",
+    path: ["entries"],
+    title_field: "topic",
+    detail_fields: ["source"],
+    field_defaults: { source: "manual", timestamp: "@now" },
+  };
+
+  it("resolves @now to an ISO timestamp when an item is added", async () => {
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[]} onItems={onItems} />);
+
+    await user.click(screen.getByRole("button", { name: /add/i }));
+    const dialog = screen.getByRole("dialog");
+    const titleInput = within(dialog).getAllByRole("textbox")[0];
+    await user.type(titleInput, "React Server Components");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    const [[added]] = onItems.mock.calls;
+    expect(added[0].source).toBe("manual");
+    // Not the literal token, and parseable back to the same instant.
+    expect(added[0].timestamp).not.toBe("@now");
+    expect(new Date(added[0].timestamp).toISOString()).toBe(added[0].timestamp);
+  });
+
+  it("does not leak the raw token into the add dialog's draft", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /add/i }));
+    // `timestamp` has no control of its own, but `source` proves defaults still
+    // preselect; a literal "@now" anywhere on screen means the token escaped.
+    expect(screen.getByDisplayValue("manual")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("@now")).not.toBeInTheDocument();
+  });
+
+  it("leaves a value that merely starts with @ alone", async () => {
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={{ ...node, field_defaults: { source: "@channel" } }}
+        items={[]}
+        onItems={onItems}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /add/i }));
+    const dialog = screen.getByRole("dialog");
+    const titleInput = within(dialog).getAllByRole("textbox")[0];
+    await user.type(titleInput, "T");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    expect(onItems.mock.calls[0][0][0].source).toBe("@channel");
+  });
+});

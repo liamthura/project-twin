@@ -211,7 +211,8 @@
           "type": "object",
           "additionalProperties": {
             "type": "string"
-          }
+          },
+          "description": "Values preselected on a new item. The exact value \"@now\" is replaced by an ISO 8601 timestamp at add time; every other value is used literally."
         },
         "children": {
           "type": "array",
@@ -283,7 +284,8 @@
           "type": "object",
           "additionalProperties": {
             "type": "string"
-          }
+          },
+          "description": "Values preselected on a new item. The exact value \"@now\" is replaced by an ISO 8601 timestamp at add time; every other value is used literally."
         }
       }
     }
