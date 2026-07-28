@@ -30,11 +30,27 @@ export function getAt(obj, path) {
  * next path segment is numeric — nothing at that point signals the caller
  * intended an array, and a plain object with a `"0"` key is the safer
  * default (see `setAt({}, ["a", 0], 1)` in the tests).
+ *
+ * A non-index key onto an array (e.g. `"length"`, or any non-numeric key) is
+ * rejected rather than silently accepted: `next[key] = ...` on an array
+ * accepts *any* key, but a non-index one lands as a stray own property (or,
+ * for `"length"`, truncates the array) that `JSON.stringify` — the
+ * persistence path — drops or corrupts without a trace. Throwing here turns
+ * that into a loud bug at the point of the bad path, not a silent hole in
+ * saved data discovered later.
  */
+const ARRAY_INDEX = /^\d+$/;
+
 export function setAt(obj, path, value) {
   if (path.length === 0) return value;
   const [key, ...rest] = path;
   if (Array.isArray(obj)) {
+    if (!ARRAY_INDEX.test(String(key))) {
+      throw new Error(
+        `setAt: cannot write non-index key "${key}" onto an array -- arrays only ` +
+          `accept numeric index keys (path: ${JSON.stringify(path)})`
+      );
+    }
     const next = obj.slice();
     next[key] = setAt(obj[key], rest, value);
     return next;

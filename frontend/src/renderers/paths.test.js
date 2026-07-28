@@ -55,6 +55,20 @@ describe("setAt", () => {
     expect(Array.isArray(result.a)).toBe(false);
     expect(result).toEqual({ a: { 0: 1 } });
   });
+
+  it("throws on a non-index key written onto an array, rather than silently producing a value JSON.stringify drops", () => {
+    // Before this fix, setAt(["a"], ["goals"], [1]) returned ["a"] carrying
+    // a stray own property "goals" -- Array's own enumerable-key semantics
+    // mean JSON.stringify(["a"]) is just `["a"]`, silently dropping it.
+    // Unreachable through today's three generic packs (their paths never
+    // cross an array), but reachable as soon as a `fields` or `children`
+    // path does in waves 4-6.
+    expect(() => setAt(["a"], ["goals"], [1])).toThrow(/non-index key/);
+  });
+
+  it("throws when the non-index key is \"length\", rather than silently truncating the array", () => {
+    expect(() => setAt(["a", "b", "c"], ["length"], 0)).toThrow(/non-index key/);
+  });
 });
 
 describe("removeAt", () => {

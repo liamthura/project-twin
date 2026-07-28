@@ -12,18 +12,6 @@ const goalsPack = packs.find((p) => p.key === "goals");
 const mediaPack = packs.find((p) => p.key === "media");
 const aestheticsPack = packs.find((p) => p.key === "aesthetics");
 
-// The entity that owns a given ui list: either the one entity whose manifest
-// `list` names it explicitly, or -- when a pack has exactly one entity and no
-// `list` is given at all (goals) -- that sole entity by fallback. Mirrors
-// normalizeUi's own entity resolution.
-function entityFor(pack, listKey) {
-  const names = Object.keys(pack.entities);
-  const named = names.find((n) => pack.entities[n].list === listKey);
-  if (named) return pack.entities[named];
-  if (names.length === 1) return pack.entities[names[0]];
-  throw new Error(`no entity maps to list "${listKey}" in pack "${pack.key}"`);
-}
-
 // The coverage guard and the round-trip guard, factored so every pack with a
 // generic item list gets both without copying the test bodies. A ui block
 // that omits a field would leave that field unreachable in the UI -- and
@@ -36,7 +24,12 @@ function entityFor(pack, listKey) {
 // even if nobody updates the test.
 function describeGuards({ pack, listKey, data }) {
   const node = normalizeUi(pack).sections.find((s) => s.path[0] === listKey);
-  const entity = entityFor(pack, listKey);
+  // Resolved exactly as ListRenderer resolves it -- via node.entity, which
+  // SectionRenderer sets from `pack.entities?.[node.entity]` -- not by
+  // re-deriving it from legacy list-matching rules. Those rules live inside
+  // normalizeUi already; re-implementing them here made this guard
+  // consistent with ListRenderer only by coincidence.
+  const entity = pack.entities?.[node.entity];
   const arrayFields = node.array_fields || [];
   const covered = [...new Set([...(node.badges || []), ...(node.detail_fields || [])])];
   const item = data[listKey][0];
@@ -44,7 +37,10 @@ function describeGuards({ pack, listKey, data }) {
   function expectFieldOnScreen(field) {
     const value = item[field];
     if (value === undefined) return;
-    const options = entity.valid_values?.[field];
+    // Same precedence ListRenderer gives an inline node.enum over the
+    // entity's valid_values -- a plain `entity.valid_values?.[field]` read
+    // would classify a wave-3 node's inline enum as a plain input.
+    const options = (node.enum ?? entity?.valid_values)?.[field];
     if (options) {
       // Enums render via EnumControl, not plain inputs, so getByDisplayValue
       // can't find them. EnumControl picks its control by option count:
@@ -198,6 +194,72 @@ describe("SectionRenderer", () => {
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("fields"));
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("mixed"));
       expect(screen.getByText("Ship it")).toBeInTheDocument();
+
+      errorSpy.mockRestore();
+    });
+
+    it("does not throw when an unsupported-kind node has a malformed path, because the kind guard runs first", () => {
+      // Before the fix, `node.path.join(".")` computed the React key before
+      // the kind check ran, so a node like this one (no `path` at all)
+      // threw on the very first render -- guard or no guard.
+      const pack = {
+        key: "mixed2",
+        title: "Mixed2",
+        description: "",
+        entities: { goal: { list: "goals" } },
+        ui: {
+          sections: [
+            { kind: "fields" },
+            { kind: "list", path: ["goals"], entity: "goal", title_field: "title" },
+          ],
+        },
+      };
+      const data = { goals: [{ title: "Ship it" }] };
+
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      expect(() => renderSection({ pack, initial: data })).not.toThrow();
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("fields"));
+      expect(screen.getByText("Ship it")).toBeInTheDocument();
+
+      errorSpy.mockRestore();
+    });
+  });
+
+  // Byte-parity with the old component: a non-array found where a list is
+  // expected renders as an empty list rather than crashing. But it is the
+  // exact silent-data-loss failure the spec names, so unlike a plain
+  // coercion it must log loudly, naming the pack key and the path, rather
+  // than disappearing without a trace.
+  describe("a non-array value at a list node's path", () => {
+    const pack = {
+      key: "corrupted",
+      title: "Corrupted",
+      description: "",
+      entities: { goal: { list: "goals" } },
+      ui: {
+        sections: [{ kind: "list", path: ["goals"], entity: "goal", title_field: "title" }],
+      },
+    };
+    const data = { goals: "not a list" };
+
+    it("logs an error naming the pack key and path, and renders as an empty list", () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderSection({ pack, initial: data });
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("corrupted")
+      );
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("goals"));
+      expect(screen.getByText("Nothing here yet. Use Add, or tap a suggestion.")).toBeInTheDocument();
+
+      errorSpy.mockRestore();
+    });
+
+    it("does not log when the path is simply absent (undefined) -- that's a fresh, unpopulated section, not corruption", () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderSection({ pack, initial: {} });
+
+      expect(errorSpy).not.toHaveBeenCalled();
 
       errorSpy.mockRestore();
     });

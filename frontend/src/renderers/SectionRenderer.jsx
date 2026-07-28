@@ -13,6 +13,12 @@
 //     both the kind and the pack key) and renders nothing for that node,
 //     rather than being silently skipped -- a silent skip is how a migrated
 //     section loses a whole list without anyone noticing
+//   - the kind guard runs before anything reads node.path, so a malformed
+//     node of an unsupported kind can't throw before the guard has a chance
+//     to make it harmless
+//   - a non-array found at a list node's path also logs loudly (naming the
+//     pack key and path) before falling back to an empty list, instead of
+//     coercing silently
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAt, setAt, normalizeUi } from "./paths";
 import ListRenderer from "./ListRenderer";
@@ -28,14 +34,26 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
       </CardHeader>
       <CardContent className="space-y-6">
         {sections.map((node) => {
-          const key = node.path.join(".");
+          // The kind check runs first, before anything reads node.path --
+          // a node of an unsupported kind is not guaranteed to carry a
+          // well-formed path (or any path at all), and the guard exists
+          // precisely to make an unsupported node harmless rather than a
+          // crash. Computing `key` beforehand defeated that: node.path
+          // .join(".") would throw before the guard ever ran.
           if (node.kind !== "list") {
             console.error(
               `SectionRenderer: unsupported node kind "${node.kind}" in pack "${pack.key}"`
             );
             return null;
           }
+          const key = node.path.join(".");
           const items = getAt(data, node.path);
+          if (items !== undefined && !Array.isArray(items)) {
+            console.error(
+              `SectionRenderer: expected an array at path ${JSON.stringify(node.path)} ` +
+                `in pack "${pack.key}", got ${typeof items} -- rendering as empty`
+            );
+          }
           return (
             <div key={key} className="space-y-3">
               {node.title && (
