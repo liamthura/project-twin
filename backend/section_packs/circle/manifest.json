@@ -45,7 +45,7 @@
         "path": ["connections"],
         "entity": "connection",
         "title_field": "name",
-        "detail_fields": ["relationship", "traits", "notes"],
+        "detail_fields": ["name", "relationship", "traits", "notes"],
         "array_fields": ["traits"],
         "long_text": ["notes"],
         "searchable": true,

@@ -193,6 +193,34 @@ describe("SectionRenderer", () => {
       expect(entry.related_entries).toEqual(before.related_entries);
       expect(entry.conversation_metadata).toEqual(before.conversation_metadata);
     });
+
+    it("shows each entry's timestamp, the field it is sorted by", () => {
+      renderSection({ pack: learningLogPack, initial: learningLogData });
+      for (const entry of learningLogData.entries) {
+        const d = new Date(entry.timestamp);
+        const p = (n) => String(n).padStart(2, "0");
+        const shown =
+          `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+          `${p(d.getHours())}:${p(d.getMinutes())}`;
+        expect(screen.getByText(shown)).toBeInTheDocument();
+      }
+    });
+
+    it("lets the title field be corrected in place, without a delete and re-add", async () => {
+      const { user, latest, initial } = renderSection({
+        pack: learningLogPack, initial: learningLogData,
+      });
+      await user.click(screen.getByText("React Server Components"));
+      const input = screen.getByDisplayValue("React Server Components");
+      await user.type(input, "!");
+
+      const after = latest();
+      const expected = structuredClone(initial);
+      expected.entries[0].topic = "React Server Components!";
+      expect(after).toEqual(expected);
+      // The id must survive -- it is what related links point at.
+      expect(after.entries[0].id).toBe(initial.entries[0].id);
+    });
   });
 
   describe("circle", () => {
@@ -218,6 +246,20 @@ describe("SectionRenderer", () => {
       const { user } = renderSection({ pack: circlePack, initial: circleData });
       await user.click(screen.getByText(circleData.connections[0].name));
       expect(screen.queryByText(/^contact$/i)).not.toBeInTheDocument();
+    });
+
+    it("lets the title field be corrected in place, without a delete and re-add", async () => {
+      const { user, latest, initial } = renderSection({ pack: circlePack, initial: circleData });
+      await user.click(screen.getByText("Ada Lovelace"));
+      const input = screen.getByDisplayValue("Ada Lovelace");
+      await user.type(input, "!");
+
+      const after = latest();
+      const expected = structuredClone(initial);
+      expected.connections[0].name = "Ada Lovelace!";
+      expect(after).toEqual(expected);
+      // The id must survive -- it is what related links point at.
+      expect(after.connections[0].id).toBe(initial.connections[0].id);
     });
   });
 

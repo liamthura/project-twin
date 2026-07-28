@@ -50,12 +50,14 @@
         "entity": "learning_entry",
         "title_field": "topic",
         "badges": ["source"],
-        "detail_fields": ["details", "source", "tags", "key_decisions", "followup_items"],
+        "detail_fields": ["topic", "details", "source", "tags", "key_decisions", "followup_items"],
         "array_fields": ["tags", "key_decisions", "followup_items"],
         "long_text": ["details"],
         "field_defaults": { "source": "manual", "timestamp": "@now" },
         "sort": { "field": "timestamp", "dir": "desc" },
-        "searchable": true
+        "searchable": true,
+        "display_fields": ["timestamp"],
+        "display_formats": { "timestamp": "datetime" }
       }
     ]
   }

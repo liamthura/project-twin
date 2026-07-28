@@ -22,6 +22,23 @@ import { InfoDialog } from "@/components/ui/info-dialog";
 import { VALUE_META, FOCUS_RING, ValueIcon } from "@/components/controls";
 import { ScalarField, LONG_TEXT_FIELDS } from "./ScalarField";
 
+// Read-only display of a machine-written key (a created-at stamp, an id).
+// Local time and locale-free: the stored value is UTC, showing it raw would
+// be wrong by the offset, and a locale-formatted string would make the same
+// log read differently on two machines. An unparseable value is shown
+// verbatim rather than dropped -- nothing validates these on write, and
+// hiding a value the user can see in their own JSON is worse than an odd
+// looking badge.
+function formatDisplay(value, format) {
+  const raw = String(value);
+  if (!format) return raw;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return raw;
+  const p = (n) => String(n).padStart(2, "0");
+  const date = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  return format === "date" ? date : `${date} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 export default function ListRenderer({ node, entity, items, onItems, onShowConfirmation }) {
   const [expanded, setExpanded] = useState({});
   const [addOpen, setAddOpen] = useState(false);
@@ -307,6 +324,13 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                 <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expanded[idx] ? "" : "-rotate-90"}`} />
                 <span className="truncate text-sm font-medium">{item[titleField]}</span>
                 <span className="flex flex-1 items-center gap-1.5">
+                  {(node.display_fields || [])
+                    .filter((f) => item[f] != null && item[f] !== "")
+                    .map((f) => (
+                      <Badge key={f} variant="secondary" className="gap-1 text-[10px] font-mono">
+                        {formatDisplay(item[f], node.display_formats?.[f])}
+                      </Badge>
+                    ))}
                   {badges.filter((b) => item[b]).map((b) => {
                     const value = String(item[b]);
                     const chip = VALUE_META[value]?.chip;

@@ -243,6 +243,16 @@
             "overview": { "type": "string", "minLength": 1 },
             "tips": { "type": "array", "items": { "type": "string" } }
           }
+        },
+        "display_fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Storage keys shown read-only as badges on the collapsed row. Unlike `badges`, these are never rendered as editable controls -- use for machine-written values such as a created-at stamp."
+        },
+        "display_formats": {
+          "type": "object",
+          "additionalProperties": { "enum": ["date", "datetime"] },
+          "description": "Optional per-field formatting for `display_fields`. Values are parsed as dates and rendered in local time; an unparseable value is shown verbatim."
         }
       }
     },

@@ -573,6 +573,77 @@ describe("search combined with sort", () => {
   });
 });
 
+describe("display_fields", () => {
+  const node = {
+    kind: "list",
+    path: ["entries"],
+    title_field: "topic",
+    detail_fields: ["details"],
+    display_fields: ["timestamp"],
+    display_formats: { timestamp: "datetime" },
+  };
+  const iso = "2026-01-15T09:30:00.000Z";
+  // Formatting is local-time, so derive the expectation the same way rather
+  // than hardcoding a string that breaks in another timezone.
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, "0");
+  const expected =
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}`;
+  const items = [{ topic: "RSC", details: "d", timestamp: iso }];
+
+  it("renders the value formatted, not as a raw ISO string", () => {
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    expect(screen.queryByText(iso)).not.toBeInTheDocument();
+  });
+
+  it("renders date-only when the format says so", () => {
+    render(
+      <ListRenderer
+        node={{ ...node, display_formats: { timestamp: "date" } }}
+        items={items}
+        onItems={vi.fn()}
+      />
+    );
+    expect(screen.getByText(expected.slice(0, 10))).toBeInTheDocument();
+  });
+
+  it("is read-only -- expanding the row exposes no control bound to it", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    await user.click(screen.getByText("RSC"));
+    // `details` proves the row really did expand.
+    expect(screen.getByDisplayValue("d")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue(iso)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(expected)).not.toBeInTheDocument();
+  });
+
+  it("shows an unparseable value as-is rather than hiding it", () => {
+    render(
+      <ListRenderer node={node} items={[{ topic: "T", timestamp: "next spring" }]} onItems={vi.fn()} />
+    );
+    expect(screen.getByText("next spring")).toBeInTheDocument();
+  });
+
+  it("renders nothing extra for a node that declares no display_fields", () => {
+    const { container } = render(
+      <ListRenderer node={{ ...node, display_fields: undefined, display_formats: undefined }}
+        items={items} onItems={vi.fn()} />
+    );
+    expect(screen.queryByText(expected)).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".font-mono")).toHaveLength(0);
+  });
+
+  it("omits the badge for an item missing the field, without affecting siblings", () => {
+    render(
+      <ListRenderer node={node} items={[...items, { topic: "No date", details: "x" }]} onItems={vi.fn()} />
+    );
+    expect(screen.getByText("No date")).toBeInTheDocument();
+    expect(screen.getAllByText(expected)).toHaveLength(1);
+  });
+});
+
 describe("info", () => {
   const info = { overview: "Who matters to you.", tips: ["Name: their name.", "Notes: context."] };
   const node = { kind: "list", path: ["items"], title_field: "name", info };
