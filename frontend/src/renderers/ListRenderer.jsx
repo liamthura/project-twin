@@ -97,15 +97,25 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
   if (node.sort?.field) {
     const { field, dir = "asc" } = node.sort;
     const sign = dir === "desc" ? -1 : 1;
+    // An empty string looks blank to the user exactly like a missing key
+    // does, so both must be treated as absent -- otherwise "" (not == null)
+    // falls through to the localeCompare branch, where it sorts before any
+    // non-empty string on an ascending list instead of trailing like a
+    // missing key does.
+    const missing = (v) => v == null || v === "";
     order.sort((a, b) => {
       const av = items[a]?.[field];
       const bv = items[b]?.[field];
-      // A missing key sorts last in both directions: an undated row is not
-      // "oldest", it is unknown, and dropping it off the top of a desc list
-      // would hide it.
-      if (av == null && bv == null) return 0;
-      if (av == null) return 1;
-      if (bv == null) return -1;
+      // A missing (or blank) key sorts last in both directions: an undated
+      // row is not "oldest", it is unknown, and dropping it off the top of a
+      // desc list would hide it.
+      if (missing(av) && missing(bv)) return 0;
+      if (missing(av)) return 1;
+      if (missing(bv)) return -1;
+      // Two real numbers compare numerically (so 2 sorts before 10); every
+      // other case -- including numeric strings like "10" -- compares as
+      // text, since JSON gives no signal that a string was meant as a number.
+      if (typeof av === "number" && typeof bv === "number") return sign * (av - bv);
       return sign * String(av).localeCompare(String(bv));
     });
   }

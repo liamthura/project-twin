@@ -224,7 +224,7 @@
           "type": "object",
           "required": ["field"],
           "additionalProperties": false,
-          "description": "Display order only. Rows are sorted by this storage key; the stored array is never reordered. Items missing the key sort last.",
+          "description": "Display order only. Rows are sorted by this storage key; the stored array is never reordered. Two numbers compare numerically; everything else compares as text. Items where the key is missing or an empty string sort last, regardless of direction.",
           "properties": {
             "field": { "type": "string" },
             "dir": { "enum": ["asc", "desc"] }

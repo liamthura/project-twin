@@ -372,4 +372,41 @@ describe("sort", () => {
       "Newest", "Middle", "Oldest", "Undated",
     ]);
   });
+
+  it("compares numeric sort fields numerically, not lexicographically", () => {
+    const numericNode = {
+      kind: "list",
+      path: ["entries"],
+      title_field: "topic",
+      detail_fields: ["source"],
+      sort: { field: "priority", dir: "asc" },
+    };
+    const numericItems = [
+      { topic: "Ten", source: "a", priority: 10 },
+      { topic: "Two", source: "b", priority: 2 },
+    ];
+    // Lexicographic compare would put "10" before "2"; numeric compare must not.
+    render(<ListRenderer node={numericNode} items={numericItems} onItems={vi.fn()} />);
+    const rows = screen.getAllByText(/Ten|Two/);
+    expect(rows.map((r) => r.textContent)).toEqual(["Two", "Ten"]);
+  });
+
+  it("sorts a blank string and a missing key the same way -- both last, neither at the top", () => {
+    // Ascending is the direction that actually exposes the bug: `av == null`
+    // is false for "", so an unfixed comparator's localeCompare branch treats
+    // "" as sorting before any non-empty string, putting the blank row
+    // *ahead* of the real value on an ascending list -- the missing-key row
+    // trails correctly (that branch isn't sign-dependent), so the two blank-
+    // looking rows would land at opposite ends instead of both trailing.
+    const ascNode = { ...node, sort: { field: "timestamp", dir: "asc" } };
+    const withBlankAndMissing = [
+      { topic: "Blank", source: "a", timestamp: "" },
+      { topic: "Dated", source: "b", timestamp: "2026-03-01T00:00:00.000Z" },
+      { topic: "Missing", source: "c" },
+    ];
+    render(<ListRenderer node={ascNode} items={withBlankAndMissing} onItems={vi.fn()} />);
+    const rows = screen.getAllByText(/Blank|Dated|Missing/);
+    // The one real value must lead; neither blank-looking row may precede it.
+    expect(rows.map((r) => r.textContent)).toEqual(["Dated", "Blank", "Missing"]);
+  });
 });
