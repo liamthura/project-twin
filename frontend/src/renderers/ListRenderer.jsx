@@ -21,6 +21,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { InfoDialog } from "@/components/ui/info-dialog";
 import { VALUE_META, FOCUS_RING, ValueIcon, SEGMENTED_MAX } from "@/components/controls";
 import { ScalarField, LONG_TEXT_FIELDS } from "./ScalarField";
+import { buildOrder, filterVisible } from "./listPipeline";
 
 // Read-only display of a machine-written key (a created-at stamp, an id).
 // Local time and locale-free: the stored value is UTC, showing it raw would
@@ -167,53 +168,10 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
     } else doRemove();
   };
 
-  // Display order only. The indexes are sorted, never the array, because
-  // updateItem/removeItem address the real stored position -- sorting a copy and
-  // handing them display positions would edit the wrong row.
-  const order = items.map((_, i) => i);
-  if (node.sort?.field) {
-    const { field, dir = "asc" } = node.sort;
-    const sign = dir === "desc" ? -1 : 1;
-    // An empty string looks blank to the user exactly like a missing key
-    // does, so both must be treated as absent -- otherwise "" (not == null)
-    // falls through to the localeCompare branch, where it sorts before any
-    // non-empty string on an ascending list instead of trailing like a
-    // missing key does.
-    const missing = (v) => v == null || v === "";
-    order.sort((a, b) => {
-      const av = items[a]?.[field];
-      const bv = items[b]?.[field];
-      // A missing (or blank) key sorts last in both directions: an undated
-      // row is not "oldest", it is unknown, and dropping it off the top of a
-      // desc list would hide it.
-      if (missing(av) && missing(bv)) return 0;
-      if (missing(av)) return 1;
-      if (missing(bv)) return -1;
-      // Two real numbers compare numerically (so 2 sorts before 10); every
-      // other case -- including numeric strings like "10" -- compares as
-      // text, since JSON gives no signal that a string was meant as a number.
-      if (typeof av === "number" && typeof bv === "number") return sign * (av - bv);
-      return sign * String(av).localeCompare(String(bv));
-    });
-  }
-
-  // Display filter only, applied after sorting -- like `order`, this holds
-  // stored indexes, never display positions, so updateItem/removeItem still
-  // address the real row while a filter is active.
-  // The union of what both deleted editors searched: title, badges, detail
-  // fields, and every entry of an array field.
+  const order = buildOrder(items, node.sort);
   const searchFields = [...new Set([titleField, ...badges, ...detailFields, ...arrayFields])];
   const q = query.trim().toLowerCase();
-  const visible = !q
-    ? order
-    : order.filter((i) => {
-        const item = items[i];
-        return searchFields.some((f) => {
-          const v = item?.[f];
-          if (Array.isArray(v)) return v.some((e) => String(e).toLowerCase().includes(q));
-          return v != null && String(v).toLowerCase().includes(q);
-        });
-      });
+  const visible = filterVisible(order, items, q, searchFields);
 
   return (
     <div className="space-y-3">
@@ -394,6 +352,7 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                   })}
                 </span>
                 <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0"
+                  aria-label={`Remove ${item[titleField] || "Untitled entry"}`}
                   onClick={(e) => { e.stopPropagation(); removeItem(idx); }}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>

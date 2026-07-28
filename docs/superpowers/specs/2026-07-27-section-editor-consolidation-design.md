@@ -213,6 +213,18 @@ sections: [ { kind: "list", path: [key], ...value } for each key ]
 Existing packs keep working with no manifest change. The three in-repo packs are moved to
 the explicit form in wave 2 for consistency, but nothing forces that on a user's pack.
 
+**One narrowing, added in the wave 4 prerequisites.** A node in the explicit form with
+`kind: "list"` must now declare `entity`. It was previously optional, and an entity-less
+list node was silently skipped by both `ui` guards while still rendering and writing
+normally — so a control could bind to a key nothing reads with nothing to catch it. The
+promise above still holds where it was aimed: the legacy flat map is normalised, not
+rejected, and no pack using it is affected. What changed is a requirement inside the
+explicit `sections` form, which wave 2 introduced days earlier and which no third-party
+pack can plausibly be using yet. A pack that does hit it fails validation, and `load_packs`
+warns and skips that pack rather than refusing to boot — so the section disappears rather
+than taking the server down. That is the deliberate trade: a missing section is recoverable,
+an unchecked editable node writing unreadable keys is not.
+
 `meta_schema.json` gains a real `ui` definition — node kinds, required keys per kind,
 recursive `children` — replacing today's unvalidated `{"type": "object"}`.
 
@@ -364,6 +376,45 @@ Convergence losses in wave 3 that were not on the original drop list, recorded s
 is visible rather than rediscovered: field placeholders (`"e.g. React Server Components"`),
 the `"Untitled entry"` / `"Untitled connection"` fallbacks, and `circle`'s fifth info tip. The
 date badge *was* restored, as `display_fields`.
+
+### State after the wave 4 prerequisites
+
+The three items above are addressed, with one exception and one carry-forward.
+
+**The `renderNode` seam exists and is half ready.** `frontend/src/renderers/renderNode.jsx` takes
+`value` and `onValue` as arguments rather than deriving them from a section root, so a caller
+*can* resolve a child's path against a list item. That was the part that mattered. But its only
+future caller cannot supply two of its six parameters: `ListRenderer` receives a single
+**resolved** `entity` object and no `packKey`, while `renderNode` needs the whole `entities` map
+and the pack key. Calling it from inside a row today would pass `entities: undefined`, so every
+child node's `valid_values`, `field_defaults` and `optional` would silently degrade — an enum
+rendering as a free-text box, which is the exact silent-binding failure this project exists to
+prevent — and its error logs would read `pack "undefined"`.
+
+So wave 4's first step is three small edits, not a one-liner: thread `entities` and `packKey`
+through `ListRenderer` into its `renderNode` call and `SectionRenderer`'s. `ListRenderer` will
+also need `setAt`, because `updateItem(idx, changes)` takes a flat field map and cannot express
+a nested child path. **Put this in the wave 4 plan rather than leaving it to be discovered.**
+
+The `ListRenderer → renderNode → ListRenderer` import cycle is still unexercised, because
+`children` is not implemented. It should survive — both sides reference the import only inside
+a render-time function body, never at module init — but nothing proves it yet.
+
+**The residual hole is now the largest risk, and it is unchanged.** `display_fields`,
+`sort.field`, `field_defaults` keys and every field on a `kind: "fields"` or `kind: "strings"`
+node are asserted by a human and checked by nothing. The alias guard added in these
+prerequisites has real teeth only where `FIELD_ALIASES` names the entity — today that is
+exactly one node (`circle`'s `connection`). It becomes load-bearing when wave 4 migrates
+`knowledge` (`mental_tab`, which persists `title`, not the `name` or `topic` its alias list
+starts with) and `projects` (`top_of_mind`, which persists `idea`, a key absent from its alias
+list entirely).
+
+`profile` is a `kind: "fields"` shape, so its top-level bindings — `name`, `preferred_name`,
+`bio` — would ship guarded by nothing at all. Closing this needs a machine-readable authority
+on what the 37 `execute_modify` branches actually write, which is the backend reconciliation
+this spec deferred as a sequel. That deferral is now doing real work rather than being
+theoretical, and it is worth deciding whether to pull it forward **before** wave 4 rather than
+after.
 
 ## Sourcing UI primitives
 
@@ -543,7 +594,7 @@ plus a `ui` block, with no frontend code at all.
 | Stored `preferences` data in the legacy flat shape is blanked | Backend normalisation lands in the same PR, ahead of the editor deletion, with a test against old-shape data |
 | Vite 7 upgrade breaks the production image | Wave 0 is a standalone PR, merged and deployed before any renderer work |
 | The renderer accretes per-section special cases and becomes what it replaced | Convergence was chosen over parity precisely to prevent this; any node kind beyond the three specified needs justifying against that |
-| Third-party pack authors' `ui` blocks break | New schema is a strict superset; the old flat form is normalised, not rejected |
+| Third-party pack authors' `ui` blocks break | The old flat form is normalised, not rejected, so no pack using it is affected. One narrowing since: a `kind: "list"` node in the explicit form must declare `entity` — see "Backwards compatibility" for why that trade was taken |
 
 ## Open questions
 

@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 
 import jsonschema
+from jsonschema.exceptions import best_match
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +40,16 @@ def _validator() -> jsonschema.Draft202012Validator:
 
 def validate_manifest(manifest: dict) -> None:
     """Schema + intra-pack cross-reference checks. Raises PackError."""
-    errors = sorted(_validator().iter_errors(manifest), key=lambda e: list(e.path))
-    if errors:
-        first = errors[0]
-        where = "/".join(str(p) for p in first.path) or "<root>"
-        raise PackError(f"manifest schema violation at {where}: {first.message}")
+    error = best_match(_validator().iter_errors(manifest))
+    # best_match descends into a `oneOf`/`anyOf` branch's own errors instead of
+    # reporting the top-level "not valid under any of the given schemas" --
+    # e.g. a `ui` list node missing `entity` fails both `$defs.ui` branches, so
+    # the plain-first-by-path error used to name `ui` and dump the whole block
+    # without ever saying `entity` is what's missing. This is purely about
+    # which error is reported; it changes nothing about what validates.
+    if error is not None:
+        where = "/".join(str(p) for p in error.path) or "<root>"
+        raise PackError(f"manifest schema violation at {where}: {error.message}")
 
     defaults = manifest["defaults"]
     for list_key, _prefix in manifest["id_lists"]:
