@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import SectionRenderer from "@/renderers/SectionRenderer";
 import packs from "@/__fixtures__/packs.json";
 import goalsData from "@/__fixtures__/data/goals.json";
@@ -7,6 +7,7 @@ import mediaData from "@/__fixtures__/data/media.json";
 import aestheticsData from "@/__fixtures__/data/aesthetics.json";
 import learningLogData from "@/__fixtures__/data/learning_log.json";
 import circleData from "@/__fixtures__/data/circle.json";
+import projectsData from "@/__fixtures__/data/projects.json";
 import { renderSection } from "@/test/harness";
 import { SEGMENTED_MAX } from "@/components/controls";
 import { normalizeUi } from "@/renderers/paths";
@@ -16,6 +17,7 @@ const mediaPack = packs.find((p) => p.key === "media");
 const aestheticsPack = packs.find((p) => p.key === "aesthetics");
 const learningLogPack = packs.find((p) => p.key === "learning_log");
 const circlePack = packs.find((p) => p.key === "circle");
+const projectsPack = packs.find((p) => p.key === "projects");
 
 // The coverage guard and the round-trip guard, factored so every pack with a
 // generic item list gets both without copying the test bodies. A ui block
@@ -261,6 +263,207 @@ describe("SectionRenderer", () => {
       expect(after).toEqual(expected);
       // The id must survive -- it is what related links point at.
       expect(after.connections[0].id).toBe(initial.connections[0].id);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // projects (wave 4, Task 5)
+  //
+  // Two lists in one section, and the first one carries a nested child list.
+  // Both facts change how selectors have to be written here:
+  //
+  //   - `Add` and `Search` exist once per list node, and a third `Add` appears
+  //     inside an expanded project row (the References child). None of the
+  //     three accessible names is namespaced by level, so anything selecting
+  //     one of them scopes by block first -- see `topOfMindBlock` below.
+  //   - The info button's aria-label is hardcoded to "About this section" in
+  //     ListRenderer, so with two `info` blocks in one section there are two
+  //     identically-named buttons. They are distinguished by DOM order, which
+  //     is section order: [0] projects, [1] top_of_mind.
+  //   - Child rows and detail controls only exist once a row is EXPANDED, so
+  //     every assertion about them clicks the row first.
+  // -------------------------------------------------------------------------
+  describe("projects", () => {
+    // describeGuards names its tests after the PACK, so running it twice for
+    // one pack would produce two identically-named cases and a failure report
+    // that cannot say which list broke. Nesting each call under the list key
+    // is what keeps them tellable apart.
+    describe("projects list", () => {
+      describeGuards({ pack: projectsPack, listKey: "projects", data: projectsData });
+    });
+    describe("top_of_mind list", () => {
+      describeGuards({ pack: projectsPack, listKey: "top_of_mind", data: projectsData });
+    });
+
+    // The wrapper SectionRenderer draws around a node that declares a
+    // `title`: <div><h3>Top of Mind</h3>{list}</div>. Located by the heading
+    // rather than by DOM position so it survives a reordering of sections.
+    const topOfMindBlock = () => screen.getByText("Top of Mind").parentElement;
+
+    // ---- the top_of_mind trap: stored key is `idea`, manifest says `item` ---
+
+    it("renders each top-of-mind entry's `idea`, the key server.py actually stores", () => {
+      renderSection({ pack: projectsPack, initial: projectsData });
+      for (const entry of projectsData.top_of_mind) {
+        expect(screen.getByText(entry.idea)).toBeInTheDocument();
+      }
+    });
+
+    // The read-side test above only proves existing rows render. This is the
+    // write side, and it is the half that loses data: `execute_modify`
+    // dedupes top_of_mind on `idea` (server.py's get_idea_text), so an entry
+    // written under `item` is invisible to the dedupe and the same idea can
+    // be added without limit. A ui block with title_field "item" passes
+    // nothing here -- the new entry would be {item: ...} and both assertions
+    // below fail.
+    it("writes a new entry under `idea`, the key execute_modify dedupes on -- never the manifest's `item`", async () => {
+      const { user, latest, initial } = renderSection({
+        pack: projectsPack, initial: projectsData,
+      });
+      await user.click(within(topOfMindBlock()).getByRole("button", { name: "Add" }));
+
+      const dialog = screen.getByRole("dialog");
+      await user.type(within(dialog).getAllByRole("textbox")[0], "Sketch a CLI");
+      await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+      const after = latest();
+      // addItem prepends, so the new entry is at index 0.
+      expect(after.top_of_mind[0]).toEqual({ idea: "Sketch a CLI" });
+      expect(after.top_of_mind[0]).not.toHaveProperty("item");
+      // Everything else in the section is untouched.
+      expect(after.top_of_mind.slice(1)).toEqual(initial.top_of_mind);
+      expect(after.projects).toEqual(initial.projects);
+    });
+
+    // Mirrors circle's `contact` guard. `item` would land as a detail-field
+    // Label, whose DOM text is the lowercase storage key (CSS capitalizes
+    // it), and those only render once the row is expanded -- asserting on a
+    // collapsed list would pass whether or not the manifest named `item`.
+    it("exposes no control for `item`, which is an MCP input alias and not a stored key", async () => {
+      const { user } = renderSection({ pack: projectsPack, initial: projectsData });
+      await user.click(screen.getByText(projectsData.top_of_mind[0].idea));
+      // Proof the row really expanded.
+      expect(
+        screen.getByDisplayValue(projectsData.top_of_mind[0].note)
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/^item$/i)).not.toBeInTheDocument();
+    });
+
+    // ---- the references child list ----
+
+    it("round-trips an edit to a `references` child, preserving every other key on the project", async () => {
+      const { user, latest, initial } = renderSection({
+        pack: projectsPack, initial: projectsData,
+      });
+      // Two clicks: the project row, then the reference row inside it.
+      await user.click(screen.getByText("MyGist"));
+      await user.click(screen.getByText("Design doc"));
+      await user.type(
+        screen.getByDisplayValue("https://example.invalid/mygist-design"),
+        "?v=2"
+      );
+
+      const after = latest();
+      const expected = structuredClone(initial);
+      expected.projects[0].references[1].url =
+        "https://example.invalid/mygist-design?v=2";
+      expect(after).toEqual(expected);
+      // Named explicitly because these are exactly the keys a whitelist-based
+      // rebuild would drop, and `toEqual` above states it less legibly:
+      // machine-written stamps, the link graph, and the three write-only
+      // keys server.py's update loop can set that nothing renders.
+      const p = after.projects[0];
+      expect(p.id).toBe(initial.projects[0].id);
+      expect(p.added_date).toBe(initial.projects[0].added_date);
+      expect(p.last_updated).toBe(initial.projects[0].last_updated);
+      expect(p.related).toEqual(initial.projects[0].related);
+      expect(p.url).toBe(initial.projects[0].url);
+      expect(p.challenges).toBe(initial.projects[0].challenges);
+      expect(p.goals).toBe(initial.projects[0].goals);
+    });
+
+    it("renders a project's references only inside its own expanded row", async () => {
+      const { user } = renderSection({ pack: projectsPack, initial: projectsData });
+      expect(screen.queryByText("References")).not.toBeInTheDocument();
+      expect(screen.queryByText("Repo")).not.toBeInTheDocument();
+
+      // The second project stores `references: []`, so expanding it must show
+      // the child list's own empty state, not the first project's rows.
+      await user.click(screen.getByText("Rangefinder rebuild"));
+      expect(screen.getByText("References")).toBeInTheDocument();
+      expect(screen.queryByText("Repo")).not.toBeInTheDocument();
+
+      await user.click(screen.getByText("MyGist"));
+      expect(screen.getByText("Repo")).toBeInTheDocument();
+      expect(screen.getByText("Design doc")).toBeInTheDocument();
+    });
+
+    // ---- collapsed-row read-only chips ----
+
+    it("counts references, tags and highlights on the collapsed row, and shows no chip for a project with none", () => {
+      renderSection({ pack: projectsPack, initial: projectsData });
+      expect(screen.getByText("2 references")).toBeInTheDocument();
+      expect(screen.getByText("2 tags")).toBeInTheDocument();
+      expect(screen.getByText("2 highlights")).toBeInTheDocument();
+      // The second project stores [] for all three: a "0 x" chip on every
+      // row that has never used a feature is noise, so none is rendered.
+      expect(screen.queryByText(/^0 /)).not.toBeInTheDocument();
+    });
+
+    // `added_date` is stored as a plain yyyy-mm-dd calendar date, not an
+    // instant, so it is deliberately displayed with NO `display_formats`
+    // entry. ListRenderer's "date" format runs the value through
+    // `new Date(...)` and reads local-time getters: a date-only string parses
+    // as UTC midnight, so in any negative-offset zone (verified:
+    // TZ=America/New_York renders "2026-01-12" as "2026-01-11") the badge
+    // would show the wrong day. Raw passthrough produces the identical
+    // yyyy-mm-dd string with no offset to get wrong.
+    //
+    // This assertion is only half a guard on its own -- it cannot fail in a
+    // UTC or positive-offset zone, which is where this suite runs -- so the
+    // manifest's own omission is asserted alongside it.
+    it("shows `added_date` verbatim, with no timezone-shifting format applied", () => {
+      renderSection({ pack: projectsPack, initial: projectsData });
+      for (const project of projectsData.projects) {
+        expect(screen.getByText(project.added_date)).toBeInTheDocument();
+      }
+      const node = normalizeUi(projectsPack).sections.find(
+        (s) => s.path[0] === "projects"
+      );
+      expect(node.display_fields).toEqual(["added_date"]);
+      expect(node.display_formats?.added_date).toBeUndefined();
+    });
+
+    it("is read-only about `added_date` -- expanding a row exposes no control bound to it", async () => {
+      const { user } = renderSection({ pack: projectsPack, initial: projectsData });
+      await user.click(screen.getByText("MyGist"));
+      expect(screen.getByDisplayValue("MyGist")).toBeInTheDocument(); // really expanded
+      expect(screen.queryByDisplayValue("2026-01-12")).not.toBeInTheDocument();
+    });
+
+    // ---- facet ----
+
+    it("renders a status filter whose options resolve from the entity's valid_values", () => {
+      renderSection({ pack: projectsPack, initial: projectsData });
+      // ListRenderer skips a facet field whose options do not resolve, so the
+      // group's presence is what proves `facets: ["status"]` names a real
+      // enum key -- a typo such as "state" renders nothing here.
+      const group = screen.getByRole("group", { name: "Filter by status" });
+      // Five statuses plus the leading "All" exceed SEGMENTED_MAX, so this is
+      // the dropdown branch; unfiltered, it reads "All".
+      expect(within(group).getByRole("combobox").textContent).toBe("All");
+    });
+
+    // ---- info dialogs ----
+
+    it("carries both bespoke-editor info dialogs, one per list", async () => {
+      const { user } = renderSection({ pack: projectsPack, initial: projectsData });
+      const buttons = screen.getAllByRole("button", { name: /about this section/i });
+      expect(buttons).toHaveLength(2);
+
+      await user.click(buttons[1]); // top_of_mind is the second section node
+      expect(screen.getByText(/Capture quick ideas/)).toBeInTheDocument();
+      expect(screen.getByText(/A short phrase or sentence/)).toBeInTheDocument();
     });
   });
 

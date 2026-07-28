@@ -1,0 +1,58 @@
+{
+  "projects": [
+    {
+      "id": "project_a1b2c3d4",
+      "name": "MyGist",
+      "description": "Portable personal context for AI assistants, served over MCP.",
+      "status": "active",
+      "tags": ["mcp", "fastapi"],
+      "highlights": [
+        "Shipped the section pack loader",
+        "Halved the minimal context payload"
+      ],
+      "references": [
+        {
+          "name": "Repo",
+          "url": "https://example.invalid/mygist-repo",
+          "notes": "Monorepo: backend, frontend, section packs."
+        },
+        {
+          "name": "Design doc",
+          "url": "https://example.invalid/mygist-design",
+          "notes": "Wave planning and the storage key audit."
+        }
+      ],
+      "notes": "Wave 4 moves the bespoke editors onto the generic renderer.",
+      "added_date": "2026-01-12",
+      "last_updated": "2026-07-20",
+      "url": "https://example.invalid/mygist-home",
+      "challenges": "Keeping the MCP tool contract and the storage schema apart.",
+      "goals": "Retire every bespoke editor.",
+      "related": ["top_11223344"]
+    },
+    {
+      "id": "project_e5f6a7b8",
+      "name": "Rangefinder rebuild",
+      "description": "Restoring a 1970s film camera end to end.",
+      "status": "paused",
+      "tags": [],
+      "highlights": [],
+      "references": [],
+      "notes": "",
+      "added_date": "2025-11-03"
+    }
+  ],
+  "top_of_mind": [
+    {
+      "id": "top_11223344",
+      "idea": "Publish a read only persona link",
+      "note": "Needs a redaction pass before anything leaves the box.",
+      "related": ["project_a1b2c3d4"]
+    },
+    {
+      "id": "top_55667788",
+      "idea": "Try a local embedding model",
+      "note": ""
+    }
+  ]
+}
