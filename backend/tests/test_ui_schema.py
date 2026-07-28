@@ -31,7 +31,7 @@ import pack_loader
 # entity vocabulary (e.g. `projects`, `knowledge`, `profile`), and this test
 # will need reworking to account for that divergence rather than those packs
 # simply being left out of this list to keep it green.
-GENERIC_PACKS = ["goals", "media", "aesthetics", "learning_log"]
+GENERIC_PACKS = ["goals", "media", "aesthetics", "learning_log", "circle"]
 
 BASE_GOALS_MANIFEST = {
     "key": "goals",

@@ -5,6 +5,7 @@ import goalsData from "@/__fixtures__/data/goals.json";
 import mediaData from "@/__fixtures__/data/media.json";
 import aestheticsData from "@/__fixtures__/data/aesthetics.json";
 import learningLogData from "@/__fixtures__/data/learning_log.json";
+import circleData from "@/__fixtures__/data/circle.json";
 import { renderSection } from "@/test/harness";
 import { SEGMENTED_MAX } from "@/components/controls";
 import { normalizeUi } from "@/renderers/paths";
@@ -13,6 +14,7 @@ const goalsPack = packs.find((p) => p.key === "goals");
 const mediaPack = packs.find((p) => p.key === "media");
 const aestheticsPack = packs.find((p) => p.key === "aesthetics");
 const learningLogPack = packs.find((p) => p.key === "learning_log");
+const circlePack = packs.find((p) => p.key === "circle");
 
 // The coverage guard and the round-trip guard, factored so every pack with a
 // generic item list gets both without copying the test bodies. A ui block
@@ -190,6 +192,32 @@ describe("SectionRenderer", () => {
       expect(entry.timestamp).toBe(before.timestamp);
       expect(entry.related_entries).toEqual(before.related_entries);
       expect(entry.conversation_metadata).toEqual(before.conversation_metadata);
+    });
+  });
+
+  describe("circle", () => {
+    describeGuards({ pack: circlePack, listKey: "connections", data: circleData });
+
+    it("offers the info dialog carried by the manifest", async () => {
+      const { user } = renderSection({ pack: circlePack, initial: circleData });
+      await user.click(screen.getByRole("button", { name: /about this section/i }));
+      expect(screen.getByText(/Track the important people/)).toBeInTheDocument();
+      expect(screen.getByText(/The person's full name/)).toBeInTheDocument();
+    });
+
+    // The brief's version of this test rendered the section unexpanded and
+    // checked for the text "contact" -- but detail_fields (where a mistaken
+    // "contact" entry would land) only render once an item is expanded, so
+    // that version would pass identically whether or not the manifest
+    // declared `contact` as a detail field. It cannot tell correct from
+    // broken. Expanding the item first makes it a real guard: with `contact`
+    // wrongly included, a "Contact" label (rendered via
+    // `f.replace(/_/g, " ")` + CSS `capitalize`, so its DOM text is lowercase
+    // "contact") would appear here and fail this assertion.
+    it("does not expose `contact`, which is an MCP alias for name and not a stored key", async () => {
+      const { user } = renderSection({ pack: circlePack, initial: circleData });
+      await user.click(screen.getByText(circleData.connections[0].name));
+      expect(screen.queryByText(/^contact$/i)).not.toBeInTheDocument();
     });
   });
 

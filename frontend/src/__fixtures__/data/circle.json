@@ -1,0 +1,18 @@
+{
+  "connections": [
+    {
+      "id": "connection_20260102_aa11bb",
+      "name": "Ada Lovelace",
+      "relationship": "Mentor from the analytical engine days",
+      "traits": ["mathematical", "patient"],
+      "notes": "Introduced me to the idea that a machine could manipulate symbols, not just numbers."
+    },
+    {
+      "id": "connection_20260214_cc22dd",
+      "name": "Grace Hopper",
+      "relationship": "Colleague",
+      "traits": ["pragmatic"],
+      "notes": "Insists the hardest thing is convincing people to stop doing it the old way."
+    }
+  ]
+}
