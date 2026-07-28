@@ -14,6 +14,10 @@ import { EnumControl } from "@/components/controls";
 // own `meta.long_text` can pass this one through.
 export const LONG_TEXT_FIELDS = new Set(["notes", "why", "description"]);
 
+// What <input type="date"> will accept and round-trip. Anything else it
+// discards on render, showing an empty picker.
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 export function ScalarField({ field, value, meta, onChange, customValue, onCustomChange }) {
   // meta.long_text is documented as a Set (that's what every caller inside
   // this codebase passes), but the published schema declares the manifest's
@@ -45,6 +49,34 @@ export function ScalarField({ field, value, meta, onChange, customValue, onCusto
   }
   if ((meta.array_fields || []).includes(field)) {
     return <ArrayInput items={value || []} onChange={onChange} placeholder={`Add ${field}…`} />;
+  }
+  if ((meta.date_fields || []).includes(field)) {
+    // A date field is only safe to render as a picker when what is stored is
+    // actually a date. Nothing validates these on write -- an MCP client can
+    // put "next spring" or "Q2 2027" into goals.target_date -- and
+    // <input type="date"> silently drops any value it cannot parse, so a
+    // picker would show empty and write that emptiness back on the next edit.
+    // A non-ISO value therefore stays a text input: visible, editable, and
+    // preserved. Clearing it hands the user the picker.
+    if (!value || ISO_DATE.test(value)) {
+      return (
+        <Input
+          type="date"
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+          // Ask the browser to draw its native picker in the app's theme,
+          // otherwise the calendar renders light-on-light in dark mode.
+          className="[color-scheme:light] dark:[color-scheme:dark]"
+        />
+      );
+    }
+    return (
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        title="Not a yyyy-mm-dd date, so this stays a text field. Clear it to get a date picker."
+      />
+    );
   }
   if (longText.has(field)) {
     return <Textarea value={value || ""} onChange={(e) => onChange(e.target.value)} rows={2} />;

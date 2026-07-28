@@ -2,24 +2,56 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "MyGist section pack manifest",
   "type": "object",
-  "required": ["key", "title", "description", "core", "position", "defaults", "id_lists", "entities"],
+  "required": [
+    "key",
+    "title",
+    "description",
+    "core",
+    "position",
+    "defaults",
+    "id_lists",
+    "entities"
+  ],
   "additionalProperties": false,
   "properties": {
     "$schema": {
       "type": "string",
       "description": "Editor hint pointing at this meta-schema. Ignored by the loader."
     },
-    "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-    "title": { "type": "string", "minLength": 1 },
-    "description": { "type": "string", "minLength": 1 },
-    "core": { "type": "boolean" },
-    "position": { "type": "integer", "minimum": 0 },
-    "defaults": { "type": "object" },
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "core": {
+      "type": "boolean"
+    },
+    "position": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "defaults": {
+      "type": "object"
+    },
     "id_lists": {
       "type": "array",
       "items": {
         "type": "array",
-        "prefixItems": [{ "type": "string" }, { "type": "string" }],
+        "prefixItems": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "string"
+          }
+        ],
         "minItems": 2,
         "maxItems": 2,
         "items": false
@@ -27,97 +59,231 @@
     },
     "scope_contributions": {
       "type": "object",
-      "additionalProperties": { "type": "array", "items": { "type": "string" } }
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
     },
     "entities": {
       "type": "object",
       "minProperties": 1,
-      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*$" },
-      "additionalProperties": { "$ref": "#/$defs/entity" }
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/entity"
+      }
     },
-    "capture_triggers": { "type": "array", "items": { "type": "string" } },
-    "ui": { "$ref": "#/$defs/ui" },
-    "default_enabled": { "type": "boolean" }
+    "capture_triggers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ui": {
+      "$ref": "#/$defs/ui"
+    },
+    "default_enabled": {
+      "type": "boolean"
+    }
   },
   "$defs": {
     "ui": {
       "oneOf": [
         {
           "type": "object",
-          "required": ["sections"],
+          "required": [
+            "sections"
+          ],
           "additionalProperties": false,
           "properties": {
             "sections": {
               "type": "array",
-              "items": { "$ref": "#/$defs/uiSection" }
+              "items": {
+                "$ref": "#/$defs/uiSection"
+              }
             }
           }
         },
         {
           "type": "object",
           "description": "Legacy flat map: { <listKey>: <uiSpec> }. Kept so third-party packs still validate.",
-          "additionalProperties": { "type": "object" }
+          "additionalProperties": {
+            "type": "object"
+          }
         }
       ]
     },
     "uiSection": {
       "type": "object",
-      "required": ["kind", "path"],
+      "required": [
+        "kind",
+        "path"
+      ],
       "additionalProperties": false,
       "properties": {
-        "kind": { "enum": ["list", "fields", "strings"] },
-        "path": { "type": "array", "items": { "type": "string" } },
-        "entity": { "type": "string" },
-        "title": { "type": "string" },
-        "title_field": { "type": "string" },
-        "fields": { "type": "array", "items": { "type": "string" } },
-        "badges": { "type": "array", "items": { "type": "string" } },
-        "detail_fields": { "type": "array", "items": { "type": "string" } },
-        "array_fields": { "type": "array", "items": { "type": "string" } },
-        "long_text": { "type": "array", "items": { "type": "string" } },
+        "kind": {
+          "enum": [
+            "list",
+            "fields",
+            "strings"
+          ]
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "entity": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "title_field": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "badges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "detail_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "array_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "date_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Storage keys rendered as a date picker. Values must be yyyy-mm-dd; anything else falls back to a text input so it is not discarded."
+        },
+        "long_text": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "suggestions": {
           "type": "object",
-          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
         "enum": {
           "type": "object",
-          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
-        "optional": { "type": "array", "items": { "type": "string" } },
+        "optional": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "field_defaults": {
           "type": "object",
-          "additionalProperties": { "type": "string" }
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "children": {
           "type": "array",
-          "items": { "$ref": "#/$defs/uiSection" }
+          "items": {
+            "$ref": "#/$defs/uiSection"
+          }
         }
       }
     },
     "entity": {
       "type": "object",
-      "required": ["actions", "required", "optional", "identifier"],
+      "required": [
+        "actions",
+        "required",
+        "optional",
+        "identifier"
+      ],
       "additionalProperties": false,
       "properties": {
         "actions": {
           "type": "array",
-          "items": { "enum": ["add", "update", "remove"] },
+          "items": {
+            "enum": [
+              "add",
+              "update",
+              "remove"
+            ]
+          },
           "minItems": 1,
           "uniqueItems": true
         },
-        "required": { "type": "array", "items": { "type": "string" } },
-        "optional": { "type": "array", "items": { "type": "string" } },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "optional": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "valid_values": {
           "type": "object",
-          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
-        "identifier": { "type": ["string", "null"] },
-        "parent": { "type": "string" },
-        "description": { "type": "string" },
-        "list": { "type": "string" },
+        "identifier": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parent": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "list": {
+          "type": "string"
+        },
         "field_defaults": {
           "type": "object",
-          "additionalProperties": { "type": "string" }
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     }

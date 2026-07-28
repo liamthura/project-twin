@@ -94,9 +94,24 @@ function describeGuards({ pack, listKey, data }) {
     const { user, latest, initial } = renderSection({ pack, initial: data });
     await user.click(screen.getByText(item[node.title_field]));
 
+    // Pick a field that is genuinely a free-text input, using the same
+    // precedence ListRenderer does. Reading entity.valid_values directly would
+    // miss a node's inline enum, and a date field renders as
+    // <input type="date">, which ignores typed characters -- either would make
+    // the edit below a silent no-op and turn this guard into a coin flip.
+    const dateFields = node.date_fields || [];
     const editableField = covered.find(
-      (f) => !entity.valid_values?.[f] && !arrayFields.includes(f) && item[f]
+      (f) =>
+        !(node.enum ?? entity?.valid_values)?.[f] &&
+        !arrayFields.includes(f) &&
+        !dateFields.includes(f) &&
+        item[f]
     );
+    if (!editableField) {
+      throw new Error(
+        `no free-text field to edit in ${pack.key}; this guard cannot run`
+      );
+    }
     const input = screen.getByDisplayValue(item[editableField]);
     await user.type(input, "X");
 

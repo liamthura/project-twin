@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { ScalarField } from "./ScalarField";
 
 describe("ScalarField", () => {
@@ -141,6 +141,69 @@ describe("ScalarField", () => {
         />
       );
       expect(screen.queryByDisplayValue("niche thing")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("a field in date_fields", () => {
+    const meta = { date_fields: ["target_date"] };
+
+    it("renders a native date picker when the value is a yyyy-mm-dd date", () => {
+      render(
+        <ScalarField field="target_date" value="2026-12-31" meta={meta} onChange={() => {}} />
+      );
+      const input = screen.getByDisplayValue("2026-12-31");
+      expect(input).toHaveAttribute("type", "date");
+    });
+
+    it("renders an empty date picker when there is no value", () => {
+      const { container } = render(
+        <ScalarField field="target_date" value={undefined} meta={meta} onChange={() => {}} />
+      );
+      const input = container.querySelector("input");
+      expect(input).toHaveAttribute("type", "date");
+      expect(input.value).toBe("");
+    });
+
+    // The data-safety case. Nothing validates this field on write -- an MCP
+    // client can store "next spring" -- and <input type="date"> discards any
+    // value it cannot parse. Rendering a picker there would show empty and
+    // write that emptiness back, losing what the user had.
+    it("keeps a non-ISO value in a text input rather than a picker", () => {
+      render(
+        <ScalarField field="target_date" value="next spring" meta={meta} onChange={() => {}} />
+      );
+      const input = screen.getByDisplayValue("next spring");
+      expect(input).not.toHaveAttribute("type", "date");
+    });
+
+    it("reports the picked date as a plain yyyy-mm-dd string", () => {
+      const onChange = vi.fn();
+      render(
+        <ScalarField field="target_date" value="2026-12-31" meta={meta} onChange={onChange} />
+      );
+      fireEvent.change(screen.getByDisplayValue("2026-12-31"), {
+        target: { value: "2027-01-15" },
+      });
+      expect(onChange).toHaveBeenCalledWith("2027-01-15");
+    });
+
+    it("leaves a field alone when it is not listed in date_fields", () => {
+      render(
+        <ScalarField field="target_date" value="2026-12-31" meta={{}} onChange={() => {}} />
+      );
+      expect(screen.getByDisplayValue("2026-12-31")).not.toHaveAttribute("type", "date");
+    });
+
+    it("lets an enum win over date_fields for the same field", () => {
+      render(
+        <ScalarField
+          field="target_date"
+          value="soon"
+          meta={{ date_fields: ["target_date"], valid_values: { target_date: ["soon", "later"] } }}
+          onChange={() => {}}
+        />
+      );
+      expect(screen.queryByDisplayValue("soon")).not.toBeInTheDocument();
     });
   });
 });
