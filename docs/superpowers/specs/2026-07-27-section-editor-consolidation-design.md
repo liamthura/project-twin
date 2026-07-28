@@ -289,6 +289,35 @@ in `entities[*].required + optional` appears somewhere in that pack's `ui`) woul
 `goals` as it stands today. That needs resolving — either by wiring `custom_type` into the
 `goals` `ui` block or by removing it from the manifest — before that check is written.
 
+### Known gaps in the wave 2 renderer kit
+
+The whole-branch review of wave 2 (PR #15) found and fixed several correctness issues in
+`ListRenderer`/`ScalarField`/`SectionRenderer`/`paths.js`/`meta_schema.json` directly (schema
+gaps for `kind: "fields"` and a shapeless `enum`, node-metadata precedence for `optional` and
+`long_text`, a crash on an entity-less node, and a couple of silent-data-loss paths). One
+structural item was found and deliberately **not** fixed in that pass, because fixing it is a
+refactor in its own right, not a bug-sized patch:
+
+**`SectionRenderer` has no seam to dispatch a child node.** The `kind` switch that picks a
+renderer for each node is inline JSX living inside `SectionRenderer`'s own `CardContent.map` —
+it cannot be invoked for a node that isn't a direct child of the section root without dragging
+the `Card`/`CardHeader` wrapper along with it. It also binds every path it renders
+(`getAt(data, node.path)`, `setAt(data || {}, node.path, next)`) to the section root, not to a
+list item, so it has no way to resolve a child node's path against `data[item]` instead of
+`data`. And `SectionRenderer` imports `ListRenderer` directly, so `ListRenderer` recursing back
+into `SectionRenderer` for its `children` would be an import cycle.
+
+None of this blocks wave 2, because no in-repo pack declares `children` yet and nothing calls
+for recursion. But `education.children[0]` (`Coursework`, nested inside `Education`) is real
+wave-4/5 shape from this spec's own `## The ui schema` example, and the fix is a one-commit
+refactor — extract the dispatch into its own module as a `renderNode(node, value, onValue)`
+seam that both `SectionRenderer` and `ListRenderer` can call — that has to land **before**
+wave 4 starts, not be improvised inside it under that wave's own deadline pressure.
+
+Also noted in passing: `key={node.path.join(".")}` (`SectionRenderer.jsx`) collides for any
+two nodes that happen to share a path — nothing in today's three packs does, but nothing
+stops a future manifest from declaring two sibling nodes over the same list either.
+
 ## Testing
 
 Wave 1 establishes the harness:
