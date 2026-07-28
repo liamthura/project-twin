@@ -79,6 +79,7 @@
           "additionalProperties": { "type": "array", "items": { "type": "string" } }
         },
         "enum": { "type": "object" },
+        "optional": { "type": "array", "items": { "type": "string" } },
         "field_defaults": {
           "type": "object",
           "additionalProperties": { "type": "string" }

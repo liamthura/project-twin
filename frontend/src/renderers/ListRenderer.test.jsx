@@ -156,4 +156,71 @@ describe("ListRenderer", () => {
 
     expect(latest()[0]).toMatchObject({ name: "Minimalist", stance: "like" });
   });
+
+  // A schema-valid node need not carry `entity` at all -- waves 3-6 author
+  // exactly such nodes for sections whose storage keys diverge from any
+  // entity's manifest names. Before this fix, the Add dialog heading did
+  // `node.entity.replace(...)` unconditionally and threw on click with no
+  // error boundary anywhere in the app to catch it (see ListRenderer.jsx and
+  // the crash this guarded against).
+  it("does not throw and shows a sensible Add dialog heading when the node has no entity", async () => {
+    const entitylessNode = { kind: "list", path: ["goals"], title_field: "title" };
+    const user = userEvent.setup();
+    render(
+      <ListRenderer node={entitylessNode} entity={undefined} items={[]} onItems={() => {}} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(screen.getByRole("heading", { name: "Add item" })).toBeInTheDocument();
+  });
+
+  it("uses node.title, when present, for the Add dialog heading in preference to node.entity", async () => {
+    const titledNode = { ...node, title: "Aesthetic style" };
+    const user = userEvent.setup();
+    render(<ListRenderer node={titledNode} entity={entity} items={[]} onItems={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(screen.getByRole("heading", { name: "Add Aesthetic style" })).toBeInTheDocument();
+  });
+
+  it("uses node.long_text (array form) over the default long-text set to render a textarea", async () => {
+    // "summary" has no enum, isn't an array field, and isn't in ScalarField's
+    // default LONG_TEXT_FIELDS set, so this only renders a Textarea if the
+    // node-declared long_text is honoured.
+    const longTextNode = { ...node, detail_fields: ["summary"], long_text: ["summary"] };
+    const item = { ...scandinavian, summary: "A short summary" };
+    const user = userEvent.setup();
+    render(<ListRenderer node={longTextNode} entity={entity} items={[item]} onItems={() => {}} />);
+
+    await user.click(screen.getByText("Scandinavian"));
+
+    const el = screen.getByDisplayValue("A short summary");
+    expect(el.tagName).toBe("TEXTAREA");
+  });
+
+  it("gives node.optional precedence over entity.optional for the custom_* overflow input", async () => {
+    // entity.optional lists custom_stance, but this node declares its own
+    // inline enum with no custom_* override -- node.optional (empty) must
+    // win, so no custom input appears for value "other".
+    const inlineEnumNode = {
+      ...node,
+      enum: { stance: ["love", "like", "avoid", "other"] },
+      optional: [],
+    };
+    const user = userEvent.setup();
+    render(
+      <ListRenderer
+        node={inlineEnumNode}
+        entity={entity}
+        items={[{ ...scandinavian, stance: "other" }]}
+        onItems={() => {}}
+      />
+    );
+
+    await user.click(screen.getByText("Scandinavian"));
+
+    expect(screen.queryByPlaceholderText("Custom stance…")).not.toBeInTheDocument();
+  });
 });

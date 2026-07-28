@@ -136,6 +136,40 @@ describe("SectionRenderer", () => {
     describeGuards({ pack: aestheticsPack, listKey: "styles", data: aestheticsData });
   });
 
+  // node.title is accepted by the schema but wasn't rendered anywhere.
+  // Wave 5's `lifestyle` packs four lists into one section with nothing to
+  // tell them apart, so a node-level heading is needed above each list's
+  // own content -- distinct from the section's own pack.title (Card
+  // heading), which must keep rendering unchanged for packs (all three
+  // today) that declare no node.title.
+  describe("node.title", () => {
+    const pack = {
+      key: "lifestyle_like",
+      title: "Lifestyle",
+      description: "",
+      entities: { goal: { list: "goals" } },
+      ui: {
+        sections: [
+          { kind: "list", path: ["goals"], entity: "goal", title: "Goals", title_field: "title" },
+        ],
+      },
+    };
+    const data = { goals: [{ title: "Ship it" }] };
+
+    it("renders node.title as a heading above the section's content when present", () => {
+      renderSection({ pack, initial: data });
+      expect(screen.getByRole("heading", { name: "Goals" })).toBeInTheDocument();
+      // The Card/pack.title heading still renders alongside it.
+      expect(screen.getByRole("heading", { name: "Lifestyle" })).toBeInTheDocument();
+    });
+
+    it("adds no extra heading when node.title is absent, as with today's three generic packs", () => {
+      renderSection({ pack: goalsPack, initial: goalsData });
+      // Only the Card's pack.title heading exists -- no node-level heading.
+      expect(screen.getAllByRole("heading")).toHaveLength(1);
+    });
+  });
+
   // A node kind other than "list" is unimplemented in this wave. It must not
   // throw (one bad node shouldn't blank an entire section) and must not fail
   // silently either -- a silently skipped node is how a migrated section

@@ -33,11 +33,17 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
   const existingTitles = new Set(items.map((i) => (i[titleField] || "").toLowerCase()));
   const editFields = [...new Set([...badges, ...detailFields])];
   const fieldDefaults = node.field_defaults ?? entity?.field_defaults ?? {};
+  // A node-declared long_text (schema: array of storage keys) takes
+  // precedence over the entity-agnostic default set, same as enum and
+  // field_defaults above -- normalised to a Set once here so both the
+  // custom_* grid layout below and ScalarField's own (defensive) normalising
+  // agree on what "long text" means for this node.
+  const longText = node.long_text ? new Set(node.long_text) : LONG_TEXT_FIELDS;
   const meta = {
     valid_values: node.enum ?? entity?.valid_values,
-    optional: entity?.optional ?? [],
+    optional: node.optional ?? entity?.optional ?? [],
     array_fields: arrayFields,
-    long_text: LONG_TEXT_FIELDS,
+    long_text: longText,
   };
 
   const addItem = (base) => {
@@ -87,7 +93,11 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
             <Button size="sm" variant="outline"><Plus className="mr-1 h-4 w-4" />Add</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Add {node.entity.replace(/_/g, " ")}</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>
+                Add {(node.title ?? node.entity ?? "item").replace(/_/g, " ")}
+              </DialogTitle>
+            </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label className="text-xs capitalize">{titleField}</Label>
@@ -201,7 +211,7 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
               {expanded[idx] && (
                 <div className="grid gap-3 px-9 pb-3 sm:grid-cols-2">
                   {editFields.map((f) => (
-                    <div key={f} className={LONG_TEXT_FIELDS.has(f) || arrayFields.includes(f) ? "sm:col-span-2" : ""}>
+                    <div key={f} className={longText.has(f) || arrayFields.includes(f) ? "sm:col-span-2" : ""}>
                       <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
                       <ScalarField
                         field={f}

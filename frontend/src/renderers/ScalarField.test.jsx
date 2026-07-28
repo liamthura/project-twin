@@ -26,7 +26,7 @@ describe("ScalarField", () => {
     expect(screen.getByPlaceholderText("Add tags…")).toBeInTheDocument();
   });
 
-  it("renders a Textarea for a field in long_text", () => {
+  it("renders a Textarea for a field in long_text given as a Set", () => {
     render(
       <ScalarField
         field="notes"
@@ -37,6 +37,30 @@ describe("ScalarField", () => {
     );
     const el = screen.getByDisplayValue("some longer notes");
     expect(el.tagName).toBe("TEXTAREA");
+  });
+
+  it("renders a Textarea for a field in long_text given as a plain array (the manifest/schema shape)", () => {
+    // meta_schema.json declares `long_text` as a JSON array, so a node built
+    // straight from a manifest (node.long_text) is array-shaped, not a Set.
+    // ScalarField must normalise rather than silently degrading to an Input.
+    render(
+      <ScalarField
+        field="notes"
+        value="some longer notes"
+        meta={{ long_text: ["notes"] }}
+        onChange={() => {}}
+      />
+    );
+    const el = screen.getByDisplayValue("some longer notes");
+    expect(el.tagName).toBe("TEXTAREA");
+  });
+
+  it("renders a plain Input when long_text is undefined", () => {
+    render(
+      <ScalarField field="notes" value="short" meta={{}} onChange={() => {}} />
+    );
+    const el = screen.getByDisplayValue("short");
+    expect(el.tagName).toBe("INPUT");
   });
 
   describe("enum control", () => {

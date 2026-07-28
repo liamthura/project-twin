@@ -37,14 +37,18 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
           }
           const items = getAt(data, node.path);
           return (
-            <ListRenderer
-              key={key}
-              node={node}
-              entity={pack.entities?.[node.entity]}
-              items={Array.isArray(items) ? items : []}
-              onItems={(next) => onChange(setAt(data || {}, node.path, next))}
-              onShowConfirmation={onShowConfirmation}
-            />
+            <div key={key} className="space-y-3">
+              {node.title && (
+                <h3 className="text-sm font-semibold text-foreground">{node.title}</h3>
+              )}
+              <ListRenderer
+                node={node}
+                entity={pack.entities?.[node.entity]}
+                items={Array.isArray(items) ? items : []}
+                onItems={(next) => onChange(setAt(data || {}, node.path, next))}
+                onShowConfirmation={onShowConfirmation}
+              />
+            </div>
           );
         })}
       </CardContent>
