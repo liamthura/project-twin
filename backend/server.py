@@ -1136,6 +1136,37 @@ FIELD_ALIASES = {
     "learning_item": ["topic", "subject", "item", "name", "learning"],
     "top_of_mind": ["topic", "item", "subject", "thought", "name"],
     "connection": ["name", "person", "contact", "connection_name"],
+    # The four *_reference entities. Every one of them accepts four spellings
+    # for its identifier and persists exactly one -- `name` -- so `ref_name`,
+    # the spelling all four manifests declare as `identifier`, is an INPUT
+    # ALIAS and nothing else. Recorded here transcribed from each branch's own
+    # get_field call, in that call's order:
+    #   hobby_reference       server.py:2097 -> writes {"name": ...} at :2102
+    #   project_reference     server.py:2328 -> writes {"name": ...} at :2333
+    #   domain_reference      server.py:2441 -> writes {"name": ...} at :2446
+    #   mental_tab_reference  server.py:2481 -> writes {"name": ...} at :2486
+    # (mental_tab_reference's fourth spelling is "reference", not "title" --
+    # transcribed, not assumed symmetric.)
+    #
+    # These four entries are INERT for normalize_data, which is the table's
+    # only runtime consumer. Every branch below looks the table up by a
+    # HARDCODED literal key, never by the entity being normalised, and all
+    # four reference entities are routed to their PARENT's alias list --
+    # hobby_reference to "hobby" (:1149), project_reference to "project"
+    # (:1151), mental_tab_reference to "mental_tab" (:1169), domain_reference
+    # to "domain" (:1173). So no lookup anywhere can reach a key added here.
+    # Asserted executably, by deleting each entry and diffing normalize_data's
+    # output, in tests/test_ui_schema.py.
+    #
+    # They exist so that tests/test_ui_schema.py's alias guard -- which is
+    # inert for any entity this table does not name -- can see them. Without
+    # them a `ui` child node binding `ref_name` fails NOTHING on the backend:
+    # `ref_name` sits in each entity's `required`, so the spelling check waves
+    # it through too.
+    "hobby_reference": ["ref_name", "name", "reference_name", "title"],
+    "project_reference": ["ref_name", "name", "reference_name", "title"],
+    "domain_reference": ["ref_name", "name", "reference_name", "title"],
+    "mental_tab_reference": ["ref_name", "name", "reference_name", "reference"],
 }
 
 def normalize_data(data: dict, entity: str) -> dict:

@@ -62,6 +62,7 @@ explicit `ui.sections` form yet.
 """
 import copy
 import json
+from unittest.mock import patch
 
 import pytest
 
@@ -78,10 +79,11 @@ import pack_loader
 #
 # The brief for this guard assumed the persisted key is always element 0.
 # It is NOT: verified branch by branch against `execute_modify` in server.py,
-# that convention holds for 9 of the 16 entries and breaks for 5 (two of them
-# entities wave 4 migrates), with 2 more storing bare strings under no key at
-# all. So the persisted key is recorded explicitly here rather than derived
-# from list position. Each entry was read off the write in the named branch.
+# that convention holds for 9 of the 20 entries and breaks for 9 (two of them
+# entities wave 4 migrates, plus the four *_reference entities grouped below),
+# with 2 more storing bare strings under no key at all. So the persisted key is
+# recorded explicitly here rather than derived from list position. Each entry
+# was read off the write in the named branch.
 #
 #   value = the key `execute_modify` persists the identifier under
 #   None      = nothing in the list is ever persisted (the branch stores a
@@ -105,6 +107,16 @@ CANONICAL_STORED_KEY = {
     "curiosity": "name",         # list starts "topic"; forwards to `interest` as {"name": ...}
     "mental_tab": "title",       # list starts "name"; stores {"title": topic, ...}
     "top_of_mind": "idea",       # list starts "topic"; stores {"idea": item, "note": ...}
+    # the four *_reference entities: list starts "ref_name", every branch
+    # writes {"name": ref_name or ""} -- server.py:2102, 2333, 2446, 2486.
+    # `ref_name` is the spelling all four MANIFESTS declare as `identifier`,
+    # which is exactly why the spelling check cannot catch a ui node binding
+    # it (it is in the entity's `required`) and why these entries have to
+    # exist for the alias check to catch it instead.
+    "hobby_reference": "name",
+    "project_reference": "name",
+    "domain_reference": "name",
+    "mental_tab_reference": "name",
     # nothing in the list is persisted
     "value": None,               # lifestyle["values"] is a list of bare strings
     "trait": None,               # lifestyle["personality_traits"] is a list of bare strings
@@ -655,6 +667,73 @@ def test_ui_may_not_name_an_mcp_input_alias():
         named={"name", "relationship", "contact"},
     )
     assert offenders == {"contact"}
+
+
+REFERENCE_ENTITIES = [
+    "hobby_reference", "project_reference", "domain_reference",
+    "mental_tab_reference",
+]
+
+
+@pytest.mark.parametrize("entity", REFERENCE_ENTITIES)
+def test_reference_entities_are_inert_in_field_aliases(entity):
+    """`FIELD_ALIASES` is not only a guard input -- `normalize_data` consumes it
+    on the live MCP write path -- so adding an entity to it must be proved to
+    change nothing there, not assumed to.
+
+    It is inert because every branch of `normalize_data` looks the table up by
+    a HARDCODED literal key rather than by the entity being normalised, and all
+    four reference entities are routed to their PARENT's list (server.py:1149,
+    :1151, :1169, :1173). Proved by deletion rather than by reading: with the
+    entry removed, `normalize_data` must produce byte-identical output for
+    every payload shape below -- including one carrying each of the four
+    spellings the entity's own get_field accepts, which is exactly what a
+    lookup-by-entity-name would react to.
+    """
+    import server
+
+    payloads = [
+        {},
+        {"name": "N"},
+        {"ref_name": "R"},
+        {"reference_name": "R"},
+        {"title": "T"},
+        {"reference": "R"},
+        {"ref_name": "R", "name": "N"},
+        {"url": "u", "notes": "n"},
+        # The parent selectors, which normalize_data DOES react to today (it
+        # routes these entities to the parent's alias list, so e.g. a bare
+        # `domain_name` becomes `name`). Included so the comparison would
+        # catch a change to that existing behaviour too, not just the absence
+        # of a new one.
+        {"hobby_name": "H"},
+        {"project_name": "P"},
+        {"domain_name": "D"},
+        {"topic": "T"},
+    ]
+    assert entity in server.FIELD_ALIASES, "this guard is about the entry being present"
+
+    with_entry = [server.normalize_data(dict(p), entity) for p in payloads]
+    with patch.dict(server.FIELD_ALIASES):
+        del server.FIELD_ALIASES[entity]
+        without_entry = [server.normalize_data(dict(p), entity) for p in payloads]
+    assert with_entry == without_entry
+
+
+@pytest.mark.parametrize("entity", REFERENCE_ENTITIES)
+def test_a_reference_ui_node_binding_ref_name_is_now_caught(entity):
+    """The hole this closes, stated as a test.
+
+    All four reference entities persist `name` and declare `ref_name` as their
+    manifest `identifier`. Because `ref_name` therefore sits in the entity's
+    `required`, the spelling check waves it through -- so before these entities
+    were in FIELD_ALIASES, a child node with `title_field: "ref_name"` failed
+    NOTHING on the backend, and the only thing standing between that and a
+    shipped control writing a key nothing reads was whether someone had written
+    the right frontend assertion."""
+    assert CANONICAL_STORED_KEY[entity] == "name"
+    assert ui_fields_that_are_aliases(entity, {"name", "url", "notes"}) == set()
+    assert ui_fields_that_are_aliases(entity, {"ref_name", "url"}) == {"ref_name"}
 
 
 def test_ui_alias_check_is_inert_for_unknown_entities():
