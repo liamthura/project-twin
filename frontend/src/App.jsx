@@ -50,8 +50,6 @@ import KnowledgeEditor from "@/editors/KnowledgeEditor";
 import PreferencesEditor from "@/editors/PreferencesEditor";
 import ProjectsEditor from "@/editors/ProjectsEditor";
 import LifestyleEditor from "@/editors/LifestyleEditor";
-import CircleEditor from "@/editors/CircleEditor";
-import LearningLogEditor from "@/editors/LearningLogEditor";
 import SectionRenderer from "@/renderers/SectionRenderer";
 
 // Debounce hook
@@ -78,8 +76,8 @@ const TAB_TRIGGER_CLASS =
 
 // Sections with a bespoke, hand-built editor. Everything else that's
 // enabled gets a generic, manifest-driven tab instead.
-const BESPOKE_EDITORS = new Set(["profile", "knowledge", "preferences", "projects", "lifestyle", "circle", "learning_log"]);
-const PACK_ICONS = { goals: Target, media: Film, aesthetics: Palette };
+const BESPOKE_EDITORS = new Set(["profile", "knowledge", "preferences", "projects", "lifestyle"]);
+const PACK_ICONS = { goals: Target, media: Film, aesthetics: Palette, circle: Users, learning_log: BookOpen };
 
 // Tracks whether a horizontally scrollable element is at its start/end edge,
 // so the tab strip only fades the side that actually has more content.
@@ -145,8 +143,6 @@ export default function App() {
   const [preferences, setPreferences] = useState({});
   const [projects, setProjects] = useState({});
   const [lifestyle, setLifestyle] = useState({});
-  const [circle, setCircle] = useState({});
-  const [learningLog, setLearningLog] = useState({});
 
   const [disabledSections, setDisabledSections] = useState([]);
   const [packs, setPacks] = useState([]);
@@ -198,8 +194,6 @@ export default function App() {
       setPreferences(response.data.preferences || {});
       setProjects(response.data.projects || {});
       setLifestyle(response.data.lifestyle || {});
-      setCircle(response.data.circle || {});
-      setLearningLog(response.data.learning_log || {});
       const known = new Set([...BESPOKE_EDITORS]);
       const rest = {};
       for (const [k, v] of Object.entries(response.data || {})) {
@@ -267,14 +261,6 @@ export default function App() {
     setLifestyle(newData);
     if (isAutosaveEnabled) debouncedSave("lifestyle", newData);
   };
-  const handleCircleChange = (newData) => {
-    setCircle(newData);
-    if (isAutosaveEnabled) debouncedSave("circle", newData);
-  };
-  const handleLearningLogChange = (newData) => {
-    setLearningLog(newData);
-    if (isAutosaveEnabled) debouncedSave("learning_log", newData);
-  };
   const handlePackChange = (key) => (newData) => {
     setPackData((prev) => ({ ...prev, [key]: newData }));
     if (isAutosaveEnabled) debouncedSave(key, newData);
@@ -291,8 +277,6 @@ export default function App() {
           preferences,
           projects,
           lifestyle,
-          circle,
-          learning_log: learningLog,
           ...packData,
         }),
       });
@@ -587,16 +571,6 @@ export default function App() {
                 <span>Lifestyle</span>
               </TabsTrigger>
             )}
-            {!disabledSections.includes("circle") && (
-              <TabsTrigger value="circle" className={TAB_TRIGGER_CLASS}>
-                <Users className="h-4 w-4" />
-                <span>Circle</span>
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="learning" className={TAB_TRIGGER_CLASS}>
-              <BookOpen className="h-4 w-4" />
-              <span>Learning Log</span>
-            </TabsTrigger>
             <TabsTrigger value="preferences" className={TAB_TRIGGER_CLASS}>
               <Settings className="h-4 w-4" />
               <span>Preferences</span>
@@ -656,22 +630,6 @@ export default function App() {
               />
             </TabsContent>
           )}
-          {!disabledSections.includes("circle") && (
-            <TabsContent value="circle">
-              <CircleEditor
-                data={circle}
-                onChange={handleCircleChange}
-                onShowConfirmation={showConfirmation}
-              />
-            </TabsContent>
-          )}
-          <TabsContent value="learning">
-            <LearningLogEditor
-              data={learningLog}
-              onChange={handleLearningLogChange}
-              onShowConfirmation={showConfirmation}
-            />
-          </TabsContent>
           <TabsContent value="preferences">
             <PreferencesEditor
               data={preferences}
