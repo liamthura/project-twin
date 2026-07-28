@@ -44,6 +44,10 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
     optional: node.optional ?? entity?.optional ?? [],
     array_fields: arrayFields,
     long_text: longText,
+    // Opt-in per node rather than inferred from the field name: `period` on
+    // profile.education and `bedtime` on lifestyle.sleep read like dates and
+    // are not, so a name heuristic would turn free text into a lossy picker.
+    date_fields: node.date_fields ?? [],
   };
 
   const addItem = (base) => {

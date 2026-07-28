@@ -227,6 +227,9 @@
             "target_date",
             "why",
             "notes"
+          ],
+          "date_fields": [
+            "target_date"
           ]
         }
       ]
