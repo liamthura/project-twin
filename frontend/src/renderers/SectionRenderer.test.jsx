@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import SectionRenderer from "@/renderers/SectionRenderer";
 import packs from "@/__fixtures__/packs.json";
 import goalsData from "@/__fixtures__/data/goals.json";
 import mediaData from "@/__fixtures__/data/media.json";
@@ -294,6 +295,85 @@ describe("SectionRenderer", () => {
       renderSection({ pack: goalsPack, initial: goalsData });
       // Only the Card's pack.title heading exists -- no node-level heading.
       expect(screen.getAllByRole("heading")).toHaveLength(1);
+    });
+  });
+
+  // The React key was `node.path.join(".")`, which collides for two sibling
+  // nodes that legitimately share a path (a shape wave 5's `lifestyle` pack
+  // is expected to introduce). A duplicate key doesn't throw, doesn't log,
+  // and doesn't even drop anything from a plain static render or a stable
+  // in-place update -- React's fast reconciliation path matches same-index
+  // children by key and both "collide" trivially with themselves. The bug
+  // only surfaces when something ahead of the pair changes shape (a node is
+  // removed, added, or reordered), which knocks React off that fast path and
+  // into its key-based lookahead matching for every remaining sibling at
+  // once: building that lookup dumps both duplicate-keyed fibers into the
+  // same map slot, the second silently overwrites the first, and the
+  // survivor's *internal* state (e.g. which row is expanded) gets handed to
+  // the wrong node entirely.
+  //
+  // This is exercised below via a direct `rerender` (not the stateful
+  // harness) with an unrelated leading node removed -- a shape change
+  // SectionRenderer itself does not prevent, even though nothing in today's
+  // static per-pack section lists happens to trigger it yet.
+  describe("sibling nodes sharing a path", () => {
+    const entities = { goal: { list: "goals" }, misc: { list: "other" } };
+    const nodeOther = {
+      kind: "list", path: ["other"], entity: "misc", title: "Other", title_field: "label",
+    };
+    const nodeFirst = {
+      kind: "list", path: ["goals"], entity: "goal",
+      title: "First", title_field: "title", detail_fields: ["title"],
+    };
+    const nodeSecond = {
+      kind: "list", path: ["goals"], entity: "goal",
+      title: "Second", title_field: "title", detail_fields: ["title"],
+    };
+    const data = { goals: [{ title: "Ship it" }], other: [{ label: "X" }] };
+    const packBefore = {
+      key: "reorder_shared_path", title: "Reorder", description: "",
+      entities, ui: { sections: [nodeOther, nodeFirst, nodeSecond] },
+    };
+    const packAfter = { ...packBefore, ui: { sections: [nodeFirst, nodeSecond] } };
+
+    it("renders both nodes, not just one, when they share a path", () => {
+      render(<SectionRenderer pack={packBefore} data={data} onChange={() => {}} />);
+
+      expect(screen.getByRole("heading", { name: "First" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Second" })).toBeInTheDocument();
+      // Headings alone aren't proof: a key collision drops one node's whole
+      // subtree, but if it happened to drop the *content* under a heading
+      // that survived some other way, checking only the headings would miss
+      // it. Each list renders its own copy of "Ship it", so two nodes
+      // sharing a path must produce two, not one.
+      expect(screen.getAllByText("Ship it")).toHaveLength(2);
+    });
+
+    it("does not leak one node's expanded state onto its sibling when an unrelated earlier node is removed", () => {
+      const { rerender } = render(
+        <SectionRenderer pack={packBefore} data={data} onChange={() => {}} />
+      );
+
+      // Expand only "Second"'s row (the later of the two "Ship it" rows);
+      // "First"'s row is left collapsed.
+      fireEvent.click(screen.getAllByText("Ship it")[1]);
+      expect(screen.getAllByDisplayValue("Ship it")).toHaveLength(1);
+
+      // Removing the unrelated leading node shifts both "goals" nodes up by
+      // one position, forcing React off the same-index fast path for the
+      // rest of the list. With a bare `path.join(".")` key both "goals"
+      // nodes are indistinguishable to the lookahead matcher: the fiber
+      // carrying "Second"'s *expanded* state is the one that survives the
+      // map collision, and it gets reattached to "First" instead --
+      // "First" now wrongly renders as expanded, a live control mounted
+      // against the wrong node's data entirely.
+      rerender(<SectionRenderer pack={packAfter} data={data} onChange={() => {}} />);
+
+      // Neither row is expected to survive a structural change it had
+      // nothing to do with -- that loss is an accepted index-keying
+      // trade-off. What must not happen is the *wrong* row ending up
+      // expanded, which is what a duplicate key produces.
+      expect(screen.queryAllByDisplayValue("Ship it")).toHaveLength(0);
     });
   });
 
