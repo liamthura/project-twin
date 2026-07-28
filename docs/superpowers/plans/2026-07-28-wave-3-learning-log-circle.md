@@ -1075,6 +1075,213 @@ Deletes LearningLogEditor (331) and CircleEditor (471)."
 
 ---
 
+### Task 8: Read-only display fields — RUNS BEFORE TASK 7
+
+Added after Task 5's review. `learning_log` sorts newest-first on `timestamp`, but nothing renders it, so the list would arrive sorted by an invisible field. The user asked for a date/time on each entry "for a sense of control over their log". This must land **before** Task 7 deletes `LearningLogEditor.jsx`, so no parity gap ever exists on `main`.
+
+**Why a new concept rather than `badges: ["timestamp"]`:** `ListRenderer` computes `editFields = [...new Set([...badges, ...detailFields])]` and renders a `ScalarField` for every one of them. Adding `timestamp` to `badges` would therefore also put a free-text input on it in the expanded row, letting a user hand-edit the machine-written sort key and silently reorder their own log. A read-only concept is required.
+
+**Files:**
+- Modify: `frontend/src/renderers/ListRenderer.jsx` — badge strip in the collapsed row
+- Modify: `backend/section_packs/meta_schema.json` — `display_fields`, `display_formats`
+- Modify: `backend/section_packs/learning_log/manifest.json`
+- Test: `frontend/src/renderers/ListRenderer.test.jsx`, `frontend/src/renderers/SectionRenderer.test.jsx`
+
+**Interfaces:**
+- Consumes: nothing from Tasks 1–6 beyond the existing badge strip.
+- Produces: node properties `display_fields: string[]` and `display_formats: {[field]: "date" | "datetime"}`.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `frontend/src/renderers/ListRenderer.test.jsx`:
+
+```jsx
+describe("display_fields", () => {
+  const node = {
+    kind: "list",
+    path: ["entries"],
+    title_field: "topic",
+    detail_fields: ["details"],
+    display_fields: ["timestamp"],
+    display_formats: { timestamp: "datetime" },
+  };
+  const iso = "2026-01-15T09:30:00.000Z";
+  // Formatting is local-time, so derive the expectation the same way rather
+  // than hardcoding a string that breaks in another timezone.
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, "0");
+  const expected =
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}`;
+  const items = [{ topic: "RSC", details: "d", timestamp: iso }];
+
+  it("renders the value formatted, not as a raw ISO string", () => {
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    expect(screen.queryByText(iso)).not.toBeInTheDocument();
+  });
+
+  it("renders date-only when the format says so", () => {
+    render(
+      <ListRenderer
+        node={{ ...node, display_formats: { timestamp: "date" } }}
+        items={items}
+        onItems={vi.fn()}
+      />
+    );
+    expect(screen.getByText(expected.slice(0, 10))).toBeInTheDocument();
+  });
+
+  it("is read-only -- expanding the row exposes no control bound to it", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    await user.click(screen.getByText("RSC"));
+    // `details` proves the row really did expand.
+    expect(screen.getByDisplayValue("d")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue(iso)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(expected)).not.toBeInTheDocument();
+  });
+
+  it("shows an unparseable value as-is rather than hiding it", () => {
+    render(
+      <ListRenderer node={node} items={[{ topic: "T", timestamp: "next spring" }]} onItems={vi.fn()} />
+    );
+    expect(screen.getByText("next spring")).toBeInTheDocument();
+  });
+
+  it("renders nothing extra for a node that declares no display_fields", () => {
+    const { container } = render(
+      <ListRenderer node={{ ...node, display_fields: undefined, display_formats: undefined }}
+        items={items} onItems={vi.fn()} />
+    );
+    expect(screen.queryByText(expected)).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".font-mono")).toHaveLength(0);
+  });
+
+  it("omits the badge for an item missing the field, without affecting siblings", () => {
+    render(
+      <ListRenderer node={node} items={[...items, { topic: "No date", details: "x" }]} onItems={vi.fn()} />
+    );
+    expect(screen.getByText("No date")).toBeInTheDocument();
+    expect(screen.getAllByText(expected)).toHaveLength(1);
+  });
+});
+```
+
+- [ ] **Step 2: Run to verify they fail**
+
+Run: `cd frontend && npx vitest run --project unit src/renderers/ListRenderer.test.jsx -t "display_fields"`
+Expected: FAIL — nothing renders the timestamp.
+
+- [ ] **Step 3: Implement**
+
+Above the component in `ListRenderer.jsx`:
+
+```jsx
+// Read-only display of a machine-written key (a created-at stamp, an id).
+// Local time and locale-free: the stored value is UTC, showing it raw would
+// be wrong by the offset, and a locale-formatted string would make the same
+// log read differently on two machines. An unparseable value is shown
+// verbatim rather than dropped -- nothing validates these on write, and
+// hiding a value the user can see in their own JSON is worse than an odd
+// looking badge.
+function formatDisplay(value, format) {
+  const raw = String(value);
+  if (!format) return raw;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return raw;
+  const p = (n) => String(n).padStart(2, "0");
+  const date = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  return format === "date" ? date : `${date} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+```
+
+In the collapsed row's badge `<span>`, **before** the existing `badges.filter(...)` map so the stamp reads first, exactly as the bespoke editor ordered it:
+
+```jsx
+{(node.display_fields || [])
+  .filter((f) => item[f] != null && item[f] !== "")
+  .map((f) => (
+    <Badge key={f} variant="secondary" className="gap-1 text-[10px] font-mono">
+      {formatDisplay(item[f], node.display_formats?.[f])}
+    </Badge>
+  ))}
+```
+
+Do **not** add `display_fields` to `editFields`. That is the entire point of the concept.
+
+- [ ] **Step 4: Run to verify they pass**
+
+Run: `cd frontend && npx vitest run --project unit`
+Expected: PASS, all pre-existing tests still green.
+
+- [ ] **Step 5: Add both properties to the schema**
+
+In `backend/section_packs/meta_schema.json`, `$defs.uiSection.properties`:
+
+```json
+"display_fields": {
+  "type": "array",
+  "items": { "type": "string" },
+  "description": "Storage keys shown read-only as badges on the collapsed row. Unlike `badges`, these are never rendered as editable controls -- use for machine-written values such as a created-at stamp."
+},
+"display_formats": {
+  "type": "object",
+  "additionalProperties": { "enum": ["date", "datetime"] },
+  "description": "Optional per-field formatting for `display_fields`. Values are parsed as dates and rendered in local time; an unparseable value is shown verbatim."
+}
+```
+
+- [ ] **Step 6: Declare it on `learning_log`**
+
+In `backend/section_packs/learning_log/manifest.json`, add to the list node:
+
+```json
+"display_fields": ["timestamp"],
+"display_formats": { "timestamp": "datetime" }
+```
+
+Then regenerate: `cd frontend && npm run fixtures`
+
+- [ ] **Step 7: Add the section-level test**
+
+`display_fields` is deliberately absent from `describeGuards`'s `covered` set — that guard asserts fields are reachable via `getByDisplayValue`, which cannot match a badge. So the pack needs its own assertion. In `SectionRenderer.test.jsx`'s `learning_log` describe block:
+
+```jsx
+it("shows each entry's timestamp, the field it is sorted by", () => {
+  renderSection({ pack: learningLogPack, initial: learningLogData });
+  for (const entry of learningLogData.entries) {
+    const d = new Date(entry.timestamp);
+    const p = (n) => String(n).padStart(2, "0");
+    const shown =
+      `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+      `${p(d.getHours())}:${p(d.getMinutes())}`;
+    expect(screen.getByText(shown)).toBeInTheDocument();
+  }
+});
+```
+
+- [ ] **Step 8: Run both suites**
+
+Run: `cd frontend && npm test`, then `cd backend && ./venv/bin/python -m pytest -q` with an explicit Bash timeout of at least 400000 ms.
+Expected: PASS.
+
+**Read `backend/tests/test_ui_schema.py::test_ui_fields_are_covered_by_the_entity` before running, and report which of these two you find:**
+
+`timestamp` is a real stored key (`server.py:2003` writes it on every add) but it is **not** in `entities.learning_entry`'s `required` or `optional` — MCP clients cannot set it, so it is absent from the input vocabulary. This is exactly the `entities` ≠ storage divergence the spec describes, and it means:
+
+- If that guard collects `display_fields` into the set it checks, it will **fail** on `timestamp`. The correct fix is to exclude `display_fields` from that check with a comment explaining why — never to drop `timestamp` from the manifest to make the test green.
+- If the guard does not know about `display_fields` (most likely, since the property is new), it will pass silently, and `display_fields` is then **unguarded** against a phantom key. Say so in your report rather than treating a green run as coverage.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add frontend/src/renderers backend/section_packs frontend/src/__fixtures__
+git commit -m "feat: read-only display fields; show each learning log entry's timestamp"
+```
+
+---
+
 ## Verification
 
 After Task 7:
