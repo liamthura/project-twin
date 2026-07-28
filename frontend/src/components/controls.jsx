@@ -144,9 +144,18 @@ export function SelectControl({ options, value, onChange }) {
         title={isLegacy ? "stored value not in the current option set" : undefined}
       >
         {value ? (
-          <span className={`inline-flex items-center gap-1.5 capitalize ${tone || (isLegacy ? "text-muted-foreground" : "")}`}>
-            <ValueIcon value={value} className="h-3.5 w-3.5" />
-            {String(value).replace(/_/g, " ")}
+          // `!flex`, not `inline-flex`. SelectTrigger's base class carries
+          // `[&>span]:line-clamp-1`, which sets display:-webkit-box plus
+          // -webkit-box-orient:vertical on any direct span child -- and that
+          // selector (.class > span) outranks a plain `.inline-flex`, so the
+          // icon and the label were being laid out as two vertical lines with
+          // the second clamped away: the icon sat on top of its own text. The
+          // important flag is what actually settles the cascade here.
+          // The label moves into a nested span so it can truncate; nested, it
+          // is no longer a direct child, so the clamp cannot reach it either.
+          <span className={`!flex min-w-0 items-center gap-1.5 capitalize ${tone || (isLegacy ? "text-muted-foreground" : "")}`}>
+            <ValueIcon value={value} className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{String(value).replace(/_/g, " ")}</span>
           </span>
         ) : (
           <span className="text-muted-foreground">Select…</span>
