@@ -927,11 +927,18 @@ describe("detail-grid column spans", () => {
 // the reason it claims.
 //
 // Selector note: with a nested list there are now delete buttons and Add
-// buttons at two levels. `Remove <title>` names the row, so parent and child
-// buttons only collide when a child item shares its parent's title (see the
-// last test in this block, which documents that). The child's Add button is
-// scoped through the child's own `title` label, whose parent element is the
-// wrapper the child list renders inside.
+// buttons at two levels, and neither accessible name is namespaced by level.
+// `Remove <title>` names the row's title, so a child item whose title equals
+// its parent's yields TWO buttons named `Remove Alpha` -- a nested test must
+// use distinct titles or scope by row, never select by name alone. Same for
+// `Add` (the parent's and the expanded row's child list both have one) and,
+// if both levels are `searchable`, for `searchbox`. The child's Add button is
+// scoped below through the child's own `title` label, whose parent element is
+// the wrapper the child list renders inside.
+//
+// That collision is documented here rather than asserted in a test: the only
+// way such a test could fail is if someone made the names distinct, i.e. it
+// would block the very improvement it describes.
 // ---------------------------------------------------------------------------
 describe("children", () => {
   const childNode = {
@@ -1024,6 +1031,7 @@ describe("children", () => {
 
   it("edits the correct stored parent index and child index, leaving every other row byte-identical", async () => {
     const onItems = vi.fn();
+    const before = JSON.stringify(items);
     const user = userEvent.setup();
     render(
       <ListRenderer
@@ -1054,13 +1062,20 @@ describe("children", () => {
         ],
       },
     ]);
-    // Structural sharing: the untouched parent and the untouched sibling
-    // child are the very same objects, not equal copies.
+    // The input is untouched -- the write replaced, it did not mutate.
+    // Neither assertion above can establish that: `toEqual` compares against
+    // the same fixture objects the write would have mutated, and `toBe` on an
+    // untouched row is satisfied by a mutated object too (it is still the
+    // same object). Only a snapshot taken before the interaction catches it.
+    expect(JSON.stringify(items)).toBe(before);
+    // Structural sharing, a separate property: the untouched parent and the
+    // untouched sibling child are the very same objects, not equal copies.
     expect(next[0]).toBe(alpha);
     expect(next[1].references[0]).toBe(beta.references[0]);
   });
 
   it("adds a child item to row 1 without touching row 0", async () => {
+    const before = JSON.stringify(items);
     const { user, latest } = renderStatefulParent(items);
 
     await user.click(screen.getByText("Beta"));
@@ -1083,6 +1098,7 @@ describe("children", () => {
         ],
       },
     ]);
+    expect(JSON.stringify(items)).toBe(before); // replaced, never mutated
     expect(latest()[0]).toBe(alpha);
     expect(screen.getByText("Ref B3")).toBeInTheDocument();
   });
@@ -1090,6 +1106,7 @@ describe("children", () => {
   it("removes a child item, routes it through the parent's confirmation, and leaves every other key on the parent item untouched", async () => {
     const onItems = vi.fn();
     const confirmations = [];
+    const before = JSON.stringify(items);
     const user = userEvent.setup();
     render(
       <ListRenderer
@@ -1122,6 +1139,7 @@ describe("children", () => {
         references: [{ name: "Ref B2", url: "https://b2" }],
       },
     ]);
+    expect(JSON.stringify(items)).toBe(before); // replaced, never mutated
     expect(next[0]).toBe(alpha);
   });
 
@@ -1132,6 +1150,7 @@ describe("children", () => {
       { ...beta, rank: 2 },
     ];
     const onItems = vi.fn();
+    const before = JSON.stringify(ranked);
     const user = userEvent.setup();
     render(
       <ListRenderer
@@ -1164,11 +1183,16 @@ describe("children", () => {
         ],
       },
     ]);
+    // Matters more here than anywhere: the expected value above is spread
+    // from the same fixtures, so an in-place mutation would appear on both
+    // sides of the comparison and pass.
+    expect(JSON.stringify(ranked)).toBe(before);
   });
 
   it("edits the right child while a search filter is active", async () => {
     const searchable = { ...parentNode, searchable: true };
     const onItems = vi.fn();
+    const before = JSON.stringify(items);
     const user = userEvent.setup();
     render(
       <ListRenderer
@@ -1201,6 +1225,7 @@ describe("children", () => {
         ],
       },
     ]);
+    expect(JSON.stringify(items)).toBe(before); // replaced, never mutated
     expect(next[0]).toBe(alpha);
   });
 
@@ -1274,25 +1299,4 @@ describe("children", () => {
     ]);
   });
 
-  it("gives a child row's delete button an accessible name that collides with the parent's when the titles match -- scope by row, not by name alone", async () => {
-    // Documented hazard, not an endorsement: `Remove <title>` names the row's
-    // title, and nothing namespaces it by level. A test that selects a nested
-    // delete button by name alone must be sure the titles differ.
-    const twin = { id: "p9", name: "Alpha", references: [{ name: "Alpha" }] };
-    const user = userEvent.setup();
-    render(
-      <ListRenderer
-        node={parentNode}
-        entities={entities}
-        entity={entities.project}
-        packKey="wave4_test"
-        items={[twin]}
-        onItems={vi.fn()}
-      />
-    );
-
-    await user.click(screen.getAllByText("Alpha")[0]);
-
-    expect(screen.getAllByRole("button", { name: "Remove Alpha" })).toHaveLength(2);
-  });
 });

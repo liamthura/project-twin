@@ -261,6 +261,48 @@ def test_list_node_missing_path_is_rejected():
         pack_loader.validate_manifest(manifest)
 
 
+def test_list_node_with_empty_path_is_rejected():
+    """`path: []` on a LIST node is a data-loss bug, not an empty section.
+
+    An empty path addresses the containing object itself, so `setAt(x, [],
+    value)` returns `value` -- it replaces `x` wholesale. For a top-level list
+    that discards the section's entire stored object on the first write; for a
+    child list (whose path resolves against the row's item) the first added
+    child replaces the parent item, taking its `id`, its title and every other
+    field with it. `Array.isArray([])` is true, so neither renderNode's guard
+    nor ListRenderer's catches it -- the schema is the only place this can be
+    stopped.
+
+    Deliberately conditional on `kind`, NOT a blanket `minItems: 1` on `path`:
+    `kind: "fields"` uses `path: []` to address the section root, which is how
+    profile's top-level scalars are bound. That blanket constraint existed
+    once and was removed in wave 2 for exactly that reason -- see
+    `test_fields_node_with_empty_path_is_accepted`, which is the other half of
+    this pair and fails if the constraint is ever re-widened.
+    """
+    top_level = _manifest_with_ui(
+        {"sections": [{"kind": "list", "path": [], "entity": "goal"}]}
+    )
+    with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(top_level)
+
+    # `children` $refs uiSection, so the same rule must reach a nested list.
+    nested = _manifest_with_ui(
+        {
+            "sections": [
+                {
+                    "kind": "list",
+                    "path": ["goals"],
+                    "entity": "goal",
+                    "children": [{"kind": "list", "path": [], "entity": "goal"}],
+                }
+            ]
+        }
+    )
+    with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(nested)
+
+
 def test_list_node_missing_entity_is_rejected():
     """A list node binds editable controls to stored keys. `entity` is what
     both guards in this module resolve those keys against, and the renderer

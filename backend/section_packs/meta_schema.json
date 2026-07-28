@@ -125,12 +125,15 @@
       "additionalProperties": false,
       "allOf": [
         {
-          "$comment": "A list node binds editable controls to an entity's stored keys, so it must name that entity. Without it the renderer still renders (falling back to node-level field_defaults/enum/optional) but tests/test_ui_schema.py has no entity to check the field names against, and a control bound to a key nothing stores would ship unnoticed.",
+          "$comment": "Two rules that apply to list nodes only. (1) `entity`: a list node binds editable controls to an entity's stored keys, so it must name that entity. Without it the renderer still renders (falling back to node-level field_defaults/enum/optional) but tests/test_ui_schema.py has no entity to check the field names against, and a control bound to a key nothing stores would ship unnoticed. (2) a non-empty `path`: an empty path addresses the containing object itself, and writes go through setAt, where `path.length === 0` returns the new value -- so the first write to a list node with `path: []` REPLACES what contains it. Top level that discards the section's whole stored object; on a child list it replaces the parent row's item, losing its id, its title and every other field. Array.isArray([]) is true, so no renderer-side guard can catch it. This is conditional on kind rather than a blanket minItems on `path` because kind: \"fields\" legitimately uses `path: []` to address the section root (profile's top-level scalars) -- see tests/test_ui_schema.py::test_fields_node_with_empty_path_is_accepted.",
           "if": {
             "required": ["kind"],
             "properties": { "kind": { "const": "list" } }
           },
-          "then": { "required": ["entity"] }
+          "then": {
+            "required": ["entity"],
+            "properties": { "path": { "minItems": 1 } }
+          }
         }
       ],
       "properties": {

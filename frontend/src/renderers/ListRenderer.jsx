@@ -25,13 +25,25 @@ import { buildOrder, filterVisible } from "./listPipeline";
 import { getAt, setAt } from "./paths";
 // Circular by construction: renderNode imports ListRenderer to dispatch a
 // "list" node, and ListRenderer imports renderNode to dispatch a node's
-// `children` against one of its own items. It resolves because neither
-// reference is read at module-evaluation time -- renderNode's ListRenderer
-// reference and this file's renderNode reference are both only dereferenced
-// inside a render call, by which point both modules have finished
-// initialising. Do not move either into module scope (a default-value
-// expression, a memo built at import time) -- that is what would turn this
-// into an undefined-component error.
+// `children` against one of its own items.
+//
+// It resolves because BOTH exports are hoisted function declarations --
+// `export default function ListRenderer` here, `export function renderNode`
+// there. A function declaration is initialised when its module's scope is
+// created, before any statement in it runs, so neither binding is ever in a
+// temporal dead zone no matter which module the cycle enters first.
+//
+// The hazard is therefore not "where is the reference read" -- it is the
+// binding FORM. Turning either export into a `const` binding reintroduces the
+// TDZ across the cycle: whichever module is evaluated second sees `undefined`,
+// React renders an undefined component, and every section blanks. Concretely,
+// any of these breaks it:
+//   - `export default memo(ListRenderer)`
+//   - `export const renderNode = (...) => ...`
+//   - `const X = ...; export default X` (or `export { X as default }`)
+//   - any `let`/`const` reassignment wrapping either export
+// If one of those is genuinely wanted, break the cycle first (e.g. move the
+// dispatch into a third module both import).
 import { renderNode } from "./renderNode";
 
 // Read-only display of a machine-written key (a created-at stamp, an id).
