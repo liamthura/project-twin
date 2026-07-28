@@ -509,6 +509,68 @@ describe("search", () => {
     expect(next[1].relationship).toBe("Colleague!");
     expect(next[0].relationship).toBe("Mentor");
   });
+
+  it("clears the query after successfully adding an item, so the new row is visible", async () => {
+    // Regression: onItems prepends the new item to the stored array, but
+    // `visible` re-filters on the unchanged query -- a name that doesn't
+    // match "grace" would render nowhere, with only the header count
+    // ("1 of 2" -> "1 of 3") hinting anything happened at all.
+    function Harness() {
+      const [state, setState] = useState(items);
+      return <ListRenderer node={node} items={state} onItems={setState} />;
+    }
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.type(screen.getByRole("searchbox"), "grace");
+    expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    const dialog = screen.getByRole("dialog");
+    const titleInput = within(dialog).getAllByRole("textbox")[0];
+    await user.type(titleInput, "Bob Smith");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    expect(screen.getByText("Bob Smith")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+  });
+});
+
+describe("search combined with sort", () => {
+  const node = {
+    kind: "list", path: ["entries"], title_field: "topic",
+    detail_fields: ["source"], searchable: true,
+    sort: { field: "priority", dir: "asc" },
+  };
+  const items = [
+    { topic: "Zeta task", source: "z", priority: 3 },
+    { topic: "Alpha task", source: "a", priority: 1 },
+    { topic: "Beta note", source: "b", priority: 2 },
+  ];
+
+  it("keeps filtered rows in sorted order", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    await user.type(screen.getByRole("searchbox"), "task");
+
+    const rows = screen.getAllByText(/Zeta task|Alpha task|Beta note/);
+    expect(rows.map((r) => r.textContent)).toEqual(["Alpha task", "Zeta task"]);
+  });
+
+  it("edits the correct stored row when editing a visible row while filtered", async () => {
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={onItems} />);
+    await user.type(screen.getByRole("searchbox"), "task");
+
+    await user.click(screen.getByText("Zeta task"));
+    await user.type(screen.getByDisplayValue("z"), "!");
+
+    const [[next]] = onItems.mock.calls;
+    expect(next[0].source).toBe("z!");
+    expect(next[1].source).toBe("a");
+    expect(next[2].source).toBe("b");
+  });
 });
 
 describe("info", () => {

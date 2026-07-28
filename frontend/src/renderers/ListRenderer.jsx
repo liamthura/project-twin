@@ -70,6 +70,12 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
     if (!item[titleField]) return;
     if (existingTitles.has(item[titleField].toLowerCase())) return;
     onItems([item, ...items]);
+    // A stale query re-filters the newly-added row out of `visible`, so the
+    // only sign anything happened is the header count ticking up -- clear it
+    // on the path that actually writes, so Add lands the user back on the
+    // unfiltered list with the new row on top, rather than looking like it
+    // silently failed.
+    setQuery("");
   };
 
   const updateItem = (idx, changes) => {
