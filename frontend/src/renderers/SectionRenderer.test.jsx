@@ -409,6 +409,40 @@ describe("SectionRenderer", () => {
       errorSpy.mockRestore();
     });
 
+    // renderNode returns null for a kind it doesn't support (logging as
+    // asserted above), but SectionRenderer's own per-node wrapper -- the
+    // `<div className="space-y-3">` and the node.title heading -- must not be
+    // emitted around that null. Otherwise a titled node of a not-yet-
+    // -implemented kind (e.g. a future `fields` node) renders an empty,
+    // heading-bearing div: a heading with no content under it, and a blank
+    // ~24px gap contributed by the wrapper even when title is absent.
+    it("emits no heading and no wrapper for a node renderNode rejects, while its titled sibling list still renders", () => {
+      const pack = {
+        key: "mixed",
+        title: "Mixed",
+        description: "",
+        entities: { goal: { list: "goals" } },
+        ui: {
+          sections: [
+            { kind: "fields", path: ["profile"], title: "Basics" },
+            { kind: "list", path: ["goals"], entity: "goal", title_field: "title" },
+          ],
+        },
+      };
+      const data = { profile: { name: "irrelevant" }, goals: [{ title: "Ship it" }] };
+
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderSection({ pack, initial: data });
+
+      // No heading for the rejected "fields" node -- only the Card's own
+      // pack.title heading remains (the list node here declares no title).
+      expect(screen.queryByRole("heading", { name: "Basics" })).not.toBeInTheDocument();
+      expect(screen.getAllByRole("heading").map((h) => h.textContent)).toEqual(["Mixed"]);
+      expect(screen.getByText("Ship it")).toBeInTheDocument();
+
+      errorSpy.mockRestore();
+    });
+
     it("does not throw when an unsupported-kind node has a malformed path, because the kind guard runs first", () => {
       // Before the fix, `node.path.join(".")` computed the React key before
       // the kind check ran, so a node like this one (no `path` at all)

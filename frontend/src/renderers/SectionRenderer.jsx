@@ -32,19 +32,25 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
           // key by index as well as path: two sibling nodes may legitimately
           // share a path, and a bare path join collides for them.
           const key = `${i}:${Array.isArray(node.path) ? node.path.join(".") : ""}`;
+          const rendered = renderNode({
+            node,
+            value: Array.isArray(node.path) ? getAt(data, node.path) : undefined,
+            onValue: (next) => onChange(setAt(data || {}, node.path, next)),
+            entities: pack.entities,
+            packKey: pack.key,
+            onShowConfirmation,
+          });
+          // renderNode returns null (after logging) for a kind it doesn't
+          // support. Bail out before the wrapper div/heading below so a
+          // rejected node contributes nothing to the DOM -- not an empty
+          // div, and not a heading floating over nothing.
+          if (!rendered) return null;
           return (
             <div key={key} className="space-y-3">
               {node.title && (
                 <h3 className="text-sm font-semibold text-foreground">{node.title}</h3>
               )}
-              {renderNode({
-                node,
-                value: Array.isArray(node.path) ? getAt(data, node.path) : undefined,
-                onValue: (next) => onChange(setAt(data || {}, node.path, next)),
-                entities: pack.entities,
-                packKey: pack.key,
-                onShowConfirmation,
-              })}
+              {rendered}
             </div>
           );
         })}
