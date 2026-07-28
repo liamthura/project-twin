@@ -22,6 +22,11 @@ import { InfoDialog } from "@/components/ui/info-dialog";
 import { VALUE_META, FOCUS_RING, ValueIcon, SEGMENTED_MAX } from "@/components/controls";
 import { ScalarField, LONG_TEXT_FIELDS } from "./ScalarField";
 import { buildOrder, filterVisible } from "./listPipeline";
+// setAt is unused today -- wave 4's Task 2 needs it to write a nested child
+// node's edit back into its parent list item. Importing it now (inert) so
+// this task's prop-threading and Task 2's actual write share one commit
+// shape instead of splitting an import across two.
+import { setAt } from "./paths";
 
 // Read-only display of a machine-written key (a created-at stamp, an id).
 // Local time and locale-free: the stored value is UTC, showing it raw would
@@ -40,7 +45,14 @@ function formatDisplay(value, format) {
   return format === "date" ? date : `${date} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-export default function ListRenderer({ node, entity, items, onItems, onShowConfirmation }) {
+// `entities` (the whole map) and `packKey` are accepted but not yet consumed
+// here -- wave 4's Task 2 uses them to dispatch a child node (via renderNode)
+// against the resolved item and its own entity, the same way SectionRenderer
+// dispatches a section's own top-level nodes today. `entity` stays the
+// pre-resolved object it always was, for every existing call site and test.
+export default function ListRenderer({
+  node, entity, entities, packKey, items, onItems, onShowConfirmation,
+}) {
   const [expanded, setExpanded] = useState({});
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState({});
