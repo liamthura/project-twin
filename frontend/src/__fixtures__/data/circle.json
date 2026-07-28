@@ -5,7 +5,8 @@
       "name": "Ada Lovelace",
       "relationship": "Mentor from the analytical engine days",
       "traits": ["mathematical", "patient"],
-      "notes": "Introduced me to the idea that a machine could manipulate symbols, not just numbers."
+      "notes": "Introduced me to the idea that a machine could manipulate symbols, not just numbers.",
+      "related": ["connection_20260214_cc22dd"]
     },
     {
       "id": "connection_20260214_cc22dd",
