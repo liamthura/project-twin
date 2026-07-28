@@ -213,6 +213,18 @@ sections: [ { kind: "list", path: [key], ...value } for each key ]
 Existing packs keep working with no manifest change. The three in-repo packs are moved to
 the explicit form in wave 2 for consistency, but nothing forces that on a user's pack.
 
+**One narrowing, added in the wave 4 prerequisites.** A node in the explicit form with
+`kind: "list"` must now declare `entity`. It was previously optional, and an entity-less
+list node was silently skipped by both `ui` guards while still rendering and writing
+normally — so a control could bind to a key nothing reads with nothing to catch it. The
+promise above still holds where it was aimed: the legacy flat map is normalised, not
+rejected, and no pack using it is affected. What changed is a requirement inside the
+explicit `sections` form, which wave 2 introduced days earlier and which no third-party
+pack can plausibly be using yet. A pack that does hit it fails validation, and `load_packs`
+warns and skips that pack rather than refusing to boot — so the section disappears rather
+than taking the server down. That is the deliberate trade: a missing section is recoverable,
+an unchecked editable node writing unreadable keys is not.
+
 `meta_schema.json` gains a real `ui` definition — node kinds, required keys per kind,
 recursive `children` — replacing today's unvalidated `{"type": "object"}`.
 
@@ -543,7 +555,7 @@ plus a `ui` block, with no frontend code at all.
 | Stored `preferences` data in the legacy flat shape is blanked | Backend normalisation lands in the same PR, ahead of the editor deletion, with a test against old-shape data |
 | Vite 7 upgrade breaks the production image | Wave 0 is a standalone PR, merged and deployed before any renderer work |
 | The renderer accretes per-section special cases and becomes what it replaced | Convergence was chosen over parity precisely to prevent this; any node kind beyond the three specified needs justifying against that |
-| Third-party pack authors' `ui` blocks break | New schema is a strict superset; the old flat form is normalised, not rejected |
+| Third-party pack authors' `ui` blocks break | The old flat form is normalised, not rejected, so no pack using it is affected. One narrowing since: a `kind: "list"` node in the explicit form must declare `entity` — see "Backwards compatibility" for why that trade was taken |
 
 ## Open questions
 
