@@ -21,6 +21,15 @@ const circlePack = packs.find((p) => p.key === "circle");
 const projectsPack = packs.find((p) => p.key === "projects");
 const knowledgePack = packs.find((p) => p.key === "knowledge");
 
+// Shared reasons for the two exclusion entries nearly every pack needs --
+// spelled out once so every call site's exclusion map still requires a real,
+// non-empty reason (the check in describeGuards below) without retyping the
+// same sentence at every one of them.
+const MACHINE_ID =
+  "machine-written identifier; nothing in the UI reads it back or offers a control to edit it.";
+const LINK_GRAPH =
+  "the link graph -- written only by _execute_link and rendered nowhere.";
+
 // The coverage guard and the round-trip guard, factored so every pack with a
 // generic item list gets both without copying the test bodies. A ui block
 // that omits a field would leave that field unreachable in the UI -- and
@@ -30,8 +39,21 @@ const knowledgePack = packs.find((p) => p.key === "knowledge");
 //
 // "covered" comes from the pack's own ui spec (badges + detail_fields), not a
 // hand-copied list, so a renderer that stops wiring up a field fails this
-// even if nobody updates the test.
-function describeGuards({ pack, listKey, data }) {
+// even if nobody updates the test. But that only checks the renderer against
+// the manifest -- it says nothing about whether the manifest itself still
+// names every key the fixture actually stores. Deleting a field from
+// detail_fields shrinks `covered` right along with it, so this half of the
+// guard would still pass with the field gone. `exclusions` below is the other
+// half: it checks the manifest against the DATA, so removing a field from
+// detail_fields (or never having added it) fails loudly instead of shrinking
+// the guard's own expectations to match.
+//
+// `exclusions` is required (pass `{}` if truly nothing is deliberately
+// unbound) and maps each fixture key that is NOT bound by the ui block to a
+// non-empty reason string -- adding to it has to be a deliberate, reviewable
+// act, not a way to quiet a failing test. A key that is neither bound nor
+// listed here fails the guard below.
+function describeGuards({ pack, listKey, data, exclusions }) {
   const node = normalizeUi(pack).sections.find((s) => s.path[0] === listKey);
   // Resolved exactly as ListRenderer resolves it -- via node.entity, which
   // SectionRenderer sets from `pack.entities?.[node.entity]` -- not by
@@ -42,6 +64,26 @@ function describeGuards({ pack, listKey, data }) {
   const arrayFields = node.array_fields || [];
   const covered = [...new Set([...(node.badges || []), ...(node.detail_fields || [])])];
   const item = data[listKey][0];
+
+  // Fail fast, at suite-definition time rather than inside an `it`, on a
+  // malformed exclusions map -- a missing map or a reason-less entry would
+  // otherwise let a key silently drop out of both halves of the guard.
+  if (!exclusions) {
+    throw new Error(
+      `describeGuards({ pack: "${pack.key}", listKey: "${listKey}" }) needs an ` +
+        `\`exclusions\` map (pass {} if every fixture key is bound) naming every ` +
+        `deliberately-unbound fixture key and why.`
+    );
+  }
+  for (const [key, reason] of Object.entries(exclusions)) {
+    if (typeof reason !== "string" || !reason.trim()) {
+      throw new Error(
+        `exclusions["${key}"] for ${pack.key}/${listKey} needs a real reason ` +
+          `string, not ${JSON.stringify(reason)} -- an exclusion with no reason ` +
+          `is indistinguishable from a way to make this guard stop complaining.`
+      );
+    }
+  }
 
   function expectFieldOnScreen(field) {
     const value = item[field];
@@ -132,6 +174,44 @@ function describeGuards({ pack, listKey, data }) {
     expected[listKey][0][editableField] = item[editableField] + "X";
     expect(after).toEqual(expected);
   });
+
+  // The guard the two tests above cannot provide: they check the RENDERER
+  // against the MANIFEST (does every field the manifest names actually make
+  // it onto the screen), never the MANIFEST against the DATA (does the
+  // manifest still name every field the data actually carries). Deleting a
+  // real, editable stored key from detail_fields shrinks `covered` right
+  // along with the deletion, so the tests above keep passing -- this is the
+  // one that would have caught task-6's `mental_tab.status` omission.
+  //
+  // Built from every item in the fixture list, not just `item` (data[listKey]
+  // [0]) above: knowledge's `domains` list is the reason -- the `knowledge`
+  // entity's shape (added_date/last_updated, no id) only shows up on
+  // domains[1], and a check scoped to domains[0] would never see it.
+  it(`accounts for every stored key on every fixture item -- bound by the ui block or explicitly excluded (${pack.key})`, () => {
+    const bound = new Set([
+      node.title_field,
+      ...(node.badges || []),
+      ...(node.detail_fields || []),
+      // display_fields and count_badges render read-only, but they DO render
+      // -- a badge showing a date, or a "N references" chip -- so a fixture
+      // key named there is reachable on screen and is not an omission.
+      ...(node.display_fields || []),
+      ...(node.count_badges || []),
+    ]);
+    const allFixtureKeys = new Set();
+    for (const row of data[listKey]) {
+      for (const key of Object.keys(row)) allFixtureKeys.add(key);
+    }
+    for (const key of allFixtureKeys) {
+      if (bound.has(key)) continue;
+      expect(
+        Object.prototype.hasOwnProperty.call(exclusions, key),
+        `"${key}" (${pack.key}/${listKey}) is neither bound by the ui block ` +
+          `nor on the exclusions list passed to describeGuards -- bind it, or ` +
+          `add a commented exclusion explaining why it is deliberately unbound.`
+      ).toBe(true);
+    }
+  });
 }
 
 describe("SectionRenderer", () => {
@@ -142,22 +222,41 @@ describe("SectionRenderer", () => {
   });
 
   describe("goals", () => {
-    describeGuards({ pack: goalsPack, listKey: "goals", data: goalsData });
+    describeGuards({
+      pack: goalsPack, listKey: "goals", data: goalsData,
+      exclusions: { id: MACHINE_ID },
+    });
   });
 
   // Media and aesthetics are the only packs with array_fields, field_defaults
   // and suggestions -- these fixtures give FieldInput's ArrayInput branch and
   // the enum/dropdown split real coverage for the first time.
   describe("media", () => {
-    describeGuards({ pack: mediaPack, listKey: "items", data: mediaData });
+    describeGuards({
+      pack: mediaPack, listKey: "items", data: mediaData,
+      exclusions: { id: MACHINE_ID, related: LINK_GRAPH },
+    });
   });
 
   describe("aesthetics", () => {
-    describeGuards({ pack: aestheticsPack, listKey: "styles", data: aestheticsData });
+    describeGuards({
+      pack: aestheticsPack, listKey: "styles", data: aestheticsData,
+      exclusions: { id: MACHINE_ID, related: LINK_GRAPH },
+    });
   });
 
   describe("learning_log", () => {
-    describeGuards({ pack: learningLogPack, listKey: "entries", data: learningLogData });
+    describeGuards({
+      pack: learningLogPack, listKey: "entries", data: learningLogData,
+      exclusions: {
+        id: MACHINE_ID,
+        // Named explicitly in "preserves its own id, timestamp,
+        // related_entries and conversation_metadata..." below: both are
+        // structured data the backend writes and nothing renders.
+        related_entries: "structured cross-entity link data; no control models it, it only has to survive an edit untouched.",
+        conversation_metadata: "write-only diagnostic blob (model, turn count); no control models it, it only has to survive an edit untouched.",
+      },
+    });
 
     it("renders newest first even though the stored array is oldest first", () => {
       renderSection({ pack: learningLogPack, initial: learningLogData });
@@ -229,7 +328,10 @@ describe("SectionRenderer", () => {
   });
 
   describe("circle", () => {
-    describeGuards({ pack: circlePack, listKey: "connections", data: circleData });
+    describeGuards({
+      pack: circlePack, listKey: "connections", data: circleData,
+      exclusions: { id: MACHINE_ID, related: LINK_GRAPH },
+    });
 
     it("offers the info dialog carried by the manifest", async () => {
       const { user } = renderSection({ pack: circlePack, initial: circleData });
@@ -293,10 +395,29 @@ describe("SectionRenderer", () => {
     // that cannot say which list broke. Nesting each call under the list key
     // is what keeps them tellable apart.
     describe("projects list", () => {
-      describeGuards({ pack: projectsPack, listKey: "projects", data: projectsData });
+      describeGuards({
+        pack: projectsPack, listKey: "projects", data: projectsData,
+        exclusions: {
+          id: MACHINE_ID,
+          related: LINK_GRAPH,
+          // Only `added_date` is in this list's display_fields -- last_updated
+          // is a real machine-written stamp with no on-screen rendering at all.
+          last_updated: "machine-written stamp; this list's display_fields names only added_date, not this one, and no control models it.",
+          // Named explicitly in "round-trips an edit to a `references`
+          // child..." below, and in the fixture's own _note: write-only keys
+          // server.py's project update loop can set verbatim, with no
+          // coercion and nothing reading them back.
+          url: "write-only key set by server.py's project update loop; no control models it.",
+          challenges: "write-only key set by server.py's project update loop; no control models it (shape is a guess -- see __fixtures__/data/projects.json's _note).",
+          goals: "write-only key set by server.py's project update loop; no control models it (shape is a guess -- see __fixtures__/data/projects.json's _note).",
+        },
+      });
     });
     describe("top_of_mind list", () => {
-      describeGuards({ pack: projectsPack, listKey: "top_of_mind", data: projectsData });
+      describeGuards({
+        pack: projectsPack, listKey: "top_of_mind", data: projectsData,
+        exclusions: { id: MACHINE_ID, related: LINK_GRAPH },
+      });
     });
 
     // The wrapper SectionRenderer draws around a node that declares a
@@ -499,10 +620,38 @@ describe("SectionRenderer", () => {
   // -------------------------------------------------------------------------
   describe("knowledge", () => {
     describe("domains list", () => {
-      describeGuards({ pack: knowledgePack, listKey: "domains", data: knowledgeData });
+      describeGuards({
+        pack: knowledgePack, listKey: "domains", data: knowledgeData,
+        exclusions: {
+          // Covers both shapes in this list: the `domain` entity's id is a
+          // plain machine-written identifier, and the `knowledge` entity's
+          // rows have no id at all until the next backend save backfills one
+          // (see the manifest's own $comment on this node) -- either way,
+          // nothing renders or edits it here.
+          id: MACHINE_ID,
+          related: LINK_GRAPH,
+        },
+      });
     });
     describe("mental_tabs list", () => {
-      describeGuards({ pack: knowledgePack, listKey: "mental_tabs", data: knowledgeData });
+      describeGuards({
+        pack: knowledgePack, listKey: "mental_tabs", data: knowledgeData,
+        exclusions: {
+          id: MACHINE_ID,
+          related: LINK_GRAPH,
+          // The two write paths disagree by the local UTC offset (server.py
+          // vs. the client-side @now stamp) -- see the manifest's own
+          // $comment on this node -- so it is deliberately never displayed or
+          // bound, per "never displays or binds a control to `created_at`"
+          // below.
+          created_at: "the two write paths for this stamp disagree by the local UTC offset; deliberately never displayed or bound.",
+          // Legacy alias for `title`, read as a fallback by server.py and
+          // written by nothing -- see the manifest's own $comment and the
+          // "legacy topic entry" tests below. Bound nowhere on purpose so a
+          // control never writes back under the wrong key.
+          topic: "legacy alias for `title`; deliberately bound nowhere so the renderer's only job for it is to not destroy it.",
+        },
+      });
     });
 
     const domainsBlock = () => screen.getByText("Skills & Domains").parentElement;
