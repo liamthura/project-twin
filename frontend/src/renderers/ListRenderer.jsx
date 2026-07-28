@@ -448,7 +448,19 @@ export default function ListRenderer({
           {visible.map((idx) => {
             const item = items[idx];
             return (
-            <div key={item.id || `${item[titleField]}-${idx}`}
+            // Keyed by the row's stored index, not its id or title: every
+            // writer here (updateItem, updateItemAt, removeItem, and
+            // expanded's own add/remove index shifting) already addresses
+            // rows by that same index, so it is the identity the component
+            // actually uses. All three reference child lists
+            // (project_reference, domain_reference, mental_tab_reference)
+            // are permanently id-less -- none are in any manifest's
+            // id_lists -- as is any row addItem has just written and every
+            // knowledge-entity row in `domains` before the next save. Keying
+            // on `item[titleField]` instead remounted the row (and its input
+            // DOM node) on every keystroke of a title edit, since the key
+            // changed along with the value being typed.
+            <div key={idx}
               className="border-b border-border last:border-b-0">
               <div className="flex cursor-pointer items-center gap-2 px-3 py-2.5 hover:bg-muted/40"
                 onClick={() => setExpanded({ ...expanded, [idx]: !expanded[idx] })}>

@@ -1631,3 +1631,110 @@ describe("facets", () => {
     expect(JSON.stringify(stored)).toBe(before);
   });
 });
+
+// Every reference child list in the real packs (project_reference,
+// domain_reference, mental_tab_reference) is permanently id-less: none of
+// them appear in any manifest's id_lists, so persona_store._assign_ids never
+// reaches them. knowledge's `domains` list is legitimately id-less too, per
+// its own manifest $comment, until the next save backfills an id. And
+// addItem itself never writes an id for a brand-new row. Before this row was
+// keyed by its stored index, editing a title field on any of these rows
+// remounted the row -- and therefore the input DOM node -- on every single
+// keystroke, because the key (`item.id || `${item[titleField]}-${idx}`)
+// changed along with the value being typed. The user kept typing into a node
+// that was no longer in the document, so only the first keystroke's worth of
+// change ever reached the screen. No existing test above catches this
+// because every child-edit test types into `url`, never into the title
+// field itself.
+describe("row identity for a title edit when the row has no stored id", () => {
+  function renderStatefulGeneric(node, initialItems) {
+    let seen = initialItems;
+    function Harness() {
+      const [state, setState] = useState(initialItems);
+      return (
+        <ListRenderer
+          node={node}
+          items={state}
+          onItems={(next) => {
+            seen = next;
+            setState(next);
+          }}
+        />
+      );
+    }
+    const utils = render(<Harness />);
+    return { ...utils, user: userEvent.setup(), latest: () => seen };
+  }
+
+  it("keeps every keystroke, not just the first, typed into a top-level row's title field", async () => {
+    const node = {
+      kind: "list",
+      path: ["entries"],
+      title_field: "topic",
+      detail_fields: ["topic", "source"],
+    };
+    // No `id` -- the shape addItem itself produces, and the shape every
+    // id-less real-pack row has.
+    const { user } = renderStatefulGeneric(node, [{ topic: "RSC", source: "conversation" }]);
+
+    await user.click(screen.getByText("RSC"));
+    await user.type(screen.getByDisplayValue("RSC"), "sitory");
+
+    expect(screen.getByDisplayValue("RSCsitory")).toBeInTheDocument();
+  });
+
+  it("keeps every keystroke typed into a child reference row's name field, mirroring project_reference/domain_reference/mental_tab_reference -- all permanently id-less", async () => {
+    const childNode = {
+      kind: "list",
+      path: ["references"],
+      entity: "project_reference",
+      title: "References",
+      title_field: "name",
+      detail_fields: ["name", "url", "notes"],
+    };
+    const parentNode = {
+      kind: "list",
+      path: ["projects"],
+      entity: "project",
+      title_field: "name",
+      detail_fields: ["status"],
+      children: [childNode],
+    };
+    const entities = { project: { optional: [] }, project_reference: { optional: [] } };
+    const alpha = {
+      id: "p1",
+      name: "Alpha",
+      status: "active",
+      // No `id` on the reference -- exactly what project_reference rows look
+      // like, since they never appear in any manifest's id_lists.
+      references: [{ name: "Repo", url: "https://example.com/repo" }],
+    };
+
+    let seen = [alpha];
+    function Harness() {
+      const [state, setState] = useState([alpha]);
+      return (
+        <ListRenderer
+          node={parentNode}
+          entities={entities}
+          entity={entities.project}
+          packKey="wave4_test"
+          items={state}
+          onItems={(next) => {
+            seen = next;
+            setState(next);
+          }}
+        />
+      );
+    }
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.click(screen.getByText("Alpha"));
+    await user.click(screen.getByText("Repo"));
+    await user.type(screen.getByDisplayValue("Repo"), "sitory");
+
+    expect(screen.getByDisplayValue("Repository")).toBeInTheDocument();
+    expect(seen[0].references[0].name).toBe("Repository");
+  });
+});
