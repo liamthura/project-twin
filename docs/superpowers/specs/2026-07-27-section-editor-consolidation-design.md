@@ -103,7 +103,7 @@ in would place the MCP contract that AI clients depend on inside a frontend refa
 | Field binding | **`ui` declares storage keys** | `entities` stays the MCP vocabulary. See the constraint above. |
 | Test net | **Vitest + Testing Library + Storybook** | Stories run as tests via `@storybook/addon-vitest`, so a story cannot drift from what is verified. |
 | Vite upgrade | **Vite 5 → 7 first, separate PR** | Required by Vitest 4. Kept apart so a build-tool failure never gets tangled with a rendering failure. |
-| New UI primitives | **Adapt a registry component before hand-rolling** | shadcn CLI is the route; components land as editable source, so tweaking beats maintaining bespoke. Optional and conditional — see "Sourcing UI primitives". |
+| New UI primitives | **Adapt a shadcn-registry component before hand-rolling** | Don't reinvent the wheel: components land as editable source on the same Radix base, so tweaking beats maintaining bespoke. Non-shadcn libraries are out regardless of looks, and anything adopted is converted to the existing design tokens. See "Sourcing UI primitives". |
 
 ## Architecture
 
@@ -353,30 +353,58 @@ regression, not an upgrade.
 
 ### Third-party registries
 
-Any registry that speaks the shadcn registry protocol installs through the same CLI —
-`npx shadcn@latest add "<registry-url>/<component>.json"` — and lands as source in
-`frontend/src/components/ui/`, where it can be edited like anything else already there.
-That is the property worth optimising for: the component becomes ours on arrival, so
-tweaking it is normal work rather than fighting a library.
+**Only registries that extend shadcn qualify.** A shadcn-registry-protocol component installs
+through the same CLI — `npx shadcn@latest add "<registry-url>/<component>.json"` — lands as
+source in `frontend/src/components/ui/`, is built on the same Radix primitives, and already
+speaks the same semantic tokens as everything else in this codebase. It becomes ours on
+arrival, so tweaking it is normal work rather than fighting a library.
 
-Two filters decide whether a given registry is usable here:
+A library that merely *looks* good but is built on some other foundation is out of scope, no
+matter how good it looks. Adopting it would mean maintaining two styling systems, which costs
+more than the hand-rolled control it was meant to save.
 
-1. **Tailwind 3.** Most current registries target Tailwind 4. Tailwind 4 is a standing
-   non-goal in this spec, so a v4-only component is markup to adapt by hand — its `@theme`
-   blocks and v4-only utilities have to be rewritten, not pasted.
-2. **No new runtime dependency.** A component that drags in an animation or styling runtime
+Three filters, all of which must pass:
+
+1. **shadcn registry protocol.** Installs via `npx shadcn@latest add <url>`, emits editable
+   source, built on Radix. A library with its own CLI and its own runtime does not qualify.
+2. **Tailwind 3.** Most current registries target Tailwind 4, which is a standing non-goal
+   here. A v4-only component is markup to adapt by hand — its `@theme` blocks and v4-only
+   utilities have to be rewritten, not pasted.
+3. **No new runtime dependency.** A component that drags in an animation or styling runtime
    the section editors do not otherwise need is not worth it. Take the layout, drop the
    dependency.
 
-Fail either filter and the answer is the simpler hand-written control, revisited after the
+Fail any of the three and the answer is the simpler hand-written control, revisited after the
 deferred Tailwind 4 upgrade.
 
-**[gluestack](https://gluestack.io/llms.txt)** — worth tracking, not usable yet. It is a
-universal React / React Native library on Tailwind 4, installed through its own CLI
-(`npx gluestack-ui@alpha add <component>`) rather than the shadcn registry protocol, and its
-current alpha has **no web support at all** — that waits on NativeWind v5 shipping web. Its
-older line supports Next.js, not Vite. Revisit once web support lands and this repo is on
-Tailwind 4; until then it is a design reference only.
+### The design language is non-negotiable
+
+Whatever the source, the result has to look like the rest of MyGist. A component that arrives
+carrying its own palette, radii or focus treatment is not finished until it has been converted
+to the tokens below — and converting it is part of the cost when judging whether it was
+worth taking.
+
+- **Semantic colour tokens only** — `background`, `foreground`, `muted`, `muted-foreground`,
+  `card`, `border`, `input`, `primary`, `destructive`, plus this project's own `success` and
+  `warning`. All defined in `frontend/tailwind.config.js` against CSS variables in
+  `frontend/src/globals.css`. No raw hex, and no arbitrary Tailwind palette colours except the
+  deliberate per-value chips already in `VALUE_META` (`frontend/src/components/controls.jsx`).
+- **Dark mode is a `class` strategy** — every colour must resolve in both themes. A semantic
+  token does this for free; a literal one needs an explicit `dark:` counterpart.
+- **Radius comes from `--radius`** (`0.5rem`) via `rounded-lg` / `rounded-md` / `rounded-sm`.
+  Full-round is reserved for chips and suggestion pills.
+- **Type is Geist / Geist Mono.** Labels are `text-xs capitalize`, secondary copy is
+  `text-sm text-muted-foreground`.
+- **Focus rings come from `FOCUS_RING`** (`frontend/src/components/controls.jsx:82`). Any
+  interactive element that is not already a shadcn primitive spreads that constant rather
+  than writing its own ring.
+- **Icons are `lucide-react`**, sized in the `h-3.5`/`h-4` range and `aria-hidden` when
+  decorative.
+- **`tailwindcss-animate` is the only animation dependency.** No second one gets added for a
+  section editor.
+
+The point is not to reinvent the wheel — but a wheel that does not match the rest of the car
+is its own kind of rework.
 
 ## Testing
 
