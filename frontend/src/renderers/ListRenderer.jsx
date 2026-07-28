@@ -80,7 +80,22 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
   };
 
   const removeItem = (idx) => {
-    const doRemove = () => onItems(items.filter((_, i) => i !== idx));
+    const doRemove = () => {
+      onItems(items.filter((_, i) => i !== idx));
+      // `expanded` is keyed by array index, so every index above the removed
+      // one now addresses a different item. Shift them down to follow their
+      // rows, rather than leaving a stale key pointing at nothing and the
+      // shifted-up row falling back to collapsed.
+      setExpanded((prev) => {
+        const next = {};
+        for (const [k, v] of Object.entries(prev)) {
+          const i = Number(k);
+          if (i < idx) next[i] = v;
+          else if (i > idx) next[i - 1] = v;
+        }
+        return next;
+      });
+    };
     if (onShowConfirmation) {
       onShowConfirmation(
         `Remove ${items[idx][titleField]}?`,

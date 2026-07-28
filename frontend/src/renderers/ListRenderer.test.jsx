@@ -223,6 +223,34 @@ describe("ListRenderer", () => {
 
     expect(screen.queryByPlaceholderText("Custom stance…")).not.toBeInTheDocument();
   });
+
+  it("keeps the right row expanded after an earlier row is removed", async () => {
+    // `expanded` is keyed by array index. Removing index 0 shifts "Second"
+    // down from stored index 1 to index 0 -- if `expanded` isn't remapped
+    // alongside the array, the stale key (1) points at nothing and the
+    // fresh key (0) was never set, so the row collapses even though the
+    // user never touched it.
+    const simpleNode = { kind: "list", path: ["items"], title_field: "name", detail_fields: ["note"] };
+    const items = [
+      { name: "First", note: "note-1" },
+      { name: "Second", note: "note-2" },
+    ];
+    let current = items;
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ListRenderer node={simpleNode} items={current} onItems={(n) => { current = n; }} />
+    );
+
+    await user.click(screen.getByText("Second"));
+    expect(screen.getByDisplayValue("note-2")).toBeInTheDocument();
+
+    // Remove "First" (index 0). "Second" shifts to index 0 and must stay open.
+    const deleteButtons = screen.getAllByRole("button").filter((b) => b.textContent === "");
+    await user.click(deleteButtons[0]);
+    rerender(<ListRenderer node={simpleNode} items={current} onItems={vi.fn()} />);
+
+    expect(screen.getByDisplayValue("note-2")).toBeInTheDocument();
+  });
 });
 
 describe("@now in field_defaults", () => {
