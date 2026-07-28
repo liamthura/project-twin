@@ -97,6 +97,70 @@ def test_unknown_key_on_section_node_is_rejected():
         pack_loader.validate_manifest(manifest)
 
 
+def test_fields_node_with_empty_path_is_accepted():
+    """The spec's mechanism for a section's top-level scalars (profile's
+    name/bio/location): `kind: "fields"` with `path: []` and a `fields` list.
+    Before this fix, `fields` had no schema property (rejected as an unknown
+    key) and `path`'s `minItems: 1` rejected the empty path outright."""
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {
+                    "kind": "fields",
+                    "path": [],
+                    "fields": ["name", "preferred_name"],
+                    "long_text": ["bio"],
+                }
+            ]
+        }
+    )
+    pack_loader.validate_manifest(manifest)  # must not raise
+
+
+def test_fields_node_with_nonempty_path_is_accepted():
+    manifest = _manifest_with_ui(
+        {"sections": [{"kind": "fields", "path": ["contact"], "fields": ["email"]}]}
+    )
+    pack_loader.validate_manifest(manifest)  # must not raise
+
+
+def test_malformed_enum_is_rejected():
+    """node.enum must have the same shape as entity.valid_values
+    (`{field: [string, ...]}`), not bare `{"type": "object"}` -- a scalar
+    value there validates and crashes EnumControl's `options.map` at
+    runtime."""
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {
+                    "kind": "list",
+                    "path": ["goals"],
+                    "entity": "goal",
+                    "enum": {"stance": "love"},
+                }
+            ]
+        }
+    )
+    with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(manifest)
+
+
+def test_well_formed_enum_is_accepted():
+    manifest = _manifest_with_ui(
+        {
+            "sections": [
+                {
+                    "kind": "list",
+                    "path": ["goals"],
+                    "entity": "goal",
+                    "enum": {"stance": ["love", "like", "avoid"]},
+                }
+            ]
+        }
+    )
+    pack_loader.validate_manifest(manifest)  # must not raise
+
+
 def test_legacy_flat_ui_map_is_still_accepted():
     manifest = _manifest_with_ui(
         {
