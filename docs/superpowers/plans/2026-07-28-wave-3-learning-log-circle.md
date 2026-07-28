@@ -15,9 +15,17 @@
 - **Converge, do not achieve parity.** Bespoke affordances not listed in this plan are dropped deliberately. Do not port them.
 - **New UI comes from existing primitives.** `frontend/src/components/ui/*` and `frontend/src/components/controls.jsx`. Any interactive element that is not already a shadcn primitive spreads `FOCUS_RING` (`frontend/src/components/controls.jsx:82`). Semantic colour tokens only. See the spec's "Sourcing UI primitives".
 - **Every `ui` schema addition is optional**, so the three already-migrated packs and any third-party pack keep validating unchanged.
-- **Backend suite stays green** (449 tests) — `cd backend && pytest -q`.
-- **Frontend suite stays green** — `cd frontend && npm test`.
+- **Backend suite stays green** (449 tests) — `cd backend && ./venv/bin/python -m pytest -q`. `pytest` is **not** on PATH; the venv is required. Takes ~3 minutes.
+- **Frontend suite stays green** — `cd frontend && npm test`. The fast inner loop is `npx vitest run --project unit` (~2s). Never background either one; they finish well inside a normal tool timeout, and polling a background job is how the last wave stalled.
+- `timeout(1)` does not exist on this macOS shell. Do not wrap commands in it.
 - Fixtures are generated, never hand-edited: `cd frontend && npm run fixtures`.
+
+**Test selector conventions in `ListRenderer.test.jsx`** — follow them; deviating is what breaks these tests:
+
+- The add-dialog title input has **no label association**. `getByLabelText("topic")` throws. Use `within(screen.getByRole("dialog")).getAllByRole("textbox")[0]`.
+- Row delete buttons are icon-only with no accessible name. Select with
+  `screen.getAllByRole("button").filter((b) => b.textContent === "")`.
+- Task 4 adds an icon-only Info button. It carries `aria-label="About this section"`, so it has an accessible name and is excluded from a `{ name: "" }` query — but its `textContent` is also `""`. Any test written after Task 4 that selects delete buttons by `textContent` on a node declaring `info` must account for it.
 
 ## Established stored keys
 
@@ -88,8 +96,9 @@ describe("@now in field_defaults", () => {
     render(<ListRenderer node={node} items={[]} onItems={onItems} />);
 
     await user.click(screen.getByRole("button", { name: /add/i }));
-    await user.type(screen.getByLabelText("topic"), "React Server Components");
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getAllByRole("textbox")[0], "React Server Components");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
 
     const [[added]] = onItems.mock.calls;
     expect(added[0].source).toBe("manual");
@@ -121,8 +130,9 @@ describe("@now in field_defaults", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /add/i }));
-    await user.type(screen.getByLabelText("topic"), "T");
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getAllByRole("textbox")[0], "T");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
 
     expect(onItems.mock.calls[0][0][0].source).toBe("@channel");
   });
@@ -255,8 +265,11 @@ describe("sort", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={items} onItems={onItems} />);
 
-    // First delete button on screen belongs to "Newest" (stored index 1).
-    await user.click(screen.getAllByRole("button", { name: "" })[0]);
+    // Delete buttons are icon-only with no accessible name -- this is the
+    // selector convention already used at ListRenderer.test.jsx:99-102. The
+    // first one on screen belongs to "Newest", which is stored at index 1.
+    const deleteButtons = screen.getAllByRole("button").filter((b) => b.textContent === "");
+    await user.click(deleteButtons[0]);
 
     const [[next]] = onItems.mock.calls;
     expect(next.map((i) => i.topic)).toEqual(["Oldest", "Middle"]);
@@ -390,7 +403,8 @@ it("keeps the right row expanded after an earlier row is removed", async () => {
   expect(screen.getByDisplayValue("note-2")).toBeInTheDocument();
 
   // Remove "First" (index 0). "Second" shifts to index 0 and must stay open.
-  await user.click(screen.getAllByRole("button", { name: "" })[0]);
+  const deleteButtons = screen.getAllByRole("button").filter((b) => b.textContent === "");
+  await user.click(deleteButtons[0]);
   rerender(<ListRenderer node={node} items={current} onItems={vi.fn()} />);
 
   expect(screen.getByDisplayValue("note-2")).toBeInTheDocument();
