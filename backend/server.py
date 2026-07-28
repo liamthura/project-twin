@@ -1055,6 +1055,36 @@ def _strip_related(data: dict) -> dict:
     return data
 
 
+# Statuses meaning "not a current concern", hidden from context.
+#
+# A DENY-list, deliberately. This was an allow-list of active statuses, which
+# meant every status not on it was dropped -- so adding a status value to a
+# manifest silently hid those items from every AI client, with no error and
+# nothing to notice. That is exactly what happened to `idea`: it replaced
+# `planning` on projects (ProjectsEditor.jsx records the rename), `planning`
+# was on the allow-list, `idea` was not, and every idea-stage project became
+# invisible. Worse, the `if active_items` below drops the field entirely when
+# everything is filtered, so someone whose projects were all at the idea stage
+# appeared to have no projects at all.
+#
+# Inverted, a status nobody anticipated defaults to VISIBLE. The failure mode
+# becomes showing something that could have been hidden, rather than hiding
+# something the user wrote.
+INACTIVE_STATUSES = frozenset({
+    "paused",     # goals, lifestyle.hobby, projects
+    "archived",   # knowledge.mental_tab, projects
+    "inactive",   # lifestyle.hobby
+    "closed",     # knowledge.mental_tab
+    "dropped",    # goals, media
+    "achieved",   # goals -- see note below
+})
+# `achieved` sits here only to preserve existing behaviour exactly. It is
+# arguably inconsistent that a `completed` project is shown while an
+# `achieved` goal is not; goals are exempt whenever the goals scope is
+# requested by name, so this only bites in a broader scope. Left alone
+# deliberately rather than changed as a side effect of a bug fix.
+
+
 def _filter_inactive(data: dict, exempt: frozenset = frozenset()) -> dict:
     """Remove inactive/paused items from context. Sections named in `exempt`
     pass through unfiltered (the goals section scope shows every status)."""
@@ -1071,8 +1101,7 @@ def _filter_inactive(data: dict, exempt: frozenset = frozenset()) -> dict:
                 for item in value:
                     if isinstance(item, dict):
                         status = item.get("status", "active")
-                        if status in ["active", "open", "exploring", "planning", None, "completed",
-                                       "want", "in_progress", "finished"]:
+                        if status not in INACTIVE_STATUSES:
                             active_items.append(item)
                     else:
                         active_items.append(item)
