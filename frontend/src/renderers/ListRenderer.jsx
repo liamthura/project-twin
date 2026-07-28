@@ -19,9 +19,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfoButton } from "@/components/ui/info-button";
-import { VALUE_META, FOCUS_RING, ValueIcon, SEGMENTED_MAX, EnumControl } from "@/components/controls";
+import { VALUE_META, FOCUS_RING, ValueIcon, EnumControl } from "@/components/controls";
 import { ScalarField, ISO_DATE } from "./ScalarField";
-import { buildFieldMeta } from "./fieldMeta";
+import { buildFieldMeta, needsFullRow as fieldNeedsFullRow } from "./fieldMeta";
 import { buildOrder, filterVisible, applyFacets } from "./listPipeline";
 import { getAt, setAt } from "./paths";
 // Circular by construction: renderNode imports ListRenderer to dispatch a
@@ -116,24 +116,9 @@ export default function ListRenderer({
   };
   const meta = buildFieldMeta(node, entity);
 
-  // Which fields need the whole row rather than one of the two grid columns.
-  //
-  // On a 1152px desktop a column is only ~386px wide: 1152 - 32 (page px-4)
-  // - 192 (tab sidebar) - 24 (gap-6) - 48 (card p-6) - 72 (grid sm:px-9),
-  // then halved less the 12px gap. A four-option segmented control needs
-  // roughly 400px, so it wrapped after three options while the column beside
-  // it sat empty. Giving it the full row is the same treatment long text and
-  // array inputs already get.
-  //
-  // Only segmented enums qualify: more than SEGMENTED_MAX options renders a
-  // ~170px dropdown instead, which fits a column comfortably. Three or fewer
-  // options also fit, and stretching those across the row would just leave a
-  // gap where the neighbouring field used to be.
-  const needsFullRow = (f) => {
-    if (meta.long_text.has(f) || meta.array_fields.includes(f)) return true;
-    const options = meta.valid_values?.[f];
-    return Boolean(options) && options.length > 3 && options.length <= SEGMENTED_MAX;
-  };
+  // See needsFullRow in fieldMeta.js -- shared so this list's edit form and a
+  // `fields` node lay out the same field identically.
+  const needsFullRow = (f) => fieldNeedsFullRow(meta, f);
 
   const addItem = (base) => {
     // `base` (the dialog draft) already carries the raw field_defaults

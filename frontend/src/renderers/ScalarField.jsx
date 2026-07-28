@@ -24,7 +24,13 @@ export const LONG_TEXT_FIELDS = new Set(["notes", "why", "description"]);
 // timezone the other.
 export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-export function ScalarField({ field, value, meta, onChange, customValue, onCustomChange }) {
+// `id` is optional and only reaches the branches that render ONE form control
+// (text, textarea, date). EnumControl is a group of buttons and ArrayInput has
+// its own internal input, so neither can carry a caller's id meaningfully --
+// a <Label htmlFor> aimed at those stays a visible caption without a
+// programmatic association. FieldsRenderer is the caller that needs this;
+// ListRenderer's edit grid labels its own cells and passes nothing.
+export function ScalarField({ id, field, value, meta, onChange, customValue, onCustomChange }) {
   // meta.long_text is documented as a Set (that's what every caller inside
   // this codebase passes), but the published schema declares the manifest's
   // `long_text` key as a JSON array, and a node built straight from a
@@ -67,6 +73,7 @@ export function ScalarField({ field, value, meta, onChange, customValue, onCusto
     if (!value || ISO_DATE.test(value)) {
       return (
         <Input
+          id={id}
           type="date"
           value={value || ""}
           onChange={(e) => onChange(e.target.value)}
@@ -78,6 +85,7 @@ export function ScalarField({ field, value, meta, onChange, customValue, onCusto
     }
     return (
       <Input
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         title="Not a yyyy-mm-dd date, so this stays a text field. Clear it to get a date picker."
@@ -85,7 +93,9 @@ export function ScalarField({ field, value, meta, onChange, customValue, onCusto
     );
   }
   if (longText.has(field)) {
-    return <Textarea value={value || ""} onChange={(e) => onChange(e.target.value)} rows={2} />;
+    return (
+      <Textarea id={id} value={value || ""} onChange={(e) => onChange(e.target.value)} rows={2} />
+    );
   }
-  return <Input value={value || ""} onChange={(e) => onChange(e.target.value)} />;
+  return <Input id={id} value={value || ""} onChange={(e) => onChange(e.target.value)} />;
 }

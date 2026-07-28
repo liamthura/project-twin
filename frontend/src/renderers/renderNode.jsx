@@ -15,6 +15,7 @@
 // would have been worse, so the seam is loud instead of either.
 import ListRenderer from "./ListRenderer";
 import { StringsRenderer } from "./StringsRenderer";
+import { FieldsRenderer } from "./FieldsRenderer";
 
 export function renderNode({ node, value, onValue, entities, packKey, onShowConfirmation }) {
   // Every branch below checks its own path rules before reading anything else.
@@ -40,6 +41,30 @@ export function renderNode({ node, value, onValue, entities, packKey, onShowConf
       );
     }
     return <StringsRenderer node={node} items={value} onItems={onValue} />;
+  }
+  if (node.kind === "fields") {
+    // Unlike list and strings, an EMPTY path is legitimate here: it addresses
+    // the section root, which is what profile's top-level scalars bind. That
+    // is safe because FieldsRenderer spreads the object it was handed on every
+    // write, so writing to the root updates keys rather than replacing the
+    // section. meta_schema.json makes the non-empty-path rule conditional on
+    // kind: "list" for exactly this reason.
+    if (!Array.isArray(node.path)) {
+      console.error(
+        `renderNode: fields node has no valid path in pack "${packKey}" ` +
+          `(node: ${JSON.stringify(node)}) -- rendering nothing`
+      );
+      return null;
+    }
+    return (
+      <FieldsRenderer
+        node={node}
+        entity={entities?.[node.entity]}
+        value={value}
+        onValue={onValue}
+        packKey={packKey}
+      />
+    );
   }
   if (node.kind !== "list") {
     console.error(`renderNode: unsupported node kind "${node.kind}" in pack "${packKey}"`);

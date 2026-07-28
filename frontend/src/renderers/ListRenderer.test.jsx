@@ -1357,10 +1357,14 @@ describe("children", () => {
 
   it("logs a child node of an unsupported kind (naming the pack) and still renders the parent row's own fields", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // "table" is deliberately a kind nothing implements. This test is about
+    // the fallback for an UNSUPPORTED kind, so it must not name one the
+    // renderer has since grown (it used to say "fields", which wave 5 added).
+    //
     // No `path` either: an unsupported kind carries no guarantee of a
     // well-formed path, and neither the value read nor the React key may
     // assume one.
-    const node = { ...parentNode, children: [{ kind: "fields", title: "Meta" }] };
+    const node = { ...parentNode, children: [{ kind: "table", title: "Meta" }] };
     const user = userEvent.setup();
     render(
       <ListRenderer
@@ -1380,7 +1384,7 @@ describe("children", () => {
     // Nothing was rendered for the rejected child -- not even its heading.
     expect(screen.queryByText("Meta")).not.toBeInTheDocument();
     expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining('unsupported node kind "fields"')
+      expect.stringContaining('unsupported node kind "table"')
     );
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("wave4_test"));
     spy.mockRestore();
