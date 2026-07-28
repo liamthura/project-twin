@@ -644,6 +644,44 @@ describe("display_fields", () => {
   });
 });
 
+describe("title field also listed in detail_fields", () => {
+  // Step 9 of wave 3 task 8 put the title field into detail_fields so it
+  // renders editable in the expanded row -- but editFields is badges union
+  // detail_fields, and the Add dialog already renders a dedicated title
+  // Label+Input (with suggestion chips and Enter-to-submit) above its
+  // editFields.map loop. Without excluding the title field from that loop,
+  // the Add dialog shows the same field twice.
+  const node = {
+    kind: "list",
+    path: ["entries"],
+    title_field: "topic",
+    detail_fields: ["topic", "source"],
+  };
+  const items = [{ topic: "RSC", source: "conversation" }];
+
+  it("shows exactly one control for the title field in the Add dialog", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    const dialog = screen.getByRole("dialog");
+    // Both the dedicated title control and a duplicate from editFields.map
+    // would carry the literal label text "topic" (the dedicated one is
+    // unstyled, the generic one runs it through .replace(/_/g, " "), which
+    // is a no-op here) -- exactly one should exist.
+    expect(within(dialog).getAllByText(/^topic$/i)).toHaveLength(1);
+  });
+
+  it("still exposes the title field as an editable control in the expanded row", async () => {
+    // Guards against a future "fix" that strips the title field out of
+    // editFields entirely instead of only out of the Add dialog's loop --
+    // that would silently undo Step 9's whole point.
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    await user.click(screen.getByText("RSC"));
+    expect(screen.getByDisplayValue("RSC")).toBeInTheDocument();
+  });
+});
+
 describe("info", () => {
   const info = { overview: "Who matters to you.", tips: ["Name: their name.", "Notes: context."] };
   const node = { kind: "list", path: ["items"], title_field: "name", info };

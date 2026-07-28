@@ -250,7 +250,7 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                   </div>
                 )}
               </div>
-              {editFields.map((f) => (
+              {editFields.filter((f) => f !== titleField).map((f) => (
                 <div key={f} className="space-y-1.5">
                   <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
                   <ScalarField
