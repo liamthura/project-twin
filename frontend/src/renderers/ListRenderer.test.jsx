@@ -438,3 +438,94 @@ describe("sort", () => {
     expect(rows.map((r) => r.textContent)).toEqual(["Dated", "Blank", "Missing"]);
   });
 });
+
+describe("search", () => {
+  const node = {
+    kind: "list", path: ["items"], title_field: "name",
+    detail_fields: ["relationship"], array_fields: ["traits"], searchable: true,
+  };
+  const items = [
+    { name: "Ada Lovelace", relationship: "Mentor", traits: ["maths"] },
+    { name: "Grace Hopper", relationship: "Colleague", traits: ["compilers"] },
+  ];
+
+  it("is absent when the node does not opt in", () => {
+    render(<ListRenderer node={{ ...node, searchable: false }} items={items} onItems={vi.fn()} />);
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  });
+
+  it("is absent when there is nothing to search", () => {
+    render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  });
+
+  it("filters on the title field", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    await user.type(screen.getByRole("searchbox"), "grace");
+    expect(screen.getByText("Grace Hopper")).toBeInTheDocument();
+    expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument();
+  });
+
+  it("filters on a detail field and on array entries", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    const box = screen.getByRole("searchbox");
+
+    await user.type(box, "mentor");
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    expect(screen.queryByText("Grace Hopper")).not.toBeInTheDocument();
+
+    await user.clear(box);
+    await user.type(box, "compilers");
+    expect(screen.getByText("Grace Hopper")).toBeInTheDocument();
+    expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument();
+  });
+
+  it("says so when nothing matches, rather than looking empty", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    await user.type(screen.getByRole("searchbox"), "zzzz");
+    expect(screen.getByText(/no matches/i)).toBeInTheDocument();
+  });
+
+  it("never writes to the data while filtering", async () => {
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={onItems} />);
+    await user.type(screen.getByRole("searchbox"), "ada");
+    expect(onItems).not.toHaveBeenCalled();
+  });
+
+  it("edits the right row while a filter is active", async () => {
+    const onItems = vi.fn();
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={onItems} />);
+    await user.type(screen.getByRole("searchbox"), "grace");
+    await user.click(screen.getByText("Grace Hopper"));
+    await user.type(screen.getByDisplayValue("Colleague"), "!");
+
+    const [[next]] = onItems.mock.calls;
+    expect(next[1].relationship).toBe("Colleague!");
+    expect(next[0].relationship).toBe("Mentor");
+  });
+});
+
+describe("info", () => {
+  const info = { overview: "Who matters to you.", tips: ["Name: their name.", "Notes: context."] };
+  const node = { kind: "list", path: ["items"], title_field: "name", info };
+
+  it("renders no info button when the node declares none", () => {
+    render(<ListRenderer node={{ ...node, info: undefined }} items={[]} onItems={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /about this section/i })).not.toBeInTheDocument();
+  });
+
+  it("opens a dialog showing the overview and every tip", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /about this section/i }));
+    expect(screen.getByText("Who matters to you.")).toBeInTheDocument();
+    for (const tip of info.tips) expect(screen.getByText(tip)).toBeInTheDocument();
+  });
+});

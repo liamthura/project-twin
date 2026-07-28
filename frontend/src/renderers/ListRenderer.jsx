@@ -11,13 +11,14 @@
 //     entity's, for sections whose manifest field names are not their
 //     storage keys (unused by today's packs, needed by waves 3-6)
 import { useState } from "react";
-import { Plus, Trash2, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { InfoDialog } from "@/components/ui/info-dialog";
 import { VALUE_META, FOCUS_RING, ValueIcon } from "@/components/controls";
 import { ScalarField, LONG_TEXT_FIELDS } from "./ScalarField";
 
@@ -25,6 +26,8 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
   const [expanded, setExpanded] = useState({});
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState({});
+  const [query, setQuery] = useState("");
+  const [infoOpen, setInfoOpen] = useState(false);
   const titleField = node.title_field;
   const badges = node.badges || [];
   const detailFields = node.detail_fields || [];
@@ -135,11 +138,43 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
     });
   }
 
+  // Display filter only, applied after sorting -- like `order`, this holds
+  // stored indexes, never display positions, so updateItem/removeItem still
+  // address the real row while a filter is active.
+  // The union of what both deleted editors searched: title, badges, detail
+  // fields, and every entry of an array field.
+  const searchFields = [...new Set([titleField, ...badges, ...detailFields, ...arrayFields])];
+  const q = query.trim().toLowerCase();
+  const visible = !q
+    ? order
+    : order.filter((i) => {
+        const item = items[i];
+        return searchFields.some((f) => {
+          const v = item?.[f];
+          if (Array.isArray(v)) return v.some((e) => String(e).toLowerCase().includes(q));
+          return v != null && String(v).toLowerCase().includes(q);
+        });
+      });
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          {items.length} {items.length === 1 ? "entry" : "entries"}
+        <div className="flex items-center gap-1">
+          {node.info && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              aria-label="About this section"
+              onClick={() => setInfoOpen(true)}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+          )}
+          <div className="text-sm text-muted-foreground">
+            {q ? `${visible.length} of ${items.length}` : items.length}{" "}
+            {items.length === 1 ? "entry" : "entries"}
+          </div>
         </div>
         <Dialog
           open={addOpen}
@@ -218,6 +253,17 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
         </Dialog>
       </div>
 
+      {node.searchable && items.length > 0 && (
+        <Input
+          type="search"
+          aria-label="Search"
+          placeholder="Search…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="h-9"
+        />
+      )}
+
       {suggestions.length > 0 && (
         <div className="space-y-1.5">
           <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -237,11 +283,15 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
         </div>
       )}
 
-      {items.length === 0 ? (
-        <EmptyState>Nothing here yet. Use Add, or tap a suggestion.</EmptyState>
+      {visible.length === 0 ? (
+        <EmptyState>
+          {q
+            ? "No matches. Clear the search to see everything."
+            : "Nothing here yet. Use Add, or tap a suggestion."}
+        </EmptyState>
       ) : (
         <div className="rounded-md border">
-          {order.map((idx) => {
+          {visible.map((idx) => {
             const item = items[idx];
             return (
             <div key={item.id || `${item[titleField]}-${idx}`}
@@ -296,6 +346,28 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
             );
           })}
         </div>
+      )}
+
+      {node.info && (
+        <InfoDialog
+          open={infoOpen}
+          onOpenChange={setInfoOpen}
+          title={node.title ?? "About this section"}
+          description={node.info.overview}
+        >
+          <p className="font-medium text-foreground">Tips for filling this section:</p>
+          <ul className="space-y-2 text-muted-foreground">
+            {(node.info.tips || []).map((tip, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-primary">•</span>
+                <span>{tip}</span>
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button onClick={() => setInfoOpen(false)}>Got it</Button>
+          </DialogFooter>
+        </InfoDialog>
       )}
     </div>
   );

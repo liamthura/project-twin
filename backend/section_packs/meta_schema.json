@@ -229,6 +229,20 @@
             "field": { "type": "string" },
             "dir": { "enum": ["asc", "desc"] }
           }
+        },
+        "searchable": {
+          "type": "boolean",
+          "description": "Renders a search box filtering rows on the title field, badges, detail fields and array-field entries."
+        },
+        "info": {
+          "type": "object",
+          "required": ["overview", "tips"],
+          "additionalProperties": false,
+          "description": "Content for the section's info dialog.",
+          "properties": {
+            "overview": { "type": "string", "minLength": 1 },
+            "tips": { "type": "array", "items": { "type": "string" } }
+          }
         }
       }
     },
