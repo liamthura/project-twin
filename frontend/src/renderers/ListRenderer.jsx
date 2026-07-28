@@ -20,7 +20,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfoButton } from "@/components/ui/info-button";
 import { VALUE_META, FOCUS_RING, ValueIcon, SEGMENTED_MAX, EnumControl } from "@/components/controls";
-import { ScalarField, LONG_TEXT_FIELDS, ISO_DATE } from "./ScalarField";
+import { ScalarField, ISO_DATE } from "./ScalarField";
+import { buildFieldMeta } from "./fieldMeta";
 import { buildOrder, filterVisible, applyFacets } from "./listPipeline";
 import { getAt, setAt } from "./paths";
 // Circular by construction: renderNode imports ListRenderer to dispatch a
@@ -91,7 +92,6 @@ export default function ListRenderer({
   const titleField = node.title_field;
   const badges = node.badges || [];
   const detailFields = node.detail_fields || [];
-  const arrayFields = node.array_fields || [];
   const suggestions = node.suggestions?.[titleField] || [];
   const existingTitles = new Set(items.map((i) => (i[titleField] || "").toLowerCase()));
   // Same case-insensitive comparison addItem itself uses to reject a
@@ -114,22 +114,7 @@ export default function ListRenderer({
     setAddOpen(true);
     setDraft({ ...fieldDefaults });
   };
-  // A node-declared long_text (schema: array of storage keys) takes
-  // precedence over the entity-agnostic default set, same as enum and
-  // field_defaults above -- normalised to a Set once here so both the
-  // custom_* grid layout below and ScalarField's own (defensive) normalising
-  // agree on what "long text" means for this node.
-  const longText = node.long_text ? new Set(node.long_text) : LONG_TEXT_FIELDS;
-  const meta = {
-    valid_values: node.enum ?? entity?.valid_values,
-    optional: node.optional ?? entity?.optional ?? [],
-    array_fields: arrayFields,
-    long_text: longText,
-    // Opt-in per node rather than inferred from the field name: `period` on
-    // profile.education and `bedtime` on lifestyle.sleep read like dates and
-    // are not, so a name heuristic would turn free text into a lossy picker.
-    date_fields: node.date_fields ?? [],
-  };
+  const meta = buildFieldMeta(node, entity);
 
   // Which fields need the whole row rather than one of the two grid columns.
   //
@@ -145,7 +130,7 @@ export default function ListRenderer({
   // options also fit, and stretching those across the row would just leave a
   // gap where the neighbouring field used to be.
   const needsFullRow = (f) => {
-    if (longText.has(f) || arrayFields.includes(f)) return true;
+    if (meta.long_text.has(f) || meta.array_fields.includes(f)) return true;
     const options = meta.valid_values?.[f];
     return Boolean(options) && options.length > 3 && options.length <= SEGMENTED_MAX;
   };
@@ -242,7 +227,9 @@ export default function ListRenderer({
   };
 
   const order = buildOrder(items, node.sort);
-  const searchFields = [...new Set([titleField, ...badges, ...detailFields, ...arrayFields])];
+  const searchFields = [
+    ...new Set([titleField, ...badges, ...detailFields, ...meta.array_fields]),
+  ];
   const q = query.trim().toLowerCase();
   const searched = filterVisible(order, items, q, searchFields);
   // Facets narrow the search box's own output -- same stored indexes in,
