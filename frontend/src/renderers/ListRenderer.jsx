@@ -380,7 +380,11 @@ export default function ListRenderer({ node, entity, items, onItems, onShowConfi
                 </Button>
               </div>
               {expanded[idx] && (
-                <div className="grid gap-3 px-9 pb-3 sm:grid-cols-2">
+                // px-9 aligns detail fields under the row title (px-3 + a
+                // 16px chevron + an 8px gap). That indent is worth 72px of a
+                // 375px screen, which is most of why an enum control had
+                // nowhere to go -- so it only applies from sm up.
+                <div className="grid gap-3 px-4 pb-3 sm:grid-cols-2 sm:px-9">
                   {editFields.map((f) => (
                     <div key={f} className={longText.has(f) || arrayFields.includes(f) ? "sm:col-span-2" : ""}>
                       <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>

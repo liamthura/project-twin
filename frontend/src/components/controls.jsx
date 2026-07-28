@@ -89,7 +89,15 @@ export function ValueIcon({ value, className }) {
 
 export function SegmentedControl({ options, value, onChange }) {
   return (
-    <div className="inline-flex rounded-lg bg-muted p-[3px]">
+    // flex-wrap + max-w-full, not a single nowrap row. A four-option enum
+    // (media.status: want / in progress / finished / dropped) needs roughly
+    // 400px, but an expanded row on a 375px phone leaves about 223px once the
+    // page px-4, the card's p-6 and the detail grid's px-9 are taken out --
+    // so the control used to run off the side of the screen with its last
+    // options unreachable. Wrapping keeps every option visible and tappable;
+    // the muted pill simply grows to two rows. gap-y gives the rows air when
+    // it does wrap, and costs nothing when it does not.
+    <div className="inline-flex max-w-full flex-wrap gap-y-[3px] rounded-lg bg-muted p-[3px]">
       {options.map((v) => {
         const active = value === v;
         const tone = active ? VALUE_META[v]?.tone : undefined;
@@ -99,7 +107,11 @@ export function SegmentedControl({ options, value, onChange }) {
             type="button"
             aria-pressed={active}
             onClick={() => onChange(active ? undefined : v)}
-            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm capitalize transition-colors ${FOCUS_RING} ${
+            // tap-target extends the hit area by 6px without affecting
+            // layout (globals.css) -- py-1 alone is a ~26px target, well
+            // under what a thumb needs. Same treatment the icon buttons
+            // elsewhere in the app already get.
+            className={`tap-target inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm capitalize transition-colors ${FOCUS_RING} ${
               active
                 ? `bg-background font-medium shadow-sm ${tone || "text-foreground"}`
                 : "text-muted-foreground hover:text-foreground"
@@ -126,7 +138,9 @@ export function SelectControl({ options, value, onChange }) {
       onValueChange={(v) => onChange(v === CLEAR_SENTINEL ? undefined : v)}
     >
       <SelectTrigger
-        className={`h-9 w-auto min-w-[170px] gap-2 ${isLegacy ? "border-dashed" : ""}`}
+        // max-w-full so the 170px floor can never push the trigger past a
+        // narrower container -- the same overflow the segmented control hit.
+        className={`h-9 w-auto min-w-[170px] max-w-full gap-2 ${isLegacy ? "border-dashed" : ""}`}
         title={isLegacy ? "stored value not in the current option set" : undefined}
       >
         {value ? (
