@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { EnumControl, SEGMENTED_MAX } from "./controls";
 
 // jsdom has no layout engine: it reports every width as 0, so an overflow
@@ -54,5 +54,40 @@ describe("EnumControl layout on narrow screens", () => {
     expect(many.length).toBeGreaterThan(SEGMENTED_MAX);
     const trigger = screen.getByRole("combobox");
     expect(trigger.className).toContain("max-w-full");
+  });
+});
+
+// SelectTrigger's base class carries `[&>span]:line-clamp-1`, which applies
+// display:-webkit-box and -webkit-box-orient:vertical to any DIRECT span
+// child. That selector is `.class > span` (0,1,1) and outranks a plain
+// `.inline-flex` (0,1,0), so the trigger's icon and label were laid out as
+// two vertical lines with the second clamped away -- the icon rendered on
+// top of its own text. Pre-existing since the dropdown was introduced.
+describe("SelectControl trigger content", () => {
+  const many = ["book", "article", "podcast", "show", "film", "game", "video", "music"];
+
+  it("lays the selected value out horizontally despite the trigger's line-clamp", () => {
+    render(<EnumControl options={many} value="book" onChange={() => {}} />);
+    const trigger = screen.getByRole("combobox");
+    const valueSpan = within(trigger).getByText("book").parentElement;
+
+    // The important flag is what settles the cascade against `>span`.
+    // A non-important display utility loses and the stacking returns.
+    expect(valueSpan.className).toContain("!flex");
+  });
+
+  it("keeps the icon from being squashed and lets a long label truncate", () => {
+    render(<EnumControl options={many} value="podcast" onChange={() => {}} />);
+    const trigger = screen.getByRole("combobox");
+    const label = within(trigger).getByText("podcast");
+
+    // The label is nested, so the clamp -- which only reaches direct
+    // children -- cannot apply to it either.
+    expect(label.tagName).toBe("SPAN");
+    expect(label.className).toContain("truncate");
+    expect(label.parentElement).not.toBe(trigger);
+
+    const icon = trigger.querySelector("svg");
+    expect(icon.getAttribute("class")).toContain("shrink-0");
   });
 });
