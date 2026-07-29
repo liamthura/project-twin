@@ -1083,7 +1083,7 @@ describe("SectionRenderer", () => {
         entities: { goal: { list: "goals" } },
         ui: {
           sections: [
-            { kind: "fields", path: ["profile"] },
+            { kind: "table", path: ["profile"] },
             { kind: "list", path: ["goals"], entity: "goal", title_field: "title" },
           ],
         },
@@ -1093,7 +1093,7 @@ describe("SectionRenderer", () => {
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       renderSection({ pack, initial: data });
 
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("fields"));
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("table"));
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("mixed"));
       expect(screen.getByText("Ship it")).toBeInTheDocument();
 
@@ -1104,7 +1104,7 @@ describe("SectionRenderer", () => {
     // asserted above), but SectionRenderer's own per-node wrapper -- the
     // `<div className="space-y-3">` and the node.title heading -- must not be
     // emitted around that null. Otherwise a titled node of a not-yet-
-    // -implemented kind (e.g. a future `fields` node) renders an empty,
+    // -implemented kind renders an empty,
     // heading-bearing div: a heading with no content under it, and a blank
     // ~24px gap contributed by the wrapper even when title is absent.
     it("emits no heading and no wrapper for a node renderNode rejects, while its titled sibling list still renders", () => {
@@ -1115,7 +1115,7 @@ describe("SectionRenderer", () => {
         entities: { goal: { list: "goals" } },
         ui: {
           sections: [
-            { kind: "fields", path: ["profile"], title: "Basics" },
+            { kind: "table", path: ["profile"], title: "Basics" },
             { kind: "list", path: ["goals"], entity: "goal", title_field: "title" },
           ],
         },
@@ -1145,7 +1145,7 @@ describe("SectionRenderer", () => {
         entities: { goal: { list: "goals" } },
         ui: {
           sections: [
-            { kind: "fields" },
+            { kind: "table" },
             { kind: "list", path: ["goals"], entity: "goal", title_field: "title" },
           ],
         },
@@ -1154,10 +1154,89 @@ describe("SectionRenderer", () => {
 
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       expect(() => renderSection({ pack, initial: data })).not.toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("fields"));
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("table"));
       expect(screen.getByText("Ship it")).toBeInTheDocument();
 
       errorSpy.mockRestore();
+    });
+  });
+
+  // The two kinds wave 5 added, exercised end to end through SectionRenderer
+  // rather than through renderNode alone -- the piece neither renderer's own
+  // tests can cover is `onChange(setAt(data, node.path, next))`, which is what
+  // puts an edit back at a NESTED path without disturbing its siblings.
+  describe("strings and fields nodes", () => {
+    const pack = {
+      key: "wellness",
+      title: "Wellness",
+      description: "",
+      entities: { sleep: { optional: ["bedtime", "wakeup"] } },
+      ui: {
+        sections: [
+          {
+            kind: "fields",
+            path: ["wellness", "sleep", "weekday"],
+            entity: "sleep",
+            fields: ["bedtime", "wakeup"],
+            title: "Weekday",
+          },
+          {
+            kind: "strings",
+            path: ["wellness", "energy_peaks"],
+            title: "Energy peaks",
+            placeholder: "e.g. Early morning...",
+          },
+        ],
+      },
+    };
+    const data = {
+      wellness: {
+        sleep: { weekday: { bedtime: "23:30", wakeup: "07:00" }, weekend: { bedtime: "01:00" } },
+        energy_peaks: ["late night"],
+      },
+    };
+
+    it("renders both kinds under their own headings", () => {
+      renderSection({ pack, initial: data });
+
+      expect(screen.getByRole("heading", { name: "Weekday" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Energy peaks" })).toBeInTheDocument();
+      expect(screen.getByLabelText("Bedtime")).toHaveValue("23:30");
+      expect(screen.getByText("late night")).toBeInTheDocument();
+    });
+
+    it("writes a fields edit back at its nested path, leaving its siblings alone", async () => {
+      const { user, latest } = renderSection({ pack, initial: data });
+
+      await user.clear(screen.getByLabelText("Wakeup"));
+      await user.type(screen.getByLabelText("Wakeup"), "06:30");
+
+      const wellness = latest().wellness;
+      expect(wellness.sleep.weekday.wakeup).toBe("06:30");
+      // The sibling day, and the sibling key beside it, are untouched.
+      expect(wellness.sleep.weekday.bedtime).toBe("23:30");
+      expect(wellness.sleep.weekend).toEqual({ bedtime: "01:00" });
+      expect(wellness.energy_peaks).toEqual(["late night"]);
+    });
+
+    it("writes a strings edit back at its nested path, leaving its siblings alone", async () => {
+      const { user, latest } = renderSection({ pack, initial: data });
+
+      await user.type(screen.getByPlaceholderText("e.g. Early morning..."), "early morning{Enter}");
+
+      expect(latest().wellness.energy_peaks).toEqual(["late night", "early morning"]);
+      expect(latest().wellness.sleep.weekday.bedtime).toBe("23:30");
+    });
+
+    it("renders both kinds for a section with no stored data at all", async () => {
+      // A new account. Waves 3 and 4 both shipped sections that rendered
+      // nothing usable here.
+      const { user, latest } = renderSection({ pack, initial: {} });
+
+      expect(screen.getByLabelText("Bedtime")).toHaveValue("");
+      await user.type(screen.getByPlaceholderText("e.g. Early morning..."), "dawn{Enter}");
+
+      expect(latest().wellness.energy_peaks).toEqual(["dawn"]);
     });
   });
 

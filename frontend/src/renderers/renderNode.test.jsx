@@ -93,6 +93,130 @@ describe("renderNode", () => {
     errorSpy.mockRestore();
   });
 
+  describe("kind: strings", () => {
+    const stringsNode = { kind: "strings", path: ["values"], title: "Values" };
+
+    it("renders a strings node without logging an unsupported-kind error", () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderResult({ node: stringsNode, value: ["honesty"] });
+
+      expect(screen.getByText("honesty")).toBeInTheDocument();
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it("reports edits through onValue as the replacement array", async () => {
+      const onValue = vi.fn();
+      const user = userEvent.setup();
+      renderResult({ node: stringsNode, value: ["honesty"], onValue });
+
+      await user.type(screen.getByPlaceholderText("Add value..."), "growth{Enter}");
+
+      expect(onValue).toHaveBeenCalledWith(["honesty", "growth"]);
+    });
+
+    it("logs and renders nothing for a strings node with an empty path", () => {
+      // An empty path addresses the containing object, so the first write
+      // would replace the whole section with a bare string[].
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { container } = renderResult({
+        node: { kind: "strings", path: [] },
+        value: ["a"],
+        packKey: "lifestyle",
+      });
+
+      expect(container).toBeEmptyDOMElement();
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining("lifestyle"));
+      spy.mockRestore();
+    });
+
+    it("logs and renders nothing for a strings node with no path at all", () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { container } = renderResult({ node: { kind: "strings" }, value: ["a"] });
+
+      expect(container).toBeEmptyDOMElement();
+      expect(spy).toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it("logs and renders empty when a strings node's value is not an array", () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderResult({ node: stringsNode, value: { not: "a list" }, packKey: "lifestyle" });
+
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining("got object"));
+      expect(screen.getByPlaceholderText("Add value...")).toBeInTheDocument();
+      spy.mockRestore();
+    });
+
+    it("does not log when a strings value is simply absent -- a fresh section", () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderResult({ node: stringsNode, value: undefined });
+
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+  });
+
+  describe("kind: fields", () => {
+    const fieldsNode = {
+      kind: "fields",
+      path: ["communication", "default"],
+      fields: ["tone", "locale"],
+    };
+
+    it("renders a fields node without logging an unsupported-kind error", () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderResult({ node: fieldsNode, value: { tone: "warm" } });
+
+      expect(screen.getByLabelText("Tone")).toHaveValue("warm");
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it("accepts an EMPTY path -- the section root, which profile binds", () => {
+      // The non-empty-path rule is conditional on kind: "list" in
+      // meta_schema.json precisely so this shape stays legal.
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderResult({ node: { kind: "fields", path: [], fields: ["name"] }, value: { name: "Ada" } });
+
+      expect(screen.getByLabelText("Name")).toHaveValue("Ada");
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it("logs and renders nothing for a fields node with no path at all", () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { container } = renderResult({
+        node: { kind: "fields", fields: ["tone"] },
+        packKey: "preferences",
+      });
+
+      expect(container).toBeEmptyDOMElement();
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining("preferences"));
+      spy.mockRestore();
+    });
+
+    it("resolves its entity from the entities map, so enums render", () => {
+      renderResult({
+        node: { ...fieldsNode, entity: "communication_default" },
+        value: {},
+        entities: { communication_default: { valid_values: { tone: ["warm", "direct"] } } },
+      });
+
+      expect(screen.getByRole("button", { name: "warm" })).toBeInTheDocument();
+    });
+
+    it("reports edits through onValue as the merged object", async () => {
+      const onValue = vi.fn();
+      const user = userEvent.setup();
+      renderResult({ node: fieldsNode, value: { tone: "warm" }, onValue });
+
+      await user.type(screen.getByLabelText("Locale"), "x");
+
+      expect(onValue).toHaveBeenCalledWith({ tone: "warm", locale: "x" });
+    });
+  });
+
   function renderResult(args) {
     return render(<>{renderNode({ onValue: () => {}, ...args })}</>);
   }

@@ -160,6 +160,14 @@
         "title": {
           "type": "string"
         },
+        "description": {
+          "type": "string",
+          "description": "One muted line under the node's title, saying what belongs here. User-facing helper text, unlike `$comment` (an authoring note) and shorter than `info` (a dialog). Optional: a node whose title is self-explanatory should omit it rather than restate itself."
+        },
+        "placeholder": {
+          "type": "string",
+          "description": "Placeholder for this node's own input -- the ArrayInput on a `strings` node. Carries the concrete examples the hand-written editors used (\"e.g. Python, TypeScript...\"), which do more to explain a free-text list than any label. Optional: without it a `strings` node derives a plain \"Add <singular title>...\"."
+        },
         "title_field": {
           "type": "string"
         },
