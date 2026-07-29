@@ -1,5 +1,5 @@
-# MyGist -- one image serving the SPA, the REST API, the MCP endpoint and
-# (from Phase 2) the docs site.
+# MyGist -- one image serving the SPA, the REST API, the MCP endpoint and the
+# docs site.
 #
 # The build context is the REPO ROOT, not backend/, so the frontend can be
 # built here and copied in. In Coolify: base directory "/", dockerfile
@@ -34,7 +34,37 @@ ENV SOURCE_COMMIT=$SOURCE_COMMIT
 
 RUN npm run build
 
-# --- Stage 2: the service ---------------------------------------------------
+# --- Stage 2: build the docs site -------------------------------------------
+# A separate stage from the SPA, not a second command in the one above: they
+# have different lockfiles and different Tailwind majors (the app is on 3.4,
+# Fumadocs requires 4), so sharing a node_modules would break both. Neither
+# stage survives into the final image -- only its output is copied.
+#
+# Pinned to node:22-alpine on purpose. docs-site/ is treated as frozen: exact
+# dependency versions, committed lockfile, and a base image that will not move
+# under it. It is upgraded deliberately or not at all.
+FROM node:22-alpine AS docs
+
+WORKDIR /build/docs-site
+
+# Dependencies first so this layer caches until the lockfile changes.
+#
+# --ignore-scripts is required, not tidiness: this package's `postinstall` runs
+# `fumadocs-mdx`, which reads source.config.ts to generate the `.source`
+# collection -- and at this point only the two manifests have been copied, so it
+# exits with ERR_MODULE_NOT_FOUND and fails the build. The generation step moves
+# below, after the source is in place.
+COPY docs-site/package.json docs-site/package-lock.json ./
+RUN npm ci --prefer-offline --ignore-scripts
+
+COPY docs-site/ ./
+
+# `fumadocs-mdx` first (the skipped postinstall), then the export. `output:
+# export` with basePath "/docs" produces a directory of static files that
+# expects to be served AT /docs, which is where register_static_routes mounts it.
+RUN npx fumadocs-mdx && npm run build
+
+# --- Stage 3: the service ---------------------------------------------------
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -48,9 +78,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ .
 
-# main.py serves these; see register_static_routes(). The Node stage itself is
+# main.py serves these; see register_static_routes(). The Node stages are
 # discarded, so only the built output lands in the final image.
 COPY --from=web /build/frontend/dist ./static
+
+# The docs export goes inside the SPA's static dir, because that is where the
+# mount looks: static/docs -> /docs. Copied second so it cannot be clobbered by
+# the SPA's own output.
+COPY --from=docs /build/docs-site/out ./static/docs
 
 EXPOSE 8000
 

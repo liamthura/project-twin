@@ -1,0 +1,39 @@
+---
+title: Running MyGist
+description: Self-hosting, operations, and extending the persona schema.
+---
+
+MyGist ships as **one container** serving four things on a single origin: the
+web UI at `/`, the REST API under `/api`, the MCP endpoint at `/mcp`, and this
+documentation at `/docs`. There is no separate frontend service and no Node
+runtime in production — the SPA and these docs are both static output built
+into the image.
+
+<Cards>
+  <Card title="Self-hosting" href="/run/self-hosting" description="Requirements, docker run, environment variables." />
+  <Card title="Database" href="/run/database" description="Postgres, pgvector, and the FTS-only fallback." />
+  <Card title="Search index" href="/run/search-index" description="Backfilling, and the --recreate gotcha." />
+  <Card title="Section packs" href="/run/section-packs" description="Adding a section of your own." />
+  <Card title="Migrating" href="/run/migrating" description="Importing legacy mygist_data JSON." />
+  <Card title="Troubleshooting" href="/run/troubleshooting" description="When something is not answering." />
+</Cards>
+
+## What you are running
+
+| Piece | Where | Notes |
+|---|---|---|
+| Web UI | `/` | Vite + React, built into the image |
+| REST API | `/api` | Bearer-token auth; `/api/health` is public |
+| MCP endpoint | `/mcp` | Mounted at root so it resolves without a redirect |
+| Docs | `/docs` | This site, statically exported |
+| Interactive API docs | `/api/docs` | Swagger; ReDoc at `/api/redoc` |
+
+## What you need
+
+Postgres, and nothing else. [pgvector](/run/database) is optional — without
+it search degrades to full-text only rather than breaking. An embedding provider
+is optional on top of that.
+
+State that lives outside the repo — DNS, the reverse proxy, the deployment
+platform — is written down in [Infrastructure](/run/infrastructure), because
+it is otherwise only in a dashboard.

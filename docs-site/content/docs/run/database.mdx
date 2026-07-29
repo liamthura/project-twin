@@ -1,0 +1,72 @@
+---
+title: Database
+description: Postgres, pgvector, and what happens when the extension is not there.
+---
+
+MyGist stores one JSONB blob per `(user, section)` in Postgres. Schema changes
+run through Alembic on container start.
+
+## Which Postgres
+
+Any Postgres you can reach. There is nothing vendor-specific in the schema.
+
+- **Self-hosted Postgres with pgvector** — what this project runs in production,
+  on its own VPS.
+- **A managed provider** — [Neon](https://neon.tech), Supabase, RDS and others
+  all work; several ship pgvector out of the box.
+- **A local container** for development, which is what
+  `backend/docker-compose.yml` provides.
+
+<Callout>
+Older documentation for this project described Neon as *the* production database.
+That has not been true since the move to a self-hosted instance. Neon remains a
+perfectly good managed option — it is just one of several, not a requirement.
+</Callout>
+
+## pgvector, and life without it
+
+The server enables the `vector` extension on startup when it is available.
+
+- **With pgvector** — search is **hybrid**: Postgres full-text search *and*
+  vector similarity, so paraphrases and related concepts match, not only shared
+  keywords.
+- **Without it** — search degrades to **FTS-only**. Nothing breaks and nothing
+  needs configuring; you lose semantic matching.
+
+Hybrid mode also needs an embedding provider configured. Extension present but
+no provider means FTS-only too — the vectors have to come from somewhere.
+
+## `EMBEDDING_DIM`
+
+The `embedding` column is created at a fixed width, default `1024`.
+
+<Callout type="warn">
+The width must match your embedding model's output. If the stored column and the
+configured `EMBEDDING_DIM` disagree, the server logs the mismatch and falls back
+to FTS-only rather than writing vectors that can never be compared. Changing
+model to one with a different width means recreating the column and
+[backfilling](/run/search-index).
+</Callout>
+
+## What is stored
+
+| Table | Holds |
+|---|---|
+| `users` | Accounts and password hashes |
+| `tokens` | Named bearer tokens, hashed, with last-used timestamps |
+| `persona_data` | One JSONB row per user per section — the personas themselves |
+| `persona_search` | The search index: per-entity rows, FTS vectors, and the optional `embedding` column |
+| `login_attempts` | Rate-limiting counters, keyed by submitted username |
+| `alembic_version` | Migration bookkeeping |
+
+`persona_search` is derived. It can be rebuilt from `persona_data` at any time —
+see [Search index](/run/search-index) — which makes it the safe thing to
+drop if it ever looks wrong.
+
+## Backups
+
+Persona data is ordinary rows; back the database up however you normally would.
+
+For a per-user copy that does not need database access, the account dialog's
+**Data → Export** produces the whole persona as JSON, and import takes it back.
+That is also the migration path between instances.

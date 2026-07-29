@@ -1,0 +1,85 @@
+---
+title: Concepts
+description: Personas, sections, entities and ids — the four ideas everything else rests on.
+---
+
+## Persona
+
+Your persona is the whole of what MyGist stores about you: one row per section,
+per user, as JSONB in Postgres. It is plain structured data. You can read it with
+`get_raw`, export it from the account dialog, and edit it by hand.
+
+## Sections
+
+A persona is divided into sections. Each is defined by a declarative **pack** —
+`backend/section_packs/<key>/manifest.json` — which states the section's default
+shape, what an AI client may write into it, what it contributes to each read
+scope, and how the web editor renders it.
+
+| Section | Holds |
+|---|---|
+| **Profile** | Name, role, organisation, location, nationality, bio, languages, work experience, education, contact |
+| **Goals** | What you are working toward — type, status, target date |
+| **Knowledge** | Domains you know, and mental tabs (topics you are tracking) |
+| **Preferences** | Code style, communication, learning style, likes and dislikes |
+| **Projects** | Active and side projects, plus top-of-mind items |
+| **Lifestyle** | Hobbies, interests, personality traits, values, wellness and routines |
+| **Circle** | People and relationships |
+| **Learning log** | What you learn, decide and reflect on, with conversation context |
+| **Media** *(opt-in)* | Favourites and current interests — taste, not a log |
+| **Aesthetics** *(opt-in)* | Visual styles and influences you prefer or avoid |
+
+Media and aesthetics ship **disabled**. Turn them on per account in the Sections
+manager. Any section can be disabled if you would rather not keep it.
+
+<Callout>
+Career aspirations used to live on the profile. They are goals now — a goal with
+`type: "career"`. Anything you read elsewhere describing them as a profile list
+is out of date.
+</Callout>
+
+## Entities
+
+Sections are *storage*. **Entities** are the vocabulary a client uses to write
+into them — `hobby`, `goal`, `work_experience`, `connection`, and so on. An
+entity names its actions (`add` / `update` / `remove`), which fields are
+required, which are optional, and any constrained values.
+
+The two are deliberately not the same thing. An entity is an *input* vocabulary:
+several entities can write into one stored list, and an entity's field names are
+not always the storage keys underneath. That indirection is why the authoritative
+list is published rather than documented:
+
+```text
+get_schema()                    → every entity, grouped by section
+get_schema(file="lifestyle")    → just one section's
+get_schema(entity="hobby")      → one entity, with worked examples
+```
+
+<Callout type="warn">
+These docs deliberately do **not** reproduce the entity table. It is generated
+from the same manifests the server enforces, and a hand-copied version has been
+wrong more than once. Ask `get_schema` — it cannot drift.
+</Callout>
+
+## Ids
+
+Most list entries carry a stable id (`proj_a1b2c3`, `hobby_7f8e`, `learn_2026…`).
+Ids are assigned by the server and are how the lean-retrieval tools address a
+single entry:
+
+```text
+search_context("postgres")  → snippets, each with an id
+get_entity(["proj_a1b2c3"]) → the full entry
+```
+
+You never send an id on `add`. Some nested lists — a project's references, a
+hobby's specifics — have no ids of their own and are addressed through their
+parent instead.
+
+## Next
+
+<Cards>
+  <Card title="Reading" href="/use/reading" description="Scopes, search, and why clients should not pull everything." />
+  <Card title="Writing" href="/use/writing" description="Making changes, one at a time or in a batch." />
+</Cards>

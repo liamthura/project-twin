@@ -1,0 +1,93 @@
+---
+title: Writing
+description: Changing your persona — one entry at a time, or several at once.
+---
+
+Writes go through `persona_modify`. It takes an **action**, an **entity**, and a
+**data** object:
+
+```json
+{
+  "action": "add",
+  "entity": "domain",
+  "data": { "name": "Rust", "level": "learning" }
+}
+```
+
+Actions are `add`, `update` and `remove` — plus `link` and `unlink`, covered in
+[Relations](/use/relations). Not every entity supports every action.
+
+## Ask the schema, don't guess
+
+`get_schema` is the authoritative list of what you can write. It is generated
+from the same manifests the server enforces, so it cannot disagree with what
+will actually be accepted:
+
+```text
+get_schema()                  → every entity, grouped by section
+get_schema(file="lifestyle")  → one section's entities
+get_schema(entity="hobby")    → one entity, with required/optional fields
+                                and a worked example per action
+```
+
+<Callout type="warn">
+Do not work from a table you found in a README — including this project's own
+older ones. The vocabulary has changed repeatedly: entities have gained `update`
+actions, fields have become required, and at least one documented field never
+existed at all. `get_schema` is the only copy that cannot drift.
+</Callout>
+
+## In conversation
+
+You do not write JSON. You say what changed:
+
+> Add Rust to my skills as something I'm learning
+> Update my Solterra project status to completed
+> I don't really play badminton anymore
+> Add 'morning meetings' to my dislikes
+> I usually sleep around 1am on weekdays
+
+The client picks the entity, fills the fields, and calls the tool. If it picks
+wrongly, the schema is what corrects it — asking the assistant to "check
+`get_schema` first" is usually enough.
+
+## Field aliases
+
+Entities accept several spellings for the same field, so a client that guesses
+`topic` where the schema says `course` still lands the write. This is
+convenience, not licence: the stored shape is the same either way, and
+`get_schema` publishes the canonical name.
+
+## Batches
+
+`persona_batch` runs several operations in one call, each reported separately:
+
+```json
+{
+  "operations": [
+    { "action": "add",    "entity": "domain",  "data": { "name": "Rust", "level": "learning" } },
+    { "action": "update", "entity": "project", "data": { "name": "Blog", "status": "active" } },
+    {
+      "action": "add",
+      "entity": "work_highlight",
+      "data": { "company": "Acme", "highlights": ["Led a team of five", "Shipped v2"] }
+    }
+  ]
+}
+```
+
+Use it when a conversation produces several facts at once. A failed operation
+does not roll back the others — read the per-operation results.
+
+## Duplicate advisories
+
+An `add` that closely resembles something already stored comes back with a note
+naming the existing entry. Nothing is blocked and nothing is merged: it is a
+prompt for the client to consider an `update` instead. Capture suggestions get
+the same treatment, and one that matches existing content is rewritten as an
+update before it ever reaches you.
+
+## Editing by hand
+
+Everything writable over MCP is also editable in the web UI, which is often
+faster for a batch of corrections — see [The web editor](/use/editor).

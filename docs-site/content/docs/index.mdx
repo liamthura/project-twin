@@ -1,0 +1,41 @@
+---
+title: MyGist
+description: Portable personal context for AI — one persona, every assistant, under your control.
+---
+
+Every new AI conversation starts from nothing. You re-explain your role, your
+stack, how you like answers written, what you are working on. MyGist stores that
+once and serves it to any client that speaks
+[MCP](https://modelcontextprotocol.io), so the context travels with you instead
+of living in one vendor's memory.
+
+Your persona is structured JSON in your own Postgres — readable, exportable, and
+editable by hand or through the web UI. Nothing is inferred behind your back:
+tools only run when a client calls them.
+
+## Two ways in
+
+<Cards>
+  <Card
+    title="Using MyGist"
+    href="/use"
+    description="Connect a client, read and write your persona, and let capture keep it current. Start here if someone else runs the server."
+  />
+  <Card
+    title="Running MyGist"
+    href="/run"
+    description="Self-host the container, manage Postgres and the search index, add your own sections. Start here if you run it yourself."
+  />
+</Cards>
+
+## The shape of it
+
+A persona is divided into **sections** — profile, goals, knowledge, preferences,
+projects, lifestyle, circle and learning log, plus opt-in media and aesthetics.
+Each section is one JSONB blob per user, defined by a declarative *pack* that
+also states what an AI client may write into it.
+
+Reads are **scoped**, so a client asks for `minimal` or `professional` rather
+than pulling everything. Writes go through a small vocabulary of entities that
+`get_schema` publishes — that is the authoritative list, and these docs teach
+you to ask it rather than keeping a copy that can drift.

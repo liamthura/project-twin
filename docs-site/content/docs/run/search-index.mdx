@@ -1,0 +1,74 @@
+---
+title: Search index
+description: How the index is maintained, and the restart step that is easy to miss.
+---
+
+`persona_search` holds one row per entity: a full-text vector, and — where
+embeddings are configured — an `embedding` column. It is **derived** from
+`persona_data`, so it can always be rebuilt.
+
+Entities are indexed automatically as they are written. You only need the
+backfill script for entries that already existed when something changed.
+
+## When to backfill
+
+- You configured an embedding provider for the first time
+- You changed `EMBEDDING_MODEL` or `EMBEDDING_DIM`
+- You imported a persona from JSON
+- The index looks wrong and you want it rebuilt
+
+## Running it
+
+From `backend/`:
+
+```bash
+# index anything missing or changed
+python scripts/backfill_search_index.py
+
+# drop and recreate the embedding column at EMBEDDING_DIM, then re-embed
+python scripts/backfill_search_index.py --recreate
+```
+
+It reads `DATABASE_URL` and the `EMBEDDING_*` variables exactly as the server
+does, `.env` included.
+
+Use `--recreate` whenever `EMBEDDING_DIM` changes: the existing column is at the
+old width and cannot simply be written into.
+
+## The two gotchas
+
+<Callout type="warn">
+**After a dimension mismatch, `--recreate` is not enough on its own — restart the
+server too.**
+
+If the server booted and logged `persona_search.embedding is vector(N) but
+EMBEDDING_DIM=M`, it cached `VECTOR_AVAILABLE = False` at startup and is running
+FTS-only. Fixing the column does not change that: the running process re-checks
+only when it restarts. Backfill, then restart, or you will be debugging a
+correct index that nothing is using.
+</Callout>
+
+<Callout>
+**`--recreate` resets every entry's last-change time.** Three things read that,
+and all three go quiet afterwards until entries change again:
+
+- `search_context(days=…)` returns nothing for a window that should have hits
+- `updated_at` on `get_entity` and titles stubs reads as today for everything
+- the top-of-mind staleness advisory is suppressed for 30 days
+
+Nothing is lost — the timestamps are metadata about indexing, not about your
+data — but a persona that looks suspiciously "all edited today" right after a
+recreate is expected, not a bug.
+</Callout>
+
+## Verifying
+
+The quickest check is a search that should obviously hit:
+
+```text
+search_context("something you know is in there")
+```
+
+Hybrid mode also matches paraphrases; FTS-only needs a shared keyword. If a
+paraphrase misses but the exact word hits, you are in FTS-only mode — check the
+provider variables and the startup log.

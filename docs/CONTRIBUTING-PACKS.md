@@ -2,8 +2,14 @@
 
 A section pack adds a new persona section to MyGist with **one file** — no
 backend code. The loader validates every pack at boot against
-`backend/section_packs/meta_schema.json`; an invalid pack is skipped with a
-warning (the server still boots).
+`backend/section_packs/meta_schema.json`. **An invalid pack in this repository
+raises and stops the server** — it is not skipped with a warning.
+
+That changed deliberately. Warn-and-skip meant a single mistyped key removed an
+entire section silently: the pack vanished, and the first symptom showed up much
+later and nowhere near the cause (a client being told an entity type was
+unknown). It happened twice. Failing at boot puts the error where the mistake
+is. Warn-and-skip survives only for pack directories the server does not own.
 
 ## Steps
 
@@ -32,18 +38,31 @@ warning (the server still boots).
      guide's `_template` both use.
    - `default_enabled` (optional, defaults to true) — whether the pack starts
      enabled or requires users to opt-in via the Sections manager.
-3. Boot the server (`python main.py`) — a schema violation is logged as a
-   warning naming your pack; fix until the log is clean.
+3. Boot the server (`python main.py`) — a schema violation raises a `PackError`
+   naming your pack and the offending key; fix until it boots.
 4. Run the tests: `python -m pytest tests/test_pack_loader.py -q`.
 5. Open a PR containing exactly one new directory under
    `backend/section_packs/`.
 
 ## The `ui.sections` block
 
-`ui` is `{ "sections": [<node>, ...] }`, where each node describes one list
-in `defaults` and is rendered by the shared renderer kit
-(`frontend/src/renderers/`) — no per-pack frontend code. Today's renderer
-implements one node kind:
+`ui` is `{ "sections": [<node>, ...] }`, where each node binds one part of
+`defaults` and is rendered by the shared renderer kit
+(`frontend/src/renderers/`) — no per-pack frontend code.
+
+The renderer implements **four** node kinds:
+
+| `kind` | Binds | Renders |
+| --- | --- | --- |
+| `list` | a list of objects | expandable rows with fields, badges and an Add dialog |
+| `fields` | named keys of one object | a form; `path: []` addresses the section root |
+| `strings` | a bare `string[]` | tag chips, or one editable row per item with `"item_control": "input"` |
+| `group` | nothing | a heading with nested `sections` under it |
+
+A `list` node may also carry `children`, rendered against each row — that is how
+a project's references and an education entry's coursework are edited.
+
+The commonest node, a top-level list:
 
 ```json
 {

@@ -1,0 +1,74 @@
+---
+title: Troubleshooting
+description: Symptoms, and what each one usually means.
+---
+
+## The server will not start
+
+**`core section pack(s) failed to load`** — a manifest in
+`backend/section_packs/` is invalid. The message names it. Since packs shipped in
+the repo now raise rather than being skipped, this is the loader doing its job:
+fix the manifest.
+
+**`PackError: section pack <name>: invalid manifest`** — the same thing for a
+non-core pack. Before this behaviour existed, such a pack disappeared silently
+and the symptom surfaced much later as an unknown entity type.
+
+**A migration failed** — the container runs `alembic upgrade head` before
+binding, deliberately, so a failed migration stops the deploy instead of leaving
+a half-migrated database serving traffic. Read the Alembic error; the app never
+started.
+
+## A client cannot see the tools
+
+Work outwards:
+
+```bash
+curl -s https://your-instance/api/health                 # public
+curl -s https://your-instance/api/auth/whoami \
+  -H "Authorization: Bearer YOUR_TOKEN"                  # token
+```
+
+- **Connection refused / DNS failure** — the server or the network.
+- **`no available server` from Cloudflare** — a proxied hostname with nothing
+  behind it. This is a routing problem, not a database one.
+- **401** — the token is wrong, revoked, or not being sent. Check the client is
+  passing `Authorization` and not stripping it.
+- **Both pass, client still blank** — it is the client's config. See
+  [Other clients](/use/clients).
+
+## Search behaves oddly
+
+**Paraphrases miss, exact words hit** — you are in FTS-only mode. Either
+pgvector is absent or no embedding provider is configured. Check the startup log.
+
+**`persona_search.embedding is vector(N) but EMBEDDING_DIM=M`** — the column and
+the configured width disagree, so the server fell back to FTS-only. Run the
+backfill with `--recreate`, **then restart the server** — the running process
+cached the decision at startup and will not re-check until it reboots.
+
+**`days` returns nothing, everything looks edited today** — expected right after
+a `--recreate` backfill, which resets every entry's last-change time. It settles
+as entries change. See [Search index](/run/search-index).
+
+**Nothing is indexed at all** — imported personas land in `persona_data` but not
+`persona_search`. Backfill.
+
+## Data looks wrong
+
+**Stored JSON does not match the editor** — probably read-time normalisation of a
+legacy shape, which is lossless. See [Migrating](/run/migrating#read-time-normalisation).
+
+**An entry has no id** — some nested lists (a project's references, a hobby's
+specifics) have no ids by design and are addressed through their parent. Rows
+written before an id backfill also lack them until the next save.
+
+**A field an AI client sent was not saved** — check `get_schema` for that entity.
+Historically the most common cause was a field that was documented but never
+stored; the stored-key audit now makes that impossible to introduce, but a field
+simply not being in the vocabulary is still a plain rejection.
+
+## Getting more detail
+
+`get_raw` dumps a persona file verbatim, bypassing every scope — the fastest way
+to see what is actually stored rather than what a scope chose to show.

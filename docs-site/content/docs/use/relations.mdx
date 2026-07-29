@@ -1,0 +1,59 @@
+---
+title: Relations
+description: Linking entries to each other, and the neighbours MyGist derives on its own.
+---
+
+Entries can be connected in two ways. One you author, one is computed.
+
+## Explicit links (`related`)
+
+Any entry can link to any other — across sections and entity types. A project can
+point at the domain it exercises, a learning-log entry at the project it came out
+of.
+
+```json
+{
+  "action": "link",
+  "data": { "from": "proj_a1b2c3", "to": "domain_7f8e" }
+}
+```
+
+Rules worth knowing:
+
+- **One-directional.** The link is stored on the source entry only. Linking A→B
+  does not create B→A; make it twice if you want both.
+- **Capped at 10** per entry. The cap keeps a scope payload bounded.
+- **Validated at both ends.** Both ids must resolve, or the call fails.
+- **Stripped from scope payloads.** `get_context` never carries them.
+
+Remove one with `action: "unlink"` and the same `from`/`to`.
+
+## Derived neighbours (`similar`)
+
+Separately, MyGist can compute semantically similar entries from the search
+index. You do not author these and they are not stored — they are found at read
+time, and they only exist where an embedding provider is configured.
+
+## Reading either
+
+Both arrive through `get_entity`:
+
+```text
+get_entity(["proj_a1b2c3"], include_related=true)
+```
+
+You get `related` (what you linked) and `similar` (what was derived), each as
+`{id, title, section}` stubs. Fetch the stubs you care about in a second call.
+
+<Callout>
+`related` is always resolved when an entry has links, whether or not you pass
+`include_related` — the flag adds the derived `similar` neighbours. A link whose
+target has since been deleted comes back with `title` and `section` null rather
+than vanishing, so a dangling reference is visible instead of silent.
+</Callout>
+
+## Where links come from
+
+Mostly from the assistant. When an `add` closely matches an existing entry, the
+response carries a nudge suggesting a link. The client can act on it or ignore
+it — nothing is linked automatically.

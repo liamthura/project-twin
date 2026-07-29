@@ -1,0 +1,121 @@
+---
+title: Self-hosting
+description: Requirements, running the container, and every environment variable that does something.
+---
+
+## Requirements
+
+- **Postgres.** Any reachable instance. [pgvector](/run/database) is
+  optional; without it search runs full-text only.
+- **Somewhere to run one container.** ~200 MB of image, one process.
+
+That is the whole list. No Node runtime, no separate frontend service, no
+message broker.
+
+## Running it
+
+```bash
+docker build -t mygist .
+docker run -p 8000:8000 \
+  -e DATABASE_URL="postgresql://user:pass@host:5432/mygist" \
+  mygist
+```
+
+The build context is the **repository root**, not `backend/` — the image builds
+the web UI and these docs in earlier stages and copies the output in. (There is
+also `backend/Dockerfile` for an API-only image with no static assets.)
+
+On start the container runs `alembic upgrade head` before binding, so a failed
+migration stops the deploy rather than leaving a half-migrated database serving
+traffic.
+
+Everything is then on one origin:
+
+| Path | What |
+|---|---|
+| `/` | Web UI |
+| `/api` | REST API — bearer auth, except `/api/health` |
+| `/mcp` | MCP endpoint |
+| `/docs` | This documentation |
+| `/api/docs`, `/api/redoc` | Swagger and ReDoc |
+
+## Environment variables
+
+### Required
+
+| Variable | Notes |
+|---|---|
+| `DATABASE_URL` | Postgres connection string. The only required variable. |
+
+### Server
+
+| Variable | Default | Notes |
+|---|---|---|
+| `PORT` | `8000` | Only read when running `main.py` directly. |
+| `HOST` | `127.0.0.1` | Same. The container's `CMD` passes `--host 0.0.0.0` explicitly, so this does not apply there. |
+
+### Search and embeddings
+
+All optional. Leaving the provider variables unset keeps the server in FTS-only
+mode — see [Database](/run/database).
+
+| Variable | Notes |
+|---|---|
+| `EMBEDDING_PROVIDER` | `voyage` (default) or `openai` |
+| `VOYAGE_API_KEY` | For `voyage` |
+| `EMBEDDING_API_URL` | For `openai` — base URL of any OpenAI-compatible `/v1/embeddings` endpoint (Ollama, LM Studio, llama.cpp, vLLM, LocalAI, OpenAI itself) |
+| `EMBEDDING_API_KEY` | For `openai`; omit for local servers that need none |
+| `EMBEDDING_MODEL` | Default `voyage-4-lite` |
+| `EMBEDDING_DIM` | Default `1024`. Must match your model's output width — see the warning in [Database](/run/database). |
+
+<Callout type="warn">
+`.env.example` also lists `DEBUG` and `MCP_TRANSPORT`. **Neither does anything.**
+`DEBUG` is read nowhere in the codebase, and `MCP_TRANSPORT` survives only in a
+commented-out line. They are left in the example file for now but setting them
+has no effect; transport is HTTP, always.
+</Callout>
+
+## Health checks
+
+`/api/health` is public and unauthenticated — use it for orchestrator probes.
+The image's own `HEALTHCHECK` hits `/health` with a 10-second start period,
+which is what lets a deploy go healthy at ~10s instead of ~31s. If you gate
+routing on health, that window is the difference between a working container and
+a stream of 502s.
+
+## Reverse proxies
+
+Nothing special is required: one upstream, one port. Two things to preserve:
+
+- **Do not strip or rewrite `/mcp`.** It is mounted at the root of the app so it
+  resolves exactly, without a redirect. A proxy that adds a trailing slash or
+  redirects will break clients that do not follow redirects on POST.
+- **Pass `Authorization` through.** Both the API and MCP authenticate on it.
+
+## Local development
+
+Run the API without building an image:
+
+```bash
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+DATABASE_URL="…" uvicorn main:app --reload
+```
+
+A throwaway database for development and tests:
+
+```bash
+cd backend && docker compose up -d test-db
+# DATABASE_URL=postgresql://mygist:mygist@localhost:5433/mygist_test
+```
+
+Static routes are conditional on the built output existing, so a source checkout
+serves the API and MCP normally with no UI and no docs — backend-only
+development is unaffected.
+
+The web UI runs separately in development:
+
+```bash
+cd frontend && npm install && npm run dev
+```

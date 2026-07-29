@@ -1,0 +1,40 @@
+---
+title: Using MyGist
+description: What you get once a client is connected, and where to go next.
+---
+
+Once a client is connected, MyGist gives it three things: a **scoped read** of
+who you are, a **write path** for keeping that current, and a **search** over
+everything you have stored.
+
+<Cards>
+  <Card title="Quick start" href="/use/quick-start" description="Register, get a token, connect Claude Desktop." />
+  <Card title="Other clients" href="/use/clients" description="Anything that speaks MCP over HTTP." />
+  <Card title="Concepts" href="/use/concepts" description="Personas, sections, entities, ids." />
+  <Card title="Reading" href="/use/reading" description="Scopes, search, and the lean-retrieval pattern." />
+  <Card title="Writing" href="/use/writing" description="persona_modify, batches, and get_schema." />
+  <Card title="Capture" href="/use/capture" description="Why nothing is saved without you asking." />
+</Cards>
+
+## What a client sees
+
+At the start of a conversation a well-behaved client calls `get_context` and
+receives a compact summary — name, role, how you like answers written, what you
+are working on. Not your whole persona: a scope.
+
+When something specific comes up it searches rather than loading more:
+
+```text
+search_context("postgres")  →  ~10 ranked snippets with entity ids
+get_entity(["proj_a1b2"])   →  full detail for just the ones that matter
+```
+
+That two-step is the pattern the tools are designed around, and it is why a
+persona can grow without every conversation paying for it.
+
+## What it cannot do
+
+MyGist tools are **passive**. They run when a client calls them and never
+otherwise. Nothing watches your conversations, and nothing is written without an
+explicit call — see [Capture](/use/capture) for what that means in practice
+and why it is a deliberate limitation rather than a missing feature.

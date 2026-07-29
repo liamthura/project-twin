@@ -1,0 +1,55 @@
+---
+title: The web editor
+description: Editing your persona by hand, and the things only the UI can do.
+---
+
+The web UI at the root of your instance is a full editor for everything MyGist
+stores. It is often the faster tool: correcting six fields is a few clicks, and
+several turns of conversation.
+
+## Sections
+
+Each section is a card. Lists expand to show an entry's fields; scalar sections —
+your profile's name, role and bio — are plain forms.
+
+The editor is **generated from the same section packs** the server writes
+through. A pack that declares a field gets a control for it, which is why the UI
+and the MCP vocabulary stay in step: there is no second definition to fall out
+of date.
+
+## Turning sections on and off
+
+Media and aesthetics ship disabled; every other section ships on. Toggle them in
+the **Sections** manager. A disabled section keeps its data — it stops being
+offered to clients and stops appearing in the editor, and comes back unchanged
+when re-enabled.
+
+## Account
+
+The account dialog holds:
+
+- **Password** — set or change it
+- **API tokens** — issue named tokens, see when each was last used, revoke any
+- **Data** — export your whole persona as JSON, or import one back
+
+Export is the honest backup: it is the same structured data the tools read, and
+nothing about it is proprietary.
+
+## What only the UI does
+
+- **Reordering and bulk edits** that would be tedious as individual tool calls.
+- **Seeing everything at once**, including fields no scope surfaces.
+- **Fixing a bad write** — if a client stored something under the wrong entry,
+  correcting it here is immediate.
+
+## What only the tools do
+
+- **Linking entries** (`link` / `unlink`) — the editor shows relationships but
+  does not author them.
+- **Capture suggestions**, which are a conversation feature by nature.
+
+<Callout>
+Both write to the same rows. There is no sync step and no conflict resolution:
+whichever wrote last wins, so avoid editing the same entry in the UI and in a
+conversation at the same moment.
+</Callout>

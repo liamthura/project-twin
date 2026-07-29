@@ -1,0 +1,15 @@
+{
+  "title": "Running MyGist",
+  "description": "Self-hosting, operations, and extending the schema",
+  "root": true,
+  "pages": [
+    "index",
+    "self-hosting",
+    "database",
+    "search-index",
+    "section-packs",
+    "migrating",
+    "infrastructure",
+    "troubleshooting"
+  ]
+}

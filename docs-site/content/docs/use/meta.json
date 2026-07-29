@@ -1,0 +1,16 @@
+{
+  "title": "Using MyGist",
+  "description": "Connect a client, read your persona, keep it current",
+  "root": true,
+  "pages": [
+    "index",
+    "quick-start",
+    "clients",
+    "concepts",
+    "reading",
+    "writing",
+    "capture",
+    "relations",
+    "editor"
+  ]
+}

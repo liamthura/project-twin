@@ -1,0 +1,60 @@
+---
+title: Other clients
+description: Connecting anything that speaks MCP over HTTP.
+---
+
+MyGist exposes a standard MCP endpoint over HTTP at `/mcp`. Any client that can
+reach a URL and send an `Authorization` header can use it — there is nothing
+Claude-specific in the server.
+
+Two things are always required:
+
+| | |
+|---|---|
+| **URL** | `https://your-instance/mcp` (or `http://127.0.0.1:8000/mcp` locally) |
+| **Auth** | `Authorization: Bearer YOUR_TOKEN` |
+
+Issue a separate token per client from **Account → API tokens**, so revoking one
+does not disconnect the rest.
+
+## Claude Desktop
+
+See the [quick start](/use/quick-start#2-connect-claude-desktop).
+
+## Claude Code
+
+Add it as an HTTP MCP server:
+
+```bash
+claude mcp add --transport http mygist https://mygist.thuradev.qzz.io/mcp \
+  --header "Authorization: Bearer YOUR_TOKEN"
+```
+
+## Anything else
+
+Most clients want the same three fields under some spelling — a name, the URL,
+and headers. The MCP specification calls this a *streamable HTTP* server.
+
+<Callout>
+Config shapes for remote MCP servers have changed more than once across client
+versions, and different clients disagree about where headers go. If a config you
+found does not match what your client expects, check that client's current
+documentation. The URL and the bearer token are the parts that never change.
+</Callout>
+
+## Checking the connection
+
+If a client cannot see the tools, work outwards from the server:
+
+```bash
+# Is it up at all? (public, no token needed)
+curl -s https://mygist.thuradev.qzz.io/api/health
+
+# Does the token work?
+curl -s https://mygist.thuradev.qzz.io/api/auth/whoami \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+A `401` means the token is wrong or missing. A connection error means the URL or
+the network is. If both of those pass and the client still shows nothing, it is
+the client's config — see [Troubleshooting](/run/troubleshooting).

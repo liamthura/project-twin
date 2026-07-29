@@ -1,0 +1,95 @@
+---
+title: Quick start
+description: Create an account, get a token, and connect Claude Desktop.
+---
+
+This page assumes a MyGist server is already running — either a hosted instance
+or one you started yourself. If you need to stand one up first, go to
+[Self-hosting](/run/self-hosting) and come back.
+
+Throughout, `https://mygist.thuradev.qzz.io` stands in for a hosted instance and
+`http://127.0.0.1:8000` for a local one. Substitute your own.
+
+## 1. Create an account
+
+People sign in with a username and password. Machines — Claude Desktop, scripts,
+anything else — authenticate with named, revocable **bearer tokens**. Both point
+at the same persona.
+
+The easiest route is the web UI: open the instance in a browser and use
+**Create an account** on the welcome screen.
+
+Or over the API:
+
+```bash
+curl -X POST https://mygist.thuradev.qzz.io/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "you", "password": "your-password"}'
+```
+
+```json
+{ "user_id": "…", "username": "you", "token": "…" }
+```
+
+<Callout type="warn">
+The token's plaintext is shown **once**. Save it now — there is no way to read
+it back, only to issue a new one.
+</Callout>
+
+Every read and write is scoped to the user behind the token. Two accounts on the
+same server cannot see each other's persona.
+
+## 2. Connect Claude Desktop
+
+MyGist's MCP server runs over HTTP, so Claude Desktop connects by **URL** rather
+than launching a local process. The token goes in an `Authorization` header.
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS,
+or `%APPDATA%\Claude\claude_desktop_config.json` on Windows:
+
+```json title="claude_desktop_config.json"
+{
+  "mcpServers": {
+    "mygist": {
+      "url": "https://mygist.thuradev.qzz.io/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN"
+      }
+    }
+  }
+}
+```
+
+For a local server, use `http://127.0.0.1:8000/mcp`.
+
+Restart Claude Desktop. The MyGist tools should now appear.
+
+<Callout>
+Config keys for remote MCP servers have changed between client versions. If this
+shape does not match what your client expects, check its current documentation —
+the URL and the bearer token are the parts that matter.
+</Callout>
+
+## 3. Check it works
+
+Ask the assistant something that requires it to look:
+
+> What do you know about me?
+
+A connected client calls `get_context` and answers from your persona. A fresh
+account has almost nothing in it, which is the expected first result — see
+[Writing](/use/writing) to start filling it, or just talk about yourself and
+let [capture](/use/capture) suggest entries.
+
+## 4. Manage tokens
+
+Issue and revoke tokens from **Account → API tokens** in the web UI, or via
+`POST /api/auth/tokens`. Use a separate token per client so revoking one does
+not lock out the others.
+
+## Next
+
+<Cards>
+  <Card title="Other clients" href="/use/clients" description="Anything that speaks MCP over HTTP." />
+  <Card title="Concepts" href="/use/concepts" description="Sections, entities and ids, before you start writing." />
+</Cards>
