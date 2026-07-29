@@ -181,6 +181,19 @@
       ],
       "optional": [],
       "identifier": "peak"
+    },
+    "stress_trigger": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "trigger"
+      ],
+      "optional": [],
+      "identifier": "trigger",
+      "description": "A situation or pattern that tends to increase your stress. Stored as a bare string in wellness.stress_triggers.",
+      "$comment": "Added in wave 7. The key had a UI node and a seeded default but no entity and no execute_modify branch, so the UI was its only writer. See the wave 5 storage-keys reference, follow-up 2."
     }
   },
   "ui": {

@@ -250,29 +250,40 @@ rather than working around.
 
 ## 5. Backend follow-ups this reading surfaced
 
-Not wave 6 work unless explicitly scoped in:
+Not wave 6 work unless explicitly scoped in. **All eight are now closed** — 0–3
+inside wave 6 itself, 4–7 in wave 7. Struck through rather than deleted, so the
+list stays readable as a record of what one wave's reading turns up.
 
-0. **`coursework`/`clubs` shape conflict (§3.8)** — **taken into wave 6**, not
-   deferred: the branches now write objects, `clubs` gains an entity, and
+0. ~~**`coursework`/`clubs` shape conflict (§3.8)**~~ — **taken into wave 6**,
+   not deferred: the branches now write objects, `clubs` gains an entity, and
    legacy strings are coerced on read. Listed first because it was a live,
    data-visible defect rather than a contract one.
-1. **Seven phantom fields in `profile.entities`** (§3.2, 3.3, 3.5, 3.6):
+1. ~~**Seven phantom fields in `profile.entities`** (§3.2, 3.3, 3.5, 3.6):
    `language.proficiency`, `email.label`, `work_experience.location`,
    `work_experience.description`, `education.degree`, `education.field`,
-   `education.period`. `get_schema` advertises all seven to every AI client;
-   values sent under them are silently discarded. **This is the largest single
-   defect any wave has surfaced.**
-2. **Seven stored keys the vocabulary omits**: `language.fluency`,
+   `education.period`~~ — **closed in wave 6**. `get_schema` advertised all
+   seven to every AI client and values sent under them were silently discarded.
+   **This is the largest single defect any wave has surfaced.**
+2. ~~**Seven stored keys the vocabulary omits**: `language.fluency`,
    `email.purpose`, `education.degree_level`, `field_of_study`, `start_year`,
-   `end_year`, `status`.
-3. **`email.add` requires `purpose`**, which the contract never mentions — an
-   MCP client following `get_schema` cannot add an email.
-4. **`coursework_topic` duplicates `coursework`** verbatim (§3.8).
-5. **`link` has no `update`** (§3.4).
-6. **`basic_info` cannot clear a field** — `if data.get(field)` skips falsy
-   values (§3.1).
-7. **`work_experience.update` cannot change `highlights`**, though `add` sets
-   them; `work_highlight` is the only path.
+   `end_year`, `status`~~ — **closed in wave 6**.
+3. ~~**`email.add` requires `purpose`**, which the contract never mentions~~ —
+   **closed in wave 6**. An MCP client following `get_schema` could not add an
+   email.
+4. ~~**`coursework_topic` duplicates `coursework`** verbatim (§3.8)~~ —
+   **closed in wave 7**: one branch, two entity names, and the alias lists
+   merged. The entity stays in the vocabulary because clients call it; it no
+   longer stays as a copy.
+5. ~~**`link` has no `update`** (§3.4)~~ — **closed in wave 7**, with
+   `new_label` for the rename, since `label` identifies the row.
+6. ~~**`basic_info` cannot clear a field** — `if data.get(field)` skips falsy
+   values (§3.1)~~ — **closed in wave 7**: presence, not truthiness. `name`
+   keeps the old guard, being what most readers title the persona with.
+7. ~~**`work_experience.update` cannot change `highlights`**, though `add` sets
+   them; `work_highlight` is the only path~~ — **closed in wave 7**, with the
+   same wholesale replacement `skills` gets, so `[]` clears.
 
-These accrete toward
+These accreted toward
 [`2026-07-28-entity-field-schema-design.md`](../specs/2026-07-28-entity-field-schema-design.md).
+Wave 7 took the whole accumulated list —
+[`2026-07-29-wave-7-mcp-contract-gaps.md`](2026-07-29-wave-7-mcp-contract-gaps.md).

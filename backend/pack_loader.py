@@ -124,5 +124,18 @@ def _reset_cache() -> None:
 
 
 def build_entity_schema(packs: dict[str, dict]) -> dict[str, dict]:
-    """{section_key: entities} in pack order — server.ENTITY_SCHEMA shape."""
-    return {key: m["entities"] for key, m in packs.items()}
+    """{section_key: entities} in pack order — server.ENTITY_SCHEMA shape.
+
+    `$comment` is dropped here rather than left to each reader. ENTITY_SCHEMA is
+    what `get_schema` hands to MCP clients, so an authoring note left in it would
+    be shipped as part of the tool contract — and the meta-schema promises the
+    opposite: `description` is the client-facing text, `$comment` is for the next
+    author. Nothing else is filtered; unknown keys are the pack's business.
+    """
+    return {
+        key: {
+            entity: {k: v for k, v in spec.items() if k != "$comment"}
+            for entity, spec in m["entities"].items()
+        }
+        for key, m in packs.items()
+    }

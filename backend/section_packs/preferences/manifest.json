@@ -42,10 +42,18 @@
       "required": [
         "item"
       ],
-      "optional": [],
+      "optional": [
+        "stance"
+      ],
+      "valid_values": {
+        "stance": [
+          "like",
+          "dislike"
+        ]
+      },
       "identifier": "item",
       "list": "likes_dislikes",
-      "description": "Something you like; stored with stance=like in the likes_dislikes list"
+      "description": "Something you like; stored in the shared likes_dislikes list with stance=like unless you send stance explicitly"
     },
     "dislike": {
       "actions": [
@@ -56,10 +64,18 @@
       "required": [
         "item"
       ],
-      "optional": [],
+      "optional": [
+        "stance"
+      ],
+      "valid_values": {
+        "stance": [
+          "like",
+          "dislike"
+        ]
+      },
       "identifier": "item",
       "list": "likes_dislikes",
-      "description": "Something you dislike; stored with stance=dislike in the likes_dislikes list"
+      "description": "Something you dislike; stored in the shared likes_dislikes list with stance=dislike unless you send stance explicitly"
     },
     "preference": {
       "actions": [
@@ -305,10 +321,7 @@
         "facets": [
           "stance"
         ],
-        "fields_outside_entity": [
-          "stance"
-        ],
-        "$comment": "One list shared by the `like` and `dislike` entities, discriminated by `stance` -- which is in NEITHER entity's required nor optional, though it is the key that decides which entity a row IS. Declared via fields_outside_entity rather than added to the entities, which would change the MCP vocabulary as a side effect of a UI change. See reference doc 2.3 and follow-up 4.",
+        "$comment": "One list shared by the `like` and `dislike` entities, discriminated by `stance`. `stance` used to be in NEITHER entity's required nor optional -- invisible to get_schema though it is the key that decides which entity a row IS -- and was declared here via fields_outside_entity instead. Wave 7 put it on both entities, where it belongs, so that declaration is gone and the node's `stance` binding is now checked against the vocabulary like any other field. See reference doc 2.3 and wave 5 follow-up 4.",
         "info": {
           "overview": "Standing likes and dislikes every AI should know about, whatever the topic.",
           "tips": [
