@@ -91,3 +91,64 @@ describe("SelectControl trigger content", () => {
     expect(icon.getAttribute("class")).toContain("shrink-0");
   });
 });
+
+// The layout contract above stops the segmented control running off the side
+// of a phone. It does not make a four-word segmented row a GOOD control at
+// 375px -- three wrapped lines of pills for one field is still most of a
+// screen. Below `sm`, EnumControl now renders the same dropdown the larger
+// enums already use.
+//
+// jsdom implements no matchMedia at all, which is exactly why useMediaQuery
+// falls back to the desktop answer: every other test in this suite asserts the
+// segmented control and must keep doing so without stubbing anything.
+describe("EnumControl below the sm breakpoint", () => {
+  const fourOptions = ["want", "in_progress", "finished", "dropped"];
+
+  function withViewport(matches, fn) {
+    const original = window.matchMedia;
+    window.matchMedia = (query) => ({
+      matches,
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+    });
+    try {
+      fn();
+    } finally {
+      if (original) window.matchMedia = original;
+      else delete window.matchMedia;
+    }
+  }
+
+  it("renders a dropdown, not a segmented row", () => {
+    withViewport(false, () => {
+      render(<EnumControl options={fourOptions} value="want" onChange={() => {}} />);
+      expect(screen.getByRole("combobox")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "finished" })).not.toBeInTheDocument();
+    });
+  });
+
+  it("still shows the current value", () => {
+    withViewport(false, () => {
+      render(<EnumControl options={fourOptions} value="in_progress" onChange={() => {}} />);
+      expect(screen.getByRole("combobox")).toHaveTextContent("in progress");
+    });
+  });
+
+  it("renders the segmented row again above the breakpoint", () => {
+    withViewport(true, () => {
+      render(<EnumControl options={fourOptions} value="want" onChange={() => {}} />);
+      expect(screen.getByRole("button", { name: "want", pressed: true })).toBeInTheDocument();
+    });
+  });
+
+  it("falls back to the segmented row where matchMedia does not exist", () => {
+    // jsdom's default. Named so the fallback is a tested contract rather than
+    // an accident every other test in the repo silently depends on.
+    expect(window.matchMedia).toBeUndefined();
+    render(<EnumControl options={fourOptions} value="want" onChange={() => {}} />);
+    expect(screen.getByRole("button", { name: "want", pressed: true })).toBeInTheDocument();
+  });
+});

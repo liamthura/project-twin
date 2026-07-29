@@ -2062,14 +2062,10 @@
             "topic",
             "details",
             "source",
-            "tags",
-            "key_decisions",
-            "followup_items"
+            "tags"
           ],
           "array_fields": [
-            "tags",
-            "key_decisions",
-            "followup_items"
+            "tags"
           ],
           "long_text": [
             "details"
@@ -2091,12 +2087,32 @@
           },
           "field_placeholders": {
             "details": "What you learned or discussed...",
-            "followup_items": "e.g. Read the migration guide",
-            "key_decisions": "e.g. Chose Postgres over SQLite",
             "source": "e.g. conversation, article, course",
             "tags": "e.g. design, languages",
             "topic": "e.g. Spanish subjunctive, React hooks"
-          }
+          },
+          "children": [
+            {
+              "kind": "strings",
+              "path": [
+                "key_decisions"
+              ],
+              "title": "Key Decisions",
+              "item_control": "input",
+              "placeholder": "e.g. Chose Postgres over SQLite for the vector index",
+              "$comment": "Bare strings on the parent row (server.py learning entry update). item_control:\"input\" for the same reason profile's work `highlights` uses it: these are SENTENCES, and a chip control makes fixing a typo mean deleting and retyping the whole line. They were chips until wave 12."
+            },
+            {
+              "kind": "strings",
+              "path": [
+                "followup_items"
+              ],
+              "title": "Follow-up Items",
+              "item_control": "input",
+              "placeholder": "e.g. Read the migration guide before the next sprint",
+              "$comment": "See the key_decisions node above -- same shape, same reasoning."
+            }
+          ]
         }
       ]
     }
