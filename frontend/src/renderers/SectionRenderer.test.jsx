@@ -1741,6 +1741,74 @@ describe("section headings and info placement", () => {
       spy.mockRestore();
     });
 
+
+    describe("separators", () => {
+      const sep = () => screen.queryAllByRole("separator");
+
+      it("rules between a group and whatever follows it", () => {
+        renderSection({ pack, initial: data });
+        // One group, one ungrouped node after it -> exactly one rule.
+        expect(sep()).toHaveLength(1);
+      });
+
+      it("leaves no dangling rule under a trailing group", () => {
+        // lifestyle's Wellness sits last today, so a plain "after every group"
+        // would leave a rule floating at the bottom of the card.
+        const trailing = {
+          ...pack,
+          ui: { sections: [pack.ui.sections[1], pack.ui.sections[0]] },
+        };
+        renderSection({ pack: trailing, initial: data });
+        expect(sep()).toHaveLength(0);
+      });
+
+      it("rules between consecutive groups but not after the last", () => {
+        const twoGroups = {
+          ...pack,
+          ui: {
+            sections: [
+              pack.ui.sections[0],
+              { ...pack.ui.sections[0], title: "Second", sections: [
+                { kind: "strings", path: ["loose"], title: "Loose" },
+              ] },
+            ],
+          },
+        };
+        renderSection({ pack: twoGroups, initial: data });
+        expect(sep()).toHaveLength(1);
+      });
+
+      it("rules after no ungrouped node", () => {
+        const flat = {
+          ...pack,
+          ui: {
+            sections: [
+              { kind: "strings", path: ["a"], title: "A" },
+              { kind: "strings", path: ["b"], title: "B" },
+            ],
+          },
+        };
+        renderSection({ pack: flat, initial: { a: [], b: [] } });
+        expect(sep()).toHaveLength(0);
+      });
+
+      it("does not rule before a rejected trailing node", () => {
+        // The rule is decided after rejected nodes are filtered out, so a
+        // group followed only by a node renderNode drops stays unruled.
+        const trailingBad = {
+          ...pack,
+          ui: {
+            sections: [pack.ui.sections[0], { kind: "table", path: ["x"] }],
+          },
+        };
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        renderSection({ pack: trailingBad, initial: data });
+
+        expect(sep()).toHaveLength(0);
+        spy.mockRestore();
+      });
+    });
+
     it("draws a node's `description` for every kind, not only strings", () => {
       // It used to live in StringsRenderer alone, so the copy declared on
       // preferences' communication-default (fields) and mood-overrides (list)

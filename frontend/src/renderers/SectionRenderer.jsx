@@ -40,9 +40,7 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
         );
         return null;
       }
-      const rendered = node.sections
-        .map((child, i) => renderSectionNode(child, `${key}:${i}`, depth + 1))
-        .filter(Boolean);
+      const rendered = withSeparators(node.sections, `${key}:`, depth + 1);
       // Every child rejected: emit nothing rather than a heading over nothing,
       // the same rule a rejected node gets below.
       if (rendered.length === 0) return null;
@@ -75,6 +73,31 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
         {node.title && heading(node, depth)}
         {rendered}
       </div>
+    );
+  }
+
+  // Render a list of sibling nodes, with a rule after each GROUP that has
+  // something rendering after it. Two things that condition buys:
+  //   - no dangling rule under the last group, which is what a plain
+  //     "separator after every group" would leave when a group sits last
+  //     (lifestyle's Wellness, today)
+  //   - a rule still lands between a group and a plain node that follows it
+  //     (preferences' Learning Style -> Likes & Dislikes), which is exactly
+  //     where the boundary is hardest to see
+  // Ungrouped siblings get none: they are single controls, and ruling between
+  // each would turn the card into a stack of boxes.
+  //
+  // `rendered` is filtered first, so a rejected trailing node cannot leave the
+  // rule before it dangling either.
+  function withSeparators(nodes, keyPrefix, depth) {
+    const rendered = (nodes || [])
+      .map((node, i) => ({ node, el: renderSectionNode(node, `${keyPrefix}${i}`, depth) }))
+      .filter((r) => r.el);
+
+    return rendered.flatMap(({ node, el }, i) =>
+      node.kind === "group" && i < rendered.length - 1
+        ? [el, <hr key={`sep:${keyPrefix}${i}`} className="border-border" />]
+        : [el]
     );
   }
 
@@ -119,11 +142,10 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
         <CardDescription>{pack.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {sections.map((node, i) =>
-          // key by index as well as path: two sibling nodes may legitimately
-          // share a path, and a bare path join collides for them.
-          renderSectionNode(node, `${i}:${Array.isArray(node.path) ? node.path.join(".") : ""}`, 0)
-        )}
+        {/* Keys carry the index as well as the path: two sibling nodes may
+            legitimately share a path, and a bare path join collides for them.
+            withSeparators appends the index to this prefix. */}
+        {withSeparators(sections, "", 0)}
       </CardContent>
     </Card>
   );
