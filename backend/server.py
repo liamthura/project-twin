@@ -1505,6 +1505,13 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 "company": data["company"],
                 "type": data["type"],
                 "period": data["period"],
+                # `location` and `description` were declared in this entity's
+                # tool contract and written by NOTHING -- not this branch, not
+                # the editor -- so every value an MCP client sent under them was
+                # discarded on arrival. Seeded like the other optional keys so a
+                # row always carries them and the UI never renders `undefined`.
+                "location": data.get("location", ""),
+                "description": data.get("description", ""),
                 "highlights": data.get("highlights", [])
             })
             save_json("profile.json", profile)
@@ -1513,7 +1520,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             idx, exp = find_in_array(work, data.get("company", ""), "company")
             if idx == -1:
                 return f"❌ Work experience at '{data.get('company')}' not found"
-            for field in ["role", "type", "period"]:
+            for field in ["role", "type", "period", "location", "description"]:
                 if data.get(field):
                     exp[field] = data[field]
             save_json("profile.json", profile)

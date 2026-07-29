@@ -46,9 +46,10 @@ beforeAll(() => {
     };
 });
 
-// A minimal but complete /all payload: one key per BESPOKE_EDITORS entry
-// (now excluding circle and learning_log) plus the two packs under test,
-// using the same fixtures SectionRenderer.test.jsx already trusts.
+// A minimal but complete /all payload: one key per section the app loads,
+// plus the packs under test, using the same fixtures SectionRenderer.test.jsx
+// already trusts. Every section is manifest-driven as of wave 6 -- there is no
+// bespoke-editor carve-out left, so the whole response becomes packData.
 const ALL_DATA = {
   profile: {},
   knowledge: {},
@@ -148,12 +149,15 @@ describe("App: circle and learning_log render through the renderer kit", () => {
       );
       expect(putAll).toBeTruthy();
       const body = JSON.parse(putAll[1].body);
-      // Before this task, saveAll sent these explicitly by name. After
-      // removing both from BESPOKE_EDITORS they must still arrive, now via
-      // packData -- a silent regression here would stop both sections
-      // saving without any error surfacing anywhere.
+      // saveAll used to send each bespoke section explicitly by name. As each
+      // one migrated it had to keep arriving via packData instead -- a silent
+      // regression here would stop a section saving with no error surfacing
+      // anywhere. `profile` is the last one to make that move (wave 6), and it
+      // is the one that would be missed most quietly, since the header reads
+      // its name and would still render from the loaded copy.
       expect(body.circle).toEqual(circleData);
       expect(body.learning_log).toEqual(learningLogData);
+      expect(body).toHaveProperty("profile");
     });
   });
 });

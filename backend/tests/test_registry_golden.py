@@ -3,6 +3,19 @@
 Pins the exact section registry and entity schema as they were BEFORE the
 refactor. Every refactor task must keep this green. If this test fails, the
 refactor changed behavior — fix the refactor, never the fixture.
+
+The one thing that legitimately moves this fixture is a DELIBERATE change to
+the tool contract, which is not a refactor and must be argued for on its own.
+That has happened once: wave 6 corrected `profile`'s vocabulary, which declared
+seven field names nothing stored (`language.proficiency`, `email.label`,
+`education.degree`/`field`/`period`) and omitted seven that were stored. Values
+sent under the phantoms were discarded on arrival, and `email.add` demanded a
+`purpose` the contract never mentioned, so no MCP client could add an email.
+See docs/superpowers/plans/2026-07-29-wave-6-storage-keys-reference.md.
+
+Before editing this fixture, diff `server.ENTITY_SCHEMA` against it and confirm
+every changed entity is one you meant to change. A refactor that quietly widens
+the diff is exactly what this file exists to catch.
 """
 import json
 from pathlib import Path

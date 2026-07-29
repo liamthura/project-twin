@@ -11,6 +11,7 @@ import projectsData from "@/__fixtures__/data/projects.json";
 import knowledgeData from "@/__fixtures__/data/knowledge.json";
 import lifestyleData from "@/__fixtures__/data/lifestyle.json";
 import preferencesData from "@/__fixtures__/data/preferences.json";
+import profileData from "@/__fixtures__/data/profile.json";
 import { renderSection } from "@/test/harness";
 import { SEGMENTED_MAX } from "@/components/controls";
 import { normalizeUi } from "@/renderers/paths";
@@ -24,6 +25,7 @@ const projectsPack = packs.find((p) => p.key === "projects");
 const knowledgePack = packs.find((p) => p.key === "knowledge");
 const lifestylePack = packs.find((p) => p.key === "lifestyle");
 const preferencesPack = packs.find((p) => p.key === "preferences");
+const profilePack = packs.find((p) => p.key === "profile");
 
 // Shared reasons for the two exclusion entries nearly every pack needs --
 // spelled out once so every call site's exclusion map still requires a real,
@@ -1832,6 +1834,144 @@ describe("section headings and info placement", () => {
       };
       renderSection({ pack: mixed, initial: {} });
       expect(screen.getByText("always active")).toBeInTheDocument();
+    });
+  });
+
+
+  // -------------------------------------------------------------------------
+  // profile (wave 6) -- the last bespoke editor, and the section whose entity
+  // vocabulary turned out to be substantially fiction: it declared seven field
+  // names nothing stored and omitted seven that were stored. Wave 6 corrected
+  // the vocabulary rather than declaring the divergences, which is why this
+  // pack ships zero `fields_outside_entity`.
+  //
+  // Two beliefs the reading overturned: `profile` is not "entirely kind:
+  // fields" (one fields node, four lists), and there is NO second level of
+  // child list -- education.coursework is a bare string array, not objects.
+  // -------------------------------------------------------------------------
+  describe("profile", () => {
+    describe("education list", () => {
+      describeGuards({
+        pack: profilePack, listKey: "education", data: profileData, exclusions: {},
+      });
+    });
+    describe("work_experience list", () => {
+      describeGuards({
+        pack: profilePack, listKey: "work_experience", data: profileData, exclusions: {},
+      });
+    });
+    describe("languages_spoken list", () => {
+      describeGuards({
+        pack: profilePack, listKey: "languages_spoken", data: profileData, exclusions: {},
+      });
+    });
+
+    it("binds the seven top-level scalars through a fields node at the section root", () => {
+      renderSection({ pack: profilePack, initial: profileData });
+
+      expect(screen.getByLabelText("Name")).toHaveValue("Ada Lovelace");
+      expect(screen.getByLabelText("Preferred name")).toHaveValue("Ada");
+      expect(screen.getByLabelText("Bio").tagName).toBe("TEXTAREA");
+    });
+
+    it("writes a root-level scalar without replacing the whole section", async () => {
+      // path: [] means setAt returns the new value outright, so this only
+      // works because FieldsRenderer spreads the stored object first. If it
+      // did not, the first keystroke would discard education, work and contact.
+      const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
+
+      const preferred = screen.getByLabelText("Preferred name");
+      await user.clear(preferred);
+      await user.type(preferred, "Ada L");
+
+      expect(latest().preferred_name).toBe("Ada L");
+      expect(latest().name).toBe("Ada Lovelace");
+      expect(latest().education).toHaveLength(1);
+      expect(latest().contact.emails).toHaveLength(1);
+    });
+
+    it("binds education's real stored keys, never the phantoms it used to declare", async () => {
+      const { user } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Northumbria University"));
+
+      expect(screen.getByDisplayValue("BSc")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Computer Science")).toBeInTheDocument();
+      // `period` mapped to TWO stored keys, so no control could ever bind it.
+      expect(screen.queryByText("period")).not.toBeInTheDocument();
+      expect(screen.queryByText("degree")).not.toBeInTheDocument();
+      expect(screen.queryByText("field")).not.toBeInTheDocument();
+    });
+
+    it("round-trips education's bare string arrays without touching each other", async () => {
+      const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Northumbria University"));
+
+      const coursework = screen.getByText("coursework").parentElement;
+      await user.type(within(coursework).getByRole("textbox"), "Type Theory{Enter}");
+
+      const edu = latest().education[0];
+      expect(edu.coursework).toEqual(["Compilers", "Distributed Systems", "Type Theory"]);
+      expect(edu.clubs).toEqual(["Hackathon Society"]);
+      expect(edu.highlights).toEqual(["First class average"]);
+    });
+
+    it("binds work experience's `location` and `description`, real as of wave 6", async () => {
+      const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Acme"));
+
+      expect(screen.getByDisplayValue("Remote")).toBeInTheDocument();
+      await user.type(screen.getByDisplayValue("Backend work on the ingest pipeline."), "!");
+
+      expect(latest().work_experience[0].description).toBe("Backend work on the ingest pipeline.!");
+      expect(latest().work_experience[1].company).toBe("Bean There");
+    });
+
+    it("stores a language's `fluency`, never the alias `proficiency`", async () => {
+      const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Welsh"));
+
+      const row = screen.getByRole("button", { name: "Remove Welsh" }).closest("div").parentElement;
+      await user.click(within(row).getByRole("button", { name: "fluent" }));
+
+      expect(latest().languages_spoken[1]).toEqual({ name: "Welsh", fluency: "fluent" });
+      expect(latest().languages_spoken[0]).toEqual({ name: "English", fluency: "native" });
+    });
+
+    it("groups emails and links under Contact & Links", () => {
+      renderSection({ pack: profilePack, initial: profileData });
+
+      const contact = uiNode("Contact & Links");
+      expect(within(contact).getByText("ada@example.invalid")).toBeInTheDocument();
+      expect(within(contact).getByText("GitHub")).toBeInTheDocument();
+    });
+
+    it("stores an email's `purpose`, the key its add branch requires", async () => {
+      const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("ada@example.invalid"));
+
+      const purpose = screen.getByText("purpose").parentElement;
+      await user.type(within(purpose).getByRole("textbox"), "!");
+
+      expect(latest().contact.emails[0].purpose).toBe("primary!");
+      expect(latest().contact.emails[0]).not.toHaveProperty("label");
+    });
+
+    it("gives every group a usable Add on a brand-new account", () => {
+      renderSection({ pack: profilePack, initial: {} });
+
+      expect(screen.getByLabelText("Name")).toHaveValue("");
+      for (const label of ["Add education", "Add work experience", "Add email",
+                           "Add link", "Add language"]) {
+        expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+      }
+    });
+
+    it("writes the first scalar on an empty account without inventing siblings", async () => {
+      const { user, latest } = renderSection({ pack: profilePack, initial: {} });
+
+      await user.type(screen.getByLabelText("Name"), "Ada");
+
+      expect(latest()).toEqual({ name: "Ada" });
     });
   });
 

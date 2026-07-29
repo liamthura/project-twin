@@ -45,7 +45,6 @@ import {
 import { ConnectionSettings } from "@/components/ConnectionSettings";
 import { api, getAuthToken } from "@/lib/api.js";
 import { WelcomeAuth } from "@/components/WelcomeAuth";
-import ProfileEditor from "@/editors/ProfileEditor";
 import SectionRenderer from "@/renderers/SectionRenderer";
 
 // Debounce hook
@@ -72,7 +71,6 @@ const TAB_TRIGGER_CLASS =
 
 // Sections with a bespoke, hand-built editor. Everything else that's
 // enabled gets a generic, manifest-driven tab instead.
-const BESPOKE_EDITORS = new Set(["profile"]);
 const PACK_ICONS = {
   goals: Target,
   media: Film,
@@ -83,6 +81,7 @@ const PACK_ICONS = {
   projects: FolderKanban,
   lifestyle: Heart,
   preferences: Settings,
+  profile: User,
 };
 
 // Tracks whether a horizontally scrollable element is at its start/end edge,
@@ -144,7 +143,6 @@ export default function App() {
     setTheme((t) => (t === "light" ? "dark" : t === "dark" ? "system" : "light"));
   const { toast } = useToast();
 
-  const [profile, setProfile] = useState({});
 
   const [disabledSections, setDisabledSections] = useState([]);
   const [packs, setPacks] = useState([]);
@@ -191,13 +189,9 @@ export default function App() {
     setError(null);
     try {
       const response = await api("/all");
-      setProfile(response.data.profile || {});
-      const known = new Set([...BESPOKE_EDITORS]);
-      const rest = {};
-      for (const [k, v] of Object.entries(response.data || {})) {
-        if (!known.has(k)) rest[k] = v;
-      }
-      setPackData(rest);
+      // Every section is manifest-driven as of wave 6, so the whole response
+      // is pack data -- there is no bespoke editor left to carve out.
+      setPackData(response.data || {});
       setIsConnected(true);
     } catch (err) {
       setError(err.message);
@@ -239,10 +233,6 @@ export default function App() {
 
   const debouncedSave = useDebounce(saveFile, 1500);
 
-  const handleProfileChange = (newData) => {
-    setProfile(newData);
-    if (isAutosaveEnabled) debouncedSave("profile", newData);
-  };
   const handlePackChange = (key) => (newData) => {
     setPackData((prev) => ({ ...prev, [key]: newData }));
     if (isAutosaveEnabled) debouncedSave(key, newData);
@@ -253,12 +243,7 @@ export default function App() {
     try {
       await api("/all", {
         method: "PUT",
-        body: JSON.stringify({
-          profile,
-          // Every section except profile is manifest-driven now and arrives
-          // via packData.
-          ...packData,
-        }),
+        body: JSON.stringify(packData),
       });
       setLastSaved(new Date());
       toast({ title: "All files saved", variant: "success" });
@@ -419,7 +404,7 @@ export default function App() {
     );
   }
 
-  const dynamicPacks = packs.filter((p) => p.enabled && !BESPOKE_EDITORS.has(p.key));
+  const dynamicPacks = packs.filter((p) => p.enabled);
 
   return (
     <div className="min-h-dvh bg-background">
@@ -509,7 +494,7 @@ export default function App() {
             >
               <User className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="max-w-[128px] truncate">
-                {profile?.preferred_name || profile?.name || "Account"}
+                {packData.profile?.preferred_name || packData.profile?.name || "Account"}
               </span>
             </button>
           </div>
@@ -529,10 +514,6 @@ export default function App() {
             data-at-end={tabStripEdges.end}
             className="scrollbar-none w-full flex-nowrap overflow-x-auto snap-x snap-proximity tab-strip-fade md:flex-wrap md:overflow-visible md:h-fit md:flex-col md:items-stretch md:justify-start"
           >
-            <TabsTrigger value="profile" className={TAB_TRIGGER_CLASS}>
-              <User className="h-4 w-4" />
-              <span>Profile</span>
-            </TabsTrigger>
             {dynamicPacks.map((p) => {
               const Icon = PACK_ICONS[p.key] || Package;
               return (
@@ -554,13 +535,6 @@ export default function App() {
 
           <div className="min-w-0 flex-1">
 
-          <TabsContent value="profile">
-            <ProfileEditor
-              data={profile}
-              onChange={handleProfileChange}
-              onShowConfirmation={showConfirmation}
-            />
-          </TabsContent>
           {dynamicPacks.map((p) => (
             <TabsContent key={p.key} value={p.key}>
               <SectionRenderer

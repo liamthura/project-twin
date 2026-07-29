@@ -514,6 +514,60 @@ still outstanding. `describeGuards` locates a node by `path[0]` and so cannot ad
 list — `preferences.communication.mood_overrides` is covered by explicit tests instead. No
 Storybook story exists for any migrated section.
 
+### State after wave 6 — the consolidation is complete
+
+`profile` (1,446 lines) is retired. **6,332 lines deleted across waves 2-6.** There are no
+bespoke section editors left: `frontend/src/editors/` is gone, `BESPOKE_EDITORS` is gone, and
+every section renders from its manifest through `SectionRenderer`.
+
+**Two things this spec believed about `profile` were wrong, and the wave 6 reading caught both.**
+It is not "entirely `kind: fields`" — one `fields` node at `path: []` plus five lists. And the
+wave table's "two levels of child list" does not exist: `education.coursework` is a bare string
+array (`server.py:2588` appends the string itself) and `coursework_topic` is a verbatim
+duplicate branch writing the same array. Every child in `profile` is a one-level string array,
+so the untested-nesting-depth risk that wave 4 made a wave 6 entry criterion was never real.
+
+**The vocabulary was the actual defect, and it was the largest of the project.**
+`profile.entities` declared **seven field names nothing stored** (`language.proficiency`,
+`email.label`, `work_experience.location`, `work_experience.description`, `education.degree`,
+`education.field`, `education.period`) and **omitted seven that were stored**. `get_schema`
+advertised all seven phantoms to every AI client and values sent under them were discarded on
+arrival; `email.add` demanded a `purpose` the contract never mentioned, so **no MCP client could
+add an email at all**. `education.period` mapped to *two* stored keys, so no node could ever have
+bound it.
+
+Neither `ui` guard could see any of it: every phantom sat in an entity's `optional`, so the
+spelling check accepted it, and seven of the ten entities are absent from `FIELD_ALIASES`, so
+the alias check skipped them. The editor, notably, was **correct** — it wrote `degree_level` and
+`fluency`, and a prior author had documented the `fluency` divergence in a comment. No user data
+was ever affected. The damage was confined to AI clients.
+
+Wave 6 corrected the vocabulary rather than declaring the divergences, and made
+`work_experience.location`/`description` real rather than dropping them. The result is that
+`profile` — the section with the worst vocabulary in the repo — ships with **zero
+`fields_outside_entity` declarations**, because there is no longer anything to declare.
+
+**Final tally on the reading discipline.** Every wave from 3 onward began by reading the
+section's `execute_modify` branches. That step found **four** live defects no guard caught:
+`top_of_mind`'s `idea`/`item` split (wave 4), `hobby.status` silently collapsing `"paused"`
+(wave 5), the mood-override `when_feeling`/`mood` split (wave 5), and `profile`'s seven phantom
+fields (wave 6). The guards caught **zero** defects — but they are not therefore worthless: in
+wave 5 the spelling check *rejected a correct binding* (`hobby_reference.name`), which forced the
+divergence to be declared in the manifest instead of assumed. Guards work as a ratchet, not a
+detector. Both reference documents are committed under `docs/superpowers/plans/`.
+
+**What remains open.** The phantom-key hole is unclosed: an entity-bearing node is checked for
+spelling and aliases, never for whether a key is actually written. `sleep.day_type` is the
+standing example — a router that is never stored and passes both checks. Closing it needs a
+machine-readable authority over what the 38 `execute_modify` branches write, which is the
+backend reconciliation this spec has always carried as a sequel. It is now better-resourced than
+it has ever been: three storage-key reference documents, and twelve recorded backend follow-ups
+across waves 5 and 6.
+
+`ListRenderer.jsx` is ~560 lines against the spec's ~200 budget; only `buildFieldMeta` and
+`needsFullRow` were extracted. `describeGuards` locates a node by `path[0]` and cannot address a
+nested list. No Storybook story exists for any migrated section.
+
 ## Sourcing UI primitives
 
 Convergence means every migrated section funnels through one small set of controls, so the
