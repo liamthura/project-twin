@@ -202,6 +202,13 @@
           },
           "description": "Storage keys rendered as a date picker. Values must be yyyy-mm-dd; anything else falls back to a text input so it is not discarded."
         },
+        "time_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Storage keys rendered as a time picker -- lifestyle's bedtime/wakeup, which the hand-written editor rendered as <input type=\"time\">. Same rule and same reason as date_fields: values must be HH:MM, and anything else falls back to a text input rather than being silently discarded by a picker that cannot parse it. Nothing validates these on write, so an MCP client can store \"after midnight\"."
+        },
         "long_text": {
           "type": "array",
           "items": {

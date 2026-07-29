@@ -184,10 +184,201 @@
     }
   },
   "ui": {
-    "interests": {
-      "title_field": "name",
-      "badges": ["kind"],
-      "detail_fields": ["notes"]
-    }
+    "sections": [
+      {
+        "kind": "list",
+        "path": [
+          "hobbies"
+        ],
+        "entity": "hobby",
+        "title": "Hobbies & Activities",
+        "title_field": "name",
+        "searchable": true,
+        "facets": [
+          "skill_level"
+        ],
+        "count_badges": [
+          "specifics",
+          "references"
+        ],
+        "badges": [
+          "skill_level",
+          "status"
+        ],
+        "detail_fields": [
+          "name",
+          "notes",
+          "specifics"
+        ],
+        "array_fields": [
+          "specifics"
+        ],
+        "field_defaults": {
+          "status": "active"
+        },
+        "$comment": "`status` binds the full three-value enum the entity declares. Until 2026-07-29 execute_modify collapsed \"paused\" to \"inactive\" on write, so a user's \"paused\" survived only until the next AI edit; see docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md 1.1.1. `references` is a child list whose rows store `name`, NOT the `ref_name` the entity declares as its identifier -- server.py:2133.",
+        "info": {
+          "overview": "Track activities you enjoy outside of work. This helps AI understand your lifestyle and can suggest relevant recommendations.",
+          "tips": [
+            "Name: The hobby or activity.",
+            "Skill Level: Beginner, Learning, Intermediate, Advanced, or Expert.",
+            "Status: Active (currently doing), Paused (on hold), or Inactive (stopped).",
+            "Specifics: Sub-areas or variations you focus on.",
+            "Notes: Your experience, goals, or what you enjoy most.",
+            "References: Links to gear, communities, or learning resources."
+          ]
+        },
+        "children": [
+          {
+            "kind": "list",
+            "path": [
+              "references"
+            ],
+            "entity": "hobby_reference",
+            "title": "References & URLs",
+            "title_field": "name",
+            "detail_fields": [
+              "name",
+              "url",
+              "notes"
+            ],
+            "fields_outside_entity": [
+              "name"
+            ],
+            "$comment": "Stores `name`. The entity declares `ref_name` as its identifier, which is an MCP input alias only -- server.py:2133 writes {\"name\": ref_name or \"\"}."
+          }
+        ]
+      },
+      {
+        "kind": "list",
+        "path": [
+          "interests"
+        ],
+        "entity": "interest",
+        "title": "Interests",
+        "title_field": "name",
+        "badges": [
+          "kind"
+        ],
+        "detail_fields": [
+          "name",
+          "notes"
+        ],
+        "field_defaults": {
+          "kind": "passion"
+        },
+        "info": {
+          "overview": "Things you're into, tagged as a passion (what you love doing or following) or a curiosity (what you want to explore). AI uses this to understand your motivations and tailor suggestions.",
+          "tips": [
+            "Passion: something you care deeply about that drives you — sustainability, design, storytelling, education, technology.",
+            "Curiosity: something you want to explore or learn more about but haven't dived into yet — quantum computing, fermentation, urban planning, linguistics.",
+            "No pressure on curiosities—these can be fleeting interests or serious research areas."
+          ]
+        }
+      },
+      {
+        "kind": "strings",
+        "path": [
+          "personality_traits"
+        ],
+        "title": "Personality Traits",
+        "placeholder": "e.g. Creative, Analytical...",
+        "$comment": "Bare strings: lifestyle[\"personality_traits\"] is a list of strings, not objects -- server.py:1772 appends `item` directly. The entity's `trait` is an input field name, never a stored key (CANONICAL_STORED_KEY[\"trait\"] is None), so this node binds no entity and names no fields.",
+        "info": {
+          "overview": "Characteristics that define how you think, work, and interact. Helps AI understand your style and adapt its responses.",
+          "tips": [
+            "Add adjectives or short phrases that describe you.",
+            "Examples: analytical, creative, detail-oriented, big-picture thinker, empathetic.",
+            "Be honest—both strengths and areas you're working on."
+          ]
+        }
+      },
+      {
+        "kind": "strings",
+        "path": [
+          "values"
+        ],
+        "title": "Values",
+        "placeholder": "e.g. Integrity, Growth...",
+        "$comment": "Bare strings, same shape as personality_traits -- server.py:1793. CANONICAL_STORED_KEY[\"value\"] is None.",
+        "info": {
+          "overview": "Core principles that guide your decisions and priorities. What matters most to you in life and work.",
+          "tips": [
+            "Add words or short phrases representing your values.",
+            "Examples: integrity, growth, family, creativity, impact, balance.",
+            "These help AI align suggestions with what truly matters to you."
+          ]
+        }
+      },
+      {
+        "kind": "fields",
+        "path": [
+          "wellness",
+          "sleep",
+          "weekday"
+        ],
+        "entity": "sleep",
+        "title": "Sleep — weekdays",
+        "fields": [
+          "bedtime",
+          "wakeup"
+        ],
+        "time_fields": [
+          "bedtime",
+          "wakeup"
+        ],
+        "$comment": "The entity's `day_type` is a ROUTER selecting which sub-object to write (server.py:2295), never itself stored, so it is deliberately not bound. The two day keys are fixed; server.py:2292 rejects any other.",
+        "info": {
+          "overview": "Track your health patterns and energy rhythms. This helps AI understand when you're at your best and what affects your wellbeing.",
+          "tips": [
+            "Sleep Schedule: When you typically go to bed and wake up (separate for weekdays vs weekends if different).",
+            "Energy Peaks: Times of day when you feel most focused and productive.",
+            "Stress Triggers: Situations, environments, or patterns that tend to increase your stress.",
+            "This info helps AI suggest optimal times for tasks and avoid recommending things during low-energy periods."
+          ]
+        }
+      },
+      {
+        "kind": "fields",
+        "path": [
+          "wellness",
+          "sleep",
+          "weekend"
+        ],
+        "entity": "sleep",
+        "title": "Sleep — weekends",
+        "fields": [
+          "bedtime",
+          "wakeup"
+        ],
+        "time_fields": [
+          "bedtime",
+          "wakeup"
+        ],
+        "$comment": "See the weekday node. Same entity, different fixed sub-object."
+      },
+      {
+        "kind": "strings",
+        "path": [
+          "wellness",
+          "energy_peaks"
+        ],
+        "title": "Energy Peaks",
+        "description": "Times of day when you feel most focused and productive",
+        "placeholder": "e.g. Early morning (6-9am), Late night (10pm-1am)...",
+        "$comment": "Bare strings -- server.py:2314 appends `item` directly."
+      },
+      {
+        "kind": "strings",
+        "path": [
+          "wellness",
+          "stress_triggers"
+        ],
+        "title": "Stress Triggers",
+        "description": "Situations or patterns that tend to increase your stress",
+        "placeholder": "e.g. Tight deadlines, Open-plan noise...",
+        "$comment": "Bare strings with NO MCP write path at all: there is no stress_trigger entity and no execute_modify branch. persona_store._normalize:267 seeds it as []. The UI is its only writer -- see reference doc 1.7 and follow-up 2."
+      }
+    ]
   }
 }

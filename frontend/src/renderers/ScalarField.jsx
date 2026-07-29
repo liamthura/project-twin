@@ -24,6 +24,13 @@ export const LONG_TEXT_FIELDS = new Set(["notes", "why", "description"]);
 // timezone the other.
 export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+// What <input type="time"> will accept and round-trip. Same contract as
+// ISO_DATE and same hazard: a value the picker cannot parse is shown as empty
+// and written back as empty on the next edit. Seconds are optional because the
+// browser emits "HH:MM:SS" when a step is set, and a stored value in that form
+// must not be demoted to a text input.
+export const HH_MM = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+
 // `id` is optional and only reaches the branches that render ONE form control
 // (text, textarea, date). EnumControl is a group of buttons and ArrayInput has
 // its own internal input, so neither can carry a caller's id meaningfully --
@@ -61,6 +68,31 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
   }
   if ((meta.array_fields || []).includes(field)) {
     return <ArrayInput items={value || []} onChange={onChange} placeholder={`Add ${field}…`} />;
+  }
+  if ((meta.time_fields || []).includes(field)) {
+    // Same guard as date_fields below: nothing validates these on write, so an
+    // MCP client can put "after midnight" into lifestyle.sleep.weekday.bedtime.
+    // A picker would show that as empty and persist the emptiness on the next
+    // edit, so a non-HH:MM value stays a text input -- visible and preserved.
+    if (!value || HH_MM.test(value)) {
+      return (
+        <Input
+          id={id}
+          type="time"
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+          className="[color-scheme:light] dark:[color-scheme:dark]"
+        />
+      );
+    }
+    return (
+      <Input
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        title="Not an HH:MM time, so this stays a text field. Clear it to get a time picker."
+      />
+    );
   }
   if ((meta.date_fields || []).includes(field)) {
     // A date field is only safe to render as a picker when what is stored is

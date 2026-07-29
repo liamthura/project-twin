@@ -26,6 +26,7 @@ export function buildFieldMeta(node, entity) {
     // profile.education and `bedtime` on lifestyle.sleep read like dates and
     // are not, so a name heuristic would turn free text into a lossy picker.
     date_fields: node.date_fields ?? [],
+    time_fields: node.time_fields ?? [],
   };
 }
 
