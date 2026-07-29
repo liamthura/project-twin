@@ -46,14 +46,29 @@ in an alias list is unguarded. Closing that needs such an authority to exist
 first.
 
 Both checks work per node and both need `node.entity` to have anything to
-check against, so a node without one is SKIPPED WHOLESALE by both -- every
-field it names is unguarded. That is `kind: "fields"` and `kind: "strings"`
-nodes, which bind top-level storage keys (profile's name/bio/location) against
-no entity vocabulary at all. `kind: "list"` nodes are the ones that must never
-slip through this way, so meta_schema.json requires `entity` on them -- the
-renderer tolerates its absence, which would otherwise turn a whole editable
-node into a blind spot at exactly the point this module exists to cover. The
-tests below re-assert that rather than trusting the schema alone.
+check against, so a node without one is SKIPPED by both -- every field it names
+is unguarded. What decides that is whether the node DECLARES an entity, not its
+kind: a `kind: "fields"` node that names one is checked exactly as a list node
+is, and wave 5's `communication.default` and `sleep` nodes do.
+
+`kind: "list"` nodes are the ones that must never slip through, so
+meta_schema.json requires `entity` on them -- the renderer tolerates its
+absence, which would otherwise turn a whole editable node into a blind spot at
+exactly the point this module exists to cover. The tests below re-assert that
+rather than trusting the schema alone.
+
+Two blind spots remain, both narrower than "every non-list node":
+
+  - A `kind: "strings"` node binds a PATH, not field names: what is stored is
+    the bare string, under no key at all (lifestyle's `values` and
+    `personality_traits` -- note their `None` entries in CANONICAL_STORED_KEY).
+    There is nothing for either check to compare, so the skip is a property of
+    the kind rather than a gap.
+  - Entity-bearing nodes are still only checked for SPELLING and ALIASES, not
+    for phantom keys. `sleep` declares `day_type`, which is a router selecting
+    which sub-object to write and is never itself stored (server.py:2295); a
+    node binding it would pass both checks. Closing that still needs a real
+    storage-key authority, per the paragraph above.
 
 The reject/accept tests below build their own manifests (based on the `goals`
 shape) rather than depending on what's currently on disk, so they exercise the
@@ -155,7 +170,13 @@ CANONICAL_STORED_KEY = {
 # machine-written stamp like `display_fields` -- a misspelled count_badges
 # entry would render a permanently-absent chip, exactly the class of phantom
 # key this check exists to catch.
-_SUBSET_CHECKED_KEYS = ("badges", "detail_fields", "array_fields", "facets", "count_badges")
+# `fields` is here for kind:"fields" nodes, whose entire editable surface is
+# that one list -- omitting it left `communication.default`'s tone/detail_level/
+# locale spelling-unchecked, which was the whole of the spelling guard's blind
+# spot for that kind. No list node has ever used the key, so adding it changes
+# nothing for kind:"list".
+_SUBSET_CHECKED_KEYS = ("fields", "badges", "detail_fields", "array_fields",
+                        "facets", "count_badges")
 
 BASE_GOALS_MANIFEST = {
     "key": "goals",
@@ -669,6 +690,124 @@ def test_ui_may_not_name_an_mcp_input_alias():
     assert offenders == {"contact"}
 
 
+def test_a_fields_node_naming_an_mcp_input_alias_is_caught():
+    """Wave 5 introduced kind:"fields" nodes. Both guards key off `entity`,
+    not off `kind`, so a fields node that DECLARES one is checked exactly as a
+    list node is -- and the manifests wave 5 ships do declare one wherever an
+    entity exists. Asserted rather than assumed, because the guards' skip
+    branches are written in terms of kind:"list" and read as if the other
+    kinds were exempt."""
+    from server import FIELD_ALIASES
+
+    assert "contact" in FIELD_ALIASES["connection"], "contact is no longer an alias"
+    node = {
+        "kind": "fields",
+        "path": ["x"],
+        "entity": "connection",
+        "fields": ["name", "contact"],
+    }
+    assert ui_fields_that_are_aliases("connection", _fields_named_by(node)) == {"contact"}
+
+
+def test_a_fields_node_naming_only_stored_keys_is_accepted():
+    node = {"kind": "fields", "path": ["x"], "entity": "connection", "fields": ["name"]}
+    assert ui_fields_that_are_aliases("connection", _fields_named_by(node)) == set()
+
+
+_COMMS_ENTITY = {"required": [], "optional": ["tone", "detail_level", "locale"]}
+
+
+def test_the_spelling_check_rejects_a_misspelled_key_on_a_fields_node():
+    """The alias check already read `fields` via _fields_named_by; the SPELLING
+    check did not, because `fields` was absent from _SUBSET_CHECKED_KEYS. A
+    fields node's entire editable surface is that one list, so the omission
+    made the spelling guard wholly inert for the kind -- `detail`, a plausible
+    slip for `detail_level`, would have shipped bound to nothing."""
+    node = {
+        "kind": "fields",
+        "path": ["communication", "default"],
+        "entity": "communication_default",
+        "fields": ["tone", "detail"],
+    }
+    with pytest.raises(AssertionError, match="detail"):
+        assert_node_spelling(node, _COMMS_ENTITY, "communication_default", where="synthetic")
+
+
+def test_the_spelling_check_accepts_a_correct_fields_node():
+    node = {
+        "kind": "fields",
+        "path": ["communication", "default"],
+        "entity": "communication_default",
+        "fields": ["tone", "detail_level", "locale"],
+    }
+    assert_node_spelling(node, _COMMS_ENTITY, "communication_default", where="synthetic")
+
+
+def test_a_fields_node_may_declare_a_divergent_key():
+    """Same escape hatch a list node has: a real storage key the tool contract
+    does not carry is declared, not hidden."""
+    node = {
+        "kind": "fields",
+        "path": ["x"],
+        "entity": "communication_default",
+        "fields": ["tone", "verbosity"],
+        "fields_outside_entity": ["verbosity"],
+    }
+    assert_node_spelling(node, _COMMS_ENTITY, "communication_default", where="synthetic")
+
+
+def test_a_strings_node_names_no_fields_so_there_is_nothing_to_check():
+    """kind:"strings" binds a PATH, not field names -- what is stored is the
+    string itself, with no key. There is nothing for either guard to compare
+    against, which is why such a node carries no entity and is skipped. Stated
+    as a test so the skip is read as a property of the kind, not an oversight."""
+    node = {"kind": "strings", "path": ["values"], "title": "Values"}
+    assert _fields_named_by(node) == set()
+    assert node.get("entity") is None
+
+
+def _spelling_named_by(node):
+    """The field names the SPELLING check compares against the entity
+    vocabulary. Narrower than `_fields_named_by` -- see `_SUBSET_CHECKED_KEYS`
+    for what is deliberately left out and why."""
+    named = set()
+    for list_key in _SUBSET_CHECKED_KEYS:
+        named |= set(node.get(list_key) or [])
+    if node.get("title_field"):
+        named.add(node["title_field"])
+    return named
+
+
+def assert_node_spelling(node, entity, entity_key, where):
+    """One node's field names against one entity's vocabulary.
+
+    Extracted from the shipped-pack sweep so synthetic nodes can drive the
+    same code -- a guard whose only caller is a loop over correct manifests is
+    proved to pass, never proved to catch anything.
+    """
+    known = set(entity["required"]) | set(entity["optional"])
+    named = _spelling_named_by(node)
+    declared = set(node.get("fields_outside_entity") or [])
+
+    stale = declared - named
+    assert not stale, (
+        f"{where}: fields_outside_entity declares {sorted(stale)}, which this "
+        f"ui node does not name"
+    )
+    redundant = declared & known
+    assert not redundant, (
+        f"{where}: fields_outside_entity declares {sorted(redundant)}, which "
+        f"entity '{entity_key}' already carries -- drop it, or a later real "
+        f"divergence hides behind it"
+    )
+    missing = named - known - declared
+    assert not missing, (
+        f"{where}: ui names field(s) {sorted(missing)} not on entity "
+        f"'{entity_key}'. If those are real storage keys the tool contract "
+        f"does not carry, declare them in this node's fields_outside_entity."
+    )
+
+
 REFERENCE_ENTITIES = [
     "hobby_reference", "project_reference", "domain_reference",
     "mental_tab_reference",
@@ -762,13 +901,16 @@ def test_shipped_ui_blocks_name_no_mcp_input_alias(key):
     for node in _walk_sections(manifest["ui"]["sections"]):
         entity = node.get("entity")
         if not entity:
-            # A `fields`/`strings` node has no entity, so this check has
-            # nothing to resolve aliases against and skips it wholesale --
-            # see module docstring. A `list` node must never reach here: it
-            # binds editable controls, and skipping it would make this guard
-            # silently inert on the node it exists for. meta_schema.json
-            # rejects that shape; asserted again so the test does not depend
-            # on the schema staying strict.
+            # No entity means nothing to resolve aliases against, so the node
+            # is skipped -- see module docstring. This is NOT a property of
+            # the node's kind: a `fields` node that declares an entity is
+            # checked here exactly as a list node is, and wave 5's do. What
+            # reaches this branch is a `strings` node (which names no fields
+            # at all) or a `fields` node binding keys no entity describes.
+            # A `list` node must never reach here: it binds editable controls,
+            # and skipping it would make this guard silently inert on the node
+            # it exists for. meta_schema.json rejects that shape; asserted
+            # again so the test does not depend on the schema staying strict.
             assert node.get("kind") != "list", (
                 f"{key}: a list node bound to path {node.get('path')} declares "
                 f"no entity, so every field it names is unchecked"
@@ -801,7 +943,8 @@ def test_ui_field_names_are_spelled_like_the_entity_vocabulary(key):
         entity_key = node.get("entity")
         if not entity_key:
             # No entity means no vocabulary to compare against, so the node is
-            # skipped wholesale -- see module docstring. A `list` node must
+            # skipped -- see module docstring. As above, this turns on whether
+            # the node declares an entity, not on its kind. A `list` node must
             # never take this branch; meta_schema.json rejects that shape.
             assert node.get("kind") != "list", (
                 f"{key}: a list node bound to path {node.get('path')} declares "
@@ -813,33 +956,7 @@ def test_ui_field_names_are_spelled_like_the_entity_vocabulary(key):
             f"does not declare"
         )
         checked_any = True
-        entity = entities[entity_key]
-        known = set(entity["required"]) | set(entity["optional"])
-        named = set()
-        for list_key in _SUBSET_CHECKED_KEYS:
-            named |= set(node.get(list_key) or [])
-        if node.get("title_field"):
-            named.add(node["title_field"])
-
-        declared = set(node.get("fields_outside_entity") or [])
-        stale = declared - named
-        assert not stale, (
-            f"{key}: fields_outside_entity declares {sorted(stale)}, which this "
-            f"ui node does not name"
-        )
-        redundant = declared & known
-        assert not redundant, (
-            f"{key}: fields_outside_entity declares {sorted(redundant)}, which "
-            f"entity '{entity_key}' already carries -- drop it, or a later real "
-            f"divergence hides behind it"
-        )
-
-        missing = named - known - declared
-        assert not missing, (
-            f"{key}: ui names field(s) {sorted(missing)} not on entity "
-            f"'{entity_key}'. If those are real storage keys the tool contract "
-            f"does not carry, declare them in this node's fields_outside_entity."
-        )
+        assert_node_spelling(node, entities[entity_key], entity_key, where=key)
     if not checked_any:
         # A pack whose sections are all `fields`/`strings` legitimately has no
         # entity to check against (profile's top-level scalars are that
