@@ -482,8 +482,16 @@ What remains is genuinely narrower than "every non-list node":
   no key at all. There is nothing to compare, so the skip is a property of the kind.
 - Entity-bearing nodes are still checked for spelling and aliases, **not for phantoms**.
   `sleep.day_type` is a router selecting which fixed sub-object to write and is never itself
-  stored; a node binding it passes both checks. `profile` binds top-level scalars against no
-  entity at all, so wave 6 still faces this.
+  stored; a node binding it passes both checks.
+
+  Wave 6 still faces this, but not in the form earlier drafts of this section claimed. `profile`
+  is **not** "entirely `kind: fields`" -- the wave table above had it right all along: a
+  singleton plus two lists plus two levels of child list. Its seven top-level scalars do bind
+  through one `fields` node at `path: []`, and that node **does** have an entity (`basic_info`),
+  so it is checkable. What is not checkable is that `basic_info` is absent from `FIELD_ALIASES`,
+  as are `work_experience`, `work_highlight`, `education`, `education_highlight`, `coursework`
+  and `coursework_topic` -- **7 of `profile`'s 10 entities**, leaving only `email`, `link` and
+  `language` visible to the alias guard.
 
 **Two live bugs surfaced, both of the shape this project exists to find.** `hobby.status`
 declared three values and stored two — `"paused"` was folded into `"inactive"` on write while
