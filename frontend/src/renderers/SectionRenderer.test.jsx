@@ -70,15 +70,57 @@ function uiNode(title) {
   return el;
 }
 
-function describeGuards({ pack, listKey, data, exclusions }) {
+// Walk from the pack's ui down to the node these guards are about, collecting
+// every node passed through and the fixture rows each one is bound to.
+//
+// `keys` is a path of `path[0]` segments. One segment addresses a top-level
+// list; two address a list nested inside a row of the first, which is how
+// education's `coursework`/`clubs` and the four `references` lists are
+// declared. Until wave 10 this function took a single string and had no way to
+// name a child node -- so six entity-bearing nested lists had neither the
+// coverage guard nor the round-trip guard, including `hobby_reference`, whose
+// declared-versus-stored divergence wave 5 had to record by hand.
+//
+// A nested level is resolved through row 0 of its parent, which is also the row
+// the tests expand to reach it.
+function resolveChain(pack, keys, data) {
   // Search through `group` nodes, which nest real nodes and carry no `path`
   // of their own -- a bare `.find` over the top level both throws on them and
   // misses everything under them.
   const flatten = (nodes) =>
     (nodes || []).flatMap((n) => (n.kind === "group" ? flatten(n.sections) : [n]));
-  const node = flatten(normalizeUi(pack).sections).find(
-    (s) => Array.isArray(s.path) && s.path[0] === listKey
-  );
+
+  const chain = [];
+  let nodes = normalizeUi(pack).sections;
+  for (const [i, key] of keys.entries()) {
+    const node = flatten(nodes).find((s) => Array.isArray(s.path) && s.path[0] === key);
+    if (!node) {
+      throw new Error(
+        `${pack.key}: no ui node with path[0]="${key}"` +
+          (i ? ` under "${keys.slice(0, i).join("/")}"` : "")
+      );
+    }
+    const rows = i === 0 ? data[key] : chain[i - 1].rows[0]?.[key];
+    if (!Array.isArray(rows)) {
+      throw new Error(
+        `${pack.key}/${keys.slice(0, i + 1).join("/")}: the fixture holds no array ` +
+          `there, so these guards would assert nothing.`
+      );
+    }
+    chain.push({ node, rows });
+    nodes = node.children || [];
+  }
+  return chain;
+}
+
+function describeGuards({ pack, listKey, data, exclusions }) {
+  // `listKey` stays a bare string for the top-level case, which is most of
+  // them; an array addresses a nested node.
+  const keys = Array.isArray(listKey) ? listKey : [listKey];
+  const label = keys.join("/");
+  const chain = resolveChain(pack, keys, data);
+  const ancestors = chain.slice(0, -1);
+  const { node, rows } = chain[chain.length - 1];
   // Resolved exactly as ListRenderer resolves it -- via node.entity, which
   // SectionRenderer sets from `pack.entities?.[node.entity]` -- not by
   // re-deriving it from legacy list-matching rules. Those rules live inside
@@ -87,7 +129,15 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   const entity = pack.entities?.[node.entity];
   const arrayFields = node.array_fields || [];
   const covered = [...new Set([...(node.badges || []), ...(node.detail_fields || [])])];
-  const item = data[listKey][0];
+  const item = rows[0];
+
+  // A nested node only renders once its ancestors' rows are expanded, so every
+  // guard below opens the chain before it looks for anything.
+  const openChain = async (user) => {
+    for (const link of ancestors) {
+      await user.click(screen.getByText(link.rows[0][link.node.title_field]));
+    }
+  };
 
   // A fixture that is easier than production is worse than no fixture. Wave 6
   // bound education's `coursework` and `clubs` as chip controls on the strength
@@ -104,7 +154,7 @@ function describeGuards({ pack, listKey, data, exclusions }) {
     const objects = value.filter((v) => v !== null && typeof v === "object");
     if (objects.length) {
       throw new Error(
-        `${pack.key}/${listKey}: node declares array_fields: ["${field}"], which ` +
+        `${pack.key}/${label}: node declares array_fields: ["${field}"], which ` +
           `renders each entry as a chip -- but the fixture holds ${objects.length} ` +
           `OBJECT entr${objects.length === 1 ? "y" : "ies"} there, which React ` +
           `cannot render as a child. This field wants a nested list node, not ` +
@@ -118,7 +168,7 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   // otherwise let a key silently drop out of both halves of the guard.
   if (!exclusions) {
     throw new Error(
-      `describeGuards({ pack: "${pack.key}", listKey: "${listKey}" }) needs an ` +
+      `describeGuards({ pack: "${pack.key}", listKey: "${label}" }) needs an ` +
         `\`exclusions\` map (pass {} if every fixture key is bound) naming every ` +
         `deliberately-unbound fixture key and why.`
     );
@@ -126,7 +176,7 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   for (const [key, reason] of Object.entries(exclusions)) {
     if (typeof reason !== "string" || !reason.trim()) {
       throw new Error(
-        `exclusions["${key}"] for ${pack.key}/${listKey} needs a real reason ` +
+        `exclusions["${key}"] for ${pack.key}/${label} needs a real reason ` +
           `string, not ${JSON.stringify(reason)} -- an exclusion with no reason ` +
           `is indistinguishable from a way to make this guard stop complaining.`
       );
@@ -179,8 +229,9 @@ function describeGuards({ pack, listKey, data, exclusions }) {
     }
   }
 
-  it(`exposes every detail field of an expanded item (${pack.key})`, async () => {
+  it(`exposes every detail field of an expanded item (${pack.key}/${label})`, async () => {
     const { user } = renderSection({ pack, initial: data });
+    await openChain(user);
     await user.click(screen.getByText(item[node.title_field]));
     for (const field of covered) expectFieldOnScreen(field);
   });
@@ -189,8 +240,9 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   // does not know about (badges/detail_fields don't cover every key -- id,
   // the title field itself, and any unmodeled field like `related` all have
   // to survive an edit untouched too).
-  it(`preserves every other field when one is edited (${pack.key})`, async () => {
+  it(`preserves every other field when one is edited (${pack.key}/${label})`, async () => {
     const { user, latest, initial } = renderSection({ pack, initial: data });
+    await openChain(user);
     await user.click(screen.getByText(item[node.title_field]));
 
     // Pick a field that is genuinely a free-text input, using the same
@@ -208,7 +260,7 @@ function describeGuards({ pack, listKey, data, exclusions }) {
     );
     if (!editableField) {
       throw new Error(
-        `no free-text field to edit in ${pack.key}; this guard cannot run`
+        `no free-text field to edit in ${pack.key}/${label}; this guard cannot run`
       );
     }
     const input = screen.getByDisplayValue(item[editableField]);
@@ -219,7 +271,11 @@ function describeGuards({ pack, listKey, data, exclusions }) {
     // fixture import -- see harness.jsx for why sharing that reference would
     // let an in-place mutation corrupt this expectation and pass.
     const expected = structuredClone(initial);
-    expected[listKey][0][editableField] = item[editableField] + "X";
+    // Walk the same chain in the expectation: a nested node's edit lands on
+    // row 0 of each ancestor, which is the row openChain expanded.
+    let target = expected;
+    for (const key of keys.slice(0, -1)) target = target[key][0];
+    target[keys[keys.length - 1]][0][editableField] = item[editableField] + "X";
     expect(after).toEqual(expected);
   });
 
@@ -235,7 +291,7 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   // [0]) above: knowledge's `domains` list is the reason -- the `knowledge`
   // entity's shape (added_date/last_updated, no id) only shows up on
   // domains[1], and a check scoped to domains[0] would never see it.
-  it(`accounts for every stored key on every fixture item -- bound by the ui block or explicitly excluded (${pack.key})`, () => {
+  it(`accounts for every stored key on every fixture item -- bound by the ui block or explicitly excluded (${pack.key}/${label})`, () => {
     const bound = new Set([
       node.title_field,
       ...(node.badges || []),
@@ -247,14 +303,14 @@ function describeGuards({ pack, listKey, data, exclusions }) {
       ...(node.count_badges || []),
     ]);
     const allFixtureKeys = new Set();
-    for (const row of data[listKey]) {
+    for (const row of rows) {
       for (const key of Object.keys(row)) allFixtureKeys.add(key);
     }
     for (const key of allFixtureKeys) {
       if (bound.has(key)) continue;
       expect(
         Object.prototype.hasOwnProperty.call(exclusions, key),
-        `"${key}" (${pack.key}/${listKey}) is neither bound by the ui block ` +
+        `"${key}" (${pack.key}/${label}) is neither bound by the ui block ` +
           `nor on the exclusions list passed to describeGuards -- bind it, or ` +
           `add a commented exclusion explaining why it is deliberately unbound.`
       ).toBe(true);
@@ -459,6 +515,12 @@ describe("SectionRenderer", () => {
           challenges: "write-only key set by server.py's project update loop; no control models it (shape is a guess -- see __fixtures__/data/projects.json's _note).",
           goals: "write-only key set by server.py's project update loop; no control models it (shape is a guess -- see __fixtures__/data/projects.json's _note).",
         },
+      });
+    });
+    describe("projects.references child list", () => {
+      describeGuards({
+        pack: projectsPack, listKey: ["projects", "references"], data: projectsData,
+        exclusions: {},
       });
     });
     describe("top_of_mind list", () => {
@@ -699,6 +761,23 @@ describe("SectionRenderer", () => {
           // control never writes back under the wrong key.
           topic: "legacy alias for `title`; deliberately bound nowhere so the renderer's only job for it is to not destroy it.",
         },
+      });
+    });
+    // The four `references` child lists across the packs are the same entity
+    // shape (`*_reference`) and had no coverage guard at all before wave 10.
+    // `hobby_reference` is the reason this matters: its entity declares
+    // `ref_name` as the identifier while the row stores `name`, a divergence
+    // wave 5 had to record in the manifest by hand because no guard saw it.
+    describe("domains.references child list", () => {
+      describeGuards({
+        pack: knowledgePack, listKey: ["domains", "references"], data: knowledgeData,
+        exclusions: {},
+      });
+    });
+    describe("mental_tabs.references child list", () => {
+      describeGuards({
+        pack: knowledgePack, listKey: ["mental_tabs", "references"], data: knowledgeData,
+        exclusions: {},
       });
     });
 
@@ -1383,6 +1462,12 @@ describe("section headings and info placement", () => {
         },
       });
     });
+    describe("hobbies.references child list", () => {
+      describeGuards({
+        pack: lifestylePack, listKey: ["hobbies", "references"], data: lifestyleData,
+        exclusions: {},
+      });
+    });
     describe("interests list", () => {
       describeGuards({
         pack: lifestylePack, listKey: "interests", data: lifestyleData,
@@ -1880,6 +1965,24 @@ describe("section headings and info placement", () => {
       describeGuards({
         pack: profilePack, listKey: "education", data: profileData,
         exclusions: { coursework: CHILD_NODE, clubs: CHILD_NODE, highlights: CHILD_NODE },
+      });
+    });
+    // The child lists themselves. `CHILD_NODE` above says these are "covered by
+    // the nesting tests below" -- until wave 10 that was true only of the
+    // hand-written nesting tests, which check that the child renders and round
+    // trips, not that the manifest still names every key the data carries.
+    // These are entity-bearing nodes and now get the same two-way guard every
+    // top-level list has had since wave 2.
+    describe("education.coursework child list", () => {
+      describeGuards({
+        pack: profilePack, listKey: ["education", "coursework"], data: profileData,
+        exclusions: {},
+      });
+    });
+    describe("education.clubs child list", () => {
+      describeGuards({
+        pack: profilePack, listKey: ["education", "clubs"], data: profileData,
+        exclusions: {},
       });
     });
     describe("work_experience list", () => {
