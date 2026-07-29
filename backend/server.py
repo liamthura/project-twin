@@ -666,6 +666,35 @@ def set_nested_value(data: dict, path: str, value, create_missing: bool = True):
         return True
     return False
 
+def _as_list(value) -> list:
+    """Coerce an MCP-supplied value to a list without raising.
+
+    `list(value or [])` looked equivalent and was not: a bool or an int raises
+    TypeError ("'bool' object is not iterable"), and a bare string silently
+    explodes into one entry per character. Both are reachable from any payload,
+    so both were unhandled 500s or silent corruption rather than a stored value.
+    A lone string is the one shape worth rescuing -- clients send `topics: "AI"`
+    when they mean a single topic -- so it becomes a one-item list.
+    """
+    if value is None or value is False or value is True:
+        return []
+    if isinstance(value, str):
+        return [value] if value else []
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value]
+
+
+def _as_text(value) -> str:
+    """An MCP-supplied value as text, or "" if it is not a string.
+
+    Guards `.strip()`/`.lower()` calls on payload values. A non-string reads as
+    absent rather than raising, which lets the surrounding validation produce its
+    own error instead of an unhandled 500.
+    """
+    return value if isinstance(value, str) else ""
+
+
 def _find_course(entries, name):
     """Locate an object-shaped entry (coursework, clubs) by its `name`.
 
@@ -674,13 +703,18 @@ def _find_course(entries, name):
     record can contain either. persona_store._normalize coerces on read, but
     this stays shape-tolerant so a write reaching an un-normalised blob still
     finds its entry rather than silently duplicating it.
+
+    Non-string names match nothing rather than raising, on the same grounds as
+    `find_in_array`: `name` arrives off an MCP payload and is not guaranteed to
+    be a string.
     """
-    if not name:
+    if not name or not isinstance(name, str):
         return None
     target = name.lower()
     for entry in entries:
         if isinstance(entry, dict):
-            if (entry.get("name") or "").lower() == target:
+            entry_name = entry.get("name")
+            if isinstance(entry_name, str) and entry_name.lower() == target:
                 return entry
         elif isinstance(entry, str) and entry.lower() == target:
             return entry
@@ -688,12 +722,28 @@ def _find_course(entries, name):
 
 
 def find_in_array(array: list, identifier: str, id_field: str = "name") -> tuple:
-    """Find an item in array by identifier. Returns (index, item) or (-1, None)"""
+    """Find an item in array by identifier. Returns (index, item) or (-1, None)
+
+    Both sides are coerced before comparison because neither is guaranteed to be
+    a string. `identifier` comes straight off an MCP payload, so a client sending
+    `{"company": ["Acme"]}` used to raise AttributeError here -- an unhandled 500
+    out of twelve entities rather than the branch's own "not found" message. The
+    stored side is coerced for the same reason: a legacy row can hold anything.
+
+    A non-string identifier now matches nothing, so the caller returns its normal
+    not-found error. That is the honest answer: no row has a list for a name.
+    """
+    def _key(value):
+        return value.lower() if isinstance(value, str) else None
+
+    target = _key(identifier)
+    if target is None:
+        return (-1, None)
     for i, item in enumerate(array):
         if isinstance(item, dict):
-            if item.get(id_field, "").lower() == identifier.lower():
+            if _key(item.get(id_field)) == target:
                 return (i, item)
-        elif isinstance(item, str) and item.lower() == identifier.lower():
+        elif isinstance(item, str) and item.lower() == target:
             return (i, item)
     return (-1, None)
 
@@ -1661,11 +1711,14 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         # same way. Without this the field would be UI-only -- the asymmetry
         # wave 6 just closed for `clubs`.
         if action == "add":
-            new_skills = data.get("skills", [])
+            # `_as_list` rather than the raw value: iterating it directly raised
+            # TypeError on a bool or an int, and turned a bare string into one
+            # entry per character.
+            new_skills = _as_list(data.get("skills"))
             if not new_skills:
                 single = get_field(data, "skill", "item", "technology", default="")
                 if single:
-                    new_skills = [single]
+                    new_skills = _as_list(single)
             if not new_skills:
                 return "❌ Work skill requires 'skill' or 'skills'"
             added = []
@@ -1692,7 +1745,10 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
 
         def _coerce_type(raw, custom):
             """Unknown types become other/custom_type — never an error."""
-            t = (raw or "").strip().lower()
+            # `_as_text`: a non-string type reads as absent rather than raising
+            # AttributeError. Consistent with this helper's own contract that an
+            # unusable type is never an error.
+            t = _as_text(raw).strip().lower()
             if t and t not in GOAL_TYPES:
                 return "other", (custom or raw), f" (type '{raw}' stored as other/custom_type)"
             return t, custom, ""
@@ -1705,7 +1761,10 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return f"ℹ️ Goal '{title}' already exists"
             gtype, custom_type, note = _coerce_type(
                 get_field(data, "type", "category"), get_field(data, "custom_type", "type_label"))
-            status = (get_field(data, "status") or "active").strip().lower()
+            raw_status = get_field(data, "status")
+            if raw_status is not None and not isinstance(raw_status, str):
+                return f"❌ Goal 'status' must be a string. Valid: {sorted(GOAL_STATUSES)}"
+            status = (raw_status or "active").strip().lower()
             if status not in GOAL_STATUSES:
                 return f"❌ Invalid status '{status}'. Valid: {sorted(GOAL_STATUSES)}"
             item = {"title": title, "status": status}
@@ -1737,6 +1796,8 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                     goal["custom_type"] = custom_type
             status = get_field(data, "status")
             if status:
+                if not isinstance(status, str):
+                    return f"❌ Goal 'status' must be a string. Valid: {sorted(GOAL_STATUSES)}"
                 status = status.strip().lower()
                 if status not in GOAL_STATUSES:
                     return f"❌ Invalid status '{status}'. Valid: {sorted(GOAL_STATUSES)}"
@@ -1859,9 +1920,15 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return "❌ Hobby requires a name"
             if any(h.get("name", "").lower() == name.lower() for h in hobbies):
                 return f"ℹ️ Hobby '{name}' already exists"
+            # `references` used to be hardcoded to [] here while `specifics`
+            # beside it honoured its input, so a client that sent references on
+            # `add` had them silently dropped and had to re-send every one
+            # through `hobby_reference`. `update` has always accepted them.
             new_hobby = {
                 "id": generate_entity_id("hobby"), "name": name,
-                "status": status, "notes": notes, "specifics": data.get("specifics", []), "references": []
+                "status": status, "notes": notes,
+                "specifics": data.get("specifics", []),
+                "references": data.get("references", []),
             }
             if skill_level:
                 new_hobby["skill_level"] = skill_level
@@ -2337,10 +2404,16 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
     elif entity == "preference":
         preferences = load_json("preferences.json")
         category = get_field(data, "category", "type", default="general")
-        cat_prefs = preferences.setdefault(category, {})
         key = get_field(data, "key", "setting", "option", "preference")
         value = get_field(data, "value", "setting_value", default="")
-        
+        # Both are used as dict keys, so a non-string one raised TypeError:
+        # unhashable type before any of the checks below could reject it.
+        if not isinstance(category, str):
+            return "❌ Preference 'category' must be a string"
+        if key is not None and not isinstance(key, str):
+            return "❌ Preference 'key' must be a string"
+        cat_prefs = preferences.setdefault(category, {})
+
         if action in ["add", "update"]:
             if not key:
                 return "❌ Preference requires 'key'"
@@ -2641,6 +2714,10 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
     elif entity == "knowledge":
         knowledge = load_json("knowledge.json")
         category = get_field(data, "category", "type", default="domains")
+        # `category` is used as a dict key, so a non-string one raised
+        # TypeError: unhashable type before it could be rejected.
+        if not isinstance(category, str):
+            return "❌ Knowledge 'category' must be a string"
         items = knowledge.setdefault(category, [])
         name = get_field(data, "name", "topic", "domain", "subject", "area")
         level = get_field(data, "level", "proficiency", "skill_level", default="learning")
@@ -2797,7 +2874,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return f"ℹ️ '{name}' already in clubs"
             clubs.append({
                 "name": name,
-                "activities_involved": list(data.get("activities_involved") or []),
+                "activities_involved": _as_list(data.get("activities_involved")),
             })
             save_json("profile.json", profile)
             return f"✅ Added club: {name}"
@@ -2840,7 +2917,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return f"❌ {noun.capitalize()} requires 'course' or 'topic'"
             if _find_course(coursework, course) is not None:
                 return f"ℹ️ '{course}' already in coursework"
-            coursework.append({"name": course, "topics": list(data.get("topics") or [])})
+            coursework.append({"name": course, "topics": _as_list(data.get("topics"))})
             save_json("profile.json", profile)
             return f"✅ Added {noun}: {course}"
         elif action == "remove":

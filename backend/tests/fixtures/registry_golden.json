@@ -42,11 +42,10 @@
           "remove"
         ],
         "required": [
-          "name"
-        ],
-        "optional": [
+          "name",
           "fluency"
         ],
+        "optional": [],
         "valid_values": {
           "fluency": [
             "native",
@@ -64,12 +63,12 @@
           "remove"
         ],
         "required": [
-          "company"
+          "company",
+          "role",
+          "type",
+          "period"
         ],
         "optional": [
-          "role",
-          "period",
-          "type",
           "location",
           "description",
           "skills",
@@ -458,10 +457,10 @@
           "remove"
         ],
         "required": [
-          "name"
+          "name",
+          "description"
         ],
         "optional": [
-          "description",
           "status",
           "tags",
           "notes",
@@ -791,8 +790,7 @@
         "optional": [
           "relationship",
           "traits",
-          "notes",
-          "contact"
+          "notes"
         ],
         "identifier": "name"
       }

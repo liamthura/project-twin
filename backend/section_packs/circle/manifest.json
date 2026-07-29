@@ -32,10 +32,10 @@
       "optional": [
         "relationship",
         "traits",
-        "notes",
-        "contact"
+        "notes"
       ],
-      "identifier": "name"
+      "identifier": "name",
+      "$comment": "`contact` was listed here until wave 8, next to notes and traits, as though it were a storable field for someone's contact details. It is not: it is an INPUT SPELLING for `name` (FIELD_ALIASES[\"connection\"]), so a value sent under it either named the connection or was discarded. Aliases are input vocabulary, not stored keys, and do not belong in `optional`. Found by the stored-key audit."
     }
   },
   "ui": {
