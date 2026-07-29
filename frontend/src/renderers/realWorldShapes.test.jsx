@@ -54,16 +54,9 @@ describe("a record shaped like production", () => {
     });
 
 
-    it("renders the sections wave 6 surfaced, and writes real booleans", async () => {
-      const data = {
-        design: { frontend_aesthetic: "Playful Editorial" },
-        work_preferences: { timezone: "GMT/BST (UK)" },
-        response_format: { prefer_code_blocks: true, include_explanations: false },
-      };
+    it("renders Response Format as switches writing real booleans", async () => {
+      const data = { response_format: { prefer_code_blocks: true, include_explanations: false } };
       const { user, latest } = renderSection({ pack: preferencesPack, initial: data });
-
-      expect(screen.getByLabelText("Frontend aesthetic")).toHaveValue("Playful Editorial");
-      expect(screen.getByLabelText("Timezone")).toHaveValue("GMT/BST (UK)");
 
       await user.click(
         within(uiNode("Response Format")).getByRole("switch", { name: "include explanations" })
@@ -71,6 +64,30 @@ describe("a record shaped like production", () => {
 
       expect(latest().response_format.include_explanations).toBe(true);
       expect(latest().response_format.prefer_code_blocks).toBe(true);
+    });
+
+    it("shows timezone beside locale, where wave 6 moved it", () => {
+      const data = { communication: { default: { locale: "British English", timezone: "GMT" } } };
+      renderSection({ pack: preferencesPack, initial: data });
+
+      expect(screen.getByLabelText("Locale")).toHaveValue("British English");
+      expect(screen.getByLabelText("Timezone")).toHaveValue("GMT");
+    });
+
+    it("no longer binds `design`, and does not disturb it", async () => {
+      // It belongs in the aesthetics pack, which holds the same material split
+      // by domain and able to express an "avoid" list. Unbound here rather than
+      // dropped: _normalize cannot reach another section to move it.
+      const data = {
+        design: { frontend_aesthetic: "Playful Editorial" },
+        code_style: { tools: ["Docker"] },
+      };
+      const { user, latest } = renderSection({ pack: preferencesPack, initial: data });
+
+      expect(screen.queryByLabelText("Frontend aesthetic")).not.toBeInTheDocument();
+      await user.type(within(uiNode("Tools")).getByRole("textbox"), "Git{Enter}");
+
+      expect(latest().design).toEqual(data.design);
     });
 
     it("keeps a nested unbound key beside a bound sibling", async () => {

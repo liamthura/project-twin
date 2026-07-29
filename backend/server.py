@@ -866,6 +866,31 @@ def get_scoped_context(
                 for g in glist[:5]
             ]
 
+    # Aesthetics hook, mirroring the goals one above. `styles` rides into
+    # `minimal` so an AI client knows the user's design language at conversation
+    # start -- but only the ONE entry marked `primary`, never the whole list,
+    # which on a real record is several long prose entries and would roughly
+    # double the minimal payload.
+    #
+    # A section the user has not enabled never reaches here (disabled sections
+    # are dropped above), and a record with no primary entry contributes
+    # nothing rather than an arbitrary first item: absent is a truthful answer
+    # to "what is your design language", a guess is not.
+    _aesthetics_full_tokens = {"personal", "aesthetics", "full"}
+    if "aesthetics" in result and not any(t in _aesthetics_full_tokens for t in tokens):
+        styles = result["aesthetics"].get("styles")
+        if isinstance(styles, list):
+            primary = next(
+                (a for a in styles if isinstance(a, dict) and a.get("primary") is True),
+                None,
+            )
+            if primary is None:
+                result["aesthetics"].pop("styles", None)
+                if not result["aesthetics"]:
+                    result.pop("aesthetics", None)
+            else:
+                result["aesthetics"]["styles"] = [primary]
+
     scope_label = scope if isinstance(scope, str) else ",".join(scope)
     scope_desc = (
         sections.SCOPES.get(scope, f"{scope} section only")
@@ -2300,8 +2325,15 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             if data.get("locale"):
                 default["locale"] = data["locale"]
                 updated.append(f"locale={data['locale']}")
+            # `timezone` moved here from `work_preferences` in wave 6: it is a
+            # formatting fact, and locale -- the other one -- already lived on
+            # this object.
+            if data.get("timezone"):
+                default["timezone"] = data["timezone"]
+                updated.append(f"timezone={data['timezone']}")
             if not updated:
-                return "❌ communication_default update requires 'tone', 'detail_level', or 'locale'"
+                return ("❌ communication_default update requires 'tone', "
+                        "'detail_level', 'locale', or 'timezone'")
             save_json("preferences.json", preferences)
             return f"✅ Updated default communication: {', '.join(updated)}"
         return f"❌ communication_default only supports 'update' action"

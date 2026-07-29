@@ -85,7 +85,8 @@
       "optional": [
         "tone",
         "detail_level",
-        "locale"
+        "locale",
+        "timezone"
       ],
       "identifier": null,
       "description": "Update-only singleton for default communication style"
@@ -104,32 +105,6 @@
         "detail_level"
       ],
       "identifier": "mood"
-    },
-    "design": {
-      "actions": [
-        "update"
-      ],
-      "required": [],
-      "optional": [
-        "frontend_aesthetic",
-        "frontend_aesthetic_tokens",
-        "frontend_hero_composition"
-      ],
-      "identifier": null,
-      "description": "Default design language for frontends you build. Long prose, read by AI clients when generating UI."
-    },
-    "work_preference": {
-      "actions": [
-        "update"
-      ],
-      "required": [],
-      "optional": [
-        "timezone",
-        "best_productivity_time",
-        "project_approach"
-      ],
-      "identifier": null,
-      "description": "How and when you work best."
     },
     "response_format": {
       "actions": [
@@ -219,6 +194,7 @@
             "fields": [
               "tone",
               "locale",
+              "timezone",
               "detail_level"
             ],
             "long_text": [
@@ -228,7 +204,8 @@
             "field_placeholders": {
               "detail_level": "e.g. comprehensive with examples, step-by-step breakdowns when explaining code...",
               "locale": "e.g. British English",
-              "tone": "e.g. friendly but professional"
+              "tone": "e.g. friendly but professional",
+              "timezone": "e.g. GMT/BST (UK)"
             }
           },
           {
@@ -288,7 +265,7 @@
       {
         "kind": "group",
         "title": "Learning Style",
-        "description": "How you learn best",
+        "description": "How you learn best, and how you like work approached",
         "info": {
           "overview": "How you learn best, so explanations arrive in a shape that works for you.",
           "tips": [
@@ -318,50 +295,6 @@
             "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
           }
         ]
-      },
-      {
-        "kind": "fields",
-        "path": [
-          "design"
-        ],
-        "entity": "design",
-        "title": "Design Language",
-        "description": "Your default aesthetic for frontends. AI clients read this when generating UI.",
-        "fields": [
-          "frontend_aesthetic",
-          "frontend_aesthetic_tokens",
-          "frontend_hero_composition"
-        ],
-        "long_text": [
-          "frontend_aesthetic",
-          "frontend_aesthetic_tokens",
-          "frontend_hero_composition"
-        ],
-        "field_placeholders": {
-          "frontend_aesthetic": "The overall feel, and what it is a corrective to...",
-          "frontend_aesthetic_tokens": "Colours, type, shape, motion — the concrete tokens...",
-          "frontend_hero_composition": "How the focal element of a page should be built..."
-        },
-        "$comment": "Writable over MCP through the generic `preference` router (preferences[\"design\"][key] = value, server.py:2185). Wave 6 gave it a UI and an entity; before that it was substantial prose editable only by asking an AI to rewrite it."
-      },
-      {
-        "kind": "fields",
-        "path": [
-          "work_preferences"
-        ],
-        "entity": "work_preference",
-        "title": "How You Work",
-        "fields": [
-          "timezone",
-          "best_productivity_time",
-          "project_approach"
-        ],
-        "field_placeholders": {
-          "timezone": "e.g. GMT/BST (UK)",
-          "best_productivity_time": "e.g. morning, evening",
-          "project_approach": "e.g. iterative, MVP first then enhance"
-        },
-        "$comment": "Same generic `preference` router as `design`."
       },
       {
         "kind": "list",

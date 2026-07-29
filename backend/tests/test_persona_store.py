@@ -492,3 +492,68 @@ def test_lifestyle_media_is_left_alone(as_user):
                                        "favourite_genres": ["sci-fi"]}})
     assert store.load("lifestyle")["media"] == {"games": ["Minecraft"],
                                                 "favourite_genres": ["sci-fi"]}
+
+
+# ---------------------------------------------------------------------------
+# Wave 6: `work_preferences` dissolves into homes that already existed.
+# ---------------------------------------------------------------------------
+
+
+def test_project_approach_folds_into_learning_style(as_user):
+    """Same class of statement as the entries already there -- "learning by
+    building", "incremental complexity"."""
+    store.save("preferences", {
+        "work_preferences": {"project_approach": "iterative, MVP first"},
+        "learning_style": {"preferred": ["hands-on examples"]},
+    })
+    prefs = store.load("preferences")
+    assert prefs["learning_style"]["preferred"] == ["hands-on examples", "iterative, MVP first"]
+    assert "project_approach" not in prefs.get("work_preferences", {})
+
+
+def test_project_approach_is_not_duplicated_on_a_second_pass(as_user):
+    store.save("preferences", {"work_preferences": {"project_approach": "iterative"}})
+    once = store.load("preferences")
+    twice = store._normalize("preferences", copy.deepcopy(once))
+    assert twice["learning_style"]["preferred"] == ["iterative"]
+
+
+def test_timezone_folds_onto_communication_default(as_user):
+    """A formatting fact, beside `locale`, the other formatting fact."""
+    store.save("preferences", {
+        "work_preferences": {"timezone": "GMT/BST (UK)"},
+        "communication": {"default": {"locale": "British English"}},
+    })
+    default = store.load("preferences")["communication"]["default"]
+    assert default["timezone"] == "GMT/BST (UK)"
+    assert default["locale"] == "British English"
+
+
+def test_timezone_does_not_overwrite_one_already_set(as_user):
+    store.save("preferences", {
+        "work_preferences": {"timezone": "GMT"},
+        "communication": {"default": {"timezone": "CET"}},
+    })
+    assert store.load("preferences")["communication"]["default"]["timezone"] == "CET"
+
+
+def test_work_preferences_disappears_once_empty(as_user):
+    store.save("preferences", {"work_preferences": {"timezone": "GMT", "project_approach": "x"}})
+    assert "work_preferences" not in store.load("preferences")
+
+
+def test_best_productivity_time_is_kept_rather_than_dropped(as_user):
+    """It duplicates lifestyle.wellness.energy_peaks -- a RICHER list in a
+    DIFFERENT section. _normalize only sees one section's blob, so it cannot be
+    folded here, and dropping it without a home would be data loss. Left in
+    place until a cross-section migration moves it."""
+    store.save("preferences", {"work_preferences": {"best_productivity_time": "evening"}})
+    assert store.load("preferences")["work_preferences"] == {"best_productivity_time": "evening"}
+
+
+def test_design_is_left_in_storage(as_user):
+    """It belongs in the aesthetics pack, but _normalize cannot reach another
+    section to move it, and cannot tell whether that pack is even in use.
+    Unbound from the UI; never dropped blind."""
+    store.save("preferences", {"design": {"frontend_aesthetic": "Playful Editorial"}})
+    assert store.load("preferences")["design"] == {"frontend_aesthetic": "Playful Editorial"}

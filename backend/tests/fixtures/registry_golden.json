@@ -397,7 +397,8 @@
         "optional": [
           "tone",
           "detail_level",
-          "locale"
+          "locale",
+          "timezone"
         ],
         "identifier": null,
         "description": "Update-only singleton for default communication style"
@@ -416,32 +417,6 @@
           "detail_level"
         ],
         "identifier": "mood"
-      },
-      "design": {
-        "actions": [
-          "update"
-        ],
-        "required": [],
-        "optional": [
-          "frontend_aesthetic",
-          "frontend_aesthetic_tokens",
-          "frontend_hero_composition"
-        ],
-        "identifier": null,
-        "description": "Default design language for frontends you build. Long prose, read by AI clients when generating UI."
-      },
-      "work_preference": {
-        "actions": [
-          "update"
-        ],
-        "required": [],
-        "optional": [
-          "timezone",
-          "best_productivity_time",
-          "project_approach"
-        ],
-        "identifier": null,
-        "description": "How and when you work best."
       },
       "response_format": {
         "actions": [
@@ -743,6 +718,7 @@
         "optional": [
           "domain",
           "stance",
+          "primary",
           "notes",
           "references"
         ],
@@ -827,251 +803,23 @@
     "learning_log"
   ],
   "section_registry": {
-    "aesthetics": {
-      "context_fields": {
-        "personal": [
-          "styles"
-        ]
-      },
-      "default": {
-        "styles": []
-      },
-      "id_lists": [
-        [
-          "styles",
-          "aesthetic"
-        ]
-      ],
-      "key": "aesthetics"
-    },
-    "circle": {
-      "context_fields": {
-        "personal": [
-          "connections"
-        ]
-      },
-      "default": {
-        "connections": []
-      },
-      "id_lists": [
-        [
-          "connections",
-          "connection"
-        ]
-      ],
-      "key": "circle"
-    },
-    "goals": {
-      "context_fields": {
-        "learning": [
-          "goals"
-        ],
-        "minimal": [
-          "goals"
-        ],
-        "personal": [
-          "goals"
-        ],
-        "professional": [
-          "goals"
-        ]
-      },
-      "default": {
-        "goals": []
-      },
-      "id_lists": [
-        [
-          "goals",
-          "goal"
-        ]
-      ],
-      "key": "goals"
-    },
-    "knowledge": {
-      "context_fields": {
-        "learning": [
-          "domains",
-          "mental_tabs"
-        ],
-        "personal": [
-          "mental_tabs"
-        ],
-        "professional": [
-          "domains"
-        ]
-      },
-      "default": {
-        "domains": [],
-        "mental_tabs": []
-      },
-      "id_lists": [
-        [
-          "domains",
-          "domain"
-        ],
-        [
-          "mental_tabs",
-          "tab"
-        ]
-      ],
-      "key": "knowledge"
-    },
-    "learning_log": {
-      "context_fields": {
-        "learning": [
-          "entries"
-        ]
-      },
-      "default": {
-        "entries": []
-      },
-      "id_lists": [
-        [
-          "entries",
-          "learn"
-        ]
-      ],
-      "key": "learning_log"
-    },
-    "lifestyle": {
-      "context_fields": {
-        "personal": [
-          "hobbies",
-          "interests",
-          "personality_traits",
-          "values",
-          "wellness"
-        ]
-      },
-      "default": {
-        "hobbies": [],
-        "interests": [],
-        "personality_traits": [],
-        "values": [],
-        "wellness": {
-          "energy_peaks": [],
-          "sleep": {
-            "weekday": {
-              "bedtime": "",
-              "wakeup": ""
-            },
-            "weekend": {
-              "bedtime": "",
-              "wakeup": ""
-            }
-          },
-          "stress_triggers": []
-        }
-      },
-      "id_lists": [
-        [
-          "hobbies",
-          "hobby"
-        ],
-        [
-          "interests",
-          "interest"
-        ]
-      ],
-      "key": "lifestyle"
-    },
-    "media": {
-      "context_fields": {
-        "personal": [
-          "items"
-        ]
-      },
-      "default": {
-        "items": []
-      },
-      "id_lists": [
-        [
-          "items",
-          "media"
-        ]
-      ],
-      "key": "media"
-    },
-    "preferences": {
-      "context_fields": {},
-      "default": {
-        "code_style": {
-          "frameworks": [],
-          "preferred_languages": [],
-          "tools": []
-        },
-        "communication": {
-          "default": {
-            "detail_level": "",
-            "locale": "British English",
-            "tone": ""
-          },
-          "mood_overrides": []
-        },
-        "learning_style": {
-          "avoid": [],
-          "preferred": []
-        },
-        "likes_dislikes": []
-      },
-      "id_lists": [
-        [
-          "likes_dislikes",
-          "taste"
-        ]
-      ],
-      "key": "preferences"
-    },
     "profile": {
-      "context_fields": {
-        "learning": [
-          "name",
-          "preferred_name",
-          "current_role"
-        ],
-        "minimal": [
-          "name",
-          "preferred_name",
-          "bio",
-          "location",
-          "current_role"
-        ],
-        "personal": [
-          "name",
-          "preferred_name",
-          "bio",
-          "location",
-          "nationality",
-          "languages_spoken"
-        ],
-        "professional": [
-          "name",
-          "preferred_name",
-          "bio",
-          "location",
-          "current_role",
-          "organisation",
-          "nationality",
-          "languages_spoken",
-          "work_experience",
-          "education"
-        ]
-      },
+      "key": "profile",
       "default": {
+        "name": "",
+        "preferred_name": "",
+        "current_role": "",
+        "organisation": "",
+        "location": "",
+        "nationality": "",
+        "languages_spoken": [],
         "bio": "",
+        "work_experience": [],
+        "education": [],
         "contact": {
           "emails": [],
           "links": []
-        },
-        "current_role": "",
-        "education": [],
-        "languages_spoken": [],
-        "location": "",
-        "name": "",
-        "nationality": "",
-        "organisation": "",
-        "preferred_name": "",
-        "work_experience": []
+        }
       },
       "id_lists": [
         [
@@ -1087,21 +835,128 @@
           "language"
         ]
       ],
-      "key": "profile"
-    },
-    "projects": {
       "context_fields": {
-        "learning": [
-          "top_of_mind"
-        ],
         "minimal": [
-          "top_of_mind"
+          "name",
+          "preferred_name",
+          "bio",
+          "location",
+          "current_role"
         ],
         "professional": [
-          "projects",
-          "top_of_mind"
+          "name",
+          "preferred_name",
+          "bio",
+          "location",
+          "current_role",
+          "organisation",
+          "nationality",
+          "languages_spoken",
+          "work_experience",
+          "education"
+        ],
+        "personal": [
+          "name",
+          "preferred_name",
+          "bio",
+          "location",
+          "nationality",
+          "languages_spoken"
+        ],
+        "learning": [
+          "name",
+          "preferred_name",
+          "current_role"
         ]
+      }
+    },
+    "goals": {
+      "key": "goals",
+      "default": {
+        "goals": []
       },
+      "id_lists": [
+        [
+          "goals",
+          "goal"
+        ]
+      ],
+      "context_fields": {
+        "minimal": [
+          "goals"
+        ],
+        "professional": [
+          "goals"
+        ],
+        "personal": [
+          "goals"
+        ],
+        "learning": [
+          "goals"
+        ]
+      }
+    },
+    "knowledge": {
+      "key": "knowledge",
+      "default": {
+        "domains": [],
+        "mental_tabs": []
+      },
+      "id_lists": [
+        [
+          "domains",
+          "domain"
+        ],
+        [
+          "mental_tabs",
+          "tab"
+        ]
+      ],
+      "context_fields": {
+        "professional": [
+          "domains"
+        ],
+        "personal": [
+          "mental_tabs"
+        ],
+        "learning": [
+          "domains",
+          "mental_tabs"
+        ]
+      }
+    },
+    "preferences": {
+      "key": "preferences",
+      "default": {
+        "code_style": {
+          "preferred_languages": [],
+          "frameworks": [],
+          "tools": []
+        },
+        "communication": {
+          "default": {
+            "tone": "",
+            "detail_level": "",
+            "locale": "British English"
+          },
+          "mood_overrides": []
+        },
+        "learning_style": {
+          "preferred": [],
+          "avoid": []
+        },
+        "likes_dislikes": []
+      },
+      "id_lists": [
+        [
+          "likes_dislikes",
+          "taste"
+        ]
+      ],
+      "context_fields": {}
+    },
+    "projects": {
+      "key": "projects",
       "default": {
         "projects": [],
         "top_of_mind": []
@@ -1116,7 +971,131 @@
           "top"
         ]
       ],
-      "key": "projects"
+      "context_fields": {
+        "minimal": [
+          "top_of_mind"
+        ],
+        "professional": [
+          "projects",
+          "top_of_mind"
+        ],
+        "learning": [
+          "top_of_mind"
+        ]
+      }
+    },
+    "lifestyle": {
+      "key": "lifestyle",
+      "default": {
+        "hobbies": [],
+        "interests": [],
+        "personality_traits": [],
+        "values": [],
+        "wellness": {
+          "sleep": {
+            "weekday": {
+              "bedtime": "",
+              "wakeup": ""
+            },
+            "weekend": {
+              "bedtime": "",
+              "wakeup": ""
+            }
+          },
+          "energy_peaks": [],
+          "stress_triggers": []
+        }
+      },
+      "id_lists": [
+        [
+          "hobbies",
+          "hobby"
+        ],
+        [
+          "interests",
+          "interest"
+        ]
+      ],
+      "context_fields": {
+        "personal": [
+          "hobbies",
+          "interests",
+          "personality_traits",
+          "values",
+          "wellness"
+        ]
+      }
+    },
+    "media": {
+      "key": "media",
+      "default": {
+        "items": []
+      },
+      "id_lists": [
+        [
+          "items",
+          "media"
+        ]
+      ],
+      "context_fields": {
+        "personal": [
+          "items"
+        ]
+      }
+    },
+    "aesthetics": {
+      "key": "aesthetics",
+      "default": {
+        "styles": []
+      },
+      "id_lists": [
+        [
+          "styles",
+          "aesthetic"
+        ]
+      ],
+      "context_fields": {
+        "minimal": [
+          "styles"
+        ],
+        "personal": [
+          "styles"
+        ]
+      }
+    },
+    "circle": {
+      "key": "circle",
+      "default": {
+        "connections": []
+      },
+      "id_lists": [
+        [
+          "connections",
+          "connection"
+        ]
+      ],
+      "context_fields": {
+        "personal": [
+          "connections"
+        ]
+      }
+    },
+    "learning_log": {
+      "key": "learning_log",
+      "default": {
+        "entries": []
+      },
+      "id_lists": [
+        [
+          "entries",
+          "learn"
+        ]
+      ],
+      "context_fields": {
+        "learning": [
+          "entries"
+        ]
+      }
     }
   }
 }
