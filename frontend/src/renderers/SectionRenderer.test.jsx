@@ -1885,7 +1885,7 @@ describe("section headings and info placement", () => {
     describe("work_experience list", () => {
       describeGuards({
         pack: profilePack, listKey: "work_experience", data: profileData,
-        exclusions: { highlights: CHILD_NODE },
+        exclusions: { highlights: CHILD_NODE, skills: CHILD_NODE },
       });
     });
     describe("languages_spoken list", () => {
@@ -2020,6 +2020,45 @@ describe("section headings and info placement", () => {
 
       expect(latest().work_experience[0].description).toBe("Backend work on the ingest pipeline.!");
       expect(latest().work_experience[1].company).toBe("Bean There");
+    });
+
+
+    it("renders a role's skills as chips, beside its highlights", async () => {
+      // Chips, not editable rows: skills are short, word-like values you add
+      // and drop but never revise, and chips show many at a glance. A
+      // highlight is a sentence where a typo means retyping the lot, which is
+      // why that one is item_control: "input".
+      const { user } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Acme"));
+
+      const skills = uiNode("Skills");
+      expect(within(skills).getByText("Python")).toBeInTheDocument();
+      expect(within(skills).getByText("PostgreSQL")).toBeInTheDocument();
+      expect(within(skills).getByPlaceholderText(/Python, Kubernetes/)).toBeInTheDocument();
+    });
+
+    it("appends a skill without touching highlights or the sibling role", async () => {
+      // Both are bare-string lists on the same row, so a wrong path here would
+      // write into the other one silently.
+      const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Acme"));
+
+      await user.type(within(uiNode("Skills")).getByRole("textbox"), "Go{Enter}");
+
+      const jobs = latest().work_experience;
+      expect(jobs[0].skills).toEqual(["Python", "PostgreSQL", "Go"]);
+      expect(jobs[0].highlights).toEqual(["Halved the ingest latency", "Shipped the pack loader"]);
+      expect(jobs[1].skills).toEqual([]);
+    });
+
+    it("offers a usable skills control on a role that has none", async () => {
+      const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Bean There"));
+
+      await user.type(within(uiNode("Skills")).getByRole("textbox"), "Latte art{Enter}");
+
+      expect(latest().work_experience[1].skills).toEqual(["Latte art"]);
+      expect(latest().work_experience[0].skills).toEqual(["Python", "PostgreSQL"]);
     });
 
     it("stores a language's `fluency`, never the alias `proficiency`", async () => {

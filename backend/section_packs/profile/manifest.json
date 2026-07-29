@@ -132,6 +132,7 @@
         "type",
         "location",
         "description",
+        "skills",
         "highlights"
       ],
       "identifier": "company"
@@ -247,6 +248,22 @@
       "identifier": "name",
       "parent": "institution",
       "description": "A society or extracurricular. Stored as {name, activities_involved}."
+    },
+    "work_skill": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "company",
+        "skill"
+      ],
+      "optional": [
+        "skills"
+      ],
+      "identifier": "skill",
+      "parent": "company",
+      "description": "A skill or technology used in a role. Bare strings on the parent row, like work_highlight."
     }
   },
   "ui": {
@@ -411,6 +428,7 @@
           "description"
         ],
         "count_badges": [
+          "skills",
           "highlights"
         ],
         "long_text": [
@@ -429,6 +447,15 @@
           ]
         },
         "children": [
+          {
+            "kind": "strings",
+            "path": [
+              "skills"
+            ],
+            "title": "Skills",
+            "placeholder": "e.g. Python, Kubernetes, PostgreSQL",
+            "$comment": "Bare strings on the parent row, same shape as `highlights` (server.py work_skill branch). Left as CHIPS rather than item_control:\"input\": these are short, word-like values you add and drop but never revise, and chips show many at a glance -- the opposite of a highlight, which is a sentence where a typo means retyping the lot."
+          },
           {
             "kind": "strings",
             "path": [

@@ -68,6 +68,7 @@
           "type",
           "location",
           "description",
+          "skills",
           "highlights"
         ],
         "identifier": "company"
@@ -183,6 +184,22 @@
         "identifier": "name",
         "parent": "institution",
         "description": "A society or extracurricular. Stored as {name, activities_involved}."
+      },
+      "work_skill": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "required": [
+          "company",
+          "skill"
+        ],
+        "optional": [
+          "skills"
+        ],
+        "identifier": "skill",
+        "parent": "company",
+        "description": "A skill or technology used in a role. Bare strings on the parent row, like work_highlight."
       }
     },
     "goals": {

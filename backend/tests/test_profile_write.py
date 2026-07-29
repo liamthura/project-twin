@@ -238,3 +238,78 @@ def test_a_write_still_finds_an_un_normalised_legacy_string(clean_database, as_u
     assert server._find_course(["Compilers"], "compilers") == "Compilers"
     assert server._find_course([{"name": "Compilers"}], "COMPILERS") == {"name": "Compilers"}
     assert server._find_course([{"name": "Other"}], "Compilers") is None
+
+
+# ---------------------------------------------------------------------------
+# work_experience.skills -- added in wave 6 alongside the migration.
+#
+# Bare strings on the parent row, the same shape as `highlights`. Given its own
+# entity so it is not UI-only: that asymmetry is exactly what `clubs` had, and
+# a field no AI client can read into or out of is half a feature in a project
+# whose point is portable context.
+# ---------------------------------------------------------------------------
+
+
+def test_add_seeds_skills(clean_database, as_user):
+    _add_job()
+    assert _profile()["work_experience"][0]["skills"] == []
+
+
+def test_add_carries_skills(clean_database, as_user):
+    _add_job(skills=["Python", "Kubernetes"])
+    assert _profile()["work_experience"][0]["skills"] == ["Python", "Kubernetes"]
+
+
+def test_update_replaces_the_whole_skill_list(clean_database, as_user):
+    _add_job(skills=["Python"])
+    server.execute_modify("update", "work_experience", {"company": "Acme", "skills": ["Go"]})
+    assert _profile()["work_experience"][0]["skills"] == ["Go"]
+
+
+def test_update_leaves_skills_alone_when_not_supplied(clean_database, as_user):
+    _add_job(skills=["Python"])
+    server.execute_modify("update", "work_experience", {"company": "Acme", "role": "Staff"})
+    assert _profile()["work_experience"][0]["skills"] == ["Python"]
+
+
+def test_update_can_clear_the_skill_list(clean_database, as_user):
+    """An empty list is a real value here, not "unset" -- the guard tests
+    isinstance, not truthiness, so a user CAN remove every skill."""
+    _add_job(skills=["Python"])
+    server.execute_modify("update", "work_experience", {"company": "Acme", "skills": []})
+    assert _profile()["work_experience"][0]["skills"] == []
+
+
+def test_work_skill_adds_one_and_dedupes(clean_database, as_user):
+    _add_job()
+    server.execute_modify("add", "work_skill", {"company": "Acme", "skill": "Python"})
+    server.execute_modify("add", "work_skill", {"company": "Acme", "skill": "Python"})
+    assert _profile()["work_experience"][0]["skills"] == ["Python"]
+
+
+def test_work_skill_adds_many_at_once(clean_database, as_user):
+    _add_job()
+    server.execute_modify("add", "work_skill", {"company": "Acme", "skills": ["Go", "Rust"]})
+    assert _profile()["work_experience"][0]["skills"] == ["Go", "Rust"]
+
+
+def test_work_skill_removes(clean_database, as_user):
+    _add_job(skills=["Python", "Go"])
+    assert server.execute_modify("remove", "work_skill",
+                                 {"company": "Acme", "skill": "Python"}).startswith("✅")
+    assert _profile()["work_experience"][0]["skills"] == ["Go"]
+
+
+def test_work_skill_needs_a_known_company(clean_database, as_user):
+    assert server.execute_modify("add", "work_skill",
+                                 {"company": "Nowhere", "skill": "Python"}).startswith("❌")
+
+
+def test_work_skill_does_not_touch_highlights(clean_database, as_user):
+    """Both are bare-string lists on the same row, so a copy-paste slip in the
+    branch would write into the wrong one silently."""
+    _add_job(highlights=["Shipped it"])
+    server.execute_modify("add", "work_skill", {"company": "Acme", "skill": "Python"})
+    job = _profile()["work_experience"][0]
+    assert job["skills"] == ["Python"]
+    assert job["highlights"] == ["Shipped it"]

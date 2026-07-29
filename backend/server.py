@@ -1533,6 +1533,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 # row always carries them and the UI never renders `undefined`.
                 "location": data.get("location", ""),
                 "description": data.get("description", ""),
+                "skills": data.get("skills", []),
                 "highlights": data.get("highlights", [])
             })
             save_json("profile.json", profile)
@@ -1544,6 +1545,11 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             for field in ["role", "type", "period", "location", "description"]:
                 if data.get(field):
                     exp[field] = data[field]
+            # A list is replaced wholesale when supplied. `work_skill` is the
+            # incremental path; this is the "set them all at once" path, and
+            # `add` already accepts `skills` the same way.
+            if isinstance(data.get("skills"), list):
+                exp["skills"] = data["skills"]
             save_json("profile.json", profile)
             return f"✅ Updated work experience at {data['company']}"
         elif action == "remove":
@@ -1589,6 +1595,45 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return f"✅ Removed highlight from {company}"
             return f"❌ Highlight not found"
     
+    elif entity == "work_skill":
+        profile = load_json("profile.json")
+        work = profile.get("work_experience", [])
+        company = get_field(data, "company", "work", "employer", "organization", default="")
+        if not company:
+            return "❌ Work skill requires 'company' to identify which work experience"
+        idx, exp = find_in_array(work, company, "company")
+        if idx == -1:
+            return f"❌ Work experience at '{company}' not found"
+        skills = exp.setdefault("skills", [])
+        # Mirrors `work_highlight`: bare strings on a parent row, accepting
+        # either a list or a single value, and deduped case-sensitively the
+        # same way. Without this the field would be UI-only -- the asymmetry
+        # wave 6 just closed for `clubs`.
+        if action == "add":
+            new_skills = data.get("skills", [])
+            if not new_skills:
+                single = get_field(data, "skill", "item", "technology", default="")
+                if single:
+                    new_skills = [single]
+            if not new_skills:
+                return "❌ Work skill requires 'skill' or 'skills'"
+            added = []
+            for sk in new_skills:
+                if sk and sk not in skills:
+                    skills.append(sk)
+                    added.append(sk)
+            save_json("profile.json", profile)
+            if len(added) == 1:
+                return f"✅ Added skill to {company}: {added[0]}"
+            return f"✅ Added {len(added)} skills to {company}"
+        elif action == "remove":
+            skill = get_field(data, "skill", "item", default="")
+            if skill in skills:
+                skills.remove(skill)
+                save_json("profile.json", profile)
+                return f"✅ Removed skill from {company}"
+            return f"❌ Skill not found"
+
     elif entity == "goal":
         blob = load_json("goals.json")
         goals = blob.setdefault("goals", [])

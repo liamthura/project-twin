@@ -25,6 +25,10 @@
       "period": "Jun 2024 – Jun 2025",
       "location": "Remote",
       "description": "Backend work on the ingest pipeline.",
+      "skills": [
+        "Python",
+        "PostgreSQL"
+      ],
       "highlights": [
         "Halved the ingest latency",
         "Shipped the pack loader"
@@ -37,6 +41,7 @@
       "period": "2022 – 2023",
       "location": "",
       "description": "",
+      "skills": [],
       "highlights": []
     }
   ],

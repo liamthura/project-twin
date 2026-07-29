@@ -63,7 +63,8 @@ Only the seven top-level scalars are. The rest is five lists.
 ```
 { name, preferred_name, current_role, organisation, location, nationality, bio,
   languages_spoken: [ {name, fluency} ],
-  work_experience:  [ {role, company, type, period, highlights: [str]} ],
+  work_experience:  [ {role, company, type, period, location, description,
+                       skills: [str], highlights: [str]} ],
   education:        [ {institution, degree_level, field_of_study, start_year,
                        end_year, status, highlights: [str],
                        coursework: [ {name, topics: [str]} ],
@@ -174,6 +175,22 @@ reject `status`, the real key. The fourth instance of this pattern, after
 
 `period` is also not a rename of one key: it maps to **two** stored keys. No
 node can bind it.
+
+### 3.6b `work_experience.skills` — child `strings`, added in wave 6
+
+Not a migration: a new field, requested alongside it. Bare strings on the
+parent row, the same shape as `highlights`, seeded by `work_experience.add` and
+replaceable wholesale by `update` (guarded on `isinstance(..., list)` rather
+than truthiness, so an empty list really does clear it).
+
+Given its own entity `work_skill` (add/remove, mirroring `work_highlight`)
+rather than left UI-only. A field no AI client can read into or out of is half
+a feature in a project whose point is portable context — and UI-only was
+exactly the asymmetry `clubs` had before this wave closed it.
+
+Rendered as **chips**, not `item_control: "input"`: skills are short,
+word-like values you add and drop but never revise, and chips show many at a
+glance. A highlight is a sentence where a typo means retyping the lot.
 
 ### 3.7 `work_highlight`, `education_highlight` — child `strings`
 
