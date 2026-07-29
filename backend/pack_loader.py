@@ -1,11 +1,13 @@
 """Loader for declarative section packs (backend/section_packs/*/manifest.json).
 
-Each pack is one manifest validated against meta_schema.json. Invalid packs
-are skipped with a warning (the server must always boot); cross-pack
-collisions (duplicate entity names or id prefixes) raise PackError because
-they are packaging bugs, not user data. sections.py and server.py build
-their registry/entity-schema views from manifests() — this module must not
-import either of them (they import us).
+Each pack is one manifest validated against meta_schema.json. Cross-pack
+collisions (duplicate entity names or id prefixes) raise PackError because they
+are packaging bugs, not user data — and so, since wave 11, does an invalid
+manifest in the packs this repo ships, via load_packs(strict=True) from
+manifests(). Warn-and-skip survives as the non-strict default, for a pack
+directory the server does not own. sections.py and server.py build their
+registry/entity-schema views from manifests() — this module must not import
+either of them (they import us).
 """
 import json
 import logging
@@ -62,10 +64,29 @@ def validate_manifest(manifest: dict) -> None:
             raise PackError(f"unknown scope '{scope}' in scope_contributions")
 
 
-def load_packs(packs_dir: Path = PACKS_DIR) -> dict[str, dict]:
-    """Scan packs_dir for <key>/manifest.json. Invalid → warn + skip.
-    Cross-pack collisions → PackError. Returns manifests ordered by
-    (position, key)."""
+def load_packs(packs_dir: Path = PACKS_DIR, strict: bool = False) -> dict[str, dict]:
+    """Scan packs_dir for <key>/manifest.json. Cross-pack collisions → PackError.
+    Returns manifests ordered by (position, key).
+
+    `strict` decides what an invalid pack means, and the two answers are for two
+    different situations:
+
+      strict=False (default) -- warn and skip. Right for a pack directory the
+        server does not own: one bad third-party pack must not stop it booting.
+
+      strict=True -- raise. Right for the packs shipped IN THIS REPO, where an
+        invalid manifest is a packaging bug, not a runtime condition. `manifests()`
+        passes it, so the real load is fatal.
+
+    The default used to apply everywhere, and it hid two bugs. Wave 6 put
+    `exclusive_fields` in the `uiSection` block instead of the `entity` block; the
+    aesthetics pack was skipped, and the first anyone knew was "❌ Unknown entity
+    type: aesthetic" much later. Wave 8 put `$comment` on an entity the meta-schema
+    did not allow it on; that one surfaced at import only because `profile` is
+    core, so sections._check_core raises on its absence. A non-core pack had no
+    such backstop -- it simply ceased to exist, and every symptom appeared
+    somewhere far from the cause.
+    """
     _validator()  # fail loudly on a broken meta-schema, not as per-pack invalidity
     loaded: list[dict] = []
     for entry in sorted(packs_dir.iterdir()) if packs_dir.exists() else []:
@@ -73,6 +94,8 @@ def load_packs(packs_dir: Path = PACKS_DIR) -> dict[str, dict]:
             continue
         path = entry / "manifest.json"
         if not path.exists():
+            if strict:
+                raise PackError(f"section pack {entry.name}: no manifest.json")
             logger.warning("section pack %s: no manifest.json — skipped", entry.name)
             continue
         try:
@@ -83,6 +106,8 @@ def load_packs(packs_dir: Path = PACKS_DIR) -> dict[str, dict]:
                     f"key '{manifest['key']}' does not match directory '{entry.name}'"
                 )
         except (PackError, json.JSONDecodeError, OSError) as exc:
+            if strict:
+                raise PackError(f"section pack {entry.name}: invalid manifest — {exc}") from exc
             logger.warning("section pack %s: invalid manifest — skipped (%s)", entry.name, exc)
             continue
         loaded.append(manifest)
@@ -111,10 +136,15 @@ _cache: dict | None = None
 
 
 def manifests() -> dict[str, dict]:
-    """Cached load of the real packs directory (call _reset_cache() in tests)."""
+    """Cached load of the real packs directory (call _reset_cache() in tests).
+
+    strict=True: these are the packs this repo ships, so an invalid one is a
+    packaging bug that must stop the process rather than quietly remove a
+    section. See load_packs for the two bugs the lenient default hid.
+    """
     global _cache
     if _cache is None:
-        _cache = load_packs(PACKS_DIR)
+        _cache = load_packs(PACKS_DIR, strict=True)
     return _cache
 
 
