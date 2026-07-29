@@ -77,6 +77,31 @@ def _normalize(file_type: str, data: dict) -> dict:
             for edu in education:
                 if isinstance(edu, dict):
                     edu.setdefault("highlights", [])
+                    # Phase 6 (consolidation): `coursework` and `clubs` are
+                    # lists of OBJECTS -- {"name", "topics"} and {"name",
+                    # "activities_involved"} -- which is what the editor has
+                    # always written and read. Until wave 6 `execute_modify`
+                    # appended a bare STRING into the same lists, so a record
+                    # touched by an AI client holds a mix of both shapes. The
+                    # renderer maps over these and reads `.name`, so a stray
+                    # string renders as a blank row -- and the pre-wave-6
+                    # chip control threw outright on an object.
+                    #
+                    # Coerced on read rather than migrated in place: this only
+                    # ever widens a string into the object that already
+                    # represents it, so it is lossless and idempotent. The
+                    # string becomes the name; its nested list starts empty,
+                    # which is exactly what the string carried.
+                    for key, nested in (("coursework", "topics"),
+                                        ("clubs", "activities_involved")):
+                        entries = edu.get(key)
+                        if not isinstance(entries, list):
+                            continue
+                        edu[key] = [
+                            {"name": e, nested: []} if isinstance(e, str)
+                            else e
+                            for e in entries
+                        ]
         else:
             data["education"] = []
 

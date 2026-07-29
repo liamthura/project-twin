@@ -129,9 +129,12 @@
           "institution",
           "course"
         ],
-        "optional": [],
+        "optional": [
+          "topics"
+        ],
         "identifier": "course",
-        "parent": "institution"
+        "parent": "institution",
+        "description": "A module or class. Stored as {name, topics}; `course` is the input spelling for `name`."
       },
       "coursework_topic": {
         "actions": [
@@ -142,9 +145,12 @@
           "institution",
           "course"
         ],
-        "optional": [],
+        "optional": [
+          "topics"
+        ],
         "identifier": "course",
-        "parent": "institution"
+        "parent": "institution",
+        "description": "Alias for `coursework` -- same list, same object shape."
       },
       "basic_info": {
         "actions": [
@@ -162,6 +168,22 @@
         ],
         "identifier": null,
         "description": "Update-only singleton for top-level profile fields"
+      },
+      "club": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "required": [
+          "institution",
+          "name"
+        ],
+        "optional": [
+          "activities_involved"
+        ],
+        "identifier": "name",
+        "parent": "institution",
+        "description": "A society or extracurricular. Stored as {name, activities_involved}."
       }
     },
     "ui": {
@@ -217,15 +239,7 @@
             "field_of_study",
             "start_year",
             "end_year",
-            "status",
-            "highlights",
-            "coursework",
-            "clubs"
-          ],
-          "array_fields": [
-            "highlights",
-            "coursework",
-            "clubs"
+            "status"
           ],
           "count_badges": [
             "coursework",
@@ -255,7 +269,62 @@
               "Clubs & Societies: Extracurricular involvement.",
               "Highlights: Notable achievements like awards, high grades, leadership roles, or recognitions."
             ]
-          }
+          },
+          "children": [
+            {
+              "kind": "strings",
+              "path": [
+                "highlights"
+              ],
+              "title": "Highlights",
+              "item_control": "input",
+              "placeholder": "e.g. First class average, Dean's list",
+              "$comment": "Bare strings on both writers (server.py:2559 appends the string itself). item_control:\"input\" because these are sentence-like -- the retired editor gave each its own editable row, and chips would mean retyping a whole achievement to fix a typo."
+            },
+            {
+              "kind": "list",
+              "path": [
+                "coursework"
+              ],
+              "entity": "coursework",
+              "title": "Coursework / Modules",
+              "title_field": "name",
+              "detail_fields": [
+                "name",
+                "topics"
+              ],
+              "array_fields": [
+                "topics"
+              ],
+              "count_badges": [
+                "topics"
+              ],
+              "fields_outside_entity": [
+                "name"
+              ],
+              "$comment": "OBJECTS: {name, topics}. The entity's `course` is the INPUT spelling; `name` is what is stored. Until wave 6 execute_modify appended a bare string here while the editor wrote objects, so an AI-added course rendered blank and could never be removed -- `course in coursework` compares a string to a dict. persona_store._normalize coerces legacy strings."
+            },
+            {
+              "kind": "list",
+              "path": [
+                "clubs"
+              ],
+              "entity": "club",
+              "title": "Clubs & Societies",
+              "title_field": "name",
+              "detail_fields": [
+                "name",
+                "activities_involved"
+              ],
+              "array_fields": [
+                "activities_involved"
+              ],
+              "count_badges": [
+                "activities_involved"
+              ],
+              "$comment": "OBJECTS: {name, activities_involved}. Before wave 6 `clubs` had no entity and no execute_modify branch at all -- the editor was its only writer, so no AI client could read into or out of it. Both added in wave 6."
+            }
+          ]
         },
         {
           "kind": "list",
@@ -276,11 +345,7 @@
             "type",
             "period",
             "location",
-            "description",
-            "highlights"
-          ],
-          "array_fields": [
-            "highlights"
+            "description"
           ],
           "count_badges": [
             "highlights"
@@ -299,7 +364,19 @@
               "Period: Date range in a readable format, e.g., 'Jan 2023 – Jun 2024' or 'Summer 2022'.",
               "Highlights: 3–6 bullet points describing what you did and achieved. Focus on outcomes and impact."
             ]
-          }
+          },
+          "children": [
+            {
+              "kind": "strings",
+              "path": [
+                "highlights"
+              ],
+              "title": "Highlights",
+              "item_control": "input",
+              "placeholder": "e.g. Led team of 5 engineers",
+              "$comment": "Bare strings on both writers (server.py:1541). item_control:\"input\" matches the retired editor, which gave each highlight its own editable row -- see the education node."
+            }
+          ]
         },
         {
           "kind": "group",

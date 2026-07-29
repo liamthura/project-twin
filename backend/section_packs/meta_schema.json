@@ -190,6 +190,10 @@
           "type": "string",
           "description": "One muted line under the node's title, saying what belongs here. User-facing helper text, unlike `$comment` (an authoring note) and shorter than `info` (a dialog). Optional: a node whose title is self-explanatory should omit it rather than restate itself."
         },
+        "item_control": {
+          "enum": ["tag", "input"],
+          "description": "How a `strings` node presents each stored string. \"tag\" (the default) renders ArrayInput's chips -- right for short, word-like values you add and remove but never revise. \"input\" renders one editable row per string with its own delete -- right for sentence-like values where a typo means retyping the whole thing, which is how the hand-written editors rendered profile's work and education highlights."
+        },
         "placeholder": {
           "type": "string",
           "description": "Placeholder for this node's own input -- the ArrayInput on a `strings` node. Carries the concrete examples the hand-written editors used (\"e.g. Python, TypeScript...\"), which do more to explain a free-text list than any label. Optional: without it a `strings` node derives a plain \"Add <singular title>...\"."

@@ -89,6 +89,30 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   const covered = [...new Set([...(node.badges || []), ...(node.detail_fields || [])])];
   const item = data[listKey][0];
 
+  // A fixture that is easier than production is worse than no fixture. Wave 6
+  // bound education's `coursework` and `clubs` as chip controls on the strength
+  // of a fixture that held bare strings; the real shape is objects, and the
+  // chip control throws "Objects are not valid as a React child" on them. Every
+  // test passed while the crash was never exercised.
+  //
+  // So: an array-valued key a node declares in `array_fields` must actually
+  // hold strings in the fixture. If it holds objects, the node is the wrong
+  // kind -- it wants a nested list, not a chip control.
+  for (const field of node.array_fields || []) {
+    const value = item[field];
+    if (!Array.isArray(value)) continue;
+    const objects = value.filter((v) => v !== null && typeof v === "object");
+    if (objects.length) {
+      throw new Error(
+        `${pack.key}/${listKey}: node declares array_fields: ["${field}"], which ` +
+          `renders each entry as a chip -- but the fixture holds ${objects.length} ` +
+          `OBJECT entr${objects.length === 1 ? "y" : "ies"} there, which React ` +
+          `cannot render as a child. This field wants a nested list node, not ` +
+          `array_fields.`
+      );
+    }
+  }
+
   // Fail fast, at suite-definition time rather than inside an `it`, on a
   // malformed exclusions map -- a missing map or a reason-less entry would
   // otherwise let a key silently drop out of both halves of the guard.
@@ -1850,14 +1874,18 @@ describe("section headings and info placement", () => {
   // child list -- education.coursework is a bare string array, not objects.
   // -------------------------------------------------------------------------
   describe("profile", () => {
+    const CHILD_NODE =
+      "a child node, not a field of the parent row -- covered by the nesting tests below.";
     describe("education list", () => {
       describeGuards({
-        pack: profilePack, listKey: "education", data: profileData, exclusions: {},
+        pack: profilePack, listKey: "education", data: profileData,
+        exclusions: { coursework: CHILD_NODE, clubs: CHILD_NODE, highlights: CHILD_NODE },
       });
     });
     describe("work_experience list", () => {
       describeGuards({
-        pack: profilePack, listKey: "work_experience", data: profileData, exclusions: {},
+        pack: profilePack, listKey: "work_experience", data: profileData,
+        exclusions: { highlights: CHILD_NODE },
       });
     });
     describe("languages_spoken list", () => {
@@ -1902,17 +1930,85 @@ describe("section headings and info placement", () => {
       expect(screen.queryByText("field")).not.toBeInTheDocument();
     });
 
-    it("round-trips education's bare string arrays without touching each other", async () => {
+    // ---- the two-level nesting: education -> coursework -> topics ----------
+    //
+    // The spec's wave table called this out from the start; a reading of
+    // execute_modify alone denied it, because that branch appended a bare
+    // string while the editor wrote {name, topics} objects into the same list.
+    // Reading only the backend is what made this look flat.
+
+    it("renders coursework as objects with their own nested topics", async () => {
+      const { user } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Northumbria University"));
+
+      const coursework = uiNode("Coursework / Modules");
+      expect(within(coursework).getByText("Compilers")).toBeInTheDocument();
+      expect(within(coursework).getByText("Distributed Systems")).toBeInTheDocument();
+
+      await user.click(within(coursework).getByText("Compilers"));
+      expect(screen.getByText("parsing")).toBeInTheDocument();
+      expect(screen.getByText("codegen")).toBeInTheDocument();
+    });
+
+    it("writes a nested topic into the right course, two levels down", async () => {
+      const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Northumbria University"));
+      await user.click(within(uiNode("Coursework / Modules")).getByText("Compilers"));
+
+      const topics = screen.getByText("topics").parentElement;
+      await user.type(within(topics).getByRole("textbox"), "optimisation{Enter}");
+
+      const cw = latest().education[0].coursework;
+      expect(cw[0]).toEqual({ name: "Compilers", topics: ["parsing", "codegen", "optimisation"] });
+      expect(cw[1]).toEqual({ name: "Distributed Systems", topics: [] });
+    });
+
+    it("stores a course under `name`, never the entity's input spelling `course`", async () => {
       const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
       await user.click(screen.getByText("Northumbria University"));
 
-      const coursework = screen.getByText("coursework").parentElement;
-      await user.type(within(coursework).getByRole("textbox"), "Type Theory{Enter}");
+      const coursework = uiNode("Coursework / Modules");
+      await user.click(within(coursework).getByRole("button", { name: "Add" }));
+      const dialog = screen.getByRole("dialog");
+      await user.type(within(dialog).getAllByRole("textbox")[0], "Type Theory");
+      await user.click(within(dialog).getByRole("button", { name: "Add" }));
 
-      const edu = latest().education[0];
-      expect(edu.coursework).toEqual(["Compilers", "Distributed Systems", "Type Theory"]);
-      expect(edu.clubs).toEqual(["Hackathon Society"]);
-      expect(edu.highlights).toEqual(["First class average"]);
+      const added = latest().education[0].coursework.find((c) => c.name === "Type Theory");
+      expect(added).toBeTruthy();
+      expect(added).not.toHaveProperty("course");
+    });
+
+    it("renders clubs as objects with their own activities", async () => {
+      const { user } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Northumbria University"));
+
+      const clubs = uiNode("Clubs & Societies");
+      await user.click(within(clubs).getByText("Hackathon Society"));
+      expect(screen.getByText("mentoring")).toBeInTheDocument();
+    });
+
+    it("edits a highlight in place rather than making the user retype it", async () => {
+      // The retired editor gave each highlight its own input. Binding them as
+      // chips meant deleting and retyping a whole sentence to fix a typo.
+      const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Acme"));
+
+      const highlights = uiNode("Highlights");
+      await user.type(within(highlights).getByDisplayValue("Halved the ingest latency"), "!");
+
+      expect(latest().work_experience[0].highlights[0]).toBe("Halved the ingest latency!");
+      expect(latest().work_experience[0].highlights[1]).toBe("Shipped the pack loader");
+    });
+
+    it("appends an empty highlight row ready to type into", async () => {
+      const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Acme"));
+
+      await user.click(within(uiNode("Highlights")).getByRole("button", { name: /Add highlight/i }));
+
+      expect(latest().work_experience[0].highlights).toEqual([
+        "Halved the ingest latency", "Shipped the pack loader", "",
+      ]);
     });
 
     it("binds work experience's `location` and `description`, real as of wave 6", async () => {

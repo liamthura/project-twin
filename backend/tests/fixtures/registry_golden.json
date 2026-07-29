@@ -128,9 +128,12 @@
           "institution",
           "course"
         ],
-        "optional": [],
+        "optional": [
+          "topics"
+        ],
         "identifier": "course",
-        "parent": "institution"
+        "parent": "institution",
+        "description": "A module or class. Stored as {name, topics}; `course` is the input spelling for `name`."
       },
       "coursework_topic": {
         "actions": [
@@ -141,9 +144,12 @@
           "institution",
           "course"
         ],
-        "optional": [],
+        "optional": [
+          "topics"
+        ],
         "identifier": "course",
-        "parent": "institution"
+        "parent": "institution",
+        "description": "Alias for `coursework` -- same list, same object shape."
       },
       "basic_info": {
         "actions": [
@@ -161,6 +167,22 @@
         ],
         "identifier": null,
         "description": "Update-only singleton for top-level profile fields"
+      },
+      "club": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "required": [
+          "institution",
+          "name"
+        ],
+        "optional": [
+          "activities_involved"
+        ],
+        "identifier": "name",
+        "parent": "institution",
+        "description": "A society or extracurricular. Stored as {name, activities_involved}."
       }
     },
     "goals": {

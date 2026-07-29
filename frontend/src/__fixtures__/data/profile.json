@@ -1,5 +1,5 @@
 {
-  "_note": "Shapes read off backend/server.py's execute_modify branches, recorded in docs/superpowers/plans/2026-07-29-wave-6-storage-keys-reference.md. Wave 6 corrected the entity vocabulary rather than working around it, so these keys now match what the tool contract advertises: `fluency` (not the old phantom `proficiency`), `purpose` (not `label`), and education's `degree_level`/`field_of_study`/`start_year`/`end_year`/`status` (not `degree`/`field`/`period`). `education.coursework`, `clubs` and `highlights` are BARE STRING arrays -- which is why profile has no second level of child list. This key itself is inert: no ui node addresses it. Every string value here is deliberately UNIQUE across the whole section: describeGuards proves a field is bound by locating its stored value with getByDisplayValue, which throws on more than one match. `organisation` and education's `institution` both read \"Northumbria University\" at first and made the guard ambiguous for reasons that had nothing to do with the binding under test.",
+  "_note": "Shapes read off backend/server.py's execute_modify branches, recorded in docs/superpowers/plans/2026-07-29-wave-6-storage-keys-reference.md. Wave 6 corrected the entity vocabulary rather than working around it, so these keys now match what the tool contract advertises: `fluency` (not the old phantom `proficiency`), `purpose` (not `label`), and education's `degree_level`/`field_of_study`/`start_year`/`end_year`/`status` (not `degree`/`field`/`period`). `education.coursework`, `clubs` and `highlights` are BARE STRING arrays -- which is why profile has no second level of child list. This key itself is inert: no ui node addresses it. Every string value here is deliberately UNIQUE across the whole section: describeGuards proves a field is bound by locating its stored value with getByDisplayValue, which throws on more than one match. `organisation` and education's `institution` both read \"Northumbria University\" at first and made the guard ambiguous for reasons that had nothing to do with the binding under test. education.coursework and clubs are lists of OBJECTS -- {name, topics} and {name, activities_involved} -- which is what the editor has always written. An earlier draft of this fixture used bare strings, matching only what execute_modify appended, and that mismatch hid a crash: the chip control throws \"Objects are not valid as a React child\" on real data. A fixture that is easier than production is worse than no fixture.",
   "name": "Ada Lovelace",
   "preferred_name": "Ada",
   "current_role": "Final Year Student",
@@ -49,11 +49,25 @@
       "end_year": "2026",
       "status": "current",
       "coursework": [
-        "Compilers",
-        "Distributed Systems"
+        {
+          "name": "Compilers",
+          "topics": [
+            "parsing",
+            "codegen"
+          ]
+        },
+        {
+          "name": "Distributed Systems",
+          "topics": []
+        }
       ],
       "clubs": [
-        "Hackathon Society"
+        {
+          "name": "Hackathon Society",
+          "activities_involved": [
+            "mentoring"
+          ]
+        }
       ],
       "highlights": [
         "First class average"

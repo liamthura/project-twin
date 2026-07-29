@@ -666,6 +666,27 @@ def set_nested_value(data: dict, path: str, value, create_missing: bool = True):
         return True
     return False
 
+def _find_course(entries, name):
+    """Locate an object-shaped entry (coursework, clubs) by its `name`.
+
+    Tolerates the legacy bare-string shape both lists could hold: before wave 6
+    `execute_modify` appended strings while the editor wrote objects, so a real
+    record can contain either. persona_store._normalize coerces on read, but
+    this stays shape-tolerant so a write reaching an un-normalised blob still
+    finds its entry rather than silently duplicating it.
+    """
+    if not name:
+        return None
+    target = name.lower()
+    for entry in entries:
+        if isinstance(entry, dict):
+            if (entry.get("name") or "").lower() == target:
+                return entry
+        elif isinstance(entry, str) and entry.lower() == target:
+            return entry
+    return None
+
+
 def find_in_array(array: list, identifier: str, id_field: str = "name") -> tuple:
     """Find an item in array by identifier. Returns (index, item) or (-1, None)"""
     for i, item in enumerate(array):
@@ -2576,6 +2597,37 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return f"✅ Removed highlight"
             return f"❌ Highlight not found"
     
+    elif entity == "club":
+        profile = load_json("profile.json")
+        education = profile.get("education", [])
+        idx, edu = find_in_array(education, data.get("institution", ""), "institution")
+        if idx == -1:
+            return f"❌ Education at '{data.get('institution')}' not found"
+
+        clubs = edu.setdefault("clubs", [])
+        name = get_field(data, "name", "club", "society", "activity")
+        # Objects, like coursework: {"name": ..., "activities_involved": [...]}.
+        # Before wave 6 `clubs` had no entity and no branch at all -- the editor
+        # was its only writer, so no AI client could read into or out of it.
+        if action == "add":
+            if not name:
+                return "❌ Club requires 'name'"
+            if _find_course(clubs, name) is not None:
+                return f"ℹ️ '{name}' already in clubs"
+            clubs.append({
+                "name": name,
+                "activities_involved": list(data.get("activities_involved") or []),
+            })
+            save_json("profile.json", profile)
+            return f"✅ Added club: {name}"
+        elif action == "remove":
+            existing = _find_course(clubs, name)
+            if existing is not None:
+                clubs.remove(existing)
+                save_json("profile.json", profile)
+                return f"✅ Removed club: {name}"
+            return f"❌ Club not found"
+
     elif entity == "coursework":
         profile = load_json("profile.json")
         education = profile.get("education", [])
@@ -2585,18 +2637,25 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         
         coursework = edu.setdefault("coursework", [])
         course = get_field(data, "course", "coursework", "class", "subject")
-        
+
+        # A course is an OBJECT: {"name": ..., "topics": [...]}. This branch
+        # used to append the bare string, while the editor wrote and read
+        # objects -- so an AI-added course rendered as "Untitled Course" and
+        # could never be removed, because `course in coursework` compares a
+        # string against a dict and never matches. Legacy bare strings are
+        # coerced on read by persona_store._normalize.
         if action == "add":
             if not course:
                 return "❌ Coursework requires 'course' or 'coursework'"
-            if course in coursework:
+            if _find_course(coursework, course) is not None:
                 return f"ℹ️ '{course}' already in coursework"
-            coursework.append(course)
+            coursework.append({"name": course, "topics": list(data.get("topics") or [])})
             save_json("profile.json", profile)
             return f"✅ Added coursework: {course}"
         elif action == "remove":
-            if course in coursework:
-                coursework.remove(course)
+            existing = _find_course(coursework, course)
+            if existing is not None:
+                coursework.remove(existing)
                 save_json("profile.json", profile)
                 return f"✅ Removed coursework: {course}"
             return f"❌ Coursework not found"
@@ -2611,18 +2670,22 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         
         coursework = edu.setdefault("coursework", [])
         course = get_field(data, "course", "coursework", "topic", "subject")
-        
+
+        # Same object shape as `coursework` above, which this branch has always
+        # duplicated verbatim. Kept as an alias so existing clients keep
+        # working; see the wave 6 storage-keys reference for the dedupe.
         if action == "add":
             if not course:
                 return "❌ Coursework topic requires 'course' or 'topic'"
-            if course in coursework:
+            if _find_course(coursework, course) is not None:
                 return f"ℹ️ '{course}' already in coursework"
-            coursework.append(course)
+            coursework.append({"name": course, "topics": list(data.get("topics") or [])})
             save_json("profile.json", profile)
             return f"✅ Added coursework topic: {course}"
         elif action == "remove":
-            if course in coursework:
-                coursework.remove(course)
+            existing = _find_course(coursework, course)
+            if existing is not None:
+                coursework.remove(existing)
                 save_json("profile.json", profile)
                 return f"✅ Removed coursework topic: {course}"
             return f"❌ Coursework topic not found"

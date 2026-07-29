@@ -19,21 +19,38 @@ skips them wholesale).
 
 ## 1. Two corrections to what this project believed
 
-### 1.1 There is no two-level child list
+### 1.1 The two-level child list is real — and reading only the backend denied it
 
-The spec's wave table has said "singleton plus two lists plus two levels of
-child list" since wave 0, and wave 4's review made untested nesting depth a
-wave 6 entry criterion. The reading says otherwise.
+**An earlier draft of this document got this wrong, and the mistake is the most
+instructive thing in it.**
 
-`education.coursework` is a **bare string array** — `coursework.append(course)`
-at `server.py:2588`, appending the string itself. It is not a list of objects,
-so it has no second level. `coursework_topic` (`:2597`) is a **verbatim
-duplicate** of the `coursework` branch writing the same array through a
-different alias list; its own comment says so.
+`execute_modify`'s `coursework` branch appends the **bare string**
+(`coursework.append(course)`), so a reading of the backend alone concludes
+`education.coursework` is `string[]` with no second level. That is what the
+first draft concluded, and it contradicted the spec's wave table, which has
+said "two levels of child list" since wave 0.
 
-So every child in `profile` is `kind: "strings"`, one level deep:
-`work_experience.highlights`, `education.highlights`, `education.coursework`,
-`education.clubs`. Wave 6 carries **no untested nesting depth at all**.
+The wave table was right. `ProfileEditor.jsx` wrote and read **objects**:
+`{name, topics: []}` for coursework and `{name, activities_involved: []}` for
+clubs. So `education → coursework → topics` is two levels, and the UI has been
+the real author of that shape all along.
+
+**The disagreement between the two writers was itself a live bug** (§3.8). And
+because the first draft trusted only the backend, the migration bound both
+lists as chip controls — which throw *"Objects are not valid as a React child"*
+on real data. The fixture used bare strings, so every test passed while the
+actual stored shape was never exercised.
+
+**The rule this establishes: read both writers.** `execute_modify` is one
+author of a section's shape; the editor being replaced is the other, and where
+they disagree neither alone is the truth.
+
+| Child | Shape | Node |
+|---|---|---|
+| `work_experience.highlights` | `string[]` | `strings`, `item_control: "input"` |
+| `education.highlights` | `string[]` | `strings`, `item_control: "input"` |
+| `education.coursework` | `[{name, topics: []}]` | `list` + nested `topics` |
+| `education.clubs` | `[{name, activities_involved: []}]` | `list` + nested activities |
 
 ### 1.2 `profile` is not "entirely `kind: fields`"
 
@@ -48,8 +65,9 @@ Only the seven top-level scalars are. The rest is five lists.
   languages_spoken: [ {name, fluency} ],
   work_experience:  [ {role, company, type, period, highlights: [str]} ],
   education:        [ {institution, degree_level, field_of_study, start_year,
-                       end_year, status, coursework: [str], clubs: [str],
-                       highlights: [str]} ],
+                       end_year, status, highlights: [str],
+                       coursework: [ {name, topics: [str]} ],
+                       clubs:      [ {name, activities_involved: [str]} ]} ],
   contact: { emails: [ {address, purpose} ], links: [ {url, label} ] } }
 ```
 
@@ -163,18 +181,35 @@ Both append into the parent row's `highlights` string array
 (`:1541`, `:2559`). No object, no key. `work_highlight` accepts a `highlights`
 array or a single `highlight`; `education_highlight` takes only `highlight`.
 
-### 3.8 `coursework` / `coursework_topic` — child `strings`, duplicated
+### 3.8 `coursework` / `coursework_topic` — child `list` of objects
 
-Both append into the parent's `coursework` string array. `coursework_topic` is
-a verbatim copy differing only in its alias list (`topic` vs `class`) and its
-messages. §5 carries the deduplication.
+Both write into the parent's `coursework` list. Until wave 6 both appended a
+bare **string** while the editor wrote and read `{name, topics}` **objects**
+into that same list, so:
 
-### 3.9 `education.clubs` — child `strings`, **no MCP write path**
+- an AI-added course rendered as "Untitled Course" — the editor reads
+  `course.name`, which a string does not have; and
+- it could **never be removed**: `if course in coursework` compares a string
+  against a dict and never matches, so `remove` failed and a repeat `add`
+  duplicated it.
 
-Seeded by the `education` add and readable, but there is **no `club` entity and
-no branch**. Like `lifestyle.wellness.stress_triggers` (wave 5 §1.7), the UI is
-its only writer. The current editor binds it, so wave 6 inherits that rather
-than creating it.
+Wave 6 makes both branches write `{name, topics}`, matching the editor, and
+`persona_store._normalize` coerces legacy bare strings into that shape on read
+— lossless and idempotent: the string becomes the name and the nested list
+starts empty, which is exactly what the string carried. `server._find_course`
+stays shape-tolerant so a write reaching an un-normalised blob still finds its
+entry rather than duplicating it.
+
+`coursework_topic` remains a verbatim alias; §5 carries the deduplication.
+
+### 3.9 `education.clubs` — child `list` of objects, new entity in wave 6
+
+`[{name, activities_involved: []}]`, written by the editor. Before wave 6 there
+was **no `club` entity and no branch at all**, so no AI client could read into
+or out of it — the same asymmetry as `lifestyle.wellness.stress_triggers`
+(wave 5 §1.7), but here wave 6 closes it rather than inheriting it: the entity
+and its branch are added, and legacy bare strings are coerced alongside
+coursework.
 
 ---
 
@@ -200,6 +235,10 @@ rather than working around.
 
 Not wave 6 work unless explicitly scoped in:
 
+0. **`coursework`/`clubs` shape conflict (§3.8)** — **taken into wave 6**, not
+   deferred: the branches now write objects, `clubs` gains an entity, and
+   legacy strings are coerced on read. Listed first because it was a live,
+   data-visible defect rather than a contract one.
 1. **Seven phantom fields in `profile.entities`** (§3.2, 3.3, 3.5, 3.6):
    `language.proficiency`, `email.label`, `work_experience.location`,
    `work_experience.description`, `education.degree`, `education.field`,
