@@ -232,6 +232,11 @@
           },
           "description": "Storage keys rendered as a date picker. Values must be yyyy-mm-dd; anything else falls back to a text input so it is not discarded."
         },
+        "bool_fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Storage keys rendered as an on/off switch. For keys genuinely stored as JSON booleans -- preferences.response_format is five of them. A missing key reads as off, and the control always writes a real boolean, never the string \"true\"."
+        },
         "time_fields": {
           "type": "array",
           "items": {

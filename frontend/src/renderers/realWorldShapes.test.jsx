@@ -44,10 +44,33 @@ describe("a record shaped like production", () => {
       await user.type(within(uiNode("Tools")).getByRole("textbox"), "Git{Enter}");
 
       expect(latest().code_style.tools).toEqual(["Docker", "Git"]);
+      // `design`, `work_preferences` and `response_format` gained UI in wave 6;
+      // `coding` is folded into code_style.tools by _normalize and no longer
+      // reaches the renderer. All four must still survive an unrelated edit.
       expect(latest().design).toEqual(data.design);
       expect(latest().work_preferences).toEqual(data.work_preferences);
       expect(latest().response_format).toEqual(data.response_format);
       expect(latest().coding).toEqual(data.coding);
+    });
+
+
+    it("renders the sections wave 6 surfaced, and writes real booleans", async () => {
+      const data = {
+        design: { frontend_aesthetic: "Playful Editorial" },
+        work_preferences: { timezone: "GMT/BST (UK)" },
+        response_format: { prefer_code_blocks: true, include_explanations: false },
+      };
+      const { user, latest } = renderSection({ pack: preferencesPack, initial: data });
+
+      expect(screen.getByLabelText("Frontend aesthetic")).toHaveValue("Playful Editorial");
+      expect(screen.getByLabelText("Timezone")).toHaveValue("GMT/BST (UK)");
+
+      await user.click(
+        within(uiNode("Response Format")).getByRole("switch", { name: "include explanations" })
+      );
+
+      expect(latest().response_format.include_explanations).toBe(true);
+      expect(latest().response_format.prefer_code_blocks).toBe(true);
     });
 
     it("keeps a nested unbound key beside a bound sibling", async () => {

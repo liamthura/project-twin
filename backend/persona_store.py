@@ -50,6 +50,35 @@ def _normalize(file_type: str, data: dict) -> dict:
     """
     # Normalize legacy profile language entries (strings -> objects with fluency)
     if file_type == "profile":
+        # Phase 6 (consolidation): `contact.github` and `contact.linkedin` are
+        # bare handles from an older shape, duplicating entries that now live in
+        # `contact.links` as {label, url}. Nothing has rendered them since the
+        # links list arrived, and no ui node binds them.
+        #
+        # Folded rather than popped outright: a record whose handle has NO
+        # matching link would otherwise lose it silently. The link is added only
+        # when no existing entry already points at that profile -- compared on
+        # the handle appearing in the url, so a link stored with or without
+        # https:// or a trailing slash still counts as present.
+        contact = data.get("contact")
+        if isinstance(contact, dict):
+            links = contact.setdefault("links", [])
+            if isinstance(links, list):
+                for key, label, base in (("github", "Github", "https://github.com/"),
+                                         ("linkedin", "LinkedIn", "https://linkedin.com/in/")):
+                    handle = contact.get(key)
+                    if not isinstance(handle, str) or not handle.strip():
+                        contact.pop(key, None)
+                        continue
+                    handle = handle.strip()
+                    already = any(
+                        isinstance(l, dict) and handle.lower() in (l.get("url") or "").lower()
+                        for l in links
+                    )
+                    if not already:
+                        links.append({"url": f"{base}{handle}", "label": label})
+                    contact.pop(key, None)
+
         languages = data.get("languages_spoken", [])
         if languages and isinstance(languages[0], str):
             data["languages_spoken"] = [
@@ -256,6 +285,22 @@ def _normalize(file_type: str, data: dict) -> dict:
             # (stance-tagged); strip it so old backups/imports can't
             # resurrect an invisible orphan key.
             data.pop("dislikes", None)
+            # Phase 6 (consolidation): `coding` held a single `editor` key that
+            # duplicates an entry in `code_style.tools`. Folded into that list
+            # when absent, so a record whose editor is not already listed keeps
+            # it, then dropped.
+            coding = data.get("coding")
+            if isinstance(coding, dict):
+                editor = coding.get("editor")
+                if isinstance(editor, str) and editor.strip():
+                    tools = data.setdefault("code_style", {}).setdefault("tools", [])
+                    if isinstance(tools, list):
+                        # Compared without spaces or case so "VSCode" recognises
+                        # an existing "VS Code" rather than adding a near-twin.
+                        squashed = {t.replace(" ", "").lower() for t in tools if isinstance(t, str)}
+                        if editor.replace(" ", "").lower() not in squashed:
+                            tools.append(editor.strip())
+                data.pop("coding", None)
             # Migrate old flat communication structure to new nested structure
             if "communication" in data:
                 comm = data["communication"]

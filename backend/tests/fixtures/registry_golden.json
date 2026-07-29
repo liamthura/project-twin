@@ -416,6 +416,47 @@
           "detail_level"
         ],
         "identifier": "mood"
+      },
+      "design": {
+        "actions": [
+          "update"
+        ],
+        "required": [],
+        "optional": [
+          "frontend_aesthetic",
+          "frontend_aesthetic_tokens",
+          "frontend_hero_composition"
+        ],
+        "identifier": null,
+        "description": "Default design language for frontends you build. Long prose, read by AI clients when generating UI."
+      },
+      "work_preference": {
+        "actions": [
+          "update"
+        ],
+        "required": [],
+        "optional": [
+          "timezone",
+          "best_productivity_time",
+          "project_approach"
+        ],
+        "identifier": null,
+        "description": "How and when you work best."
+      },
+      "response_format": {
+        "actions": [
+          "update"
+        ],
+        "required": [],
+        "optional": [
+          "prefer_code_blocks",
+          "prefer_bullet_points_for_lists",
+          "include_explanations",
+          "show_file_structure",
+          "provide_next_steps"
+        ],
+        "identifier": null,
+        "description": "Boolean toggles for how an AI should shape its answers."
       }
     },
     "projects": {

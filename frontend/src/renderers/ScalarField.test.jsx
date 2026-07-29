@@ -258,4 +258,37 @@ describe("ScalarField", () => {
     });
   });
 
+
+  describe("bool_fields", () => {
+    const boolMeta = {
+      bool_fields: ["prefer_code_blocks"],
+      long_text: new Set(), array_fields: [], date_fields: [], time_fields: [], optional: [],
+    };
+
+    it("renders a switch, not a text input", () => {
+      render(<ScalarField field="prefer_code_blocks" value={true} meta={boolMeta} onChange={() => {}} />);
+      expect(screen.getByRole("switch")).toBeChecked();
+    });
+
+    it("reads a missing key as off rather than inventing a third state", () => {
+      render(<ScalarField field="prefer_code_blocks" value={undefined} meta={boolMeta} onChange={() => {}} />);
+      expect(screen.getByRole("switch")).not.toBeChecked();
+    });
+
+    it("writes a real boolean, never a string", () => {
+      const onChange = vi.fn();
+      render(<ScalarField field="prefer_code_blocks" value={false} meta={boolMeta} onChange={onChange} />);
+
+      fireEvent.click(screen.getByRole("switch"));
+
+      expect(onChange).toHaveBeenCalledWith(true);
+      expect(typeof onChange.mock.calls[0][0]).toBe("boolean");
+    });
+
+    it("leaves a field outside bool_fields as a text input", () => {
+      render(<ScalarField field="other" value="" meta={boolMeta} onChange={() => {}} />);
+      expect(screen.getByRole("textbox")).toBeInTheDocument();
+    });
+  });
+
 });

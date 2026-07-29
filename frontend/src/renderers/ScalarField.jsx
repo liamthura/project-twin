@@ -7,6 +7,7 @@
 // where valid_values came from.
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { ArrayInput } from "@/components/ArrayInput";
 import { EnumControl } from "@/components/controls";
 
@@ -76,6 +77,20 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
         items={value || []}
         onChange={onChange}
         placeholder={hint ?? `Add ${field}…`}
+      />
+    );
+  }
+  if ((meta.bool_fields || []).includes(field)) {
+    // A real JSON boolean, not the string "true". `preferences.response_format`
+    // stores five of these. A missing key reads as off rather than as a third
+    // state -- there is no control for "unset", and inventing one would write a
+    // key the user never touched.
+    return (
+      <Switch
+        id={id}
+        checked={value === true}
+        onCheckedChange={(next) => onChange(next)}
+        aria-label={field.replace(/_/g, " ")}
       />
     );
   }

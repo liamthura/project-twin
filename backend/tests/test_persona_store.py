@@ -388,3 +388,107 @@ def test_flat_communication_migrates_to_the_nested_shape(as_user):
         "locale": "British English",
     }
     assert comm["mood_overrides"] == []
+
+
+# ---------------------------------------------------------------------------
+# Wave 6 duplicate cleanup.
+#
+# `contact.github`/`contact.linkedin` and `preferences.coding` held values that
+# already existed in `contact.links` and `code_style.tools`. Each is FOLDED into
+# its canonical home before being dropped, so a record where the duplicate is
+# NOT actually duplicated keeps its value.
+# ---------------------------------------------------------------------------
+
+
+def test_github_handle_is_dropped_when_the_link_already_exists(as_user):
+    store.save("profile", {"contact": {
+        "links": [{"url": "https://github.com/someone", "label": "Github"}],
+        "github": "someone",
+    }})
+    contact = store.load("profile")["contact"]
+    assert "github" not in contact
+    assert [l["url"] for l in contact["links"]] == ["https://github.com/someone"]
+
+
+def test_github_handle_becomes_a_link_when_none_exists(as_user):
+    """The reason this is a fold and not a pop: on a record with no matching
+    link, a bare pop would silently delete the only copy."""
+    store.save("profile", {"contact": {"links": [], "github": "someone"}})
+    contact = store.load("profile")["contact"]
+    assert "github" not in contact
+    assert contact["links"] == [{"url": "https://github.com/someone", "label": "Github"}]
+
+
+def test_linkedin_handle_folds_the_same_way(as_user):
+    store.save("profile", {"contact": {"links": [], "linkedin": "someone"}})
+    [link] = store.load("profile")["contact"]["links"]
+    assert link == {"url": "https://linkedin.com/in/someone", "label": "LinkedIn"}
+
+
+def test_a_handle_matches_a_link_stored_in_another_form(as_user):
+    """A link saved without the scheme, or with a trailing slash, is still the
+    same profile -- matching on the handle rather than the exact url stops a
+    near-duplicate being appended."""
+    store.save("profile", {"contact": {
+        "links": [{"url": "github.com/someone/", "label": "My code"}],
+        "github": "someone",
+    }})
+    links = store.load("profile")["contact"]["links"]
+    assert len(links) == 1
+    assert links[0]["label"] == "My code"
+
+
+def test_an_empty_handle_is_dropped_without_adding_a_link(as_user):
+    store.save("profile", {"contact": {"links": [], "github": "   "}})
+    contact = store.load("profile")["contact"]
+    assert "github" not in contact
+    assert contact["links"] == []
+
+
+def test_the_handle_fold_is_idempotent(as_user):
+    store.save("profile", {"contact": {"links": [], "github": "someone"}})
+    once = store.load("profile")
+    twice = store._normalize("profile", copy.deepcopy(once))
+    assert twice["contact"]["links"] == once["contact"]["links"]
+
+
+def test_coding_editor_is_dropped_when_tools_already_lists_it(as_user):
+    """Compared without spaces or case, so "VSCode" recognises "VS Code"."""
+    store.save("preferences", {"coding": {"editor": "VSCode"},
+                               "code_style": {"tools": ["VS Code", "Docker"]}})
+    prefs = store.load("preferences")
+    assert "coding" not in prefs
+    assert prefs["code_style"]["tools"] == ["VS Code", "Docker"]
+
+
+def test_coding_editor_joins_tools_when_absent(as_user):
+    store.save("preferences", {"coding": {"editor": "Zed"},
+                               "code_style": {"tools": ["Docker"]}})
+    prefs = store.load("preferences")
+    assert "coding" not in prefs
+    assert prefs["code_style"]["tools"] == ["Docker", "Zed"]
+
+
+def test_coding_editor_folds_when_there_is_no_tools_list_at_all(as_user):
+    store.save("preferences", {"coding": {"editor": "Zed"}})
+    prefs = store.load("preferences")
+    assert "coding" not in prefs
+    assert prefs["code_style"]["tools"] == ["Zed"]
+
+
+def test_the_editor_fold_is_idempotent(as_user):
+    store.save("preferences", {"coding": {"editor": "Zed"}, "code_style": {"tools": []}})
+    once = store.load("preferences")
+    twice = store._normalize("preferences", copy.deepcopy(once))
+    assert twice["code_style"]["tools"] == once["code_style"]["tools"]
+
+
+def test_lifestyle_media_is_left_alone(as_user):
+    """Deliberately NOT removed. It looks like a duplicate of the `media`
+    section pack, but that pack stores items[] of {title, kind, status} -- there
+    is nowhere for `favourite_genres` or a bare game title to go, so dropping it
+    would destroy data rather than de-duplicate it."""
+    store.save("lifestyle", {"media": {"games": ["Minecraft"],
+                                       "favourite_genres": ["sci-fi"]}})
+    assert store.load("lifestyle")["media"] == {"games": ["Minecraft"],
+                                                "favourite_genres": ["sci-fi"]}
