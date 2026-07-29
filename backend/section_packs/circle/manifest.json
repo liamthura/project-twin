@@ -42,12 +42,23 @@
     "sections": [
       {
         "kind": "list",
-        "path": ["connections"],
+        "path": [
+          "connections"
+        ],
         "entity": "connection",
         "title_field": "name",
-        "detail_fields": ["name", "relationship", "traits", "notes"],
-        "array_fields": ["traits"],
-        "long_text": ["notes"],
+        "detail_fields": [
+          "name",
+          "relationship",
+          "traits",
+          "notes"
+        ],
+        "array_fields": [
+          "traits"
+        ],
+        "long_text": [
+          "notes"
+        ],
         "searchable": true,
         "info": {
           "overview": "Track the important people in your life and your relationships with them. This helps AI understand your social context and tailor suggestions accordingly.",
@@ -57,6 +68,12 @@
             "Traits: Key characteristics or tags that describe them - personality, interests, expertise, etc.",
             "Notes: Context about your relationship, shared experiences, important details to remember."
           ]
+        },
+        "field_placeholders": {
+          "name": "Person's name",
+          "notes": "Context about your relationship, shared experiences, important details...",
+          "relationship": "e.g. Friend, Colleague, Mentor",
+          "traits": "Add trait..."
         }
       }
     ]

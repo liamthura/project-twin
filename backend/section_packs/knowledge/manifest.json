@@ -198,9 +198,18 @@
             ],
             "fields_outside_entity": [
               "name"
-            ]
+            ],
+            "field_placeholders": {
+              "name": "Reference name",
+              "notes": "Notes",
+              "url": "URL"
+            }
           }
-        ]
+        ],
+        "field_placeholders": {
+          "name": "e.g. Photography, Marketing, Python",
+          "notes": "Add context, projects, or experience..."
+        }
       },
       {
         "kind": "list",
@@ -264,9 +273,19 @@
             ],
             "fields_outside_entity": [
               "name"
-            ]
+            ],
+            "field_placeholders": {
+              "name": "Reference name",
+              "notes": "Notes",
+              "url": "URL"
+            }
           }
-        ]
+        ],
+        "field_placeholders": {
+          "notes": "Your notes, code snippets, reminders...",
+          "tags": "Add tag...",
+          "title": "e.g. Git commands, Recipe ideas"
+        }
       }
     ]
   }

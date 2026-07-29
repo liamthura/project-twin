@@ -77,11 +77,10 @@
         "remove"
       ],
       "required": [
-        "address"
+        "address",
+        "purpose"
       ],
-      "optional": [
-        "label"
-      ],
+      "optional": [],
       "identifier": "address"
     },
     "link": {
@@ -106,10 +105,10 @@
         "name"
       ],
       "optional": [
-        "proficiency"
+        "fluency"
       ],
       "valid_values": {
-        "proficiency": [
+        "fluency": [
           "native",
           "fluent",
           "conversational",
@@ -133,6 +132,7 @@
         "type",
         "location",
         "description",
+        "skills",
         "highlights"
       ],
       "identifier": "company"
@@ -160,9 +160,11 @@
         "institution"
       ],
       "optional": [
-        "degree",
-        "field",
-        "period",
+        "degree_level",
+        "field_of_study",
+        "start_year",
+        "end_year",
+        "status",
         "highlights",
         "coursework",
         "clubs"
@@ -191,9 +193,12 @@
         "institution",
         "course"
       ],
-      "optional": [],
+      "optional": [
+        "topics"
+      ],
       "identifier": "course",
-      "parent": "institution"
+      "parent": "institution",
+      "description": "A module or class. Stored as {name, topics}; `course` is the input spelling for `name`."
     },
     "coursework_topic": {
       "actions": [
@@ -204,9 +209,12 @@
         "institution",
         "course"
       ],
-      "optional": [],
+      "optional": [
+        "topics"
+      ],
       "identifier": "course",
-      "parent": "institution"
+      "parent": "institution",
+      "description": "Alias for `coursework` -- same list, same object shape."
     },
     "basic_info": {
       "actions": [
@@ -224,6 +232,357 @@
       ],
       "identifier": null,
       "description": "Update-only singleton for top-level profile fields"
+    },
+    "club": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "institution",
+        "name"
+      ],
+      "optional": [
+        "activities_involved"
+      ],
+      "identifier": "name",
+      "parent": "institution",
+      "description": "A society or extracurricular. Stored as {name, activities_involved}."
+    },
+    "work_skill": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "company",
+        "skill"
+      ],
+      "optional": [
+        "skills"
+      ],
+      "identifier": "skill",
+      "parent": "company",
+      "description": "A skill or technology used in a role. Bare strings on the parent row, like work_highlight."
     }
+  },
+  "ui": {
+    "sections": [
+      {
+        "kind": "fields",
+        "path": [],
+        "entity": "basic_info",
+        "title": "Personal Information",
+        "description": "Your basic identity and current status",
+        "fields": [
+          "name",
+          "preferred_name",
+          "current_role",
+          "organisation",
+          "location",
+          "nationality",
+          "bio"
+        ],
+        "long_text": [
+          "bio"
+        ],
+        "$comment": "path: [] addresses the section ROOT -- these seven keys are stored as top-level scalars on profile.json (server.py:1651). Safe because FieldsRenderer spreads the stored object on every write, so a root write updates keys rather than replacing the section. The one profile entity whose vocabulary was already correct.",
+        "info": {
+          "overview": "This section captures who you are at a glance. It helps AI assistants address you correctly and understand your current context (student, professional, location, etc.).",
+          "tips": [
+            "Name: Your full legal name as it appears on official documents.",
+            "Preferred Name: The name you'd like AI to call you (nickname, first name, etc.).",
+            "Current Role: Your primary occupation or status, e.g. 'Final Year Student', 'Software Engineer', 'Freelance Designer'.",
+            "Organisation: Your school, university, or employer.",
+            "Location: City and country—helps with locale-specific suggestions (holidays, time zones, spelling conventions).",
+            "Nationality: Useful for cultural context and language defaults.",
+            "Bio: A 2–3 sentence summary of who you are, your interests, and what you're working on. Think of it as your elevator pitch."
+          ]
+        },
+        "field_placeholders": {
+          "bio": "A brief description of who you are...",
+          "current_role": "e.g. Designer, Teacher, Student",
+          "location": "City, Country",
+          "name": "Your name",
+          "nationality": "Your nationality",
+          "organisation": "Company, school, or organisation",
+          "preferred_name": "What you'd like to be called"
+        }
+      },
+      {
+        "kind": "list",
+        "path": [
+          "education"
+        ],
+        "entity": "education",
+        "title": "Education",
+        "description": "Your educational background and qualifications",
+        "title_field": "institution",
+        "searchable": true,
+        "badges": [
+          "status"
+        ],
+        "detail_fields": [
+          "institution",
+          "degree_level",
+          "field_of_study",
+          "start_year",
+          "end_year",
+          "status"
+        ],
+        "count_badges": [
+          "coursework",
+          "highlights"
+        ],
+        "enum": {
+          "status": [
+            "current",
+            "completed",
+            "incomplete"
+          ]
+        },
+        "field_defaults": {
+          "status": "current"
+        },
+        "$comment": "Binds the STORED keys. The vocabulary used to declare `degree`, `field` and `period`, none of which any writer produced -- `period` in particular maps to TWO stored keys (start_year, end_year), so no node could ever have bound it. Corrected in wave 6; see the wave 6 storage-keys reference. `clubs` has no MCP write path at all (no entity, no branch) -- the UI is its only writer, as it already was.",
+        "info": {
+          "overview": "Document your educational journey—schools, degrees, and achievements. This helps AI understand your academic background and tailor advice accordingly.",
+          "tips": [
+            "Add one entry per institution or degree (e.g., separate entries for high school and university).",
+            "Institution Name: Full official name of the school or university.",
+            "Degree Level: e.g., 'High School Diploma', 'BSc', 'MSc', 'PhD'.",
+            "Field of Study: Your major, concentration, or programme name.",
+            "Status: Whether you're currently enrolled, have completed, or left incomplete.",
+            "Years: Start and end (or expected end) years.",
+            "Coursework: Key modules or classes you've taken.",
+            "Clubs & Societies: Extracurricular involvement.",
+            "Highlights: Notable achievements like awards, high grades, leadership roles, or recognitions."
+          ]
+        },
+        "children": [
+          {
+            "kind": "strings",
+            "path": [
+              "highlights"
+            ],
+            "title": "Highlights",
+            "item_control": "input",
+            "placeholder": "e.g. Graduated with honours, Led the debate team",
+            "$comment": "Bare strings on both writers (server.py:2559 appends the string itself). item_control:\"input\" because these are sentence-like -- the retired editor gave each its own editable row, and chips would mean retyping a whole achievement to fix a typo."
+          },
+          {
+            "kind": "list",
+            "path": [
+              "coursework"
+            ],
+            "entity": "coursework",
+            "title": "Coursework / Modules",
+            "title_field": "name",
+            "detail_fields": [
+              "name",
+              "topics"
+            ],
+            "array_fields": [
+              "topics"
+            ],
+            "count_badges": [
+              "topics"
+            ],
+            "fields_outside_entity": [
+              "name"
+            ],
+            "$comment": "OBJECTS: {name, topics}. The entity's `course` is the INPUT spelling; `name` is what is stored. Until wave 6 execute_modify appended a bare string here while the editor wrote objects, so an AI-added course rendered blank and could never be removed -- `course in coursework` compares a string to a dict. persona_store._normalize coerces legacy strings.",
+            "field_placeholders": {
+              "name": "e.g. Macroeconomics, Data Structures",
+              "topics": "Key topics covered..."
+            }
+          },
+          {
+            "kind": "list",
+            "path": [
+              "clubs"
+            ],
+            "entity": "club",
+            "title": "Clubs & Societies",
+            "title_field": "name",
+            "detail_fields": [
+              "name",
+              "activities_involved"
+            ],
+            "array_fields": [
+              "activities_involved"
+            ],
+            "count_badges": [
+              "activities_involved"
+            ],
+            "$comment": "OBJECTS: {name, activities_involved}. Before wave 6 `clubs` had no entity and no execute_modify branch at all -- the editor was its only writer, so no AI client could read into or out of it. Both added in wave 6.",
+            "field_placeholders": {
+              "activities_involved": "e.g. Committee member, Event organiser",
+              "name": "e.g. Debate Society, Football Club"
+            }
+          }
+        ],
+        "field_placeholders": {
+          "degree_level": "e.g. High School, Bachelor's, Master's, PhD",
+          "end_year": "e.g. 2024 or Expected 2026",
+          "field_of_study": "e.g. Computer Science, Economics, Design",
+          "institution": "School, college, or university",
+          "start_year": "e.g. 2020"
+        }
+      },
+      {
+        "kind": "list",
+        "path": [
+          "work_experience"
+        ],
+        "entity": "work_experience",
+        "title": "Work Experience",
+        "description": "Your professional experience",
+        "title_field": "company",
+        "searchable": true,
+        "badges": [
+          "type"
+        ],
+        "detail_fields": [
+          "company",
+          "role",
+          "type",
+          "period",
+          "location",
+          "description"
+        ],
+        "count_badges": [
+          "skills",
+          "highlights"
+        ],
+        "long_text": [
+          "description"
+        ],
+        "$comment": "`location` and `description` were declared here and written by NOTHING before wave 6 -- not execute_modify, not the editor -- so every value an MCP client sent under them was discarded. Made real in server.py rather than dropped. `period` IS a stored key on this entity, unlike on `education` where the same name was a phantom.",
+        "info": {
+          "overview": "List your professional experiences—jobs, internships, placements, and volunteer work. This helps AI understand your skills and career trajectory.",
+          "tips": [
+            "Add one entry per role. If you held multiple roles at the same company, consider separate entries.",
+            "Role: Your job title or position.",
+            "Company: The organisation you worked for.",
+            "Type: e.g., 'Full-time', 'Part-time', 'Internship', 'Placement', 'Volunteer', 'Freelance'.",
+            "Period: Date range in a readable format, e.g., 'Jan 2023 – Jun 2024' or 'Summer 2022'.",
+            "Highlights: 3–6 bullet points describing what you did and achieved. Focus on outcomes and impact."
+          ]
+        },
+        "children": [
+          {
+            "kind": "strings",
+            "path": [
+              "skills"
+            ],
+            "title": "Skills",
+            "placeholder": "e.g. Project management, Python, Public speaking",
+            "$comment": "Bare strings on the parent row, same shape as `highlights` (server.py work_skill branch). Left as CHIPS rather than item_control:\"input\": these are short, word-like values you add and drop but never revise, and chips show many at a glance -- the opposite of a highlight, which is a sentence where a typo means retyping the lot."
+          },
+          {
+            "kind": "strings",
+            "path": [
+              "highlights"
+            ],
+            "title": "Highlights",
+            "item_control": "input",
+            "placeholder": "e.g. Led a team of five, Cut response time by 40%",
+            "$comment": "Bare strings on both writers (server.py:1541). item_control:\"input\" matches the retired editor, which gave each highlight its own editable row -- see the education node."
+          }
+        ],
+        "field_placeholders": {
+          "company": "Company or organisation",
+          "description": "What the role involved...",
+          "location": "e.g. Remote, or a city",
+          "period": "e.g. Jan 2022 - Jun 2023",
+          "role": "e.g. Analyst, Designer, Engineer",
+          "type": "e.g. Full-time, Internship, Freelance"
+        }
+      },
+      {
+        "kind": "group",
+        "title": "Contact & Links",
+        "description": "How to reach you and your online presence",
+        "info": {
+          "overview": "Provide ways to reach you and links to your online profiles. AI can use this to reference your portfolio or suggest networking opportunities.",
+          "tips": [
+            "Emails: Add all relevant email addresses and tag their purpose (Primary, Work, School, etc.).",
+            "Links: Your portfolio, GitHub, LinkedIn or personal site — label each one."
+          ]
+        },
+        "sections": [
+          {
+            "kind": "list",
+            "path": [
+              "contact",
+              "emails"
+            ],
+            "entity": "email",
+            "title": "Emails",
+            "title_field": "address",
+            "badges": [
+              "purpose"
+            ],
+            "detail_fields": [
+              "address",
+              "purpose"
+            ],
+            "$comment": "Stores `purpose`. The vocabulary declared `label`, which nothing wrote, and omitted `purpose` -- which the add branch REQUIRES (server.py:1418), so no MCP client could add an email. Both corrected in wave 6.",
+            "field_placeholders": {
+              "address": "you@example.com",
+              "purpose": "e.g. primary, work, personal"
+            }
+          },
+          {
+            "kind": "list",
+            "path": [
+              "contact",
+              "links"
+            ],
+            "entity": "link",
+            "title": "Links",
+            "title_field": "label",
+            "detail_fields": [
+              "label",
+              "url"
+            ],
+            "$comment": "No `update` action on this entity (server.py:1444-1465) -- an MCP client edits a link by removing and re-adding it. The UI edits in place, which is a superset and needs no declaration.",
+            "field_placeholders": {
+              "label": "e.g. Portfolio, LinkedIn",
+              "url": "https://example.com"
+            }
+          }
+        ]
+      },
+      {
+        "kind": "list",
+        "path": [
+          "languages_spoken"
+        ],
+        "entity": "language",
+        "title": "Languages",
+        "description": "Languages you speak and your fluency level",
+        "title_field": "name",
+        "badges": [
+          "fluency"
+        ],
+        "detail_fields": [
+          "name",
+          "fluency"
+        ],
+        "$comment": "Stores `fluency`. The vocabulary declared `proficiency`, the third member of get_field(data, \"fluency\", \"level\", \"proficiency\") -- an input alias that is never persisted. ProfileEditor.jsx documented the divergence in a comment and wrote the correct key; the vocabulary was corrected in wave 6.",
+        "info": {
+          "overview": "Languages you speak and your fluency level. This helps AI communicate with you appropriately and understand your linguistic capabilities.",
+          "tips": [
+            "Add one entry per language.",
+            "Fluency: native, fluent, conversational or basic."
+          ]
+        },
+        "field_placeholders": {
+          "name": "e.g. English, Spanish"
+        }
+      }
+    ]
   }
 }

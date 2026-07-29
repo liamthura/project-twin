@@ -245,9 +245,19 @@
             "fields_outside_entity": [
               "name"
             ],
-            "$comment": "Stores `name`. The entity declares `ref_name` as its identifier, which is an MCP input alias only -- server.py:2133 writes {\"name\": ref_name or \"\"}."
+            "$comment": "Stores `name`. The entity declares `ref_name` as its identifier, which is an MCP input alias only -- server.py:2133 writes {\"name\": ref_name or \"\"}.",
+            "field_placeholders": {
+              "name": "Reference name",
+              "notes": "Notes about this reference (optional)...",
+              "url": "URL (optional)"
+            }
           }
-        ]
+        ],
+        "field_placeholders": {
+          "name": "Hobby name",
+          "notes": "Additional notes about this hobby...",
+          "specifics": "Add specifics..."
+        }
       },
       {
         "kind": "list",
@@ -274,6 +284,10 @@
             "Curiosity: something you want to explore or learn more about but haven't dived into yet — quantum computing, fermentation, urban planning, linguistics.",
             "No pressure on curiosities—these can be fleeting interests or serious research areas."
           ]
+        },
+        "field_placeholders": {
+          "name": "Interest name",
+          "notes": "e.g. Reading Substacks, Photography"
         }
       },
       {

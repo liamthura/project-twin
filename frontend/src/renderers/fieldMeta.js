@@ -27,6 +27,11 @@ export function buildFieldMeta(node, entity) {
     // are not, so a name heuristic would turn free text into a lossy picker.
     date_fields: node.date_fields ?? [],
     time_fields: node.time_fields ?? [],
+    bool_fields: node.bool_fields ?? [],
+    // Per-field placeholder text. Node-only, with no entity fallback: a
+    // placeholder is a presentation choice about one binding, not part of the
+    // tool contract -- the same field on two nodes can want different hints.
+    field_placeholders: node.field_placeholders ?? {},
   };
 }
 

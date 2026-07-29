@@ -74,7 +74,11 @@ def test_resolve_scope_fields_full_is_all():
 
 def test_resolve_scope_fields_preserves_legacy_key_order():
     expected = {
-        "minimal": ["preferences", "profile", "goals", "projects"],
+        # `aesthetics` joined minimal in wave 6 and, like media/aesthetics on
+        # "personal" below, lands after the legacy tuple. It contributes only
+        # the ONE entry marked `primary` -- see the aesthetics hook in
+        # get_scoped_context -- so minimal stays small.
+        "minimal": ["preferences", "profile", "goals", "projects", "aesthetics"],
         "professional": ["preferences", "profile", "goals", "knowledge", "projects"],
         # media/aesthetics contribute to "personal" too but post-date the
         # legacy _CONTEXT_FILE_ORDER tuple, so they land after it (in
@@ -93,3 +97,49 @@ def test_token_estimate_reflects_returned_payload(as_user):
     est = json.loads(raw)["token_estimate"]
     actual = len(raw) // 4
     assert abs(est - actual) <= max(10, int(actual * 0.10)), (est, actual)
+
+
+# ---------------------------------------------------------------------------
+# The aesthetics hook: a user's design language reaches an AI client at
+# conversation start, without the whole styles list riding along.
+# ---------------------------------------------------------------------------
+
+
+def _styles(*entries):
+    import settings_store
+    settings_store.set_enabled_optins(["aesthetics"])
+    from persona_store import save
+    save("aesthetics", {"styles": list(entries)})
+
+
+def test_minimal_carries_only_the_primary_style(as_user):
+    _styles(
+        {"name": "Playful Editorial", "notes": "the governing one", "primary": True},
+        {"name": "Brutalist", "notes": "just liked"},
+    )
+    styles = server.get_scoped_context("minimal")["context"]["aesthetics"]["styles"]
+    assert [s["name"] for s in styles] == ["Playful Editorial"]
+    assert styles[0]["notes"] == "the governing one"
+
+
+def test_minimal_omits_aesthetics_entirely_when_nothing_is_primary(as_user):
+    """Absent is a truthful answer to "what is your design language". Picking
+    an arbitrary first entry would be a guess."""
+    _styles({"name": "Brutalist", "notes": "just liked"})
+    assert "aesthetics" not in server.get_scoped_context("minimal")["context"]
+
+
+def test_a_full_aesthetics_scope_still_returns_every_style(as_user):
+    _styles(
+        {"name": "Playful Editorial", "primary": True},
+        {"name": "Brutalist"},
+    )
+    for scope in ("aesthetics", "personal", "full"):
+        styles = server.get_scoped_context(scope)["context"]["aesthetics"]["styles"]
+        assert len(styles) == 2, f"{scope} should not be reduced"
+
+
+def test_a_disabled_aesthetics_section_contributes_nothing_to_minimal(as_user):
+    import settings_store
+    settings_store.set_enabled_optins([])
+    assert "aesthetics" not in server.get_scoped_context("minimal")["context"]

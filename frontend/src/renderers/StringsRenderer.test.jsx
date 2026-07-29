@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -76,6 +77,76 @@ describe("StringsRenderer", () => {
     // item, so the empty state gets its own assertion in every list renderer.
     render(<StringsRenderer node={node} items={[]} onItems={() => {}} />);
     expect(screen.getByPlaceholderText(node.placeholder)).toBeEnabled();
+  });
+
+
+  describe('item_control: "input"', () => {
+    // Sentence-like values. The retired ProfileEditor gave each highlight its
+    // own editable row; chips would mean deleting and retyping a whole
+    // achievement to fix one word.
+    const rows = { ...node, title: "Highlights", item_control: "input" };
+
+    it("renders one editable input per stored string", () => {
+      render(<StringsRenderer node={rows} items={["Led the migration", "Halved latency"]} onItems={() => {}} />);
+      expect(screen.getByDisplayValue("Led the migration")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Halved latency")).toBeInTheDocument();
+    });
+
+    it("edits one string in place without disturbing its siblings", async () => {
+      const onItems = vi.fn();
+      render(<StringsRenderer node={rows} items={["one", "two"]} onItems={onItems} />);
+
+      await userEvent.type(screen.getByDisplayValue("two"), "!");
+
+      expect(onItems).toHaveBeenCalledWith(["one", "two!"]);
+    });
+
+    it("does not mutate the array it was handed", async () => {
+      const items = ["one"];
+      render(<StringsRenderer node={rows} items={items} onItems={vi.fn()} />);
+      await userEvent.type(screen.getByDisplayValue("one"), "!");
+      expect(items).toEqual(["one"]);
+    });
+
+    it("removes the row the user pointed at", async () => {
+      const onItems = vi.fn();
+      render(<StringsRenderer node={rows} items={["a", "b", "c"]} onItems={onItems} />);
+
+      await userEvent.click(screen.getByRole("button", { name: "Remove highlight 2" }));
+
+      expect(onItems).toHaveBeenCalledWith(["a", "c"]);
+    });
+
+    it("appends an empty row to type into", async () => {
+      const onItems = vi.fn();
+      render(<StringsRenderer node={rows} items={["a"]} onItems={onItems} />);
+
+      await userEvent.click(screen.getByRole("button", { name: /Add highlight/i }));
+
+      expect(onItems).toHaveBeenCalledWith(["a", ""]);
+    });
+
+    it("keeps focus while typing -- rows are keyed by index, not by value", async () => {
+      // Keying on the value would remount the input on every keystroke, since
+      // the value IS what is being typed.
+      function Harness() {
+        const [items, setItems] = useState(["a"]);
+        return <StringsRenderer node={rows} items={items} onItems={setItems} />;
+      }
+      render(<Harness />);
+
+      await userEvent.type(screen.getByDisplayValue("a"), "bc");
+
+      expect(screen.getByDisplayValue("abc")).toBeInTheDocument();
+    });
+
+    it("renders a non-string entry as text rather than throwing", () => {
+      // The chip control throws "Objects are not valid as a React child" on a
+      // stray object; a row must degrade instead.
+      expect(() =>
+        render(<StringsRenderer node={rows} items={[{ name: "oops" }]} onItems={() => {}} />)
+      ).not.toThrow();
+    });
   });
 
   it("treats a missing stored value as empty rather than throwing", () => {

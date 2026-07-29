@@ -666,6 +666,27 @@ def set_nested_value(data: dict, path: str, value, create_missing: bool = True):
         return True
     return False
 
+def _find_course(entries, name):
+    """Locate an object-shaped entry (coursework, clubs) by its `name`.
+
+    Tolerates the legacy bare-string shape both lists could hold: before wave 6
+    `execute_modify` appended strings while the editor wrote objects, so a real
+    record can contain either. persona_store._normalize coerces on read, but
+    this stays shape-tolerant so a write reaching an un-normalised blob still
+    finds its entry rather than silently duplicating it.
+    """
+    if not name:
+        return None
+    target = name.lower()
+    for entry in entries:
+        if isinstance(entry, dict):
+            if (entry.get("name") or "").lower() == target:
+                return entry
+        elif isinstance(entry, str) and entry.lower() == target:
+            return entry
+    return None
+
+
 def find_in_array(array: list, identifier: str, id_field: str = "name") -> tuple:
     """Find an item in array by identifier. Returns (index, item) or (-1, None)"""
     for i, item in enumerate(array):
@@ -844,6 +865,31 @@ def get_scoped_context(
                 _goal_stub(g) if isinstance(g, dict) else g
                 for g in glist[:5]
             ]
+
+    # Aesthetics hook, mirroring the goals one above. `styles` rides into
+    # `minimal` so an AI client knows the user's design language at conversation
+    # start -- but only the ONE entry marked `primary`, never the whole list,
+    # which on a real record is several long prose entries and would roughly
+    # double the minimal payload.
+    #
+    # A section the user has not enabled never reaches here (disabled sections
+    # are dropped above), and a record with no primary entry contributes
+    # nothing rather than an arbitrary first item: absent is a truthful answer
+    # to "what is your design language", a guess is not.
+    _aesthetics_full_tokens = {"personal", "aesthetics", "full"}
+    if "aesthetics" in result and not any(t in _aesthetics_full_tokens for t in tokens):
+        styles = result["aesthetics"].get("styles")
+        if isinstance(styles, list):
+            primary = next(
+                (a for a in styles if isinstance(a, dict) and a.get("primary") is True),
+                None,
+            )
+            if primary is None:
+                result["aesthetics"].pop("styles", None)
+                if not result["aesthetics"]:
+                    result.pop("aesthetics", None)
+            else:
+                result["aesthetics"]["styles"] = [primary]
 
     scope_label = scope if isinstance(scope, str) else ",".join(scope)
     scope_desc = (
@@ -1505,6 +1551,14 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 "company": data["company"],
                 "type": data["type"],
                 "period": data["period"],
+                # `location` and `description` were declared in this entity's
+                # tool contract and written by NOTHING -- not this branch, not
+                # the editor -- so every value an MCP client sent under them was
+                # discarded on arrival. Seeded like the other optional keys so a
+                # row always carries them and the UI never renders `undefined`.
+                "location": data.get("location", ""),
+                "description": data.get("description", ""),
+                "skills": data.get("skills", []),
                 "highlights": data.get("highlights", [])
             })
             save_json("profile.json", profile)
@@ -1513,9 +1567,14 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             idx, exp = find_in_array(work, data.get("company", ""), "company")
             if idx == -1:
                 return f"❌ Work experience at '{data.get('company')}' not found"
-            for field in ["role", "type", "period"]:
+            for field in ["role", "type", "period", "location", "description"]:
                 if data.get(field):
                     exp[field] = data[field]
+            # A list is replaced wholesale when supplied. `work_skill` is the
+            # incremental path; this is the "set them all at once" path, and
+            # `add` already accepts `skills` the same way.
+            if isinstance(data.get("skills"), list):
+                exp["skills"] = data["skills"]
             save_json("profile.json", profile)
             return f"✅ Updated work experience at {data['company']}"
         elif action == "remove":
@@ -1561,6 +1620,45 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return f"✅ Removed highlight from {company}"
             return f"❌ Highlight not found"
     
+    elif entity == "work_skill":
+        profile = load_json("profile.json")
+        work = profile.get("work_experience", [])
+        company = get_field(data, "company", "work", "employer", "organization", default="")
+        if not company:
+            return "❌ Work skill requires 'company' to identify which work experience"
+        idx, exp = find_in_array(work, company, "company")
+        if idx == -1:
+            return f"❌ Work experience at '{company}' not found"
+        skills = exp.setdefault("skills", [])
+        # Mirrors `work_highlight`: bare strings on a parent row, accepting
+        # either a list or a single value, and deduped case-sensitively the
+        # same way. Without this the field would be UI-only -- the asymmetry
+        # wave 6 just closed for `clubs`.
+        if action == "add":
+            new_skills = data.get("skills", [])
+            if not new_skills:
+                single = get_field(data, "skill", "item", "technology", default="")
+                if single:
+                    new_skills = [single]
+            if not new_skills:
+                return "❌ Work skill requires 'skill' or 'skills'"
+            added = []
+            for sk in new_skills:
+                if sk and sk not in skills:
+                    skills.append(sk)
+                    added.append(sk)
+            save_json("profile.json", profile)
+            if len(added) == 1:
+                return f"✅ Added skill to {company}: {added[0]}"
+            return f"✅ Added {len(added)} skills to {company}"
+        elif action == "remove":
+            skill = get_field(data, "skill", "item", default="")
+            if skill in skills:
+                skills.remove(skill)
+                save_json("profile.json", profile)
+                return f"✅ Removed skill from {company}"
+            return f"❌ Skill not found"
+
     elif entity == "goal":
         blob = load_json("goals.json")
         goals = blob.setdefault("goals", [])
@@ -2233,6 +2331,35 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             return f"✅ Updated default communication: {', '.join(updated)}"
         return f"❌ communication_default only supports 'update' action"
     
+    elif entity == "response_format":
+        preferences = load_json("preferences.json")
+        items = preferences.setdefault("response_format", [])
+        # Bare strings, like lifestyle's energy_peaks. Was five fixed booleans
+        # until wave 6; free text says what a boolean cannot ("code blocks for
+        # anything over three lines").
+        if not isinstance(items, list):
+            items = []
+            preferences["response_format"] = items
+        item = get_field(data, "item", "format", "preference", "value", default="")
+
+        if action == "add":
+            if not item:
+                return "❌ response_format requires 'item'"
+            if any(isinstance(i, str) and i.lower() == item.lower() for i in items):
+                return f"ℹ️ '{item}' already in response format"
+            items.append(item)
+            save_json("preferences.json", preferences)
+            return f"✅ Added response format: {item}"
+        elif action == "remove":
+            found = next(
+                (i for i in items if isinstance(i, str) and i.lower() == item.lower()), None
+            )
+            if found is None:
+                return f"❌ Response format '{item}' not found"
+            items.remove(found)
+            save_json("preferences.json", preferences)
+            return f"✅ Removed response format: {item}"
+
     elif entity == "mood_override":
         preferences = load_json("preferences.json")
         comm = preferences.setdefault("communication", {})
@@ -2569,6 +2696,37 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return f"✅ Removed highlight"
             return f"❌ Highlight not found"
     
+    elif entity == "club":
+        profile = load_json("profile.json")
+        education = profile.get("education", [])
+        idx, edu = find_in_array(education, data.get("institution", ""), "institution")
+        if idx == -1:
+            return f"❌ Education at '{data.get('institution')}' not found"
+
+        clubs = edu.setdefault("clubs", [])
+        name = get_field(data, "name", "club", "society", "activity")
+        # Objects, like coursework: {"name": ..., "activities_involved": [...]}.
+        # Before wave 6 `clubs` had no entity and no branch at all -- the editor
+        # was its only writer, so no AI client could read into or out of it.
+        if action == "add":
+            if not name:
+                return "❌ Club requires 'name'"
+            if _find_course(clubs, name) is not None:
+                return f"ℹ️ '{name}' already in clubs"
+            clubs.append({
+                "name": name,
+                "activities_involved": list(data.get("activities_involved") or []),
+            })
+            save_json("profile.json", profile)
+            return f"✅ Added club: {name}"
+        elif action == "remove":
+            existing = _find_course(clubs, name)
+            if existing is not None:
+                clubs.remove(existing)
+                save_json("profile.json", profile)
+                return f"✅ Removed club: {name}"
+            return f"❌ Club not found"
+
     elif entity == "coursework":
         profile = load_json("profile.json")
         education = profile.get("education", [])
@@ -2578,18 +2736,25 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         
         coursework = edu.setdefault("coursework", [])
         course = get_field(data, "course", "coursework", "class", "subject")
-        
+
+        # A course is an OBJECT: {"name": ..., "topics": [...]}. This branch
+        # used to append the bare string, while the editor wrote and read
+        # objects -- so an AI-added course rendered as "Untitled Course" and
+        # could never be removed, because `course in coursework` compares a
+        # string against a dict and never matches. Legacy bare strings are
+        # coerced on read by persona_store._normalize.
         if action == "add":
             if not course:
                 return "❌ Coursework requires 'course' or 'coursework'"
-            if course in coursework:
+            if _find_course(coursework, course) is not None:
                 return f"ℹ️ '{course}' already in coursework"
-            coursework.append(course)
+            coursework.append({"name": course, "topics": list(data.get("topics") or [])})
             save_json("profile.json", profile)
             return f"✅ Added coursework: {course}"
         elif action == "remove":
-            if course in coursework:
-                coursework.remove(course)
+            existing = _find_course(coursework, course)
+            if existing is not None:
+                coursework.remove(existing)
                 save_json("profile.json", profile)
                 return f"✅ Removed coursework: {course}"
             return f"❌ Coursework not found"
@@ -2604,18 +2769,22 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         
         coursework = edu.setdefault("coursework", [])
         course = get_field(data, "course", "coursework", "topic", "subject")
-        
+
+        # Same object shape as `coursework` above, which this branch has always
+        # duplicated verbatim. Kept as an alias so existing clients keep
+        # working; see the wave 6 storage-keys reference for the dedupe.
         if action == "add":
             if not course:
                 return "❌ Coursework topic requires 'course' or 'topic'"
-            if course in coursework:
+            if _find_course(coursework, course) is not None:
                 return f"ℹ️ '{course}' already in coursework"
-            coursework.append(course)
+            coursework.append({"name": course, "topics": list(data.get("topics") or [])})
             save_json("profile.json", profile)
             return f"✅ Added coursework topic: {course}"
         elif action == "remove":
-            if course in coursework:
-                coursework.remove(course)
+            existing = _find_course(coursework, course)
+            if existing is not None:
+                coursework.remove(existing)
                 save_json("profile.json", profile)
                 return f"✅ Removed coursework topic: {course}"
             return f"❌ Coursework topic not found"
@@ -2624,6 +2793,21 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         section, list_key, espec = _gspec
         blob = load_json(f"{section}.json")
         items = blob.setdefault(list_key, [])
+
+        def _enforce_exclusive(payload, keep):
+            """Clear an entity's `exclusive_fields` on every item but `keep`.
+
+            Declared once on the entity so both writers honour it; enforcing it
+            in the renderer alone would leave an MCP client free to create a
+            second `primary` aesthetic, which is exactly the write the minimal
+            context scope reads.
+            """
+            for field in espec.get("exclusive_fields") or []:
+                if payload.get(field) is not True:
+                    continue
+                for other in items:
+                    if other is not keep and isinstance(other, dict):
+                        other.pop(field, None)
         ident = espec["identifier"]
         value = get_field(data, ident, "name", "title")
 
@@ -2655,6 +2839,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             if err:
                 return err
             items.append(item)
+            _enforce_exclusive(item, item)
             save_json(f"{section}.json", blob)
             return f"✅ Added {entity}: {value}"
 
@@ -2671,6 +2856,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             if err:
                 return err
             item.update(changes)
+            _enforce_exclusive(changes, item)
             new_ident = get_field(data, f"new_{ident}")
             if new_ident:
                 item[ident] = new_ident

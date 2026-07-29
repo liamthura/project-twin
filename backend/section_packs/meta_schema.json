@@ -126,25 +126,62 @@
         {
           "$comment": "`path` is required for every kind EXCEPT `group`. A group binds no storage at all -- it is a heading with nested sections under it, restoring the two-level structure the hand-written editors had (preferences' \"Code Style\" over its three lists, lifestyle's \"Wellness\" over sleep/energy/stress). Giving it a path would be noise that every renderer must then remember not to read.",
           "if": {
-            "required": ["kind"],
-            "properties": { "kind": { "not": { "const": "group" } } }
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "not": {
+                  "const": "group"
+                }
+              }
+            }
           },
-          "then": { "required": ["path"] }
+          "then": {
+            "required": [
+              "path"
+            ]
+          }
         },
         {
           "$comment": "A group carries no storage-binding key, so declaring one is a sign the node was meant to be a list or fields node. Rejected rather than ignored.",
           "if": {
-            "required": ["kind"],
-            "properties": { "kind": { "const": "group" } }
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "group"
+              }
+            }
           },
           "then": {
-            "required": ["title", "sections"],
+            "required": [
+              "title",
+              "sections"
+            ],
             "not": {
               "anyOf": [
-                { "required": ["path"] },
-                { "required": ["entity"] },
-                { "required": ["fields"] },
-                { "required": ["title_field"] }
+                {
+                  "required": [
+                    "path"
+                  ]
+                },
+                {
+                  "required": [
+                    "entity"
+                  ]
+                },
+                {
+                  "required": [
+                    "fields"
+                  ]
+                },
+                {
+                  "required": [
+                    "title_field"
+                  ]
+                }
               ]
             }
           }
@@ -152,12 +189,24 @@
         {
           "$comment": "Two rules that apply to list nodes only. (1) `entity`: a list node binds editable controls to an entity's stored keys, so it must name that entity. Without it the renderer still renders (falling back to node-level field_defaults/enum/optional) but tests/test_ui_schema.py has no entity to check the field names against, and a control bound to a key nothing stores would ship unnoticed. (2) a non-empty `path`: an empty path addresses the containing object itself, and writes go through setAt, where `path.length === 0` returns the new value -- so the first write to a list node with `path: []` REPLACES what contains it. Top level that discards the section's whole stored object; on a child list it replaces the parent row's item, losing its id, its title and every other field. Array.isArray([]) is true, so no renderer-side guard can catch it. This is conditional on kind rather than a blanket minItems on `path` because kind: \"fields\" legitimately uses `path: []` to address the section root (profile's top-level scalars) -- see tests/test_ui_schema.py::test_fields_node_with_empty_path_is_accepted.",
           "if": {
-            "required": ["kind"],
-            "properties": { "kind": { "const": "list" } }
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "list"
+              }
+            }
           },
           "then": {
-            "required": ["entity"],
-            "properties": { "path": { "minItems": 1 } }
+            "required": [
+              "entity"
+            ],
+            "properties": {
+              "path": {
+                "minItems": 1
+              }
+            }
           }
         }
       ],
@@ -189,6 +238,13 @@
         "description": {
           "type": "string",
           "description": "One muted line under the node's title, saying what belongs here. User-facing helper text, unlike `$comment` (an authoring note) and shorter than `info` (a dialog). Optional: a node whose title is self-explanatory should omit it rather than restate itself."
+        },
+        "item_control": {
+          "enum": [
+            "tag",
+            "input"
+          ],
+          "description": "How a `strings` node presents each stored string. \"tag\" (the default) renders ArrayInput's chips -- right for short, word-like values you add and remove but never revise. \"input\" renders one editable row per string with its own delete -- right for sentence-like values where a typo means retyping the whole thing, which is how the hand-written editors rendered profile's work and education highlights."
         },
         "placeholder": {
           "type": "string",
@@ -228,6 +284,13 @@
           },
           "description": "Storage keys rendered as a date picker. Values must be yyyy-mm-dd; anything else falls back to a text input so it is not discarded."
         },
+        "bool_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Storage keys rendered as an on/off switch. For keys genuinely stored as JSON booleans -- preferences.response_format is five of them. A missing key reads as off, and the control always writes a real boolean, never the string \"true\"."
+        },
         "time_fields": {
           "type": "array",
           "items": {
@@ -265,6 +328,13 @@
             "type": "string"
           }
         },
+        "field_placeholders": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Placeholder text per storage key, for the text, textarea, date, time and chip controls a node renders. Keyed by field like `field_defaults`, and distinct from the singular `placeholder`, which belongs to a `strings` node's own one input. Optional: a field with no entry renders an empty control. Concrete examples earn their place here -- \"e.g. Bachelor's, Master's, PhD\" says more about `degree_level` than its label can."
+        },
         "field_defaults": {
           "type": "object",
           "additionalProperties": {
@@ -286,14 +356,35 @@
             "$ref": "#/$defs/uiSection"
           }
         },
+        "pinned": {
+          "type": "object",
+          "required": ["field", "title", "empty", "noun"],
+          "additionalProperties": false,
+          "description": "Lifts the ONE row holding `field` out of the list and renders it above, as the section's answer to a question the list cannot answer -- \"which of these is your design language\". The lifted row is excluded from the list below rather than shown twice, `field` never renders as an editable control or appears in the Add dialog, and every other row gets a star to claim the slot. Pair it with the entity's `exclusive_fields` so both writers keep it to one.",
+          "properties": {
+            "field": { "type": "string" },
+            "title": { "type": "string", "minLength": 1 },
+            "empty": { "type": "string", "minLength": 1 },
+            "noun": { "type": "string", "minLength": 1, "description": "What the slot is called in a control's accessible name, e.g. \"primary\" -> \"Make Brutalist primary\"." }
+          }
+        },
         "sort": {
           "type": "object",
-          "required": ["field"],
+          "required": [
+            "field"
+          ],
           "additionalProperties": false,
           "description": "Display order only. Rows are sorted by this storage key; the stored array is never reordered. Two numbers compare numerically; everything else compares as text. Items where the key is missing or an empty string sort last, regardless of direction.",
           "properties": {
-            "field": { "type": "string" },
-            "dir": { "enum": ["asc", "desc"] }
+            "field": {
+              "type": "string"
+            },
+            "dir": {
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
           }
         },
         "searchable": {
@@ -309,32 +400,54 @@
         },
         "info": {
           "type": "object",
-          "required": ["overview", "tips"],
+          "required": [
+            "overview",
+            "tips"
+          ],
           "additionalProperties": false,
           "description": "Content for the section's info dialog.",
           "properties": {
-            "overview": { "type": "string", "minLength": 1 },
-            "tips": { "type": "array", "items": { "type": "string" } }
+            "overview": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tips": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           }
         },
         "display_fields": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Storage keys shown read-only as badges on the collapsed row. Unlike `badges`, these are never rendered as editable controls -- use for machine-written values such as a created-at stamp."
         },
         "count_badges": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Array-valued storage keys shown read-only as \"N <field>\" chips on the collapsed row (e.g. \"3 references\"), rendered after display_fields and before badges. Never rendered as an editable control. A key that is absent, empty, or not an array on a given item renders no chip for that item -- a \"0 x\" chip would be noise on every row that has not used the feature."
         },
         "display_formats": {
           "type": "object",
-          "additionalProperties": { "enum": ["date", "datetime"] },
+          "additionalProperties": {
+            "enum": [
+              "date",
+              "datetime"
+            ]
+          },
           "description": "Optional per-field formatting for `display_fields`. Values are parsed as dates and rendered in local time; an unparseable value is shown verbatim."
         },
         "fields_outside_entity": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Storage keys this node binds that the entity's tool-contract vocabulary (required + optional) deliberately does not carry. Documentation only -- the renderer ignores it. Declaring them here is how a pack whose ui names diverge from its entity names opts that node out of the spelling check in tests/test_ui_schema.py, so the divergence is stated in the manifest instead of the pack being dropped from a test list."
         }
       }
@@ -403,6 +516,13 @@
             "type": "string"
           },
           "description": "Values preselected on a new item. The exact value \"@now\" is replaced by an ISO 8601 timestamp at add time; every other value is used literally."
+        },
+        "exclusive_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Storage keys that at most ONE item in this entity's list may hold as true. Setting it on one item clears it on every other, in BOTH writers -- the renderer and execute_modify -- because either alone leaves the invariant enforceable from only one side. `aesthetics.aesthetic.primary` is the case it exists for: the primary entry is what rides into the minimal context scope, and two primaries would make that a coin toss."
         }
       }
     }

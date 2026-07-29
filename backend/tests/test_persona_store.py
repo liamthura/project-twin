@@ -388,3 +388,215 @@ def test_flat_communication_migrates_to_the_nested_shape(as_user):
         "locale": "British English",
     }
     assert comm["mood_overrides"] == []
+
+
+# ---------------------------------------------------------------------------
+# Wave 6 duplicate cleanup.
+#
+# `contact.github`/`contact.linkedin` and `preferences.coding` held values that
+# already existed in `contact.links` and `code_style.tools`. Each is FOLDED into
+# its canonical home before being dropped, so a record where the duplicate is
+# NOT actually duplicated keeps its value.
+# ---------------------------------------------------------------------------
+
+
+def test_github_handle_is_dropped_when_the_link_already_exists(as_user):
+    store.save("profile", {"contact": {
+        "links": [{"url": "https://github.com/someone", "label": "Github"}],
+        "github": "someone",
+    }})
+    contact = store.load("profile")["contact"]
+    assert "github" not in contact
+    assert [l["url"] for l in contact["links"]] == ["https://github.com/someone"]
+
+
+def test_github_handle_becomes_a_link_when_none_exists(as_user):
+    """The reason this is a fold and not a pop: on a record with no matching
+    link, a bare pop would silently delete the only copy."""
+    store.save("profile", {"contact": {"links": [], "github": "someone"}})
+    contact = store.load("profile")["contact"]
+    assert "github" not in contact
+    assert contact["links"] == [{"url": "https://github.com/someone", "label": "Github"}]
+
+
+def test_linkedin_handle_folds_the_same_way(as_user):
+    store.save("profile", {"contact": {"links": [], "linkedin": "someone"}})
+    [link] = store.load("profile")["contact"]["links"]
+    assert link == {"url": "https://linkedin.com/in/someone", "label": "LinkedIn"}
+
+
+def test_a_handle_matches_a_link_stored_in_another_form(as_user):
+    """A link saved without the scheme, or with a trailing slash, is still the
+    same profile -- matching on the handle rather than the exact url stops a
+    near-duplicate being appended."""
+    store.save("profile", {"contact": {
+        "links": [{"url": "github.com/someone/", "label": "My code"}],
+        "github": "someone",
+    }})
+    links = store.load("profile")["contact"]["links"]
+    assert len(links) == 1
+    assert links[0]["label"] == "My code"
+
+
+def test_an_empty_handle_is_dropped_without_adding_a_link(as_user):
+    store.save("profile", {"contact": {"links": [], "github": "   "}})
+    contact = store.load("profile")["contact"]
+    assert "github" not in contact
+    assert contact["links"] == []
+
+
+def test_the_handle_fold_is_idempotent(as_user):
+    store.save("profile", {"contact": {"links": [], "github": "someone"}})
+    once = store.load("profile")
+    twice = store._normalize("profile", copy.deepcopy(once))
+    assert twice["contact"]["links"] == once["contact"]["links"]
+
+
+def test_coding_editor_is_dropped_when_tools_already_lists_it(as_user):
+    """Compared without spaces or case, so "VSCode" recognises "VS Code"."""
+    store.save("preferences", {"coding": {"editor": "VSCode"},
+                               "code_style": {"tools": ["VS Code", "Docker"]}})
+    prefs = store.load("preferences")
+    assert "coding" not in prefs
+    assert prefs["code_style"]["tools"] == ["VS Code", "Docker"]
+
+
+def test_coding_editor_joins_tools_when_absent(as_user):
+    store.save("preferences", {"coding": {"editor": "Zed"},
+                               "code_style": {"tools": ["Docker"]}})
+    prefs = store.load("preferences")
+    assert "coding" not in prefs
+    assert prefs["code_style"]["tools"] == ["Docker", "Zed"]
+
+
+def test_coding_editor_folds_when_there_is_no_tools_list_at_all(as_user):
+    store.save("preferences", {"coding": {"editor": "Zed"}})
+    prefs = store.load("preferences")
+    assert "coding" not in prefs
+    assert prefs["code_style"]["tools"] == ["Zed"]
+
+
+def test_the_editor_fold_is_idempotent(as_user):
+    store.save("preferences", {"coding": {"editor": "Zed"}, "code_style": {"tools": []}})
+    once = store.load("preferences")
+    twice = store._normalize("preferences", copy.deepcopy(once))
+    assert twice["code_style"]["tools"] == once["code_style"]["tools"]
+
+
+def test_lifestyle_media_is_left_alone(as_user):
+    """Deliberately NOT removed. It looks like a duplicate of the `media`
+    section pack, but that pack stores items[] of {title, kind, status} -- there
+    is nowhere for `favourite_genres` or a bare game title to go, so dropping it
+    would destroy data rather than de-duplicate it."""
+    store.save("lifestyle", {"media": {"games": ["Minecraft"],
+                                       "favourite_genres": ["sci-fi"]}})
+    assert store.load("lifestyle")["media"] == {"games": ["Minecraft"],
+                                                "favourite_genres": ["sci-fi"]}
+
+
+# ---------------------------------------------------------------------------
+# Wave 6: `work_preferences` dissolves into homes that already existed.
+# ---------------------------------------------------------------------------
+
+
+def test_project_approach_folds_into_learning_style(as_user):
+    """Same class of statement as the entries already there -- "learning by
+    building", "incremental complexity"."""
+    store.save("preferences", {
+        "work_preferences": {"project_approach": "iterative, MVP first"},
+        "learning_style": {"preferred": ["hands-on examples"]},
+    })
+    prefs = store.load("preferences")
+    assert prefs["learning_style"]["preferred"] == ["hands-on examples", "iterative, MVP first"]
+    assert "project_approach" not in prefs.get("work_preferences", {})
+
+
+def test_project_approach_is_not_duplicated_on_a_second_pass(as_user):
+    store.save("preferences", {"work_preferences": {"project_approach": "iterative"}})
+    once = store.load("preferences")
+    twice = store._normalize("preferences", copy.deepcopy(once))
+    assert twice["learning_style"]["preferred"] == ["iterative"]
+
+
+def test_timezone_is_left_alone(as_user):
+    """profile.location already implies it, so it earns no control -- but it is
+    not popped either: a record whose location is vague or absent would lose
+    the only explicit copy, and _normalize cannot read another section to
+    check."""
+    store.save("preferences", {"work_preferences": {"timezone": "GMT/BST (UK)"}})
+    assert store.load("preferences")["work_preferences"] == {"timezone": "GMT/BST (UK)"}
+    assert "timezone" not in store.load("preferences").get("communication", {}).get("default", {})
+
+
+def test_work_preferences_disappears_once_empty(as_user):
+    store.save("preferences", {"work_preferences": {"project_approach": "x"}})
+    assert "work_preferences" not in store.load("preferences")
+
+
+# ---------------------------------------------------------------------------
+# response_format: five fixed booleans -> a free-text list
+# ---------------------------------------------------------------------------
+
+
+def test_response_format_booleans_become_text(as_user):
+    store.save("preferences", {"response_format": {
+        "prefer_code_blocks": True,
+        "provide_next_steps": True,
+    }})
+    assert store.load("preferences")["response_format"] == [
+        "prefer code blocks", "provide next steps",
+    ]
+
+
+def test_a_false_boolean_is_dropped_rather_than_negated(as_user):
+    """A list of wants has no way to say "explicitly off", and a false boolean
+    already read the same as absent for every reader of this key."""
+    store.save("preferences", {"response_format": {
+        "prefer_code_blocks": True,
+        "include_explanations": False,
+    }})
+    assert store.load("preferences")["response_format"] == ["prefer code blocks"]
+
+
+def test_an_already_converted_list_is_untouched(as_user):
+    store.save("preferences", {"response_format": ["code blocks over three lines"]})
+    assert store.load("preferences")["response_format"] == ["code blocks over three lines"]
+
+
+def test_the_response_format_conversion_is_idempotent(as_user):
+    store.save("preferences", {"response_format": {"prefer_code_blocks": True}})
+    once = store.load("preferences")
+    twice = store._normalize("preferences", copy.deepcopy(once))
+    assert twice["response_format"] == once["response_format"]
+
+
+def test_best_productivity_time_is_kept_rather_than_dropped(as_user):
+    """It duplicates lifestyle.wellness.energy_peaks -- a RICHER list in a
+    DIFFERENT section. _normalize only sees one section's blob, so it cannot be
+    folded here, and dropping it without a home would be data loss. Left in
+    place until a cross-section migration moves it."""
+    store.save("preferences", {"work_preferences": {"best_productivity_time": "evening"}})
+    assert store.load("preferences")["work_preferences"] == {"best_productivity_time": "evening"}
+
+
+def test_design_is_left_in_storage(as_user):
+    """It belongs in the aesthetics pack, but _normalize cannot reach another
+    section to move it, and cannot tell whether that pack is even in use.
+    Unbound from the UI; never dropped blind."""
+    store.save("preferences", {"design": {"frontend_aesthetic": "Playful Editorial"}})
+    assert store.load("preferences")["design"] == {"frontend_aesthetic": "Playful Editorial"}
+
+
+def test_response_format_entity_adds_and_removes(as_user):
+    """Bare strings need their own branch -- the generic `preference` router
+    writes scalars into a category dict and cannot append to a list."""
+    import server
+    store.save("preferences", {"response_format": []})
+    server.execute_modify("add", "response_format", {"item": "code blocks over three lines"})
+    server.execute_modify("add", "response_format", {"item": "code blocks over three lines"})
+    assert store.load("preferences")["response_format"] == ["code blocks over three lines"]
+
+    assert server.execute_modify(
+        "remove", "response_format", {"item": "CODE BLOCKS OVER THREE LINES"}
+    ).startswith("✅")
+    assert store.load("preferences")["response_format"] == []

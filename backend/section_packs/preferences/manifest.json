@@ -104,6 +104,18 @@
         "detail_level"
       ],
       "identifier": "mood"
+    },
+    "response_format": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "required": [
+        "item"
+      ],
+      "optional": [],
+      "identifier": "item",
+      "description": "One statement about how you want answers shaped. Bare strings, like lifestyle's energy_peaks."
     }
   },
   "ui": {
@@ -183,7 +195,12 @@
             "long_text": [
               "detail_level"
             ],
-            "$comment": "An update-only singleton (identifier: null). All three keys are written literally, not through get_field -- server.py:2211-2219."
+            "$comment": "An update-only singleton (identifier: null). All three keys are written literally, not through get_field -- server.py:2211-2219.",
+            "field_placeholders": {
+              "detail_level": "e.g. comprehensive with examples, step-by-step breakdowns when explaining code...",
+              "locale": "e.g. British English",
+              "tone": "e.g. friendly but professional"
+            }
           },
           {
             "kind": "list",
@@ -206,14 +223,30 @@
             "long_text": [
               "detail_level"
             ],
-            "$comment": "Stores `mood`. The retired editor wrote this name under `when_feeling`, which no execute_modify branch has ever read -- every MCP lookup resolves on o.get(\"mood\") -- so UI-written overrides were unreachable over MCP and AI-written ones rendered as \"Untitled mood\". persona_store._normalize backfills when_feeling -> mood with a collision guard. `locale`, which the old editor also wrote here, is NOT stored for an override (server.py:2245-2249) and is deliberately not bound."
+            "$comment": "Stores `mood`. The retired editor wrote this name under `when_feeling`, which no execute_modify branch has ever read -- every MCP lookup resolves on o.get(\"mood\") -- so UI-written overrides were unreachable over MCP and AI-written ones rendered as \"Untitled mood\". persona_store._normalize backfills when_feeling -> mood with a collision guard. `locale`, which the old editor also wrote here, is NOT stored for an override (server.py:2245-2249) and is deliberately not bound.",
+            "field_placeholders": {
+              "detail_level": "e.g. brief and to the point, skip the explanations...",
+              "mood": "e.g. stressed, tired, excited, creative",
+              "tone": "e.g. gentle, encouraging"
+            }
+          },
+          {
+            "kind": "strings",
+            "path": [
+              "response_format"
+            ],
+            "title": "Response Format",
+            "description": "How you want answers shaped",
+            "item_control": "input",
+            "placeholder": "e.g. code blocks for anything over three lines",
+            "$comment": "Bare strings. Was five fixed booleans until wave 6 -- a boolean can only answer yes or no to an idea someone else chose, and real preferences are more specific than that. persona_store._normalize converts the old shape, keeping the TRUE keys as text; a list of wants cannot express \"explicitly off\", and a false boolean already read the same as absent."
           }
         ]
       },
       {
         "kind": "group",
         "title": "Learning Style",
-        "description": "How you learn best",
+        "description": "How you learn best, and how you like work approached",
         "info": {
           "overview": "How you learn best, so explanations arrive in a shape that works for you.",
           "tips": [
@@ -283,6 +316,9 @@
             "Stance decides which way it reads: like or dislike.",
             "Both stances live in one list, so flipping a row's stance is a single click."
           ]
+        },
+        "field_placeholders": {
+          "item": "e.g. unsolicited sales tone, jargon..."
         }
       }
     ]

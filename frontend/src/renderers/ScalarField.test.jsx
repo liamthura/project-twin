@@ -206,4 +206,89 @@ describe("ScalarField", () => {
       expect(screen.queryByDisplayValue("soon")).not.toBeInTheDocument();
     });
   });
+
+  describe("field_placeholders", () => {
+    // Declared per field in the manifest, keyed like field_defaults. Restores
+    // the hint copy the hand-written editors carried -- "e.g. Bachelor's,
+    // Master's, PhD" says more about degree_level than its label can.
+    const withHint = (extra = {}) => ({
+      field_placeholders: { thing: "e.g. a hint" },
+      long_text: new Set(),
+      array_fields: [],
+      date_fields: [],
+      time_fields: [],
+      optional: [],
+      ...extra,
+    });
+
+    it("puts the hint on a plain text input", () => {
+      render(<ScalarField field="thing" value="" meta={withHint()} onChange={() => {}} />);
+      expect(screen.getByPlaceholderText("e.g. a hint")).toBeInTheDocument();
+    });
+
+    it("puts the hint on a textarea", () => {
+      const meta = withHint({ long_text: new Set(["thing"]) });
+      render(<ScalarField field="thing" value="" meta={meta} onChange={() => {}} />);
+      expect(screen.getByPlaceholderText("e.g. a hint").tagName).toBe("TEXTAREA");
+    });
+
+    it("puts the hint on a chip list, overriding the derived one", () => {
+      const meta = withHint({ array_fields: ["thing"] });
+      render(<ScalarField field="thing" value={[]} meta={meta} onChange={() => {}} />);
+      expect(screen.getByPlaceholderText("e.g. a hint")).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("Add thing…")).not.toBeInTheDocument();
+    });
+
+    it("falls back to the derived chip hint when no entry exists", () => {
+      const meta = withHint({ array_fields: ["other"] });
+      render(<ScalarField field="other" value={[]} meta={meta} onChange={() => {}} />);
+      expect(screen.getByPlaceholderText("Add other…")).toBeInTheDocument();
+    });
+
+    it("leaves a field with no entry unhinted, as every field was before", () => {
+      render(<ScalarField field="other" value="" meta={withHint()} onChange={() => {}} />);
+      expect(screen.getByRole("textbox")).not.toHaveAttribute("placeholder");
+    });
+
+    it("survives a node that declares none at all", () => {
+      const meta = { long_text: new Set(), array_fields: [], date_fields: [], optional: [] };
+      expect(() =>
+        render(<ScalarField field="thing" value="" meta={meta} onChange={() => {}} />)
+      ).not.toThrow();
+    });
+  });
+
+
+  describe("bool_fields", () => {
+    const boolMeta = {
+      bool_fields: ["prefer_code_blocks"],
+      long_text: new Set(), array_fields: [], date_fields: [], time_fields: [], optional: [],
+    };
+
+    it("renders a switch, not a text input", () => {
+      render(<ScalarField field="prefer_code_blocks" value={true} meta={boolMeta} onChange={() => {}} />);
+      expect(screen.getByRole("switch")).toBeChecked();
+    });
+
+    it("reads a missing key as off rather than inventing a third state", () => {
+      render(<ScalarField field="prefer_code_blocks" value={undefined} meta={boolMeta} onChange={() => {}} />);
+      expect(screen.getByRole("switch")).not.toBeChecked();
+    });
+
+    it("writes a real boolean, never a string", () => {
+      const onChange = vi.fn();
+      render(<ScalarField field="prefer_code_blocks" value={false} meta={boolMeta} onChange={onChange} />);
+
+      fireEvent.click(screen.getByRole("switch"));
+
+      expect(onChange).toHaveBeenCalledWith(true);
+      expect(typeof onChange.mock.calls[0][0]).toBe("boolean");
+    });
+
+    it("leaves a field outside bool_fields as a text input", () => {
+      render(<ScalarField field="other" value="" meta={boolMeta} onChange={() => {}} />);
+      expect(screen.getByRole("textbox")).toBeInTheDocument();
+    });
+  });
+
 });

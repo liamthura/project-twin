@@ -144,6 +144,10 @@
             "Use this for: half-baked concepts, 'what if' questions, problems you want to solve, things to research later.",
             "When an idea matures, you can promote it to a full project with more details."
           ]
+        },
+        "field_placeholders": {
+          "idea": "Project idea or thing you want to build...",
+          "note": "Add a note (optional)..."
         }
       },
       {
@@ -212,9 +216,21 @@
             ],
             "fields_outside_entity": [
               "name"
-            ]
+            ],
+            "field_placeholders": {
+              "name": "Reference name",
+              "notes": "Notes about this resource (optional)...",
+              "url": "URL (optional)"
+            }
           }
-        ]
+        ],
+        "field_placeholders": {
+          "description": "Brief description...",
+          "highlights": "e.g. Cut load time by 40%, Shipped the beta",
+          "name": "e.g. Personal website, Mobile app",
+          "notes": "Additional notes, blockers, or context...",
+          "tags": "Add tag..."
+        }
       }
     ]
   }

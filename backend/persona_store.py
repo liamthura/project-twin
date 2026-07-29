@@ -50,6 +50,35 @@ def _normalize(file_type: str, data: dict) -> dict:
     """
     # Normalize legacy profile language entries (strings -> objects with fluency)
     if file_type == "profile":
+        # Phase 6 (consolidation): `contact.github` and `contact.linkedin` are
+        # bare handles from an older shape, duplicating entries that now live in
+        # `contact.links` as {label, url}. Nothing has rendered them since the
+        # links list arrived, and no ui node binds them.
+        #
+        # Folded rather than popped outright: a record whose handle has NO
+        # matching link would otherwise lose it silently. The link is added only
+        # when no existing entry already points at that profile -- compared on
+        # the handle appearing in the url, so a link stored with or without
+        # https:// or a trailing slash still counts as present.
+        contact = data.get("contact")
+        if isinstance(contact, dict):
+            links = contact.setdefault("links", [])
+            if isinstance(links, list):
+                for key, label, base in (("github", "Github", "https://github.com/"),
+                                         ("linkedin", "LinkedIn", "https://linkedin.com/in/")):
+                    handle = contact.get(key)
+                    if not isinstance(handle, str) or not handle.strip():
+                        contact.pop(key, None)
+                        continue
+                    handle = handle.strip()
+                    already = any(
+                        isinstance(l, dict) and handle.lower() in (l.get("url") or "").lower()
+                        for l in links
+                    )
+                    if not already:
+                        links.append({"url": f"{base}{handle}", "label": label})
+                    contact.pop(key, None)
+
         languages = data.get("languages_spoken", [])
         if languages and isinstance(languages[0], str):
             data["languages_spoken"] = [
@@ -77,6 +106,31 @@ def _normalize(file_type: str, data: dict) -> dict:
             for edu in education:
                 if isinstance(edu, dict):
                     edu.setdefault("highlights", [])
+                    # Phase 6 (consolidation): `coursework` and `clubs` are
+                    # lists of OBJECTS -- {"name", "topics"} and {"name",
+                    # "activities_involved"} -- which is what the editor has
+                    # always written and read. Until wave 6 `execute_modify`
+                    # appended a bare STRING into the same lists, so a record
+                    # touched by an AI client holds a mix of both shapes. The
+                    # renderer maps over these and reads `.name`, so a stray
+                    # string renders as a blank row -- and the pre-wave-6
+                    # chip control threw outright on an object.
+                    #
+                    # Coerced on read rather than migrated in place: this only
+                    # ever widens a string into the object that already
+                    # represents it, so it is lossless and idempotent. The
+                    # string becomes the name; its nested list starts empty,
+                    # which is exactly what the string carried.
+                    for key, nested in (("coursework", "topics"),
+                                        ("clubs", "activities_involved")):
+                        entries = edu.get(key)
+                        if not isinstance(entries, list):
+                            continue
+                        edu[key] = [
+                            {"name": e, nested: []} if isinstance(e, str)
+                            else e
+                            for e in entries
+                        ]
         else:
             data["education"] = []
 
@@ -231,6 +285,78 @@ def _normalize(file_type: str, data: dict) -> dict:
             # (stance-tagged); strip it so old backups/imports can't
             # resurrect an invisible orphan key.
             data.pop("dislikes", None)
+            # Phase 6 (consolidation): `coding` held a single `editor` key that
+            # duplicates an entry in `code_style.tools`. Folded into that list
+            # when absent, so a record whose editor is not already listed keeps
+            # it, then dropped.
+            coding = data.get("coding")
+            if isinstance(coding, dict):
+                editor = coding.get("editor")
+                if isinstance(editor, str) and editor.strip():
+                    tools = data.setdefault("code_style", {}).setdefault("tools", [])
+                    if isinstance(tools, list):
+                        # Compared without spaces or case so "VSCode" recognises
+                        # an existing "VS Code" rather than adding a near-twin.
+                        squashed = {t.replace(" ", "").lower() for t in tools if isinstance(t, str)}
+                        if editor.replace(" ", "").lower() not in squashed:
+                            tools.append(editor.strip())
+                data.pop("coding", None)
+
+            # Phase 6 (consolidation): `work_preferences` held three keys that
+            # each belong somewhere that already existed.
+            wp = data.get("work_preferences")
+            if isinstance(wp, dict):
+                # `project_approach` ("iterative, MVP first then enhance") is
+                # the same class of statement as learning_style.preferred,
+                # which already carries "learning by building" and
+                # "incremental complexity".
+                approach = wp.get("project_approach")
+                if isinstance(approach, str) and approach.strip():
+                    pref = data.setdefault("learning_style", {}).setdefault("preferred", [])
+                    if isinstance(pref, list) and approach.strip() not in pref:
+                        pref.append(approach.strip())
+                    wp.pop("project_approach", None)
+                # `timezone` is left alone: profile.location already implies
+                # it, so it earns no control of its own. Not popped either --
+                # a record whose location is vague or absent would lose the
+                # only explicit copy, and an unbound key costs a line of JSON.
+                #
+                # `best_productivity_time` duplicates lifestyle.wellness.
+                # energy_peaks, which is a RICHER list in a DIFFERENT section --
+                # and _normalize only ever sees one section's blob, so it
+                # cannot be folded here. Left in place rather than dropped:
+                # deleting it without a home is data loss, and an unbound key
+                # costs nothing but a line of JSON.
+                if not wp:
+                    data.pop("work_preferences", None)
+
+            # Phase 6 (consolidation): `response_format` was five booleans,
+            # which can only say yes or no to five fixed ideas. Real preferences
+            # are more specific than that ("code blocks for anything over three
+            # lines"), so it becomes a free-text list like work highlights.
+            #
+            # Only the TRUE keys carry over: a list of wants has no way to
+            # express "explicitly off", and a false boolean was already the
+            # same as absent for every reader of this key.
+            rf = data.get("response_format")
+            if isinstance(rf, dict):
+                data["response_format"] = [
+                    key.replace("_", " ")
+                    for key, on in rf.items()
+                    if on is True
+                ]
+
+            # `design` is deliberately NOT dropped here. It duplicates the
+            # aesthetics pack, which holds the same material split by domain,
+            # stance-tagged, and able to express the "avoid" list `design` had
+            # no room for -- so it should end up there. But _normalize only
+            # ever sees ONE section's blob, and cannot check whether that pack
+            # is in use, let alone move prose into it. Popping blind would
+            # destroy the only copy for anyone who never adopted aesthetics.
+            #
+            # So it is unbound from the preferences UI (wave 6) and left in
+            # storage, and moving it is a one-off migration rather than a
+            # read-time normalisation.
             # Migrate old flat communication structure to new nested structure
             if "communication" in data:
                 comm = data["communication"]
