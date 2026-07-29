@@ -105,5 +105,186 @@
       ],
       "identifier": "mood"
     }
+  },
+  "ui": {
+    "sections": [
+      {
+        "kind": "group",
+        "title": "Code Style",
+        "description": "Your preferred programming languages, frameworks, and tools",
+        "info": {
+          "overview": "Your preferred programming languages, frameworks, and tools. AI uses these to pick idioms and examples that match how you actually work.",
+          "tips": [
+            "Languages: what you reach for by default, not everything you have ever used.",
+            "Frameworks: the ones you want code examples written against.",
+            "Tools: editors, runtimes and services worth assuming you have."
+          ]
+        },
+        "sections": [
+          {
+            "kind": "strings",
+            "path": [
+              "code_style",
+              "preferred_languages"
+            ],
+            "title": "Preferred Languages",
+            "placeholder": "e.g. Python, TypeScript...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          },
+          {
+            "kind": "strings",
+            "path": [
+              "code_style",
+              "frameworks"
+            ],
+            "title": "Frameworks",
+            "placeholder": "e.g. FastAPI, Next.js...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          },
+          {
+            "kind": "strings",
+            "path": [
+              "code_style",
+              "tools"
+            ],
+            "title": "Tools",
+            "placeholder": "e.g. VS Code, Docker...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          }
+        ]
+      },
+      {
+        "kind": "group",
+        "title": "Communication",
+        "description": "How you prefer AI responses to be formatted",
+        "info": {
+          "overview": "How you prefer AI responses to be formatted. This is the baseline; mood overrides below adjust it situationally.",
+          "tips": [
+            "Tone: how it should sound — e.g. friendly but professional.",
+            "Detail Level: how much to say and how to structure it.",
+            "Locale: spelling and conventions, e.g. British English."
+          ]
+        },
+        "sections": [
+          {
+            "kind": "fields",
+            "path": [
+              "communication",
+              "default"
+            ],
+            "entity": "communication_default",
+            "title": "Default Communication Style",
+            "description": "Always active. How you prefer AI responses to be written.",
+            "fields": [
+              "tone",
+              "locale",
+              "detail_level"
+            ],
+            "long_text": [
+              "detail_level"
+            ],
+            "$comment": "An update-only singleton (identifier: null). All three keys are written literally, not through get_field -- server.py:2211-2219."
+          },
+          {
+            "kind": "list",
+            "path": [
+              "communication",
+              "mood_overrides"
+            ],
+            "entity": "mood_override",
+            "title": "When I'm feeling...",
+            "description": "Override the defaults based on your mood or context",
+            "title_field": "mood",
+            "badges": [
+              "tone"
+            ],
+            "detail_fields": [
+              "mood",
+              "tone",
+              "detail_level"
+            ],
+            "long_text": [
+              "detail_level"
+            ],
+            "$comment": "Stores `mood`. The retired editor wrote this name under `when_feeling`, which no execute_modify branch has ever read -- every MCP lookup resolves on o.get(\"mood\") -- so UI-written overrides were unreachable over MCP and AI-written ones rendered as \"Untitled mood\". persona_store._normalize backfills when_feeling -> mood with a collision guard. `locale`, which the old editor also wrote here, is NOT stored for an override (server.py:2245-2249) and is deliberately not bound."
+          }
+        ]
+      },
+      {
+        "kind": "group",
+        "title": "Learning Style",
+        "description": "How you learn best",
+        "info": {
+          "overview": "How you learn best, so explanations arrive in a shape that works for you.",
+          "tips": [
+            "Preferred: the formats that land — worked examples, diagrams, analogies.",
+            "Avoid: what reliably loses you — walls of text, unexplained jargon."
+          ]
+        },
+        "sections": [
+          {
+            "kind": "strings",
+            "path": [
+              "learning_style",
+              "preferred"
+            ],
+            "title": "Preferred Methods",
+            "placeholder": "e.g. hands-on examples...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          },
+          {
+            "kind": "strings",
+            "path": [
+              "learning_style",
+              "avoid"
+            ],
+            "title": "Things to Avoid",
+            "placeholder": "e.g. walls of text...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          }
+        ]
+      },
+      {
+        "kind": "list",
+        "path": [
+          "likes_dislikes"
+        ],
+        "entity": "like",
+        "title": "Likes & Dislikes",
+        "description": "Things you want every AI to know you like or avoid",
+        "title_field": "item",
+        "badges": [
+          "stance"
+        ],
+        "detail_fields": [
+          "item",
+          "stance"
+        ],
+        "enum": {
+          "stance": [
+            "like",
+            "dislike"
+          ]
+        },
+        "field_defaults": {
+          "stance": "like"
+        },
+        "facets": [
+          "stance"
+        ],
+        "fields_outside_entity": [
+          "stance"
+        ],
+        "$comment": "One list shared by the `like` and `dislike` entities, discriminated by `stance` -- which is in NEITHER entity's required nor optional, though it is the key that decides which entity a row IS. Declared via fields_outside_entity rather than added to the entities, which would change the MCP vocabulary as a side effect of a UI change. See reference doc 2.3 and follow-up 4.",
+        "info": {
+          "overview": "Standing likes and dislikes every AI should know about, whatever the topic.",
+          "tips": [
+            "Keep each one short and concrete — \"unsolicited sales tone\" beats \"bad writing\".",
+            "Stance decides which way it reads: like or dislike.",
+            "Both stances live in one list, so flipping a row's stance is a single click."
+          ]
+        }
+      }
+    ]
   }
 }

@@ -46,7 +46,6 @@ import { ConnectionSettings } from "@/components/ConnectionSettings";
 import { api, getAuthToken } from "@/lib/api.js";
 import { WelcomeAuth } from "@/components/WelcomeAuth";
 import ProfileEditor from "@/editors/ProfileEditor";
-import PreferencesEditor from "@/editors/PreferencesEditor";
 import SectionRenderer from "@/renderers/SectionRenderer";
 
 // Debounce hook
@@ -73,7 +72,7 @@ const TAB_TRIGGER_CLASS =
 
 // Sections with a bespoke, hand-built editor. Everything else that's
 // enabled gets a generic, manifest-driven tab instead.
-const BESPOKE_EDITORS = new Set(["profile", "preferences"]);
+const BESPOKE_EDITORS = new Set(["profile"]);
 const PACK_ICONS = {
   goals: Target,
   media: Film,
@@ -83,6 +82,7 @@ const PACK_ICONS = {
   knowledge: Brain,
   projects: FolderKanban,
   lifestyle: Heart,
+  preferences: Settings,
 };
 
 // Tracks whether a horizontally scrollable element is at its start/end edge,
@@ -145,7 +145,6 @@ export default function App() {
   const { toast } = useToast();
 
   const [profile, setProfile] = useState({});
-  const [preferences, setPreferences] = useState({});
 
   const [disabledSections, setDisabledSections] = useState([]);
   const [packs, setPacks] = useState([]);
@@ -193,7 +192,6 @@ export default function App() {
     try {
       const response = await api("/all");
       setProfile(response.data.profile || {});
-      setPreferences(response.data.preferences || {});
       const known = new Set([...BESPOKE_EDITORS]);
       const rest = {};
       for (const [k, v] of Object.entries(response.data || {})) {
@@ -245,10 +243,6 @@ export default function App() {
     setProfile(newData);
     if (isAutosaveEnabled) debouncedSave("profile", newData);
   };
-  const handlePreferencesChange = (newData) => {
-    setPreferences(newData);
-    if (isAutosaveEnabled) debouncedSave("preferences", newData);
-  };
   const handlePackChange = (key) => (newData) => {
     setPackData((prev) => ({ ...prev, [key]: newData }));
     if (isAutosaveEnabled) debouncedSave(key, newData);
@@ -261,9 +255,8 @@ export default function App() {
         method: "PUT",
         body: JSON.stringify({
           profile,
-          preferences,
-          // lifestyle now arrives via packData -- it is a manifest-driven
-          // section like every other one except profile and preferences.
+          // Every section except profile is manifest-driven now and arrives
+          // via packData.
           ...packData,
         }),
       });
@@ -540,10 +533,6 @@ export default function App() {
               <User className="h-4 w-4" />
               <span>Profile</span>
             </TabsTrigger>
-            <TabsTrigger value="preferences" className={TAB_TRIGGER_CLASS}>
-              <Settings className="h-4 w-4" />
-              <span>Preferences</span>
-            </TabsTrigger>
             {dynamicPacks.map((p) => {
               const Icon = PACK_ICONS[p.key] || Package;
               return (
@@ -570,12 +559,6 @@ export default function App() {
               data={profile}
               onChange={handleProfileChange}
               onShowConfirmation={showConfirmation}
-            />
-          </TabsContent>
-          <TabsContent value="preferences">
-            <PreferencesEditor
-              data={preferences}
-              onChange={handlePreferencesChange}
             />
           </TabsContent>
           {dynamicPacks.map((p) => (

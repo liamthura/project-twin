@@ -249,6 +249,53 @@ def _normalize(file_type: str, data: dict) -> dict:
                 data["communication"] = copy.deepcopy(
                     sections.SECTION_REGISTRY["preferences"].default["communication"]
                 )
+            # Phase 5 (consolidation): the retired PreferencesEditor wrote a
+            # mood override's name under `when_feeling`; execute_modify has
+            # always written `mood` (server.py:2247). The two never met, so a
+            # UI-written override was invisible to every MCP lookup -- all of
+            # which resolve on `o.get("mood", "").lower()`, meaning update and
+            # remove could never find it and a second `add` for the same mood
+            # silently duplicated it. In the other direction an AI-written
+            # override had no `when_feeling` and the editor rendered it as
+            # "Untitled mood".
+            #
+            # Backfilled here rather than fixed only forward, so overrides
+            # already in a record become reachable. Exactly the shape of the
+            # `mental_tab` topic -> title backfill above, and it carries the
+            # same two rules for the same reasons:
+            #
+            #   - `when_feeling` is NOT popped. Where both keys exist the entry
+            #     is addressable by either name today, and dropping one would
+            #     remove an address rather than add one. This only ever ADDS.
+            #   - Read-neutral is not collision-neutral. Every MCP site
+            #     resolves by `mood` case-insensitively and takes the FIRST
+            #     match, so backfilling a name another override already holds
+            #     would let list position silently decide which entry a remove
+            #     resolves to. So: skip when the candidate collides with
+            #     another override's `mood` AS IT CURRENTLY STANDS -- which
+            #     includes one backfilled earlier in this same pass, since the
+            #     list is scanned and mutated in order and two overrides both
+            #     carrying only {when_feeling: "X"} would otherwise both claim
+            #     it. The earlier one claims it; the later stays collided on
+            #     every later pass, reachable only via `when_feeling`.
+            comm = data.get("communication")
+            if isinstance(comm, dict):
+                overrides = comm.get("mood_overrides")
+                if isinstance(overrides, list):
+                    for override in overrides:
+                        if not isinstance(override, dict):
+                            continue
+                        if override.get("mood") or not override.get("when_feeling"):
+                            continue
+                        candidate = override["when_feeling"]
+                        collides = any(
+                            other is not override
+                            and isinstance(other, dict)
+                            and (other.get("mood") or "").lower() == candidate.lower()
+                            for other in overrides
+                        )
+                        if not collides:
+                            override["mood"] = candidate
     if file_type == "lifestyle":
         if isinstance(data, dict):
             # Phase 5 (consolidation): passions/curiosities folded into the

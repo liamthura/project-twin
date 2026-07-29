@@ -446,6 +446,66 @@ this spec deferred as a sequel. That deferral is now doing real work rather than
 theoretical, and it is worth deciding whether to pull it forward **before** wave 4 rather than
 after.
 
+### State after wave 5
+
+`lifestyle` (1,165 lines) and `preferences` (478 lines) are retired. **4,886 lines deleted across
+waves 2-5.** `ProfileEditor.jsx` (1,446 lines) is the last one standing.
+
+**All three node kinds now exist.** `renderNode` dispatches `list`, `strings` and `fields`.
+Both new renderers are thin because `ScalarField` already owned every control they needed:
+`StringsRenderer` binds a bare `string[]` to the existing `ArrayInput`, and `FieldsRenderer`
+binds named keys of an object to `ScalarField`. `buildFieldMeta` and `needsFullRow` were pulled
+out of `ListRenderer` so all three resolve enums, long text, dates and column layout
+identically.
+
+A `fields` node accepts an **empty path** where `list` and `strings` reject one. `setAt` on a
+zero-length path replaces the target, which is fatal for a list but correct for a writer that
+spreads the stored object first — and it is exactly what `profile`'s top-level scalars need in
+wave 6.
+
+**Two manifest keys were added for parity, not for novelty.** `time_fields` (mirroring
+`date_fields`, including the guard: a non-`HH:MM` value stays a text input rather than being
+silently discarded by a picker that cannot parse it) and `placeholder`/`description`, which
+carry the retired editors' concrete example copy — "e.g. Python, TypeScript..." does more to
+explain a free-text list than any derived label.
+
+**The residual hole is narrower but still open.** Both `ui` guards key off whether a node
+declares an `entity`, not off its kind, so an entity-bearing `fields` node is checked exactly
+as a list node is — the wave-4 note that neither guard could see one was half right. The real
+gap was the spelling check, whose `_SUBSET_CHECKED_KEYS` omitted the `fields` key entirely;
+that is closed, and `assert_node_spelling` is extracted so synthetic nodes drive the same code
+as the shipped-pack sweep.
+
+What remains is genuinely narrower than "every non-list node":
+
+- A `strings` node binds a **path**, not field names — what is stored is the bare string under
+  no key at all. There is nothing to compare, so the skip is a property of the kind.
+- Entity-bearing nodes are still checked for spelling and aliases, **not for phantoms**.
+  `sleep.day_type` is a router selecting which fixed sub-object to write and is never itself
+  stored; a node binding it passes both checks. `profile` binds top-level scalars against no
+  entity at all, so wave 6 still faces this.
+
+**Two live bugs surfaced, both of the shape this project exists to find.** `hobby.status`
+declared three values and stored two — `"paused"` was folded into `"inactive"` on write while
+`_filter_inactive` had always treated it as distinct, so a user's "paused" survived only until
+the next AI edit. And the retired `PreferencesEditor` wrote a mood override's name under
+`when_feeling` while `execute_modify` has always written `mood`: every MCP lookup resolves on
+`o.get("mood")`, so a UI-written override could never be updated or removed and a second add
+duplicated it, while an AI-written one rendered as "Untitled mood". Both are fixed, the second
+with a collision-guarded backfill matching the `mental_tab` precedent.
+
+Counting `top_of_mind` in wave 4, that is **three** live data bugs found by reading storage keys
+before writing a manifest. The per-wave reading is now the single highest-yield step in this
+project, and its output is committed rather than discarded — see
+`docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md`, which also carries five
+backend follow-ups this wave did not take.
+
+**Deferred from wave 5.** `ListRenderer.jsx` is ~560 lines against the spec's ~200 budget; only
+`buildFieldMeta`/`needsFullRow` were extracted, and the badge-strip and `editFields` cuts are
+still outstanding. `describeGuards` locates a node by `path[0]` and so cannot address a nested
+list — `preferences.communication.mood_overrides` is covered by explicit tests instead. No
+Storybook story exists for any migrated section.
+
 ## Sourcing UI primitives
 
 Convergence means every migrated section funnels through one small set of controls, so the

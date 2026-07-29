@@ -217,10 +217,13 @@ def _on_disk_pack_keys():
 
 
 def _walk_sections(sections):
-    """Yield every ui section node, including nested `children`."""
+    """Yield every ui section node, including nested `children` and `sections`."""
     for node in sections or []:
         yield node
         yield from _walk_sections(node.get("children"))
+        # A group binds nothing itself but nests real nodes; missing these
+        # would drop every field they name out of both guards.
+        yield from _walk_sections(node.get("sections"))
 
 
 def _packs_with_ui_sections():
@@ -689,6 +692,62 @@ def test_ui_may_not_name_an_mcp_input_alias():
     )
     assert offenders == {"contact"}
 
+
+
+def test_group_node_is_accepted_without_a_path():
+    """A group binds no storage -- it is a heading with nested sections. `path`
+    is required for every other kind."""
+    pack_loader.validate_manifest(_manifest_with_ui({"sections": [
+        {"kind": "group", "title": "Code Style", "sections": [
+            {"kind": "strings", "path": ["code_style", "tools"], "title": "Tools"},
+        ]},
+    ]}))
+
+
+def test_group_node_without_sections_is_rejected():
+    with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(_manifest_with_ui({"sections": [{"kind": "group", "title": "Hollow"}]}))
+
+
+def test_group_node_without_a_title_is_rejected():
+    """A group exists only to name what is under it."""
+    with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(_manifest_with_ui({"sections": [
+            {"kind": "group", "sections": [
+                {"kind": "strings", "path": ["x"], "title": "X"},
+            ]},
+        ]}))
+
+
+@pytest.mark.parametrize("key,value", [
+    ("path", ["x"]),
+    ("entity", "goal"),
+    ("fields", ["a"]),
+    ("title_field", "name"),
+])
+def test_group_node_carrying_a_storage_binding_key_is_rejected(key, value):
+    """A storage-binding key on a group means it was meant to be a list or
+    fields node. Rejected rather than silently ignored."""
+    node = {"kind": "group", "title": "G", "sections": [
+        {"kind": "strings", "path": ["x"], "title": "X"},
+    ], key: value}
+    with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(_manifest_with_ui({"sections": [node]}))
+
+
+def test_a_non_group_node_still_requires_a_path():
+    """Moving `path` out of the top-level `required` must not relax it for the
+    kinds that bind storage."""
+    with pytest.raises(pack_loader.PackError):
+        pack_loader.validate_manifest(_manifest_with_ui({"sections": [{"kind": "strings", "title": "X"}]}))
+
+
+def test_guards_see_a_node_nested_inside_a_group():
+    """_walk_sections must recurse `sections` as well as `children`, or every
+    field a grouped node names drops out of both guards."""
+    node = {"kind": "fields", "path": ["x"], "entity": "mental_tab", "fields": ["name"]}
+    grouped = [{"kind": "group", "title": "G", "sections": [node]}]
+    assert node in list(_walk_sections(grouped))
 
 def test_a_fields_node_naming_an_mcp_input_alias_is_caught():
     """Wave 5 introduced kind:"fields" nodes. Both guards key off `entity`,

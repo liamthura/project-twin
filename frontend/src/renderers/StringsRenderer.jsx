@@ -29,16 +29,15 @@ export function StringsRenderer({ node, items, onItems }) {
   // .map/.filter of a non-array.
   const list = Array.isArray(items) ? items : [];
 
+  // `node.description` is deliberately NOT rendered here: SectionRenderer draws
+  // it under the node's heading, for every kind. Rendering it in both places
+  // showed it twice, and having only this renderer honour it silently dropped
+  // the copy on `fields` and `list` nodes that declared one.
   return (
-    <div className="space-y-2">
-      {node.description && (
-        <p className="text-xs text-muted-foreground">{node.description}</p>
-      )}
-      <ArrayInput
-        items={list}
-        onChange={onItems}
-        placeholder={node.placeholder ?? derivePlaceholder(node)}
-      />
-    </div>
+    <ArrayInput
+      items={list}
+      onChange={onItems}
+      placeholder={node.placeholder ?? derivePlaceholder(node)}
+    />
   );
 }

@@ -566,6 +566,7 @@ export default function ListRenderer({
                   return (
                     <div
                       key={`${ci}:${hasPath ? child.path.join(".") : ""}`}
+                      data-ui-node={child.title}
                       className="space-y-2 px-4 pb-3 sm:px-9"
                     >
                       {child.title && (

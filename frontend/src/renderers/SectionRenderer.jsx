@@ -1,7 +1,6 @@
 // Top-level entry point for rendering a pack's `ui` block. Normalises the
 // pack's `ui` (old flat map or new explicit `ui.sections` form) via
-// `normalizeUi`, then dispatches each node by `kind` via `renderNode`. Only
-// `kind: "list"` is implemented in this wave -- later waves add more.
+// `normalizeUi`, then dispatches each node by `kind` via `renderNode`.
 //
 // Lifted from GenericSectionEditor.jsx's default export (its Card/CardHeader
 // wrapper, kept exactly as GenericSectionEditor.jsx:252-258 rendered it) with
@@ -14,6 +13,11 @@
 //     SectionRenderer keeps only section-root concerns: the Card, the
 //     node.title heading, the React key, and binding each node's path
 //     against the section's own `data`
+//   - `kind: "group"` is handled HERE rather than in renderNode: a group
+//     binds no path and takes no value, so it has nothing renderNode's
+//     signature is built around. It is a heading with nested sections, and
+//     those sections bind against the same `data` root their ungrouped
+//     siblings do.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InfoButton } from "@/components/ui/info-button";
 import { getAt, setAt, normalizeUi } from "./paths";
@@ -21,6 +25,103 @@ import { renderNode } from "./renderNode";
 
 export default function SectionRenderer({ pack, data, onChange, onShowConfirmation }) {
   const { sections } = normalizeUi(pack);
+
+  // One node, plus the heading/description/info wrapper it earns. Recursive so
+  // a group's nested sections get the identical treatment one level in --
+  // `depth` only picks the heading size, never the binding, because a nested
+  // section's path resolves against the section root exactly like a top-level
+  // one's does.
+  function renderSectionNode(node, key, depth) {
+    if (node.kind === "group") {
+      if (!Array.isArray(node.sections) || node.sections.length === 0) {
+        console.error(
+          `SectionRenderer: group "${node.title}" in pack "${pack.key}" has no ` +
+            `sections -- rendering nothing rather than a heading over an empty space`
+        );
+        return null;
+      }
+      const rendered = withSeparators(node.sections, `${key}:`, depth + 1);
+      // Every child rejected: emit nothing rather than a heading over nothing,
+      // the same rule a rejected node gets below.
+      if (rendered.length === 0) return null;
+      return (
+        <div key={key} data-ui-node={node.title} className="space-y-4">
+          {heading(node, depth)}
+          <div className="space-y-4 border-l pl-4">{rendered}</div>
+        </div>
+      );
+    }
+
+    const rendered = renderNode({
+      node,
+      value: Array.isArray(node.path) ? getAt(data, node.path) : undefined,
+      onValue: (next) => onChange(setAt(data || {}, node.path, next)),
+      entities: pack.entities,
+      packKey: pack.key,
+      onShowConfirmation,
+    });
+    // renderNode returns null (after logging) for a kind it doesn't support.
+    // Bail out before the wrapper below so a rejected node contributes nothing
+    // to the DOM -- not an empty div, and not a heading floating over nothing.
+    if (!rendered) return null;
+    // `data-ui-node` is the stable handle a test scopes a node by. Walking up
+    // from the heading text with .parentElement broke the moment the heading
+    // gained a wrapper for `description`; this survives markup changes because
+    // it names the node rather than describing where it sits.
+    return (
+      <div key={key} data-ui-node={node.title} className="space-y-3">
+        {node.title && heading(node, depth)}
+        {rendered}
+      </div>
+    );
+  }
+
+  // Render a list of sibling nodes, with a rule after each GROUP that has
+  // something rendering after it. Two things that condition buys:
+  //   - no dangling rule under the last group, which is what a plain
+  //     "separator after every group" would leave when a group sits last
+  //     (lifestyle's Wellness, today)
+  //   - a rule still lands between a group and a plain node that follows it
+  //     (preferences' Learning Style -> Likes & Dislikes), which is exactly
+  //     where the boundary is hardest to see
+  // Ungrouped siblings get none: they are single controls, and ruling between
+  // each would turn the card into a stack of boxes.
+  //
+  // `rendered` is filtered first, so a rejected trailing node cannot leave the
+  // rule before it dangling either.
+  function withSeparators(nodes, keyPrefix, depth) {
+    const rendered = (nodes || [])
+      .map((node, i) => ({ node, el: renderSectionNode(node, `${keyPrefix}${i}`, depth) }))
+      .filter((r) => r.el);
+
+    return rendered.flatMap(({ node, el }, i) =>
+      node.kind === "group" && i < rendered.length - 1
+        ? [el, <hr key={`sep:${keyPrefix}${i}`} className="border-border" />]
+        : [el]
+    );
+  }
+
+  // A node's own heading row: its title, the "i" that explains it, and the one
+  // muted line under both. Shared by groups and titled nodes so a description
+  // renders for every kind -- it used to be StringsRenderer's alone, which
+  // silently dropped the copy on `fields` and `list` nodes that declared one.
+  function heading(node, depth) {
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center gap-1.5">
+          {depth === 0 ? (
+            <h3 className="text-sm font-semibold text-foreground">{node.title}</h3>
+          ) : (
+            <h4 className="text-sm font-medium text-foreground">{node.title}</h4>
+          )}
+          <InfoButton info={node.info} title={node.title} />
+        </div>
+        {node.description && (
+          <p className="text-xs text-muted-foreground">{node.description}</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <Card>
@@ -41,35 +142,10 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
         <CardDescription>{pack.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {sections.map((node, i) => {
-          // key by index as well as path: two sibling nodes may legitimately
-          // share a path, and a bare path join collides for them.
-          const key = `${i}:${Array.isArray(node.path) ? node.path.join(".") : ""}`;
-          const rendered = renderNode({
-            node,
-            value: Array.isArray(node.path) ? getAt(data, node.path) : undefined,
-            onValue: (next) => onChange(setAt(data || {}, node.path, next)),
-            entities: pack.entities,
-            packKey: pack.key,
-            onShowConfirmation,
-          });
-          // renderNode returns null (after logging) for a kind it doesn't
-          // support. Bail out before the wrapper div/heading below so a
-          // rejected node contributes nothing to the DOM -- not an empty
-          // div, and not a heading floating over nothing.
-          if (!rendered) return null;
-          return (
-            <div key={key} className="space-y-3">
-              {node.title && (
-                <div className="flex items-center gap-1.5">
-                  <h3 className="text-sm font-semibold text-foreground">{node.title}</h3>
-                  <InfoButton info={node.info} title={node.title} />
-                </div>
-              )}
-              {rendered}
-            </div>
-          );
-        })}
+        {/* Keys carry the index as well as the path: two sibling nodes may
+            legitimately share a path, and a bare path join collides for them.
+            withSeparators appends the index to this prefix. */}
+        {withSeparators(sections, "", 0)}
       </CardContent>
     </Card>
   );

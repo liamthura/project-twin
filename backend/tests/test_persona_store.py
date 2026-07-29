@@ -259,3 +259,132 @@ def test_same_pass_backfill_counts_as_collision_for_a_later_entry(as_user):
     # Idempotent: a second pass makes no further change.
     twice = store._normalize("knowledge", copy.deepcopy({"domains": [], "mental_tabs": tabs}))
     assert twice["mental_tabs"] == tabs
+
+
+# ---------------------------------------------------------------------------
+# preferences: mood override `when_feeling` -> `mood` (wave 5)
+#
+# The retired PreferencesEditor wrote a mood override's name under
+# `when_feeling`; execute_modify has always written `mood` (server.py:2247).
+# Same shape as the mental_tab topic -> title backfill above, and it carries
+# the same two rules: never pop the legacy key, and skip on collision.
+# ---------------------------------------------------------------------------
+
+
+def _overrides(data):
+    return store.load("preferences")["communication"]["mood_overrides"]
+
+
+def test_when_feeling_is_backfilled_to_mood(as_user):
+    """Until this backfill, a UI-written override was invisible to every MCP
+    lookup: they all resolve on `o.get("mood", "").lower()`, so update and
+    remove could never find it and a second add for the same mood silently
+    duplicated it."""
+    store.save("preferences", {
+        "communication": {
+            "default": {"tone": "", "detail_level": "", "locale": "British English"},
+            "mood_overrides": [{"when_feeling": "stressed", "tone": "brief"}],
+        }
+    })
+    [override] = _overrides(store.load("preferences"))
+    assert override["mood"] == "stressed"
+    assert override["tone"] == "brief"
+
+
+def test_when_feeling_is_not_popped(as_user):
+    """Where both keys exist the entry is addressable by either name today;
+    dropping one would remove an address rather than add one."""
+    store.save("preferences", {
+        "communication": {
+            "default": {"tone": "", "detail_level": "", "locale": "British English"},
+            "mood_overrides": [{"when_feeling": "tired"}],
+        }
+    })
+    [override] = _overrides(store.load("preferences"))
+    assert override["when_feeling"] == "tired"
+    assert override["mood"] == "tired"
+
+
+def test_an_override_that_already_has_mood_is_left_alone(as_user):
+    store.save("preferences", {
+        "communication": {
+            "default": {"tone": "", "detail_level": "", "locale": "British English"},
+            "mood_overrides": [{"mood": "excited", "when_feeling": "something else"}],
+        }
+    })
+    [override] = _overrides(store.load("preferences"))
+    assert override["mood"] == "excited"
+
+
+def test_mood_backfill_skips_a_collision_case_insensitively(as_user):
+    """execute_modify matches with .lower(), so a name colliding only by case
+    is still a collision -- otherwise the guard and the lookup it protects
+    would disagree about what counts as a match."""
+    store.save("preferences", {
+        "communication": {
+            "default": {"tone": "", "detail_level": "", "locale": "British English"},
+            "mood_overrides": [{"when_feeling": "stressed"}, {"mood": "STRESSED"}],
+        }
+    })
+    overrides = _overrides(store.load("preferences"))
+    assert "mood" not in overrides[0]
+    assert overrides[0]["when_feeling"] == "stressed"
+
+
+def test_same_pass_mood_backfill_counts_as_a_collision_for_a_later_entry(as_user):
+    """Two overrides carrying only {when_feeling: "X"} are processed in list
+    order: the earlier claims the name, the later is left unbackfilled rather
+    than both ending up identical -- which would recreate the ambiguous-lookup
+    hazard the guard exists to prevent."""
+    store.save("preferences", {
+        "communication": {
+            "default": {"tone": "", "detail_level": "", "locale": "British English"},
+            "mood_overrides": [
+                {"when_feeling": "stressed", "tone": "first, claims the name"},
+                {"when_feeling": "stressed", "tone": "second, loses the race"},
+            ],
+        }
+    })
+    overrides = _overrides(store.load("preferences"))
+
+    assert overrides[0]["mood"] == "stressed"
+    assert "mood" not in overrides[1]
+
+    # Idempotent: a second pass makes no further change.
+    twice = store._normalize("preferences", copy.deepcopy({
+        "communication": {"default": {}, "mood_overrides": overrides}
+    }))
+    assert twice["communication"]["mood_overrides"] == overrides
+
+
+def test_mood_backfill_survives_a_malformed_override(as_user):
+    """An MCP client can leave any shape behind; a bare string in the list
+    must not crash the read path for the whole section."""
+    store.save("preferences", {
+        "communication": {
+            "default": {"tone": "", "detail_level": "", "locale": "British English"},
+            "mood_overrides": ["oops", {"when_feeling": "tired"}],
+        }
+    })
+    overrides = _overrides(store.load("preferences"))
+    assert overrides[0] == "oops"
+    assert overrides[1]["mood"] == "tired"
+
+
+def test_flat_communication_migrates_to_the_nested_shape(as_user):
+    """This migration already existed (persona_store.py) but was never tested
+    against an old-shape record. Wave 5 adds the test, not the code."""
+    store.save("preferences", {
+        "communication": {
+            "tone": "warm",
+            "detail_level": "thorough",
+            "locale": "British English",
+        }
+    })
+    comm = store.load("preferences")["communication"]
+    assert comm["default"] == {
+        "tone": "warm",
+        "detail_level": "thorough",
+        "locale": "British English",
+    }
+    assert comm["mood_overrides"] == []
