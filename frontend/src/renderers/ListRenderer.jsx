@@ -157,12 +157,30 @@ export default function ListRenderer({
     setQuery("");
   };
 
+  // Fields at most one row may hold as true, declared on the entity. Setting
+  // one clears every other row's copy, so the invariant holds however the user
+  // gets there -- `aesthetics.primary` decides which entry rides into the
+  // minimal context scope, and two primaries would make that a coin toss.
+  const exclusiveFields = entity?.exclusive_fields || [];
+
   const updateItem = (idx, changes) => {
     const next = [...items];
     next[idx] = { ...next[idx] };
     for (const [field, value] of Object.entries(changes)) {
       if (value === undefined || value === "") delete next[idx][field];
       else next[idx][field] = value;
+    }
+    for (const field of exclusiveFields) {
+      if (changes[field] !== true) continue;
+      // Every OTHER row loses the flag. Deleted rather than set false: absent
+      // is how a row that never claimed it already looks, so this leaves one
+      // shape instead of two that render identically.
+      next.forEach((item, i) => {
+        if (i !== idx && item && item[field] !== undefined) {
+          next[i] = { ...item };
+          delete next[i][field];
+        }
+      });
     }
     onItems(next);
   };

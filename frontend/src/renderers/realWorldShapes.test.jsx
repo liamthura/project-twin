@@ -25,6 +25,7 @@ import { renderSection } from "@/test/harness";
 const lifestylePack = packs.find((p) => p.key === "lifestyle");
 const preferencesPack = packs.find((p) => p.key === "preferences");
 const profilePack = packs.find((p) => p.key === "profile");
+const aestheticsPack = packs.find((p) => p.key === "aesthetics");
 
 describe("a record shaped like production", () => {
   describe("keys no node binds", () => {
@@ -54,24 +55,29 @@ describe("a record shaped like production", () => {
     });
 
 
-    it("renders Response Format as switches writing real booleans", async () => {
-      const data = { response_format: { prefer_code_blocks: true, include_explanations: false } };
+    it("renders Response Format as editable text rows, not fixed switches", async () => {
+      // Five booleans could only answer yes or no to five ideas someone else
+      // chose. Free text says what a boolean cannot.
+      const data = { response_format: ["code blocks over three lines", "next steps at the end"] };
       const { user, latest } = renderSection({ pack: preferencesPack, initial: data });
 
-      await user.click(
-        within(uiNode("Response Format")).getByRole("switch", { name: "include explanations" })
+      const block = uiNode("Response Format");
+      expect(within(block).queryByRole("switch")).not.toBeInTheDocument();
+
+      await user.type(
+        within(block).getByDisplayValue("code blocks over three lines"), " please"
       );
 
-      expect(latest().response_format.include_explanations).toBe(true);
-      expect(latest().response_format.prefer_code_blocks).toBe(true);
+      expect(latest().response_format[0]).toBe("code blocks over three lines please");
+      expect(latest().response_format[1]).toBe("next steps at the end");
     });
 
-    it("shows timezone beside locale, where wave 6 moved it", () => {
-      const data = { communication: { default: { locale: "British English", timezone: "GMT" } } };
+    it("does not offer a timezone control -- profile.location implies it", () => {
+      const data = { communication: { default: { locale: "British English" } } };
       renderSection({ pack: preferencesPack, initial: data });
 
       expect(screen.getByLabelText("Locale")).toHaveValue("British English");
-      expect(screen.getByLabelText("Timezone")).toHaveValue("GMT");
+      expect(screen.queryByLabelText("Timezone")).not.toBeInTheDocument();
     });
 
     it("no longer binds `design`, and does not disturb it", async () => {
@@ -197,6 +203,67 @@ describe("a record shaped like production", () => {
 
       // Nothing is invented for the missing key until the user picks one.
       expect(latest().hobbies[1].status).toBeUndefined();
+    });
+  });
+
+
+  describe("exclusive_fields", () => {
+    // `primary` decides which aesthetic rides into the minimal context scope,
+    // so two primaries would make that a coin toss. Enforced in BOTH writers;
+    // this is the renderer half.
+    const styles = {
+      styles: [
+        { id: "a1", name: "Playful Editorial", primary: true },
+        { id: "a2", name: "Brutalist" },
+        { id: "a3", name: "Y2K" },
+      ],
+    };
+
+    it("sorts the primary entry above everything else", () => {
+      const later = { styles: [styles.styles[1], styles.styles[2], styles.styles[0]] };
+      renderSection({ pack: aestheticsPack, initial: later });
+
+      const names = screen
+        .getAllByRole("button", { name: /^Remove / })
+        .map((b) => b.getAttribute("aria-label").replace("Remove ", ""));
+      expect(names[0]).toBe("Playful Editorial");
+    });
+
+    it("clears the flag on every other row when one claims it", async () => {
+      const { user, latest } = renderSection({ pack: aestheticsPack, initial: styles });
+
+      await user.click(screen.getByText("Brutalist"));
+      const row = screen
+        .getByRole("button", { name: "Remove Brutalist" })
+        .closest("div").parentElement;
+      await user.click(within(row).getByRole("switch"));
+
+      const after = Object.fromEntries(latest().styles.map((s) => [s.name, s.primary]));
+      expect(after["Brutalist"]).toBe(true);
+      expect(after["Playful Editorial"]).toBeUndefined();
+      expect(after["Y2K"]).toBeUndefined();
+    });
+
+    it("leaves the others alone when an unrelated field is edited", async () => {
+      const { user, latest } = renderSection({ pack: aestheticsPack, initial: styles });
+
+      await user.click(screen.getByText("Brutalist"));
+      const notes = screen.getByText("notes").parentElement;
+      await user.type(within(notes).getByRole("textbox"), "just liked");
+
+      expect(latest().styles.find((s) => s.name === "Playful Editorial").primary).toBe(true);
+    });
+
+    it("turning the only primary off leaves none, rather than moving it", async () => {
+      const { user, latest } = renderSection({ pack: aestheticsPack, initial: styles });
+
+      await user.click(screen.getByText("Playful Editorial"));
+      const row = screen
+        .getByRole("button", { name: "Remove Playful Editorial" })
+        .closest("div").parentElement;
+      await user.click(within(row).getByRole("switch"));
+
+      expect(latest().styles.every((s) => !s.primary)).toBe(true);
     });
   });
 

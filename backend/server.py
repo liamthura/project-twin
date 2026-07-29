@@ -2325,19 +2325,41 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             if data.get("locale"):
                 default["locale"] = data["locale"]
                 updated.append(f"locale={data['locale']}")
-            # `timezone` moved here from `work_preferences` in wave 6: it is a
-            # formatting fact, and locale -- the other one -- already lived on
-            # this object.
-            if data.get("timezone"):
-                default["timezone"] = data["timezone"]
-                updated.append(f"timezone={data['timezone']}")
             if not updated:
-                return ("❌ communication_default update requires 'tone', "
-                        "'detail_level', 'locale', or 'timezone'")
+                return "❌ communication_default update requires 'tone', 'detail_level', or 'locale'"
             save_json("preferences.json", preferences)
             return f"✅ Updated default communication: {', '.join(updated)}"
         return f"❌ communication_default only supports 'update' action"
     
+    elif entity == "response_format":
+        preferences = load_json("preferences.json")
+        items = preferences.setdefault("response_format", [])
+        # Bare strings, like lifestyle's energy_peaks. Was five fixed booleans
+        # until wave 6; free text says what a boolean cannot ("code blocks for
+        # anything over three lines").
+        if not isinstance(items, list):
+            items = []
+            preferences["response_format"] = items
+        item = get_field(data, "item", "format", "preference", "value", default="")
+
+        if action == "add":
+            if not item:
+                return "❌ response_format requires 'item'"
+            if any(isinstance(i, str) and i.lower() == item.lower() for i in items):
+                return f"ℹ️ '{item}' already in response format"
+            items.append(item)
+            save_json("preferences.json", preferences)
+            return f"✅ Added response format: {item}"
+        elif action == "remove":
+            found = next(
+                (i for i in items if isinstance(i, str) and i.lower() == item.lower()), None
+            )
+            if found is None:
+                return f"❌ Response format '{item}' not found"
+            items.remove(found)
+            save_json("preferences.json", preferences)
+            return f"✅ Removed response format: {item}"
+
     elif entity == "mood_override":
         preferences = load_json("preferences.json")
         comm = preferences.setdefault("communication", {})
@@ -2771,6 +2793,21 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         section, list_key, espec = _gspec
         blob = load_json(f"{section}.json")
         items = blob.setdefault(list_key, [])
+
+        def _enforce_exclusive(payload, keep):
+            """Clear an entity's `exclusive_fields` on every item but `keep`.
+
+            Declared once on the entity so both writers honour it; enforcing it
+            in the renderer alone would leave an MCP client free to create a
+            second `primary` aesthetic, which is exactly the write the minimal
+            context scope reads.
+            """
+            for field in espec.get("exclusive_fields") or []:
+                if payload.get(field) is not True:
+                    continue
+                for other in items:
+                    if other is not keep and isinstance(other, dict):
+                        other.pop(field, None)
         ident = espec["identifier"]
         value = get_field(data, ident, "name", "title")
 
@@ -2802,6 +2839,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             if err:
                 return err
             items.append(item)
+            _enforce_exclusive(item, item)
             save_json(f"{section}.json", blob)
             return f"✅ Added {entity}: {value}"
 
@@ -2818,6 +2856,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             if err:
                 return err
             item.update(changes)
+            _enforce_exclusive(changes, item)
             new_ident = get_field(data, f"new_{ident}")
             if new_ident:
                 item[ident] = new_ident

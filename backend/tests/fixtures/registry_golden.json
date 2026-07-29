@@ -397,8 +397,7 @@
         "optional": [
           "tone",
           "detail_level",
-          "locale",
-          "timezone"
+          "locale"
         ],
         "identifier": null,
         "description": "Update-only singleton for default communication style"
@@ -420,18 +419,15 @@
       },
       "response_format": {
         "actions": [
-          "update"
+          "add",
+          "remove"
         ],
-        "required": [],
-        "optional": [
-          "prefer_code_blocks",
-          "prefer_bullet_points_for_lists",
-          "include_explanations",
-          "show_file_structure",
-          "provide_next_steps"
+        "required": [
+          "item"
         ],
-        "identifier": null,
-        "description": "Boolean toggles for how an AI should shape its answers."
+        "optional": [],
+        "identifier": "item",
+        "description": "One statement about how you want answers shaped. Bare strings, like lifestyle's energy_peaks."
       }
     },
     "projects": {
@@ -740,6 +736,9 @@
             "avoid"
           ]
         },
+        "exclusive_fields": [
+          "primary"
+        ],
         "identifier": "name",
         "list": "styles",
         "field_defaults": {

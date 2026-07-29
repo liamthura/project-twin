@@ -518,28 +518,56 @@ def test_project_approach_is_not_duplicated_on_a_second_pass(as_user):
     assert twice["learning_style"]["preferred"] == ["iterative"]
 
 
-def test_timezone_folds_onto_communication_default(as_user):
-    """A formatting fact, beside `locale`, the other formatting fact."""
-    store.save("preferences", {
-        "work_preferences": {"timezone": "GMT/BST (UK)"},
-        "communication": {"default": {"locale": "British English"}},
-    })
-    default = store.load("preferences")["communication"]["default"]
-    assert default["timezone"] == "GMT/BST (UK)"
-    assert default["locale"] == "British English"
-
-
-def test_timezone_does_not_overwrite_one_already_set(as_user):
-    store.save("preferences", {
-        "work_preferences": {"timezone": "GMT"},
-        "communication": {"default": {"timezone": "CET"}},
-    })
-    assert store.load("preferences")["communication"]["default"]["timezone"] == "CET"
+def test_timezone_is_left_alone(as_user):
+    """profile.location already implies it, so it earns no control -- but it is
+    not popped either: a record whose location is vague or absent would lose
+    the only explicit copy, and _normalize cannot read another section to
+    check."""
+    store.save("preferences", {"work_preferences": {"timezone": "GMT/BST (UK)"}})
+    assert store.load("preferences")["work_preferences"] == {"timezone": "GMT/BST (UK)"}
+    assert "timezone" not in store.load("preferences").get("communication", {}).get("default", {})
 
 
 def test_work_preferences_disappears_once_empty(as_user):
-    store.save("preferences", {"work_preferences": {"timezone": "GMT", "project_approach": "x"}})
+    store.save("preferences", {"work_preferences": {"project_approach": "x"}})
     assert "work_preferences" not in store.load("preferences")
+
+
+# ---------------------------------------------------------------------------
+# response_format: five fixed booleans -> a free-text list
+# ---------------------------------------------------------------------------
+
+
+def test_response_format_booleans_become_text(as_user):
+    store.save("preferences", {"response_format": {
+        "prefer_code_blocks": True,
+        "provide_next_steps": True,
+    }})
+    assert store.load("preferences")["response_format"] == [
+        "prefer code blocks", "provide next steps",
+    ]
+
+
+def test_a_false_boolean_is_dropped_rather_than_negated(as_user):
+    """A list of wants has no way to say "explicitly off", and a false boolean
+    already read the same as absent for every reader of this key."""
+    store.save("preferences", {"response_format": {
+        "prefer_code_blocks": True,
+        "include_explanations": False,
+    }})
+    assert store.load("preferences")["response_format"] == ["prefer code blocks"]
+
+
+def test_an_already_converted_list_is_untouched(as_user):
+    store.save("preferences", {"response_format": ["code blocks over three lines"]})
+    assert store.load("preferences")["response_format"] == ["code blocks over three lines"]
+
+
+def test_the_response_format_conversion_is_idempotent(as_user):
+    store.save("preferences", {"response_format": {"prefer_code_blocks": True}})
+    once = store.load("preferences")
+    twice = store._normalize("preferences", copy.deepcopy(once))
+    assert twice["response_format"] == once["response_format"]
 
 
 def test_best_productivity_time_is_kept_rather_than_dropped(as_user):
@@ -557,3 +585,18 @@ def test_design_is_left_in_storage(as_user):
     Unbound from the UI; never dropped blind."""
     store.save("preferences", {"design": {"frontend_aesthetic": "Playful Editorial"}})
     assert store.load("preferences")["design"] == {"frontend_aesthetic": "Playful Editorial"}
+
+
+def test_response_format_entity_adds_and_removes(as_user):
+    """Bare strings need their own branch -- the generic `preference` router
+    writes scalars into a category dict and cannot append to a list."""
+    import server
+    store.save("preferences", {"response_format": []})
+    server.execute_modify("add", "response_format", {"item": "code blocks over three lines"})
+    server.execute_modify("add", "response_format", {"item": "code blocks over three lines"})
+    assert store.load("preferences")["response_format"] == ["code blocks over three lines"]
+
+    assert server.execute_modify(
+        "remove", "response_format", {"item": "CODE BLOCKS OVER THREE LINES"}
+    ).startswith("✅")
+    assert store.load("preferences")["response_format"] == []

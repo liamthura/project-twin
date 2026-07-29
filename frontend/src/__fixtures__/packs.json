@@ -919,8 +919,7 @@
         "optional": [
           "tone",
           "detail_level",
-          "locale",
-          "timezone"
+          "locale"
         ],
         "identifier": null,
         "description": "Update-only singleton for default communication style"
@@ -942,18 +941,15 @@
       },
       "response_format": {
         "actions": [
-          "update"
+          "add",
+          "remove"
         ],
-        "required": [],
-        "optional": [
-          "prefer_code_blocks",
-          "prefer_bullet_points_for_lists",
-          "include_explanations",
-          "show_file_structure",
-          "provide_next_steps"
+        "required": [
+          "item"
         ],
-        "identifier": null,
-        "description": "Boolean toggles for how an AI should shape its answers."
+        "optional": [],
+        "identifier": "item",
+        "description": "One statement about how you want answers shaped. Bare strings, like lifestyle's energy_peaks."
       }
     },
     "ui": {
@@ -1028,7 +1024,6 @@
               "fields": [
                 "tone",
                 "locale",
-                "timezone",
                 "detail_level"
               ],
               "long_text": [
@@ -1038,8 +1033,7 @@
               "field_placeholders": {
                 "detail_level": "e.g. comprehensive with examples, step-by-step breakdowns when explaining code...",
                 "locale": "e.g. British English",
-                "tone": "e.g. friendly but professional",
-                "timezone": "e.g. GMT/BST (UK)"
+                "tone": "e.g. friendly but professional"
               }
             },
             {
@@ -1071,28 +1065,15 @@
               }
             },
             {
-              "kind": "fields",
+              "kind": "strings",
               "path": [
                 "response_format"
               ],
-              "entity": "response_format",
               "title": "Response Format",
               "description": "How you want answers shaped",
-              "fields": [
-                "prefer_code_blocks",
-                "prefer_bullet_points_for_lists",
-                "include_explanations",
-                "show_file_structure",
-                "provide_next_steps"
-              ],
-              "bool_fields": [
-                "prefer_code_blocks",
-                "prefer_bullet_points_for_lists",
-                "include_explanations",
-                "show_file_structure",
-                "provide_next_steps"
-              ],
-              "$comment": "Real JSON booleans, hence bool_fields rather than an enum. Same generic `preference` router."
+              "item_control": "input",
+              "placeholder": "e.g. code blocks for anything over three lines",
+              "$comment": "Bare strings. Was five fixed booleans until wave 6 -- a boolean can only answer yes or no to an idea someone else chose, and real preferences are more specific than that. persona_store._normalize converts the old shape, keeping the TRUE keys as text; a list of wants cannot express \"explicitly off\", and a false boolean already read the same as absent."
             }
           ]
         },
@@ -1874,6 +1855,9 @@
             "avoid"
           ]
         },
+        "exclusive_fields": [
+          "primary"
+        ],
         "identifier": "name",
         "list": "styles",
         "field_defaults": {

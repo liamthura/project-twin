@@ -85,3 +85,49 @@ def test_aesthetic_avoid_survives_personal_scope(clean_database, as_user):
     server.execute_modify("add", "aesthetic", {"name": "Corporate memphis", "stance": "avoid"})
     ctx = server.get_scoped_context("personal")["context"]
     assert ctx["aesthetics"]["styles"][0]["stance"] == "avoid"
+
+
+# ---------------------------------------------------------------------------
+# exclusive_fields: at most one item may hold the flag.
+#
+# Declared on the entity so BOTH writers honour it. Enforcing it in the
+# renderer alone would leave an MCP client free to create a second `primary`
+# aesthetic -- which is precisely the write the minimal context scope reads.
+# ---------------------------------------------------------------------------
+
+
+def test_adding_a_second_primary_clears_the_first(clean_database, as_user):
+    _enable("aesthetics")
+    server.execute_modify("add", "aesthetic", {"name": "Playful Editorial", "primary": True})
+    server.execute_modify("add", "aesthetic", {"name": "Brutalist", "primary": True})
+    styles = {s["name"]: s for s in server.load_json("aesthetics.json")["styles"]}
+    assert "primary" not in styles["Playful Editorial"]
+    assert styles["Brutalist"]["primary"] is True
+
+
+def test_updating_an_entry_to_primary_clears_the_others(clean_database, as_user):
+    _enable("aesthetics")
+    server.execute_modify("add", "aesthetic", {"name": "Playful Editorial", "primary": True})
+    server.execute_modify("add", "aesthetic", {"name": "Brutalist"})
+    server.execute_modify("update", "aesthetic", {"name": "Brutalist", "primary": True})
+    styles = {s["name"]: s for s in server.load_json("aesthetics.json")["styles"]}
+    assert "primary" not in styles["Playful Editorial"]
+    assert styles["Brutalist"]["primary"] is True
+
+
+def test_an_unrelated_update_leaves_the_primary_alone(clean_database, as_user):
+    _enable("aesthetics")
+    server.execute_modify("add", "aesthetic", {"name": "Playful Editorial", "primary": True})
+    server.execute_modify("add", "aesthetic", {"name": "Brutalist"})
+    server.execute_modify("update", "aesthetic", {"name": "Brutalist", "notes": "just liked"})
+    styles = {s["name"]: s for s in server.load_json("aesthetics.json")["styles"]}
+    assert styles["Playful Editorial"]["primary"] is True
+
+
+def test_primary_survives_as_a_real_boolean(clean_database, as_user):
+    """get_field returns the raw value, so a JSON true must not arrive as the
+    string "true" -- the context hook tests `is True`."""
+    _enable("aesthetics")
+    server.execute_modify("add", "aesthetic", {"name": "Playful Editorial", "primary": True})
+    [style] = server.load_json("aesthetics.json")["styles"]
+    assert style["primary"] is True

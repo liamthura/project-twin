@@ -316,14 +316,11 @@ def _normalize(file_type: str, data: dict) -> dict:
                     if isinstance(pref, list) and approach.strip() not in pref:
                         pref.append(approach.strip())
                     wp.pop("project_approach", None)
-                # `timezone` is a formatting fact, and locale -- the other
-                # formatting fact -- already lives on communication.default.
-                tz = wp.get("timezone")
-                if isinstance(tz, str) and tz.strip():
-                    comm = data.setdefault("communication", {}).setdefault("default", {})
-                    if isinstance(comm, dict) and not comm.get("timezone"):
-                        comm["timezone"] = tz.strip()
-                    wp.pop("timezone", None)
+                # `timezone` is left alone: profile.location already implies
+                # it, so it earns no control of its own. Not popped either --
+                # a record whose location is vague or absent would lose the
+                # only explicit copy, and an unbound key costs a line of JSON.
+                #
                 # `best_productivity_time` duplicates lifestyle.wellness.
                 # energy_peaks, which is a RICHER list in a DIFFERENT section --
                 # and _normalize only ever sees one section's blob, so it
@@ -332,6 +329,22 @@ def _normalize(file_type: str, data: dict) -> dict:
                 # costs nothing but a line of JSON.
                 if not wp:
                     data.pop("work_preferences", None)
+
+            # Phase 6 (consolidation): `response_format` was five booleans,
+            # which can only say yes or no to five fixed ideas. Real preferences
+            # are more specific than that ("code blocks for anything over three
+            # lines"), so it becomes a free-text list like work highlights.
+            #
+            # Only the TRUE keys carry over: a list of wants has no way to
+            # express "explicitly off", and a false boolean was already the
+            # same as absent for every reader of this key.
+            rf = data.get("response_format")
+            if isinstance(rf, dict):
+                data["response_format"] = [
+                    key.replace("_", " ")
+                    for key, on in rf.items()
+                    if on is True
+                ]
 
             # `design` is deliberately NOT dropped here. It duplicates the
             # aesthetics pack, which holds the same material split by domain,

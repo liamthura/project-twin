@@ -58,6 +58,9 @@
           "avoid"
         ]
       },
+      "exclusive_fields": [
+        "primary"
+      ],
       "identifier": "name",
       "list": "styles",
       "field_defaults": {
