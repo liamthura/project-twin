@@ -1,0 +1,27 @@
+{
+  "_note": "Shapes read off backend/server.py's execute_modify branches, recorded in docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md. Two traps: a mood override's name is stored as `mood` (server.py:2247), NOT the `when_feeling` the retired editor wrote -- persona_store._normalize backfills the legacy key with a collision guard. And `likes_dislikes` is ONE list shared by the `like` and `dislike` entities, discriminated by `stance`, which appears in neither entity's required nor optional. The five code_style/learning_style arrays have no usable MCP write path at all. This key itself is inert: no ui node addresses it.",
+  "code_style": {
+    "preferred_languages": ["Python", "TypeScript"],
+    "frameworks": ["FastAPI", "React"],
+    "tools": ["VS Code", "Docker"]
+  },
+  "communication": {
+    "default": {
+      "tone": "friendly but direct",
+      "detail_level": "Thorough, with worked examples when explaining code.",
+      "locale": "British English"
+    },
+    "mood_overrides": [
+      { "mood": "stressed", "tone": "brief", "detail_level": "Answer first, context after." },
+      { "mood": "curious", "tone": "exploratory" }
+    ]
+  },
+  "learning_style": {
+    "preferred": ["hands-on examples", "diagrams"],
+    "avoid": ["walls of text"]
+  },
+  "likes_dislikes": [
+    { "item": "worked examples", "stance": "like" },
+    { "item": "unsolicited sales tone", "stance": "dislike" }
+  ]
+}

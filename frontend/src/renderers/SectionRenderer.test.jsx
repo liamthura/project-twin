@@ -10,6 +10,7 @@ import circleData from "@/__fixtures__/data/circle.json";
 import projectsData from "@/__fixtures__/data/projects.json";
 import knowledgeData from "@/__fixtures__/data/knowledge.json";
 import lifestyleData from "@/__fixtures__/data/lifestyle.json";
+import preferencesData from "@/__fixtures__/data/preferences.json";
 import { renderSection } from "@/test/harness";
 import { SEGMENTED_MAX } from "@/components/controls";
 import { normalizeUi } from "@/renderers/paths";
@@ -22,6 +23,7 @@ const circlePack = packs.find((p) => p.key === "circle");
 const projectsPack = packs.find((p) => p.key === "projects");
 const knowledgePack = packs.find((p) => p.key === "knowledge");
 const lifestylePack = packs.find((p) => p.key === "lifestyle");
+const preferencesPack = packs.find((p) => p.key === "preferences");
 
 // Shared reasons for the two exclusion entries nearly every pack needs --
 // spelled out once so every call site's exclusion map still requires a real,
@@ -1483,6 +1485,145 @@ describe("section headings and info placement", () => {
       await user.type(within(block("Values")).getByRole("textbox"), "integrity{Enter}");
 
       expect(latest().values).toEqual(["integrity"]);
+    });
+  });
+
+
+  // -------------------------------------------------------------------------
+  // preferences (wave 5) -- five `strings` nodes, one `fields` node and two
+  // `list` nodes, and the section that carries this wave's second live bug.
+  //
+  // The retired editor wrote a mood override's name under `when_feeling`;
+  // execute_modify has always written `mood` (server.py:2247). Every MCP
+  // lookup resolves on `o.get("mood")`, so a UI-written override could never
+  // be updated or removed and a second add for the same mood duplicated it,
+  // while an AI-written one rendered as "Untitled mood". The manifest binds
+  // `mood`; persona_store._normalize backfills the legacy key.
+  // -------------------------------------------------------------------------
+  describe("preferences", () => {
+    // No describeGuards for mood_overrides: it locates a node by `path[0]`,
+    // which cannot distinguish the two nodes under `communication` (the
+    // `default` fields node and the `mood_overrides` list). The explicit
+    // tests below cover that list instead.
+    describe("likes_dislikes list", () => {
+      describeGuards({
+        pack: preferencesPack, listKey: "likes_dislikes", data: preferencesData,
+        exclusions: {},
+      });
+    });
+
+    const block = (heading) => screen.getByText(heading).parentElement.parentElement;
+
+    it("renders every node kind the pack declares", () => {
+      renderSection({ pack: preferencesPack, initial: preferencesData });
+
+      expect(screen.getByText("Python")).toBeInTheDocument();
+      expect(screen.getByText("hands-on examples")).toBeInTheDocument();
+      expect(screen.getByLabelText("Tone")).toHaveValue("friendly but direct");
+      expect(screen.getByText("stressed")).toBeInTheDocument();
+      expect(screen.getByText("worked examples")).toBeInTheDocument();
+    });
+
+    it("renders a mood override by its stored `mood`, not the retired `when_feeling`", () => {
+      renderSection({ pack: preferencesPack, initial: preferencesData });
+      for (const o of preferencesData.communication.mood_overrides) {
+        expect(screen.getByText(o.mood)).toBeInTheDocument();
+      }
+      expect(screen.queryByText("Untitled mood")).not.toBeInTheDocument();
+    });
+
+    it("writes a new mood override under `mood`, the key execute_modify reads", async () => {
+      // The write half, and the half that loses data: an override stored
+      // under `when_feeling` is unreachable by every MCP lookup.
+      const { user, latest } = renderSection({ pack: preferencesPack, initial: preferencesData });
+
+      await user.click(within(block("When I'm feeling...")).getByRole("button", { name: "Add" }));
+      const dialog = screen.getByRole("dialog");
+      await user.type(within(dialog).getAllByRole("textbox")[0], "tired");
+      await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+      const added = latest().communication.mood_overrides.find((o) => o.mood === "tired");
+      expect(added).toBeTruthy();
+      expect(added).not.toHaveProperty("when_feeling");
+    });
+
+    it("never binds `locale` on a mood override -- no branch stores it there", () => {
+      // The retired editor wrote it; server.py:2245-2249 writes only tone and
+      // detail_level. Binding it would render a control whose edits no AI
+      // client can ever see.
+      renderSection({ pack: preferencesPack, initial: preferencesData });
+      const moods = block("When I'm feeling...");
+      expect(within(moods).queryByLabelText(/locale/i)).not.toBeInTheDocument();
+    });
+
+    it("keeps likes and dislikes in ONE list, discriminated by stance", () => {
+      renderSection({ pack: preferencesPack, initial: preferencesData });
+      const list = block("Likes & Dislikes");
+
+      expect(within(list).getByText("worked examples")).toBeInTheDocument();
+      expect(within(list).getByText("unsolicited sales tone")).toBeInTheDocument();
+    });
+
+    it("flips a row's stance without disturbing the other rows", async () => {
+      const { user, latest } = renderSection({ pack: preferencesPack, initial: preferencesData });
+
+      await user.click(screen.getByText("worked examples"));
+      // `stance` is also a facet, so the filter bar renders its own "stance"
+      // label and its own like/dislike buttons. Scope to this row via its
+      // remove button, whose accessible name carries the row's title -- the
+      // one handle in the markup that is unique per row.
+      const row = screen
+        .getByRole("button", { name: "Remove worked examples" })
+        .closest("div").parentElement;
+      await user.click(within(row).getByRole("button", { name: "dislike" }));
+
+      expect(latest().likes_dislikes[0]).toEqual({
+        item: "worked examples",
+        stance: "dislike",
+      });
+      expect(latest().likes_dislikes[1]).toEqual({
+        item: "unsolicited sales tone",
+        stance: "dislike",
+      });
+    });
+
+    it("writes the communication default without touching the overrides beside it", async () => {
+      const { user, latest } = renderSection({ pack: preferencesPack, initial: preferencesData });
+
+      const locale = screen.getByLabelText("Locale");
+      await user.clear(locale);
+      await user.type(locale, "American English");
+
+      expect(latest().communication.default.locale).toBe("American English");
+      expect(latest().communication.default.tone).toBe("friendly but direct");
+      expect(latest().communication.mood_overrides).toHaveLength(2);
+    });
+
+    it("keeps the three code_style lists independent of each other", async () => {
+      const { user, latest } = renderSection({ pack: preferencesPack, initial: preferencesData });
+
+      await user.type(within(block("Tools")).getByRole("textbox"), "tmux{Enter}");
+
+      expect(latest().code_style.tools).toEqual(["VS Code", "Docker", "tmux"]);
+      expect(latest().code_style.frameworks).toEqual(["FastAPI", "React"]);
+      expect(latest().learning_style.preferred).toEqual(["hands-on examples", "diagrams"]);
+    });
+
+    it("renders detail_level as a textarea, as the retired editor did", () => {
+      renderSection({ pack: preferencesPack, initial: preferencesData });
+      expect(screen.getByLabelText("Detail level").tagName).toBe("TEXTAREA");
+    });
+
+    it("gives every group a usable control on a brand-new account", () => {
+      renderSection({ pack: preferencesPack, initial: {} });
+
+      for (const heading of ["Preferred Languages", "Frameworks", "Tools",
+                             "Preferred Methods", "Things to Avoid"]) {
+        expect(within(block(heading)).getByRole("textbox")).toBeEnabled();
+      }
+      expect(screen.getByLabelText("Tone")).toHaveValue("");
+      expect(screen.getByRole("button", { name: "Add mood override" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add like" })).toBeInTheDocument();
     });
   });
 
