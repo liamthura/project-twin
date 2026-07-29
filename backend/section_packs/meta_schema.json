@@ -356,6 +356,18 @@
             "$ref": "#/$defs/uiSection"
           }
         },
+        "pinned": {
+          "type": "object",
+          "required": ["field", "title", "empty", "noun"],
+          "additionalProperties": false,
+          "description": "Lifts the ONE row holding `field` out of the list and renders it above, as the section's answer to a question the list cannot answer -- \"which of these is your design language\". The lifted row is excluded from the list below rather than shown twice, `field` never renders as an editable control or appears in the Add dialog, and every other row gets a star to claim the slot. Pair it with the entity's `exclusive_fields` so both writers keep it to one.",
+          "properties": {
+            "field": { "type": "string" },
+            "title": { "type": "string", "minLength": 1 },
+            "empty": { "type": "string", "minLength": 1 },
+            "noun": { "type": "string", "minLength": 1, "description": "What the slot is called in a control's accessible name, e.g. \"primary\" -> \"Make Brutalist primary\"." }
+          }
+        },
         "sort": {
           "type": "object",
           "required": [

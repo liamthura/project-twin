@@ -89,7 +89,6 @@
           "stance"
         ],
         "detail_fields": [
-          "primary",
           "notes",
           "references"
         ],
@@ -112,17 +111,17 @@
             "Glassmorphism"
           ]
         },
-        "bool_fields": [
-          "primary"
-        ],
-        "sort": {
-          "field": "primary",
-          "dir": "desc"
-        },
         "count_badges": [
           "references"
         ],
-        "$comment": "`primary` marks the one entry that IS the user's design language, as opposed to a style they merely like. It is the only entry that rides into the `minimal` scope, so an AI client gets the governing aesthetic at conversation start without the whole list. Nothing enforces a single primary -- ListRenderer has no cross-row logic -- so the sort surfaces whichever are marked and the hook takes the first."
+        "$comment": "`primary` marks the one entry that IS the user's design language, as opposed to a style they merely like. It is the only entry that rides into the `minimal` scope, so an AI client gets the governing aesthetic at conversation start without the whole list. Rendered via `pinned` rather than as a field control -- a labelled switch in a detail grid is a poor way to say \"this one is THE one\" -- and kept to a single holder by the entity's `exclusive_fields`, which both the renderer and execute_modify honour.",
+        "title": "Styles",
+        "pinned": {
+          "field": "primary",
+          "title": "Primary aesthetic",
+          "empty": "No primary set yet. Star a style below to make it your design language.",
+          "noun": "primary"
+        }
       }
     ]
   }

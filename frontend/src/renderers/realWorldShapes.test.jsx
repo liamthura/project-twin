@@ -232,11 +232,7 @@ describe("a record shaped like production", () => {
     it("clears the flag on every other row when one claims it", async () => {
       const { user, latest } = renderSection({ pack: aestheticsPack, initial: styles });
 
-      await user.click(screen.getByText("Brutalist"));
-      const row = screen
-        .getByRole("button", { name: "Remove Brutalist" })
-        .closest("div").parentElement;
-      await user.click(within(row).getByRole("switch"));
+      await user.click(screen.getByRole("button", { name: "Make Brutalist primary" }));
 
       const after = Object.fromEntries(latest().styles.map((s) => [s.name, s.primary]));
       expect(after["Brutalist"]).toBe(true);
@@ -254,16 +250,42 @@ describe("a record shaped like production", () => {
       expect(latest().styles.find((s) => s.name === "Playful Editorial").primary).toBe(true);
     });
 
-    it("turning the only primary off leaves none, rather than moving it", async () => {
-      const { user, latest } = renderSection({ pack: aestheticsPack, initial: styles });
+    it("marks the pinned row as already primary rather than offering to re-claim it", () => {
+      renderSection({ pack: aestheticsPack, initial: styles });
 
-      await user.click(screen.getByText("Playful Editorial"));
-      const row = screen
-        .getByRole("button", { name: "Remove Playful Editorial" })
-        .closest("div").parentElement;
-      await user.click(within(row).getByRole("switch"));
+      const star = screen.getByRole("button", { name: "Playful Editorial is primary" });
+      expect(star).toBeDisabled();
+      expect(star).toHaveAttribute("aria-pressed", "true");
+    });
 
-      expect(latest().styles.every((s) => !s.primary)).toBe(true);
+    it("lifts the primary out of the list rather than showing it twice", () => {
+      renderSection({ pack: aestheticsPack, initial: styles });
+
+      // One occurrence: the pinned block. It has no Remove-in-list twin.
+      expect(screen.getAllByText("Playful Editorial")).toHaveLength(1);
+      expect(
+        screen.queryByRole("button", { name: "Make Playful Editorial primary" })
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows the empty prompt when nothing is primary", () => {
+      renderSection({
+        pack: aestheticsPack,
+        initial: { styles: [{ id: "a1", name: "Brutalist" }] },
+      });
+
+      expect(screen.getByText(/No primary set yet/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Make Brutalist primary" })).toBeInTheDocument();
+    });
+
+    it("keeps the flag out of the Add dialog", async () => {
+      const { user } = renderSection({ pack: aestheticsPack, initial: styles });
+
+      await user.click(screen.getByRole("button", { name: /^Add/ }));
+      const dialog = screen.getByRole("dialog");
+
+      expect(within(dialog).queryByText(/primary/i)).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole("switch")).not.toBeInTheDocument();
     });
   });
 

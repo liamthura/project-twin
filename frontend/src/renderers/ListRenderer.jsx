@@ -11,7 +11,7 @@
 //     entity's, for sections whose manifest field names are not their
 //     storage keys (unused by today's packs, needed by waves 3-6)
 import { useState } from "react";
-import { Plus, Trash2, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -99,7 +99,20 @@ export default function ListRenderer({
   // letting addItem silently no-op and close on a title the user already has.
   const titleCollides =
     !!draft[titleField] && existingTitles.has(draft[titleField].toLowerCase());
-  const editFields = [...new Set([...badges, ...detailFields])];
+  // A node may lift ONE row out of the list and render it above, as the
+  // section's answer to a question the list as a whole cannot answer --
+  // "which of these is your design language". The lifted row is excluded from
+  // the list below rather than shown twice, and every remaining row gets a
+  // star to claim the slot. The flag itself never appears as a field control:
+  // a labelled switch inside a detail grid is a poor way to say "this one is
+  // THE one".
+  const pinnedField = node.pinned?.field;
+  const pinnedIdx = pinnedField
+    ? items.findIndex((i) => i && i[pinnedField] === true)
+    : -1;
+  const editFields = [...new Set([...badges, ...detailFields])].filter(
+    (f) => f !== pinnedField
+  );
   const fieldDefaults = node.field_defaults ?? entity?.field_defaults ?? {};
   // What this list holds, for the Add affordances. Was inline in the dialog
   // heading only; the header button said a bare "Add", which reads fine beside
@@ -163,6 +176,7 @@ export default function ListRenderer({
   // minimal context scope, and two primaries would make that a coin toss.
   const exclusiveFields = entity?.exclusive_fields || [];
 
+
   const updateItem = (idx, changes) => {
     const next = [...items];
     next[idx] = { ...next[idx] };
@@ -197,6 +211,11 @@ export default function ListRenderer({
   // last entry" -- the same thing the section root leaves behind when the
   // last row of a top-level list is deleted. Blanking a scalar inside a child
   // item is the child renderer's own concern and is handled by ITS updateItem.
+  // Claim the pinned slot. Routed through updateItem so the exclusivity rule
+  // declared on the entity clears every other row, rather than being
+  // reimplemented here and drifting from it.
+  const promote = (idx) => updateItem(idx, { [pinnedField]: true });
+
   const updateItemAt = (idx, path, value) => {
     const next = [...items];
     next[idx] = setAt(next[idx] ?? {}, path, value);
@@ -244,7 +263,8 @@ export default function ListRenderer({
   // options. A facet field with no resolvable options is skipped entirely
   // below rather than narrowing on a value that could never be selected.
   const facetOptions = (field) => node.enum?.[field] ?? entity?.valid_values?.[field];
-  const visible = applyFacets(searched, items, node.facets, facetValues);
+  const visible = applyFacets(searched, items, node.facets, facetValues)
+    .filter((idx) => idx !== pinnedIdx);
   // Whether the header's "N of M" count needs to account for something
   // narrowing `visible` -- previously only the search query, now a selected
   // facet too. Reads the same facetValues map applyFacets already consumed;
@@ -420,6 +440,21 @@ export default function ListRenderer({
         </div>
       )}
 
+      {pinnedField && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            {node.pinned.title}
+          </p>
+          {pinnedIdx === -1 ? (
+            <EmptyState>{node.pinned.empty}</EmptyState>
+          ) : (
+            <div className="rounded-md border border-primary/40 bg-primary/[0.03]">
+              {renderRow(pinnedIdx)}
+            </div>
+          )}
+        </div>
+      )}
+
       {visible.length === 0 ? (
         <EmptyState>
           {q ? (
@@ -456,9 +491,19 @@ export default function ListRenderer({
         </EmptyState>
       ) : (
         <div className="rounded-md border">
-          {visible.map((idx) => {
-            const item = items[idx];
-            return (
+          {visible.map(renderRow)}
+        </div>
+      )}
+    </div>
+  );
+
+  // One row. Named rather than inline so the pinned block above renders the
+  // SAME thing the list does -- a second copy would drift the moment either
+  // gained a control. Declared after the return because function declarations
+  // hoist, which keeps 130 lines of JSX where they already were.
+  function renderRow(idx) {
+    const item = items[idx];
+    return (
             // Keyed by the row's stored index, not its id or title: every
             // writer here (updateItem, updateItemAt, removeItem, and
             // expanded's own add/remove index shifting) already addresses
@@ -524,6 +569,24 @@ export default function ListRenderer({
                     );
                   })}
                 </span>
+                {pinnedField && (
+                  <Button variant="ghost" size="icon"
+                    className={`h-7 w-7 shrink-0 ${
+                      idx === pinnedIdx
+                        ? "text-primary hover:text-primary"
+                        : "text-muted-foreground hover:text-primary"
+                    }`}
+                    aria-label={
+                      idx === pinnedIdx
+                        ? `${item[titleField] || "Untitled entry"} is ${node.pinned.noun}`
+                        : `Make ${item[titleField] || "Untitled entry"} ${node.pinned.noun}`
+                    }
+                    aria-pressed={idx === pinnedIdx}
+                    disabled={idx === pinnedIdx}
+                    onClick={(e) => { e.stopPropagation(); promote(idx); }}>
+                    <Star className={`h-3.5 w-3.5 ${idx === pinnedIdx ? "fill-current" : ""}`} />
+                  </Button>
+                )}
                 <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0"
                   aria-label={`Remove ${item[titleField] || "Untitled entry"}`}
                   onClick={(e) => { e.stopPropagation(); removeItem(idx); }}>
@@ -600,11 +663,6 @@ export default function ListRenderer({
                 </>
               )}
             </div>
-            );
-          })}
-        </div>
-      )}
-
-    </div>
-  );
+    );
+  }
 }
