@@ -15,6 +15,14 @@ sent under the phantoms were discarded on arrival, and `email.add` demanded a
 `purpose` the contract never mentioned, so no MCP client could add an email.
 See docs/superpowers/plans/2026-07-29-wave-6-storage-keys-reference.md.
 
+Wave 8 moved four more, all found by the stored-key audit
+(tests/test_stored_key_audit.py). Three had a `required` that did not match what
+their branch demands -- `profile.language` (name AND fluency),
+`profile.work_experience` (role/company/type/period), `projects.project` (name
+AND description) -- so a client following `get_schema` got a rejection it could
+not predict. The fourth, `circle.connection`, listed `contact` in `optional` as
+though it were storable; it is an input spelling for `name`.
+
 Wave 7 moved four entities, each closing a recorded follow-up: `profile.link`
 gained `update` (and `new_label`, since `label` identifies the row);
 `preferences.like`/`dislike` gained `stance`, the key that decides which entity

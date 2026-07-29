@@ -39,10 +39,10 @@
         "remove"
       ],
       "required": [
-        "name"
+        "name",
+        "description"
       ],
       "optional": [
-        "description",
         "status",
         "tags",
         "notes",
@@ -58,7 +58,8 @@
           "idea"
         ]
       },
-      "identifier": "name"
+      "identifier": "name",
+      "$comment": "`required` was [\"name\"] until wave 8 while the branch has always demanded name AND description. `name` alone remains the identifier for update/remove; `required` describes `add`. Found by the stored-key audit."
     },
     "project_tag": {
       "actions": [

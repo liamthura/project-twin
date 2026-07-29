@@ -44,11 +44,10 @@
           "remove"
         ],
         "required": [
-          "name"
-        ],
-        "optional": [
+          "name",
           "fluency"
         ],
+        "optional": [],
         "valid_values": {
           "fluency": [
             "native",
@@ -57,7 +56,8 @@
             "basic"
           ]
         },
-        "identifier": "name"
+        "identifier": "name",
+        "$comment": "`required` was [\"name\"] until wave 8 while the branch has always demanded name AND fluency, so a client following get_schema got a rejection it could not predict. Found by the stored-key audit."
       },
       "work_experience": {
         "actions": [
@@ -66,17 +66,18 @@
           "remove"
         ],
         "required": [
-          "company"
+          "company",
+          "role",
+          "type",
+          "period"
         ],
         "optional": [
-          "role",
-          "period",
-          "type",
           "location",
           "description",
           "skills",
           "highlights"
         ],
+        "$comment": "`required` was [\"company\"] until wave 8, while the `add` branch has always demanded role/company/type/period -- so an MCP client following get_schema got a rejection it had no way to predict. `company` alone remains the identifier for update/remove, which is what `identifier` says; `required` describes `add`. Found by the stored-key audit.",
         "identifier": "company"
       },
       "work_highlight": {
@@ -1191,10 +1192,10 @@
           "remove"
         ],
         "required": [
-          "name"
+          "name",
+          "description"
         ],
         "optional": [
-          "description",
           "status",
           "tags",
           "notes",
@@ -1210,7 +1211,8 @@
             "idea"
           ]
         },
-        "identifier": "name"
+        "identifier": "name",
+        "$comment": "`required` was [\"name\"] until wave 8 while the branch has always demanded name AND description. `name` alone remains the identifier for update/remove; `required` describes `add`. Found by the stored-key audit."
       },
       "project_tag": {
         "actions": [
@@ -1967,10 +1969,10 @@
         "optional": [
           "relationship",
           "traits",
-          "notes",
-          "contact"
+          "notes"
         ],
-        "identifier": "name"
+        "identifier": "name",
+        "$comment": "`contact` was listed here until wave 8, next to notes and traits, as though it were a storable field for someone's contact details. It is not: it is an INPUT SPELLING for `name` (FIELD_ALIASES[\"connection\"]), so a value sent under it either named the connection or was discarded. Aliases are input vocabulary, not stored keys, and do not belong in `optional`. Found by the stored-key audit."
       }
     },
     "ui": {

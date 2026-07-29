@@ -613,6 +613,40 @@ reconciliation is as well-resourced as it will get without doing it: three stora
 documents, twelve worked examples, and a test file that states the class rather than the
 instances. 643 backend tests, 398 frontend, build clean.
 
+### State after wave 8 — the phantom-key hole is closed on `add`
+
+The backend reconciliation this spec has carried as a sequel since wave 4 is done, and it is a
+**guard rather than a list**. See
+[`2026-07-29-wave-8-stored-key-audit.md`](../plans/2026-07-29-wave-8-stored-key-audit.md).
+
+The obvious implementation — a table of what each of the 38 branches stores — would be a second
+copy of the truth, free to drift from the first. That is the bug, not the fix. So the audit
+measures instead: for each declared field it runs `add` twice with two **different** values and
+diffs the stored blob. Identical either way means nothing in the branch read the field. Diffing
+two live values rather than present-versus-absent is what makes it immune to defaults, and the
+probe pairs (scalar vs list, true vs false, enum ends) defeat the three ways a branch can quietly
+ignore an input. **New entities are swept automatically; nothing has to be registered.**
+
+It found nine defects, none previously recorded, all hand-verified before being fixed. Two real
+phantoms (`hobby.references`, hardcoded to `[]` on add; `connection.contact`, an input spelling
+for `name` masquerading as a storable field). Four `required` declarations that did not match
+what the branch demands — `work_experience` declared `["company"]` while demanding
+role/company/type/period — so a client following `get_schema` got a rejection it could not
+predict. And three classes of unhandled crash, each an unhandled 500 reachable from an MCP
+payload: `.lower()` on a non-string identifier in `find_in_array` and `_find_course` (**twelve
+entities**), non-string values used as dict keys, and `list(x or [])` on a bool.
+
+`work_experience` surfaced *as a bug in the probe* — every payload was being rejected and the
+harness looked broken. It was the contract.
+
+**What is not closed.** The audit probes `add` only. `update` has its own divergences: wave 7's
+`work_experience.update` silently dropping `highlights` was exactly that shape, and it was found
+by reading. Extending the same two-value diff to `update` needs no new machinery — seed a row,
+then vary one field through `update`. Until then `sleep.day_type`, the standing example
+throughout this spec, remains **unaudited**, because it is an `update`-only entity. That is the
+honest state: the hole is closed on the action where twelve of twelve recorded defects lived, and
+open on the one where the thirteenth will. 646 backend tests, 398 frontend, build clean.
+
 ## Sourcing UI primitives
 
 Convergence means every migrated section funnels through one small set of controls, so the
