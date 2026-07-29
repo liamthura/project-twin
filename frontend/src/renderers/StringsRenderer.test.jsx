@@ -61,10 +61,14 @@ describe("StringsRenderer", () => {
     expect(screen.getByPlaceholderText("Add personality trait...")).toBeInTheDocument();
   });
 
-  it("renders the node's description when it has one", () => {
+  it("leaves `description` to SectionRenderer, which draws it under the heading", () => {
+    // It used to render here too, which showed the copy twice -- and having
+    // only this renderer honour it silently dropped it on `fields` and `list`
+    // nodes that declared one. SectionRenderer.test.jsx owns the assertion
+    // that it renders at all.
     const described = { ...node, description: "What matters to you" };
     render(<StringsRenderer node={described} items={[]} onItems={() => {}} />);
-    expect(screen.getByText("What matters to you")).toBeInTheDocument();
+    expect(screen.queryByText("What matters to you")).not.toBeInTheDocument();
   });
 
   it("renders a usable input when nothing is stored", () => {

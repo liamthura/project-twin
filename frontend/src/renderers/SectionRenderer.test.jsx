@@ -57,8 +57,26 @@ const LINK_GRAPH =
 // non-empty reason string -- adding to it has to be a deliberate, reviewable
 // act, not a way to quiet a failing test. A key that is neither bound nor
 // listed here fails the guard below.
+// Scope to one ui node by its title, via the `data-ui-node` attribute
+// SectionRenderer stamps on each node's wrapper. Walking up from the heading
+// text with .parentElement used to work and broke the moment the heading
+// gained a wrapper for `description` -- this names the node instead of
+// describing where it sits.
+function uiNode(title) {
+  const el = document.querySelector(`[data-ui-node="${title}"]`);
+  if (!el) throw new Error(`no ui node titled "${title}" is rendered`);
+  return el;
+}
+
 function describeGuards({ pack, listKey, data, exclusions }) {
-  const node = normalizeUi(pack).sections.find((s) => s.path[0] === listKey);
+  // Search through `group` nodes, which nest real nodes and carry no `path`
+  // of their own -- a bare `.find` over the top level both throws on them and
+  // misses everything under them.
+  const flatten = (nodes) =>
+    (nodes || []).flatMap((n) => (n.kind === "group" ? flatten(n.sections) : [n]));
+  const node = flatten(normalizeUi(pack).sections).find(
+    (s) => Array.isArray(s.path) && s.path[0] === listKey
+  );
   // Resolved exactly as ListRenderer resolves it -- via node.entity, which
   // SectionRenderer sets from `pack.entities?.[node.entity]` -- not by
   // re-deriving it from legacy list-matching rules. Those rules live inside
@@ -427,7 +445,7 @@ describe("SectionRenderer", () => {
     // The wrapper SectionRenderer draws around a node that declares a
     // `title`: <div><h3>Top of Mind</h3>{list}</div>. Located by the heading
     // rather than by DOM position so it survives a reordering of sections.
-    const topOfMindBlock = () => screen.getByText("Top of Mind").parentElement.parentElement;
+    const topOfMindBlock = () => uiNode("Top of Mind");
 
     // ---- the top_of_mind trap: stored key is `idea`, manifest says `item` ---
 
@@ -658,8 +676,8 @@ describe("SectionRenderer", () => {
       });
     });
 
-    const domainsBlock = () => screen.getByText("Skills & Domains").parentElement.parentElement;
-    const mentalTabsBlock = () => screen.getByText("Mental Tabs").parentElement.parentElement;
+    const domainsBlock = () => uiNode("Skills & Domains");
+    const mentalTabsBlock = () => uiNode("Mental Tabs");
     const tabsNode = () =>
       normalizeUi(knowledgePack).sections.find((s) => s.path[0] === "mental_tabs");
     const domainsNode = () =>
@@ -1348,7 +1366,7 @@ describe("section headings and info placement", () => {
 
     // Located by heading rather than DOM position so these survive a
     // reordering of the manifest's sections.
-    const block = (heading) => screen.getByText(heading).parentElement.parentElement;
+    const block = uiNode;
 
     it("renders every node kind the pack declares", () => {
       renderSection({ pack: lifestylePack, initial: lifestyleData });
@@ -1385,7 +1403,7 @@ describe("section headings and info placement", () => {
 
       await user.click(screen.getByText("Bouldering"));
       // A child row shows its title as text until it too is expanded.
-      const refs = screen.getByText("References & URLs").parentElement.parentElement;
+      const refs = uiNode("References & URLs");
       await user.click(within(refs).getByText("Local gym"));
       await user.type(within(refs).getByDisplayValue("Local gym"), " B");
 
@@ -1512,7 +1530,7 @@ describe("section headings and info placement", () => {
       });
     });
 
-    const block = (heading) => screen.getByText(heading).parentElement.parentElement;
+    const block = uiNode;
 
     it("renders every node kind the pack declares", () => {
       renderSection({ pack: preferencesPack, initial: preferencesData });
@@ -1624,6 +1642,128 @@ describe("section headings and info placement", () => {
       expect(screen.getByLabelText("Tone")).toHaveValue("");
       expect(screen.getByRole("button", { name: "Add mood override" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Add like" })).toBeInTheDocument();
+    });
+  });
+
+
+  // -------------------------------------------------------------------------
+  // kind: "group" -- the two-level structure the hand-written editors had.
+  // Every retired editor rendered several Cards, each a named group over a few
+  // controls ("Code Style" over its three lists, "Wellness" over sleep/energy/
+  // stress). Waves 2-4 had no section that needed it; wave 5's two both did,
+  // and flattening them lost the group names entirely.
+  // -------------------------------------------------------------------------
+  describe("a group node", () => {
+    const pack = {
+      key: "grouped",
+      title: "Grouped",
+      description: "",
+      entities: {},
+      ui: {
+        sections: [
+          {
+            kind: "group",
+            title: "Code Style",
+            description: "Languages, frameworks and tools",
+            sections: [
+              { kind: "strings", path: ["code_style", "frameworks"], title: "Frameworks" },
+              { kind: "strings", path: ["code_style", "tools"], title: "Tools" },
+            ],
+          },
+          { kind: "strings", path: ["loose"], title: "Ungrouped" },
+        ],
+      },
+    };
+    const data = { code_style: { frameworks: ["React"], tools: ["Docker"] }, loose: ["x"] };
+
+    it("renders the group's heading and description over its children", () => {
+      renderSection({ pack, initial: data });
+
+      expect(screen.getByRole("heading", { name: "Code Style" })).toBeInTheDocument();
+      expect(screen.getByText("Languages, frameworks and tools")).toBeInTheDocument();
+      expect(within(uiNode("Code Style")).getByText("React")).toBeInTheDocument();
+      expect(within(uiNode("Code Style")).getByText("Docker")).toBeInTheDocument();
+    });
+
+    it("keeps a grouped node's path resolving against the SECTION root", async () => {
+      // A group is a visual container, not a data scope -- unlike a list
+      // node's `children`, whose paths resolve against the row's item.
+      const { user, latest } = renderSection({ pack, initial: data });
+
+      await user.type(within(uiNode("Frameworks")).getByRole("textbox"), "Vue{Enter}");
+
+      expect(latest().code_style.frameworks).toEqual(["React", "Vue"]);
+      expect(latest().code_style.tools).toEqual(["Docker"]);
+    });
+
+    it("leaves an ungrouped sibling at the top level", () => {
+      renderSection({ pack, initial: data });
+      expect(within(uiNode("Ungrouped")).getByText("x")).toBeInTheDocument();
+      expect(uiNode("Code Style")).not.toContainElement(uiNode("Ungrouped"));
+    });
+
+    it("gives a grouped child a lower-level heading than a top-level node", () => {
+      renderSection({ pack, initial: data });
+
+      expect(screen.getByRole("heading", { name: "Code Style", level: 3 })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Frameworks", level: 4 })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Ungrouped", level: 3 })).toBeInTheDocument();
+    });
+
+    it("renders nothing, and logs, for a group with no sections", () => {
+      // A heading over an empty space is the same defect as a heading over a
+      // rejected node, and gets the same treatment.
+      const empty = {
+        ...pack,
+        ui: { sections: [{ kind: "group", title: "Hollow", sections: [] }] },
+      };
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderSection({ pack: empty, initial: {} });
+
+      expect(screen.queryByText("Hollow")).not.toBeInTheDocument();
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining("grouped"));
+      spy.mockRestore();
+    });
+
+    it("renders nothing for a group whose every child is rejected", () => {
+      const allBad = {
+        ...pack,
+        ui: {
+          sections: [
+            { kind: "group", title: "Hollow", sections: [{ kind: "table", path: ["x"] }] },
+          ],
+        },
+      };
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderSection({ pack: allBad, initial: {} });
+
+      expect(screen.queryByRole("heading", { name: "Hollow" })).not.toBeInTheDocument();
+      spy.mockRestore();
+    });
+
+    it("draws a node's `description` for every kind, not only strings", () => {
+      // It used to live in StringsRenderer alone, so the copy declared on
+      // preferences' communication-default (fields) and mood-overrides (list)
+      // nodes rendered nowhere at all.
+      const mixed = {
+        key: "mixed",
+        title: "Mixed",
+        description: "",
+        entities: {},
+        ui: {
+          sections: [
+            {
+              kind: "fields",
+              path: ["comm"],
+              title: "Default",
+              description: "always active",
+              fields: ["tone"],
+            },
+          ],
+        },
+      };
+      renderSection({ pack: mixed, initial: {} });
+      expect(screen.getByText("always active")).toBeInTheDocument();
     });
   });
 

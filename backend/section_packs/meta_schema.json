@@ -119,11 +119,36 @@
     "uiSection": {
       "type": "object",
       "required": [
-        "kind",
-        "path"
+        "kind"
       ],
       "additionalProperties": false,
       "allOf": [
+        {
+          "$comment": "`path` is required for every kind EXCEPT `group`. A group binds no storage at all -- it is a heading with nested sections under it, restoring the two-level structure the hand-written editors had (preferences' \"Code Style\" over its three lists, lifestyle's \"Wellness\" over sleep/energy/stress). Giving it a path would be noise that every renderer must then remember not to read.",
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "not": { "const": "group" } } }
+          },
+          "then": { "required": ["path"] }
+        },
+        {
+          "$comment": "A group carries no storage-binding key, so declaring one is a sign the node was meant to be a list or fields node. Rejected rather than ignored.",
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "const": "group" } }
+          },
+          "then": {
+            "required": ["title", "sections"],
+            "not": {
+              "anyOf": [
+                { "required": ["path"] },
+                { "required": ["entity"] },
+                { "required": ["fields"] },
+                { "required": ["title_field"] }
+              ]
+            }
+          }
+        },
         {
           "$comment": "Two rules that apply to list nodes only. (1) `entity`: a list node binds editable controls to an entity's stored keys, so it must name that entity. Without it the renderer still renders (falling back to node-level field_defaults/enum/optional) but tests/test_ui_schema.py has no entity to check the field names against, and a control bound to a key nothing stores would ship unnoticed. (2) a non-empty `path`: an empty path addresses the containing object itself, and writes go through setAt, where `path.length === 0` returns the new value -- so the first write to a list node with `path: []` REPLACES what contains it. Top level that discards the section's whole stored object; on a child list it replaces the parent row's item, losing its id, its title and every other field. Array.isArray([]) is true, so no renderer-side guard can catch it. This is conditional on kind rather than a blanket minItems on `path` because kind: \"fields\" legitimately uses `path: []` to address the section root (profile's top-level scalars) -- see tests/test_ui_schema.py::test_fields_node_with_empty_path_is_accepted.",
           "if": {
@@ -145,7 +170,8 @@
           "enum": [
             "list",
             "fields",
-            "strings"
+            "strings",
+            "group"
           ]
         },
         "path": {
@@ -245,6 +271,13 @@
             "type": "string"
           },
           "description": "Values preselected on a new item. The exact value \"@now\" is replaced by an ISO 8601 timestamp at add time; every other value is used literally."
+        },
+        "sections": {
+          "type": "array",
+          "description": "Nodes nested under a `group` heading. Recursive, like `children` -- but unlike `children`, a nested section's `path` resolves against the SECTION ROOT, not against a row's item: a group is a visual container, not a data scope.",
+          "items": {
+            "$ref": "#/$defs/uiSection"
+          }
         },
         "children": {
           "type": "array",

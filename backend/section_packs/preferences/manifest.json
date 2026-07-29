@@ -109,14 +109,9 @@
   "ui": {
     "sections": [
       {
-        "kind": "strings",
-        "path": [
-          "code_style",
-          "preferred_languages"
-        ],
-        "title": "Preferred Languages",
-        "placeholder": "e.g. Python, TypeScript...",
-        "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3.",
+        "kind": "group",
+        "title": "Code Style",
+        "description": "Your preferred programming languages, frameworks, and tools",
         "info": {
           "overview": "Your preferred programming languages, frameworks, and tools. AI uses these to pick idioms and examples that match how you actually work.",
           "tips": [
@@ -124,46 +119,44 @@
             "Frameworks: the ones you want code examples written against.",
             "Tools: editors, runtimes and services worth assuming you have."
           ]
-        }
+        },
+        "sections": [
+          {
+            "kind": "strings",
+            "path": [
+              "code_style",
+              "preferred_languages"
+            ],
+            "title": "Preferred Languages",
+            "placeholder": "e.g. Python, TypeScript...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          },
+          {
+            "kind": "strings",
+            "path": [
+              "code_style",
+              "frameworks"
+            ],
+            "title": "Frameworks",
+            "placeholder": "e.g. FastAPI, Next.js...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          },
+          {
+            "kind": "strings",
+            "path": [
+              "code_style",
+              "tools"
+            ],
+            "title": "Tools",
+            "placeholder": "e.g. VS Code, Docker...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          }
+        ]
       },
       {
-        "kind": "strings",
-        "path": [
-          "code_style",
-          "frameworks"
-        ],
-        "title": "Frameworks",
-        "placeholder": "e.g. FastAPI, Next.js...",
-        "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
-      },
-      {
-        "kind": "strings",
-        "path": [
-          "code_style",
-          "tools"
-        ],
-        "title": "Tools",
-        "placeholder": "e.g. VS Code, Docker...",
-        "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
-      },
-      {
-        "kind": "fields",
-        "path": [
-          "communication",
-          "default"
-        ],
-        "entity": "communication_default",
-        "title": "Default Communication Style",
-        "description": "Always active. How you prefer AI responses to be written.",
-        "fields": [
-          "tone",
-          "locale",
-          "detail_level"
-        ],
-        "long_text": [
-          "detail_level"
-        ],
-        "$comment": "An update-only singleton (identifier: null). All three keys are written literally, not through get_field -- server.py:2211-2219.",
+        "kind": "group",
+        "title": "Communication",
+        "description": "How you prefer AI responses to be formatted",
         "info": {
           "overview": "How you prefer AI responses to be formatted. This is the baseline; mood overrides below adjust it situationally.",
           "tips": [
@@ -171,57 +164,85 @@
             "Detail Level: how much to say and how to structure it.",
             "Locale: spelling and conventions, e.g. British English."
           ]
-        }
+        },
+        "sections": [
+          {
+            "kind": "fields",
+            "path": [
+              "communication",
+              "default"
+            ],
+            "entity": "communication_default",
+            "title": "Default Communication Style",
+            "description": "Always active. How you prefer AI responses to be written.",
+            "fields": [
+              "tone",
+              "locale",
+              "detail_level"
+            ],
+            "long_text": [
+              "detail_level"
+            ],
+            "$comment": "An update-only singleton (identifier: null). All three keys are written literally, not through get_field -- server.py:2211-2219."
+          },
+          {
+            "kind": "list",
+            "path": [
+              "communication",
+              "mood_overrides"
+            ],
+            "entity": "mood_override",
+            "title": "When I'm feeling...",
+            "description": "Override the defaults based on your mood or context",
+            "title_field": "mood",
+            "badges": [
+              "tone"
+            ],
+            "detail_fields": [
+              "mood",
+              "tone",
+              "detail_level"
+            ],
+            "long_text": [
+              "detail_level"
+            ],
+            "$comment": "Stores `mood`. The retired editor wrote this name under `when_feeling`, which no execute_modify branch has ever read -- every MCP lookup resolves on o.get(\"mood\") -- so UI-written overrides were unreachable over MCP and AI-written ones rendered as \"Untitled mood\". persona_store._normalize backfills when_feeling -> mood with a collision guard. `locale`, which the old editor also wrote here, is NOT stored for an override (server.py:2245-2249) and is deliberately not bound."
+          }
+        ]
       },
       {
-        "kind": "list",
-        "path": [
-          "communication",
-          "mood_overrides"
-        ],
-        "entity": "mood_override",
-        "title": "When I'm feeling...",
-        "description": "Override the defaults based on your mood or context",
-        "title_field": "mood",
-        "badges": [
-          "tone"
-        ],
-        "detail_fields": [
-          "mood",
-          "tone",
-          "detail_level"
-        ],
-        "long_text": [
-          "detail_level"
-        ],
-        "$comment": "Stores `mood`. The retired editor wrote this name under `when_feeling`, which no execute_modify branch has ever read -- every MCP lookup resolves on o.get(\"mood\") -- so UI-written overrides were unreachable over MCP and AI-written ones rendered as \"Untitled mood\". persona_store._normalize backfills when_feeling -> mood with a collision guard. `locale`, which the old editor also wrote here, is NOT stored for an override (server.py:2245-2249) and is deliberately not bound."
-      },
-      {
-        "kind": "strings",
-        "path": [
-          "learning_style",
-          "preferred"
-        ],
-        "title": "Preferred Methods",
-        "placeholder": "e.g. hands-on examples...",
-        "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3.",
+        "kind": "group",
+        "title": "Learning Style",
+        "description": "How you learn best",
         "info": {
           "overview": "How you learn best, so explanations arrive in a shape that works for you.",
           "tips": [
             "Preferred: the formats that land — worked examples, diagrams, analogies.",
             "Avoid: what reliably loses you — walls of text, unexplained jargon."
           ]
-        }
-      },
-      {
-        "kind": "strings",
-        "path": [
-          "learning_style",
-          "avoid"
-        ],
-        "title": "Things to Avoid",
-        "placeholder": "e.g. walls of text...",
-        "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+        },
+        "sections": [
+          {
+            "kind": "strings",
+            "path": [
+              "learning_style",
+              "preferred"
+            ],
+            "title": "Preferred Methods",
+            "placeholder": "e.g. hands-on examples...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          },
+          {
+            "kind": "strings",
+            "path": [
+              "learning_style",
+              "avoid"
+            ],
+            "title": "Things to Avoid",
+            "placeholder": "e.g. walls of text...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          }
+        ]
       },
       {
         "kind": "list",
