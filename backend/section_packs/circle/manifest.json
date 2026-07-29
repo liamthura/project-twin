@@ -70,9 +70,9 @@
           ]
         },
         "field_placeholders": {
-          "name": "e.g., John Smith",
+          "name": "Person's name",
           "notes": "Context about your relationship, shared experiences, important details...",
-          "relationship": "e.g., College friend, Mentor",
+          "relationship": "e.g. Friend, Colleague, Mentor",
           "traits": "Add trait..."
         }
       }

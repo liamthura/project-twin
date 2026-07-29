@@ -226,8 +226,8 @@
         ],
         "field_placeholders": {
           "description": "Brief description...",
-          "highlights": "e.g. Increased performance by 40%, Implemented CI/CD pipeline",
-          "name": "e.g., Personal Website, Mobile App",
+          "highlights": "e.g. Cut load time by 40%, Shipped the beta",
+          "name": "e.g. Personal website, Mobile app",
           "notes": "Additional notes, blockers, or context...",
           "tags": "Add tag..."
         }

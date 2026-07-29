@@ -207,7 +207,7 @@
           }
         ],
         "field_placeholders": {
-          "name": "e.g. Python, Docker, Machine Learning",
+          "name": "e.g. Photography, Marketing, Python",
           "notes": "Add context, projects, or experience..."
         }
       },
@@ -284,7 +284,7 @@
         "field_placeholders": {
           "notes": "Your notes, code snippets, reminders...",
           "tags": "Add tag...",
-          "title": "e.g. AWS CLI Commands, Git Workflows"
+          "title": "e.g. Git commands, Recipe ideas"
         }
       }
     ]

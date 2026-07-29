@@ -238,12 +238,12 @@
           },
           "field_placeholders": {
             "bio": "A brief description of who you are...",
-            "current_role": "e.g. Software Engineer",
+            "current_role": "e.g. Designer, Teacher, Student",
             "location": "City, Country",
             "name": "Your name",
-            "nationality": "e.g. Myanmar",
-            "organisation": "Company or university",
-            "preferred_name": "e.g. Liam"
+            "nationality": "Your nationality",
+            "organisation": "Company, school, or organisation",
+            "preferred_name": "What you'd like to be called"
           }
         },
         {
@@ -304,7 +304,7 @@
               ],
               "title": "Highlights",
               "item_control": "input",
-              "placeholder": "e.g. First class average, Dean's list",
+              "placeholder": "e.g. Graduated with honours, Led the debate team",
               "$comment": "Bare strings on both writers (server.py:2559 appends the string itself). item_control:\"input\" because these are sentence-like -- the retired editor gave each its own editable row, and chips would mean retyping a whole achievement to fix a typo."
             },
             {
@@ -330,8 +330,8 @@
               ],
               "$comment": "OBJECTS: {name, topics}. The entity's `course` is the INPUT spelling; `name` is what is stored. Until wave 6 execute_modify appended a bare string here while the editor wrote objects, so an AI-added course rendered blank and could never be removed -- `course in coursework` compares a string to a dict. persona_store._normalize coerces legacy strings.",
               "field_placeholders": {
-                "name": "e.g. Data Structures",
-                "topics": "e.g. Algorithms, Hash tables"
+                "name": "e.g. Macroeconomics, Data Structures",
+                "topics": "Key topics covered..."
               }
             },
             {
@@ -354,16 +354,16 @@
               ],
               "$comment": "OBJECTS: {name, activities_involved}. Before wave 6 `clubs` had no entity and no execute_modify branch at all -- the editor was its only writer, so no AI client could read into or out of it. Both added in wave 6.",
               "field_placeholders": {
-                "activities_involved": "e.g. Project lead, Event organizer",
-                "name": "e.g. Robotics Club"
+                "activities_involved": "e.g. Committee member, Event organiser",
+                "name": "e.g. Debate Society, Football Club"
               }
             }
           ],
           "field_placeholders": {
-            "degree_level": "e.g. Bachelor's, Master's, PhD, High School",
+            "degree_level": "e.g. High School, Bachelor's, Master's, PhD",
             "end_year": "e.g. 2024 or Expected 2026",
-            "field_of_study": "e.g. Computer Science, Business, etc.",
-            "institution": "e.g. University of Cambridge, Harvard, etc.",
+            "field_of_study": "e.g. Computer Science, Economics, Design",
+            "institution": "School, college, or university",
             "start_year": "e.g. 2020"
           }
         },
@@ -414,7 +414,7 @@
                 "skills"
               ],
               "title": "Skills",
-              "placeholder": "e.g. Python, Kubernetes, PostgreSQL",
+              "placeholder": "e.g. Project management, Python, Public speaking",
               "$comment": "Bare strings on the parent row, same shape as `highlights` (server.py work_skill branch). Left as CHIPS rather than item_control:\"input\": these are short, word-like values you add and drop but never revise, and chips show many at a glance -- the opposite of a highlight, which is a sentence where a typo means retyping the lot."
             },
             {
@@ -424,17 +424,17 @@
               ],
               "title": "Highlights",
               "item_control": "input",
-              "placeholder": "e.g. Led team of 5 engineers",
+              "placeholder": "e.g. Led a team of five, Cut response time by 40%",
               "$comment": "Bare strings on both writers (server.py:1541). item_control:\"input\" matches the retired editor, which gave each highlight its own editable row -- see the education node."
             }
           ],
           "field_placeholders": {
-            "company": "e.g. TechCorp",
+            "company": "Company or organisation",
             "description": "What the role involved...",
-            "location": "e.g. Remote, London",
+            "location": "e.g. Remote, or a city",
             "period": "e.g. Jan 2022 - Jun 2023",
-            "role": "e.g. Software Engineer",
-            "type": "e.g. Full-time"
+            "role": "e.g. Analyst, Designer, Engineer",
+            "type": "e.g. Full-time, Internship, Freelance"
           }
         },
         {
@@ -467,8 +467,8 @@
               ],
               "$comment": "Stores `purpose`. The vocabulary declared `label`, which nothing wrote, and omitted `purpose` -- which the add branch REQUIRES (server.py:1418), so no MCP client could add an email. Both corrected in wave 6.",
               "field_placeholders": {
-                "address": "you@school.edu",
-                "purpose": "e.g. primary, work, school"
+                "address": "you@example.com",
+                "purpose": "e.g. primary, work, personal"
               }
             },
             {
@@ -486,7 +486,7 @@
               ],
               "$comment": "No `update` action on this entity (server.py:1444-1465) -- an MCP client edits a link by removing and re-adding it. The UI edits in place, which is a superset and needs no declaration.",
               "field_placeholders": {
-                "label": "e.g. Portfolio",
+                "label": "e.g. Portfolio, LinkedIn",
                 "url": "https://example.com"
               }
             }
@@ -517,7 +517,7 @@
             ]
           },
           "field_placeholders": {
-            "name": "e.g. English"
+            "name": "e.g. English, Spanish"
           }
         }
       ]
@@ -776,7 +776,7 @@
             }
           ],
           "field_placeholders": {
-            "name": "e.g. Python, Docker, Machine Learning",
+            "name": "e.g. Photography, Marketing, Python",
             "notes": "Add context, projects, or experience..."
           }
         },
@@ -853,7 +853,7 @@
           "field_placeholders": {
             "notes": "Your notes, code snippets, reminders...",
             "tags": "Add tag...",
-            "title": "e.g. AWS CLI Commands, Git Workflows"
+            "title": "e.g. Git commands, Recipe ideas"
           }
         }
       ]
@@ -1337,8 +1337,8 @@
           ],
           "field_placeholders": {
             "description": "Brief description...",
-            "highlights": "e.g. Increased performance by 40%, Implemented CI/CD pipeline",
-            "name": "e.g., Personal Website, Mobile App",
+            "highlights": "e.g. Cut load time by 40%, Shipped the beta",
+            "name": "e.g. Personal website, Mobile app",
             "notes": "Additional notes, blockers, or context...",
             "tags": "Add tag..."
           }
@@ -1596,7 +1596,7 @@
           },
           "field_placeholders": {
             "name": "Interest name",
-            "notes": "e.g., Reading Substacks, Photography"
+            "notes": "e.g. Reading Substacks, Photography"
           }
         },
         {
@@ -1936,9 +1936,9 @@
             ]
           },
           "field_placeholders": {
-            "name": "e.g., John Smith",
+            "name": "Person's name",
             "notes": "Context about your relationship, shared experiences, important details...",
-            "relationship": "e.g., College friend, Mentor",
+            "relationship": "e.g. Friend, Colleague, Mentor",
             "traits": "Add trait..."
           }
         }
@@ -2023,8 +2023,8 @@
             "followup_items": "e.g. Read the migration guide",
             "key_decisions": "e.g. Chose Postgres over SQLite",
             "source": "e.g. conversation, article, course",
-            "tags": "e.g. react, architecture",
-            "topic": "e.g. React Server Components"
+            "tags": "e.g. design, languages",
+            "topic": "e.g. Spanish subjunctive, React hooks"
           }
         }
       ]

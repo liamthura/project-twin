@@ -2034,7 +2034,13 @@ describe("section headings and info placement", () => {
       const skills = uiNode("Skills");
       expect(within(skills).getByText("Python")).toBeInTheDocument();
       expect(within(skills).getByText("PostgreSQL")).toBeInTheDocument();
-      expect(within(skills).getByPlaceholderText(/Python, Kubernetes/)).toBeInTheDocument();
+      // Read the hint from the manifest rather than repeating it: placeholder
+      // copy is wording, and a test that pins wording turns every copy edit
+      // into a failing test for no behavioural reason.
+      const node = normalizeUi(profilePack)
+        .sections.flatMap((n) => n.children ?? [])
+        .find((n) => n.title === "Skills");
+      expect(within(skills).getByPlaceholderText(node.placeholder)).toBeInTheDocument();
     });
 
     it("appends a skill without touching highlights or the sibling role", async () => {

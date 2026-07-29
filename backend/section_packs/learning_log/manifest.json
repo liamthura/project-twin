@@ -90,8 +90,8 @@
           "followup_items": "e.g. Read the migration guide",
           "key_decisions": "e.g. Chose Postgres over SQLite",
           "source": "e.g. conversation, article, course",
-          "tags": "e.g. react, architecture",
-          "topic": "e.g. React Server Components"
+          "tags": "e.g. design, languages",
+          "topic": "e.g. Spanish subjunctive, React hooks"
         }
       }
     ]

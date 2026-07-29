@@ -75,7 +75,9 @@
     "sections": [
       {
         "kind": "list",
-        "path": ["items"],
+        "path": [
+          "items"
+        ],
         "entity": "media_item",
         "title_field": "title",
         "badges": [
