@@ -89,6 +89,71 @@ def test_load_packs_skips_invalid_manifest_with_warning(tmp_path, caplog):
     assert any("bad" in r.message for r in caplog.records)
 
 
+# ---------------------------------------------------------------------------
+# strict mode: the shipped packs are ours, so an invalid one is a packaging bug
+#
+# Warn-and-skip is right for a pack directory the server does not own -- one bad
+# third-party pack must not stop it booting. It was wrong for the packs in this
+# repo, and it hid two bugs: wave 6's `exclusive_fields` in the wrong schema
+# block (aesthetics vanished; the symptom was "❌ Unknown entity type: aesthetic"
+# much later) and wave 8's `$comment` on an entity. The second surfaced at import
+# only because `profile` is core and sections._check_core raises on its absence.
+# A NON-CORE pack had no such backstop: it simply ceased to exist.
+# ---------------------------------------------------------------------------
+
+
+def test_strict_raises_on_invalid_manifest(tmp_path):
+    _write_pack(tmp_path, "good")
+    bad_dir = tmp_path / "bad"
+    bad_dir.mkdir()
+    (bad_dir / "manifest.json").write_text("{not json")
+    with pytest.raises(pack_loader.PackError, match="bad"):
+        pack_loader.load_packs(tmp_path, strict=True)
+
+
+def test_strict_raises_on_schema_violation(tmp_path):
+    """The exact shape of both hidden bugs: a key the meta-schema rejects."""
+    _write_pack(tmp_path, "good",
+                mutate=lambda m: m["entities"]["good_item"].update({"nonsense": 1}))
+    with pytest.raises(pack_loader.PackError, match="good"):
+        pack_loader.load_packs(tmp_path, strict=True)
+
+
+def test_strict_raises_on_missing_manifest(tmp_path):
+    _write_pack(tmp_path, "good")
+    (tmp_path / "empty").mkdir()
+    with pytest.raises(pack_loader.PackError, match="empty"):
+        pack_loader.load_packs(tmp_path, strict=True)
+
+
+def test_strict_still_skips_underscore_dirs(tmp_path):
+    """`_template` is not a pack and must not become a boot failure."""
+    _write_pack(tmp_path, "real")
+    _write_pack(tmp_path, "template", dirname="_template")
+    assert list(pack_loader.load_packs(tmp_path, strict=True)) == ["real"]
+
+
+def test_manifests_loads_the_shipped_packs_strictly(monkeypatch):
+    """The real load is the strict one -- otherwise this whole mode is unused.
+
+    Asserted on the call rather than by corrupting a shipped manifest, which
+    would leave the repo one failed assertion away from a broken tree.
+    """
+    seen = {}
+
+    def _spy(packs_dir, strict=False):
+        seen["dir"], seen["strict"] = packs_dir, strict
+        return {}
+
+    monkeypatch.setattr(pack_loader, "load_packs", _spy)
+    pack_loader._reset_cache()
+    try:
+        pack_loader.manifests()
+    finally:
+        pack_loader._reset_cache()
+    assert seen == {"dir": pack_loader.PACKS_DIR, "strict": True}
+
+
 def test_load_packs_skips_underscore_dirs(tmp_path):
     _write_pack(tmp_path, "real")
     _write_pack(tmp_path, "template", dirname="_template")
@@ -121,9 +186,9 @@ def test_manifests_is_cached(tmp_path, monkeypatch):
     calls = []
     real = pack_loader.load_packs
 
-    def counting(packs_dir=pack_loader.PACKS_DIR):
+    def counting(packs_dir=pack_loader.PACKS_DIR, strict=False):
         calls.append(1)
-        return real(packs_dir)
+        return real(packs_dir, strict=strict)
 
     monkeypatch.setattr(pack_loader, "load_packs", counting)
     pack_loader._reset_cache()
