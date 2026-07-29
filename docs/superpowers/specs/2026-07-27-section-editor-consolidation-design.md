@@ -647,6 +647,39 @@ throughout this spec, remains **unaudited**, because it is an `update`-only enti
 honest state: the hole is closed on the action where twelve of twelve recorded defects lived, and
 open on the one where the thirteenth will. 646 backend tests, 398 frontend, build clean.
 
+### State after wave 9 — both write actions are swept
+
+Wave 8 closed the phantom-key hole on `add` and named what it had not closed. Wave 9 extends the
+same probe to `update`, with no new machinery — vary one field through two values, diff the blob,
+seeding a row first. See
+[`2026-07-29-wave-9-update-audit.md`](../plans/2026-07-29-wave-9-update-audit.md).
+
+Sweeping `update` is not redundant with `add`. A branch can honour a field on the way in and
+ignore it on every subsequent edit, which makes the field look entirely real — declared, stored,
+readable — right until someone tries to change it. **Six of the seven fields this wave found were
+in entities whose `add` path was already clean**, so no amount of sweeping `add` would have
+surfaced them: `education.highlights`/`coursework`/`clubs`, `domain.references`,
+`knowledge.references`, and `goal.custom_type` (reachable only when `type` was sent alongside).
+`mood_override` turned out to declare `update` with no branch implementing it. Two more
+`.lower()`-on-a-non-string crashes went with them.
+
+**`sleep.day_type` is not a defect, and this spec should stop citing it as one.** It has been the
+standing example since wave 4 — "a router that is never stored and passes both checks". Building
+the audit settled it: `day_type` selects which sub-object (`weekday`/`weekend`) receives the
+write, is correctly declared as the entity's `identifier`, and is a router in exactly the sense
+`knowledge.category` is. The audit's question — does this field determine what gets stored? —
+answers yes. It is recorded in the audit's docstring so it stops being hunted.
+
+`remove` is deliberately not swept: it takes an identifier and a parent and writes nothing else,
+so there is no field for it to drop.
+
+648 backend tests, 398 frontend, build clean. `registry_golden.json` did not move — every fix
+this wave was to a branch, not a manifest, which is what distinguishes wave 9 from waves 6–8.
+
+**What is left of this spec is now entirely frontend debt:** `ListRenderer.jsx` at ~560 lines
+against a ~200 budget; `describeGuards` unable to address a nested list; no Storybook story for
+any migrated section.
+
 ## Sourcing UI primitives
 
 Convergence means every migrated section funnels through one small set of controls, so the

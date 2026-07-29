@@ -1794,6 +1794,14 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                         goal.pop("custom_type", None)
                 if custom_type:
                     goal["custom_type"] = custom_type
+            else:
+                # `custom_type` used to be reachable only alongside `type`, so
+                # correcting the label on an existing other/custom_type goal
+                # meant re-sending the type as well. It is a declared optional
+                # field in its own right.
+                own_custom = get_field(data, "custom_type", "type_label")
+                if own_custom is not None:
+                    goal["custom_type"] = own_custom
             status = get_field(data, "status")
             if status:
                 if not isinstance(status, str):
@@ -1883,6 +1891,15 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return f"❌ Education at '{data.get('institution')}' not found"
             for field in ["degree_level", "field_of_study", "start_year", "end_year", "status"]:
                 if data.get(field):
+                    edu[field] = data[field]
+            # `highlights`, `coursework` and `clubs` are all declared optional on
+            # this entity and all three were honoured by `add` and ignored here,
+            # so once a row existed the only way to change them was the
+            # per-item entities -- which can only append. Replaced wholesale when
+            # supplied, the same treatment `work_experience` gives its lists, so
+            # `[]` clears.
+            for field in ["highlights", "coursework", "clubs"]:
+                if isinstance(data.get(field), list):
                     edu[field] = data[field]
             save_json("profile.json", profile)
             return f"✅ Updated education: {data['institution']}"
@@ -2039,6 +2056,11 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 domain["level"] = level
             if notes:
                 domain["notes"] = notes
+            # Declared optional and stored by `add`, ignored here until wave 9:
+            # `domain_reference` was the only way to change them, and it only
+            # appends.
+            if isinstance(data.get("references"), list):
+                domain["references"] = data["references"]
             save_json("knowledge.json", knowledge)
             return f"✅ Updated domain: {name}"
         elif action == "remove":
@@ -2294,13 +2316,18 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             return f"✅ Logged learning: {data['topic']} (id: {entry_id})"
         elif action == "update":
             entry_id = data.get("id", "")
-            topic = data.get("topic", "")
+            # `_as_text`: `topic` is compared with `.lower()`, so a non-string
+            # one raised AttributeError instead of falling through to the
+            # "requires 'id' or 'topic'" error below.
+            topic = _as_text(data.get("topic", ""))
             if not entry_id and not topic:
                 return "❌ Learning log update requires 'id' or 'topic'"
             target = None
             for entry in reversed(entries):
+                stored_topic = entry.get("topic")
                 if (entry_id and entry.get("id") == entry_id) or \
-                   (not entry_id and topic and entry.get("topic", "").lower() == topic.lower()):
+                   (not entry_id and topic and isinstance(stored_topic, str)
+                    and stored_topic.lower() == topic.lower()):
                     target = entry
                     break
             if target is None:
@@ -2492,12 +2519,26 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         preferences = load_json("preferences.json")
         comm = preferences.setdefault("communication", {})
         overrides = comm.setdefault("mood_overrides", [])
-        mood = get_field(data, "mood", "feeling", "state", "when", default="")
-        
-        if action == "add":
+        # `_as_text`: `mood` is compared with `.lower()` below, so a non-string
+        # one used to raise AttributeError. Reading as absent lets the branch's
+        # own "requires 'mood'" check answer instead.
+        mood = _as_text(get_field(data, "mood", "feeling", "state", "when", default=""))
+
+        def _find_override(value):
+            return next((o for o in overrides
+                         if isinstance(o.get("mood"), str)
+                         and o["mood"].lower() == value.lower()), None)
+
+        if action in ("add", "update"):
             if not mood:
                 return "❌ mood_override requires 'mood' (e.g., 'stressed', 'tired', 'excited')"
-            existing = next((o for o in overrides if o.get("mood", "").lower() == mood.lower()), None)
+            existing = _find_override(mood)
+            # `update` is declared on this entity and had no branch: it fell
+            # through to the generic path, which does not know this shape. The
+            # `add`-onto-an-existing-row path below already IS an update, so the
+            # two actions share it.
+            if existing is None and action == "update":
+                return f"❌ No mood override for '{mood}'"
             if existing:
                 if data.get("tone"):
                     existing["tone"] = data["tone"]
@@ -2518,7 +2559,7 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         elif action == "remove":
             if not mood:
                 return "❌ mood_override remove requires 'mood'"
-            found = next((o for o in overrides if o.get("mood", "").lower() == mood.lower()), None)
+            found = _find_override(mood)
             if not found:
                 return f"❌ No mood override for '{mood}'"
             overrides.remove(found)
@@ -2743,6 +2784,9 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 item["level"] = level
             if notes:
                 item["notes"] = notes
+            # Same gap as `domain.update`, which this branch mirrors.
+            if isinstance(data.get("references"), list):
+                item["references"] = data["references"]
             item["last_updated"] = datetime.now().strftime("%Y-%m-%d")
             save_json("knowledge.json", knowledge)
             return f"✅ Updated {name} in {category}"

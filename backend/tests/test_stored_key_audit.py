@@ -5,7 +5,20 @@ Every other check on the entity vocabulary is a *spelling* check: it asks whethe
 a declared name matches something, never whether anything writes it. So a field
 can sit in an entity's `optional` forever, be advertised to every MCP client by
 `get_schema`, and be discarded on arrival. Wave 6 found seven such fields in
-`profile` alone. `sleep.day_type` is the standing example.
+`profile` alone.
+
+Both write actions are swept: `add` (wave 8) and `update` (wave 9). Sweeping
+`update` is not redundant -- a branch can honour a field on the way in and ignore
+it on every subsequent edit, which is what `work_experience.highlights` did until
+wave 7 and what six more fields did until wave 9.
+
+A note on `sleep.day_type`, which the consolidation spec cited from wave 4 onward
+as the standing example of a field the guards could not verify: building this
+audit settled it, and it is **not** a defect. `day_type` is a router -- it selects
+which sub-object (`weekday`/`weekend`) receives the write -- correctly declared as
+the entity's `identifier`. It is never stored as a key, but it does determine what
+is stored, which is the question that actually matters. Recorded here so it stops
+being hunted.
 
 **The method is empirical, not declarative.** A hand-written table of "what each
 branch stores" would be a second copy of the truth, free to drift from the first
@@ -185,11 +198,92 @@ def _is_stored(section, entity, spec, field):
     return False, any_accepted
 
 
-def _probeable_entities():
+def _probeable_entities(action="add"):
     for section, entities in server.ENTITY_SCHEMA.items():
         for entity, spec in entities.items():
-            if "add" in spec.get("actions", []):
+            if action in spec.get("actions", []):
                 yield section, entity, spec
+
+
+# ---------------------------------------------------------------------------
+# The same probe, applied to `update`.
+#
+# `add` is where twelve of twelve recorded defects lived, but it is not where
+# they stop: wave 7's `work_experience.update` silently dropped `highlights`
+# while `add` stored them, and that was found by reading, not by a guard. An
+# entity can honour a field on the way in and ignore it on every subsequent
+# edit.
+#
+# The shape is the same -- vary one field, diff the blob -- with one extra step:
+# `update` needs a row to target, so each probe seeds one first.
+# ---------------------------------------------------------------------------
+
+# Declared on an update-capable entity and legitimately not written BY update.
+#
+# The identifier and the parent are excluded automatically below: on `update`
+# they select the row rather than change it, which is what `identifier` means.
+# This list is for anything else.
+ALLOWED_UNSTORED_ON_UPDATE = {
+    ("knowledge", "knowledge", "category"): "selects the target list",
+    ("preferences", "preference", "category"): "selects the target sub-object",
+}
+
+
+def _locator(section, entity, spec):
+    """Create the row `update` will target, and return the payload that finds it.
+
+    Update-only entities (`basic_info`, `communication_default`, `sleep`) have
+    nothing to seed: they write into a fixed object that always exists.
+    """
+    locate = {}
+    identifier = spec.get("identifier")
+    if "add" in spec.get("actions", []):
+        payload = _payload(section, entity, spec)
+        server.execute_modify("add", entity, payload)
+        if spec.get("parent"):
+            locate[spec["parent"]] = payload[spec["parent"]]
+        if identifier:
+            locate[identifier] = payload.get(identifier, _sample(identifier, spec))
+    else:
+        if identifier:
+            locate[identifier] = _sample(identifier, spec)
+        extra = CONDITIONAL_REQUIRED.get((section, entity))
+        if extra:
+            locate.update(extra[0])
+    return locate
+
+
+def _update_after(section, entity, spec, field, value):
+    """Seed a row, `update` one field on it, return (ok, stored blob)."""
+    _reset(section)
+    payload = _locator(section, entity, spec)
+    payload[field] = value
+    try:
+        result = server.execute_modify("update", entity, payload)
+    except Exception as exc:  # noqa: BLE001
+        pytest.fail(
+            f"update {section}.{entity}.{field}={value!r} raised "
+            f"{type(exc).__name__}: {exc}. execute_modify must return an error "
+            f"string, never raise."
+        )
+    ok = isinstance(result, str) and result.startswith("✅")
+    return ok, _strip(server.load_json(f"{section}.json"))
+
+
+def _is_updatable(section, entity, spec, field):
+    pairs = list(_PROBE_PAIRS)
+    valid = (spec.get("valid_values") or {}).get(field)
+    if valid and len(valid) > 1:
+        pairs.insert(0, (valid[0], valid[-1]))
+
+    any_accepted = False
+    for v1, v2 in pairs:
+        ok1, blob1 = _update_after(section, entity, spec, field, v1)
+        ok2, blob2 = _update_after(section, entity, spec, field, v2)
+        any_accepted = any_accepted or ok1 or ok2
+        if blob1 != blob2:
+            return True, True
+    return False, any_accepted
 
 
 @pytest.fixture
@@ -275,4 +369,53 @@ def test_no_payload_shape_raises(clean_database, all_packs_on):
                     server.execute_modify("add", entity, payload)
                 except Exception as exc:  # noqa: BLE001
                     pytest.fail(f"{section}.{entity}.{field}={value!r} raised "
+                                f"{type(exc).__name__}: {exc}")
+
+
+def test_every_declared_field_is_writable_by_update(clean_database, all_packs_on):
+    """A field an entity declares must be changeable through `update`, not only
+    settable through `add`.
+
+    `work_experience.highlights` was exactly this before wave 7: stored by `add`,
+    ignored by `update`, so once a row existed the only way to touch it was
+    `work_highlight`, which can only append. That gap survived six waves of
+    reading precisely because nothing swept it.
+    """
+    phantoms, unreachable = [], []
+
+    for section, entity, spec in _probeable_entities("update"):
+        skip = {spec.get("identifier"), spec.get("parent")}
+        for field in dict.fromkeys(spec.get("required", []) + spec.get("optional", [])):
+            if field in skip or (section, entity, field) in ALLOWED_UNSTORED_ON_UPDATE:
+                continue
+            stored, accepted = _is_updatable(section, entity, spec, field)
+            if stored:
+                continue
+            (unreachable if not accepted else phantoms).append(f"{section}.{entity}.{field}")
+
+    assert not phantoms, (
+        "These fields are declared on an entity that supports `update`, and `update` "
+        "does not write them. `add` may well store them -- which makes the field look "
+        "real right up until someone tries to change it:\n  " + "\n  ".join(phantoms) +
+        "\n\nFix the update branch, or add the field to ALLOWED_UNSTORED_ON_UPDATE with "
+        "a reason. The identifier and parent are skipped automatically."
+    )
+    assert not unreachable, (
+        "`update` was rejected for every probe value of these fields, so whether they "
+        "are written could not be established:\n  " + "\n  ".join(unreachable)
+    )
+
+
+def test_no_update_payload_shape_raises(clean_database, all_packs_on):
+    """`update` must return errors too, never raise."""
+    for section, entity, spec in _probeable_entities("update"):
+        for field in dict.fromkeys(spec.get("required", []) + spec.get("optional", [])):
+            for value in (["listy"], True, 7):
+                _reset(section)
+                payload = _locator(section, entity, spec)
+                payload[field] = value
+                try:
+                    server.execute_modify("update", entity, payload)
+                except Exception as exc:  # noqa: BLE001
+                    pytest.fail(f"update {section}.{entity}.{field}={value!r} raised "
                                 f"{type(exc).__name__}: {exc}")
