@@ -47,6 +47,10 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
   // silently turning every declared textarea into a one-line input.
   const longText =
     meta.long_text instanceof Set ? meta.long_text : new Set(meta.long_text ?? []);
+  // Manifest-declared hint for this field, if the node carries one. Undefined
+  // renders an empty control, which is what every field did before this
+  // existed.
+  const hint = meta.field_placeholders?.[field];
   const enums = meta.valid_values?.[field];
   if (enums) {
     const customField = `custom_${field}`;
@@ -67,7 +71,13 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
     );
   }
   if ((meta.array_fields || []).includes(field)) {
-    return <ArrayInput items={value || []} onChange={onChange} placeholder={`Add ${field}…`} />;
+    return (
+      <ArrayInput
+        items={value || []}
+        onChange={onChange}
+        placeholder={hint ?? `Add ${field}…`}
+      />
+    );
   }
   if ((meta.time_fields || []).includes(field)) {
     // Same guard as date_fields below: nothing validates these on write, so an
@@ -79,6 +89,7 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
         <Input
           id={id}
           type="time"
+          placeholder={hint}
           value={value || ""}
           onChange={(e) => onChange(e.target.value)}
           className="[color-scheme:light] dark:[color-scheme:dark]"
@@ -88,6 +99,7 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
     return (
       <Input
         id={id}
+        placeholder={hint}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         title="Not an HH:MM time, so this stays a text field. Clear it to get a time picker."
@@ -107,6 +119,7 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
         <Input
           id={id}
           type="date"
+          placeholder={hint}
           value={value || ""}
           onChange={(e) => onChange(e.target.value)}
           // Ask the browser to draw its native picker in the app's theme,
@@ -118,6 +131,7 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
     return (
       <Input
         id={id}
+        placeholder={hint}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         title="Not a yyyy-mm-dd date, so this stays a text field. Clear it to get a date picker."
@@ -126,8 +140,21 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
   }
   if (longText.has(field)) {
     return (
-      <Textarea id={id} value={value || ""} onChange={(e) => onChange(e.target.value)} rows={2} />
+      <Textarea
+        id={id}
+        placeholder={hint}
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        rows={2}
+      />
     );
   }
-  return <Input id={id} value={value || ""} onChange={(e) => onChange(e.target.value)} />;
+  return (
+    <Input
+      id={id}
+      placeholder={hint}
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
 }

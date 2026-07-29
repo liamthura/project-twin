@@ -183,7 +183,12 @@
             "long_text": [
               "detail_level"
             ],
-            "$comment": "An update-only singleton (identifier: null). All three keys are written literally, not through get_field -- server.py:2211-2219."
+            "$comment": "An update-only singleton (identifier: null). All three keys are written literally, not through get_field -- server.py:2211-2219.",
+            "field_placeholders": {
+              "detail_level": "e.g. comprehensive with examples, step-by-step breakdowns when explaining code...",
+              "locale": "e.g. British English",
+              "tone": "e.g. friendly but professional"
+            }
           },
           {
             "kind": "list",
@@ -206,7 +211,12 @@
             "long_text": [
               "detail_level"
             ],
-            "$comment": "Stores `mood`. The retired editor wrote this name under `when_feeling`, which no execute_modify branch has ever read -- every MCP lookup resolves on o.get(\"mood\") -- so UI-written overrides were unreachable over MCP and AI-written ones rendered as \"Untitled mood\". persona_store._normalize backfills when_feeling -> mood with a collision guard. `locale`, which the old editor also wrote here, is NOT stored for an override (server.py:2245-2249) and is deliberately not bound."
+            "$comment": "Stores `mood`. The retired editor wrote this name under `when_feeling`, which no execute_modify branch has ever read -- every MCP lookup resolves on o.get(\"mood\") -- so UI-written overrides were unreachable over MCP and AI-written ones rendered as \"Untitled mood\". persona_store._normalize backfills when_feeling -> mood with a collision guard. `locale`, which the old editor also wrote here, is NOT stored for an override (server.py:2245-2249) and is deliberately not bound.",
+            "field_placeholders": {
+              "detail_level": "e.g. brief and to the point, skip the explanations...",
+              "mood": "e.g. stressed, tired, excited, creative",
+              "tone": "e.g. gentle, encouraging"
+            }
           }
         ]
       },
@@ -283,6 +293,9 @@
             "Stance decides which way it reads: like or dislike.",
             "Both stances live in one list, so flipping a row's stance is a single click."
           ]
+        },
+        "field_placeholders": {
+          "item": "e.g. unsolicited sales tone, jargon..."
         }
       }
     ]

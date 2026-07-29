@@ -269,6 +269,11 @@
             "type": "string"
           }
         },
+        "field_placeholders": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Placeholder text per storage key, for the text, textarea, date, time and chip controls a node renders. Keyed by field like `field_defaults`, and distinct from the singular `placeholder`, which belongs to a `strings` node's own one input. Optional: a field with no entry renders an empty control. Concrete examples earn their place here -- \"e.g. Bachelor's, Master's, PhD\" says more about `degree_level` than its label can."
+        },
         "field_defaults": {
           "type": "object",
           "additionalProperties": {

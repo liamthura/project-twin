@@ -175,8 +175,11 @@ CANONICAL_STORED_KEY = {
 # locale spelling-unchecked, which was the whole of the spelling guard's blind
 # spot for that kind. No list node has ever used the key, so adding it changes
 # nothing for kind:"list".
+# `field_placeholders` is a MAP; `set()` of it yields its keys, which is exactly
+# what needs checking -- a placeholder keyed on a field nothing stores is dead
+# config that looks like working config.
 _SUBSET_CHECKED_KEYS = ("fields", "badges", "detail_fields", "array_fields",
-                        "facets", "count_badges")
+                        "facets", "count_badges", "field_placeholders")
 
 BASE_GOALS_MANIFEST = {
     "key": "goals",
@@ -251,7 +254,8 @@ def _fields_named_by(node):
                      "date_fields", "long_text", "optional", "display_fields",
                      "facets", "count_badges"):
         named |= set(node.get(list_key) or [])
-    for map_key in ("suggestions", "enum", "field_defaults", "display_formats"):
+    for map_key in ("suggestions", "enum", "field_defaults", "display_formats",
+                    "field_placeholders"):
         named |= set((node.get(map_key) or {}).keys())
     if node.get("title_field"):
         named.add(node["title_field"])
@@ -813,6 +817,27 @@ def test_a_fields_node_may_declare_a_divergent_key():
         "fields_outside_entity": ["verbosity"],
     }
     assert_node_spelling(node, _COMMS_ENTITY, "communication_default", where="synthetic")
+
+
+def test_a_placeholder_keyed_on_a_field_nothing_stores_is_caught():
+    """Dead config that looks like working config: the control it targets never
+    renders, so the hint silently never appears."""
+    node = {
+        "kind": "fields", "path": ["x"], "entity": "communication_default",
+        "fields": ["tone"],
+        "field_placeholders": {"tone": "ok", "detail": "typo for detail_level"},
+    }
+    with pytest.raises(AssertionError, match="detail"):
+        assert_node_spelling(node, _COMMS_ENTITY, "communication_default", where="synthetic")
+
+
+def test_a_placeholder_keyed_on_an_mcp_input_alias_is_caught():
+    from server import FIELD_ALIASES
+
+    assert "contact" in FIELD_ALIASES["connection"]
+    node = {"kind": "list", "path": ["x"], "entity": "connection",
+            "field_placeholders": {"contact": "how to reach them"}}
+    assert ui_fields_that_are_aliases("connection", _fields_named_by(node)) == {"contact"}
 
 
 def test_a_strings_node_names_no_fields_so_there_is_nothing_to_check():

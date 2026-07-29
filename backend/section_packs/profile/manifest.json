@@ -298,6 +298,15 @@
             "Nationality: Useful for cultural context and language defaults.",
             "Bio: A 2–3 sentence summary of who you are, your interests, and what you're working on. Think of it as your elevator pitch."
           ]
+        },
+        "field_placeholders": {
+          "bio": "A brief description of who you are...",
+          "current_role": "e.g. Software Engineer",
+          "location": "City, Country",
+          "name": "Your name",
+          "nationality": "e.g. Myanmar",
+          "organisation": "Company or university",
+          "preferred_name": "e.g. Liam"
         }
       },
       {
@@ -382,7 +391,11 @@
             "fields_outside_entity": [
               "name"
             ],
-            "$comment": "OBJECTS: {name, topics}. The entity's `course` is the INPUT spelling; `name` is what is stored. Until wave 6 execute_modify appended a bare string here while the editor wrote objects, so an AI-added course rendered blank and could never be removed -- `course in coursework` compares a string to a dict. persona_store._normalize coerces legacy strings."
+            "$comment": "OBJECTS: {name, topics}. The entity's `course` is the INPUT spelling; `name` is what is stored. Until wave 6 execute_modify appended a bare string here while the editor wrote objects, so an AI-added course rendered blank and could never be removed -- `course in coursework` compares a string to a dict. persona_store._normalize coerces legacy strings.",
+            "field_placeholders": {
+              "name": "e.g. Data Structures",
+              "topics": "e.g. Algorithms, Hash tables"
+            }
           },
           {
             "kind": "list",
@@ -402,9 +415,20 @@
             "count_badges": [
               "activities_involved"
             ],
-            "$comment": "OBJECTS: {name, activities_involved}. Before wave 6 `clubs` had no entity and no execute_modify branch at all -- the editor was its only writer, so no AI client could read into or out of it. Both added in wave 6."
+            "$comment": "OBJECTS: {name, activities_involved}. Before wave 6 `clubs` had no entity and no execute_modify branch at all -- the editor was its only writer, so no AI client could read into or out of it. Both added in wave 6.",
+            "field_placeholders": {
+              "activities_involved": "e.g. Project lead, Event organizer",
+              "name": "e.g. Robotics Club"
+            }
           }
-        ]
+        ],
+        "field_placeholders": {
+          "degree_level": "e.g. Bachelor's, Master's, PhD, High School",
+          "end_year": "e.g. 2024 or Expected 2026",
+          "field_of_study": "e.g. Computer Science, Business, etc.",
+          "institution": "e.g. University of Cambridge, Harvard, etc.",
+          "start_year": "e.g. 2020"
+        }
       },
       {
         "kind": "list",
@@ -466,7 +490,15 @@
             "placeholder": "e.g. Led team of 5 engineers",
             "$comment": "Bare strings on both writers (server.py:1541). item_control:\"input\" matches the retired editor, which gave each highlight its own editable row -- see the education node."
           }
-        ]
+        ],
+        "field_placeholders": {
+          "company": "e.g. TechCorp",
+          "description": "What the role involved...",
+          "location": "e.g. Remote, London",
+          "period": "e.g. Jan 2022 - Jun 2023",
+          "role": "e.g. Software Engineer",
+          "type": "e.g. Full-time"
+        }
       },
       {
         "kind": "group",
@@ -496,7 +528,11 @@
               "address",
               "purpose"
             ],
-            "$comment": "Stores `purpose`. The vocabulary declared `label`, which nothing wrote, and omitted `purpose` -- which the add branch REQUIRES (server.py:1418), so no MCP client could add an email. Both corrected in wave 6."
+            "$comment": "Stores `purpose`. The vocabulary declared `label`, which nothing wrote, and omitted `purpose` -- which the add branch REQUIRES (server.py:1418), so no MCP client could add an email. Both corrected in wave 6.",
+            "field_placeholders": {
+              "address": "you@school.edu",
+              "purpose": "e.g. primary, work, school"
+            }
           },
           {
             "kind": "list",
@@ -511,7 +547,11 @@
               "label",
               "url"
             ],
-            "$comment": "No `update` action on this entity (server.py:1444-1465) -- an MCP client edits a link by removing and re-adding it. The UI edits in place, which is a superset and needs no declaration."
+            "$comment": "No `update` action on this entity (server.py:1444-1465) -- an MCP client edits a link by removing and re-adding it. The UI edits in place, which is a superset and needs no declaration.",
+            "field_placeholders": {
+              "label": "e.g. Portfolio",
+              "url": "https://example.com"
+            }
           }
         ]
       },
@@ -538,6 +578,9 @@
             "Add one entry per language.",
             "Fluency: native, fluent, conversational or basic."
           ]
+        },
+        "field_placeholders": {
+          "name": "e.g. English"
         }
       }
     ]
