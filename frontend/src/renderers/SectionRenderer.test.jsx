@@ -9,6 +9,7 @@ import learningLogData from "@/__fixtures__/data/learning_log.json";
 import circleData from "@/__fixtures__/data/circle.json";
 import projectsData from "@/__fixtures__/data/projects.json";
 import knowledgeData from "@/__fixtures__/data/knowledge.json";
+import lifestyleData from "@/__fixtures__/data/lifestyle.json";
 import { renderSection } from "@/test/harness";
 import { SEGMENTED_MAX } from "@/components/controls";
 import { normalizeUi } from "@/renderers/paths";
@@ -20,6 +21,7 @@ const learningLogPack = packs.find((p) => p.key === "learning_log");
 const circlePack = packs.find((p) => p.key === "circle");
 const projectsPack = packs.find((p) => p.key === "projects");
 const knowledgePack = packs.find((p) => p.key === "knowledge");
+const lifestylePack = packs.find((p) => p.key === "lifestyle");
 
 // Shared reasons for the two exclusion entries nearly every pack needs --
 // spelled out once so every call site's exclusion map still requires a real,
@@ -1304,6 +1306,184 @@ describe("section headings and info placement", () => {
       // Same heading row, so the icon reads as belonging to that heading.
       expect(heading.parentElement).toBe(button.parentElement);
     }
+  });
+
+
+  // -------------------------------------------------------------------------
+  // lifestyle (wave 5) -- the first section that is not all lists. It exercises
+  // every node kind at once: two `list` nodes (one with a child list), four
+  // `strings` nodes and two `fields` nodes.
+  //
+  // Three traps this pack carries, all recorded in
+  // docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md:
+  //   - `personality_traits`/`values`/`energy_peaks`/`stress_triggers` store
+  //     BARE STRINGS. The entities' `trait`/`value` field names are MCP input
+  //     spellings that are never stored (CANONICAL_STORED_KEY maps both to
+  //     None), so those nodes bind no entity and name no fields.
+  //   - a hobby's `references` rows store `name`, not the `ref_name` the
+  //     entity declares as its identifier -- declared via
+  //     fields_outside_entity.
+  //   - `sleep`'s `day_type` is a router selecting which fixed sub-object to
+  //     write; it is never itself stored, so no node binds it.
+  // -------------------------------------------------------------------------
+  describe("lifestyle", () => {
+    describe("hobbies list", () => {
+      describeGuards({
+        pack: lifestylePack, listKey: "hobbies", data: lifestyleData,
+        exclusions: {
+          id: MACHINE_ID,
+          last_updated: "machine-written stamp (server.py:1743); no control models it and this node names no display_fields.",
+          references: "a child list node, not a field of the parent row -- covered by the reference round-trip test below.",
+        },
+      });
+    });
+    describe("interests list", () => {
+      describeGuards({
+        pack: lifestylePack, listKey: "interests", data: lifestyleData,
+        exclusions: {},
+      });
+    });
+
+    // Located by heading rather than DOM position so these survive a
+    // reordering of the manifest's sections.
+    const block = (heading) => screen.getByText(heading).parentElement.parentElement;
+
+    it("renders every node kind the pack declares", () => {
+      renderSection({ pack: lifestylePack, initial: lifestyleData });
+
+      // list
+      expect(screen.getByText("Bouldering")).toBeInTheDocument();
+      expect(screen.getByText("Typography")).toBeInTheDocument();
+      // strings -- bare strings, rendered as their own text
+      expect(screen.getByText("analytical")).toBeInTheDocument();
+      expect(screen.getByText("integrity")).toBeInTheDocument();
+      expect(screen.getByText("early morning")).toBeInTheDocument();
+      expect(screen.getByText("context switching")).toBeInTheDocument();
+      // fields
+      expect(within(block("Sleep — weekdays")).getByLabelText("Bedtime")).toHaveValue("23:30");
+      expect(within(block("Sleep — weekends")).getByLabelText("Wakeup")).toHaveValue("09:30");
+    });
+
+    it("renders a hobby's stored `paused` status, which the manifest now declares in full", async () => {
+      // Until 2026-07-29 execute_modify collapsed "paused" to "inactive" on
+      // write, so this value could exist in storage but never be written by
+      // an AI client. Both halves are fixed; this pins the read half -- as a
+      // read-only chip on the collapsed row, and as a bound, selected control
+      // once the row is expanded.
+      const { user } = renderSection({ pack: lifestylePack, initial: lifestyleData });
+
+      expect(screen.getByText("paused")).toBeInTheDocument();
+
+      await user.click(screen.getByText("Film photography"));
+      expect(screen.getByRole("button", { name: "paused", pressed: true })).toBeInTheDocument();
+    });
+
+    it("round-trips an edit to a hobby's `references` child, storing `name`", async () => {
+      const { user, latest } = renderSection({ pack: lifestylePack, initial: lifestyleData });
+
+      await user.click(screen.getByText("Bouldering"));
+      // A child row shows its title as text until it too is expanded.
+      const refs = screen.getByText("References & URLs").parentElement.parentElement;
+      await user.click(within(refs).getByText("Local gym"));
+      await user.type(within(refs).getByDisplayValue("Local gym"), " B");
+
+      const stored = latest().hobbies[0].references[0];
+      expect(stored.name).toBe("Local gym B");
+      expect(stored).not.toHaveProperty("ref_name");
+      expect(stored.url).toBe("https://example.invalid/gym");
+    });
+
+    it("round-trips a hobby's `specifics` array without touching sibling hobbies", async () => {
+      const { user, latest } = renderSection({ pack: lifestylePack, initial: lifestyleData });
+
+      await user.click(screen.getByText("Bouldering"));
+      // Edit-field labels render lowercase (CSS `capitalize` does the rest).
+      // An edit-field label sits directly beside its control:
+      // <div><Label>specifics</Label><ScalarField/></div>. That is one level
+      // shallower than the section wrappers `block` walks.
+      const specifics = screen.getByText("specifics").parentElement;
+      await user.type(within(specifics).getByRole("textbox"), "crimps{Enter}");
+
+      expect(latest().hobbies[0].specifics).toEqual(["overhangs", "slab", "crimps"]);
+      expect(latest().hobbies[2].specifics).toEqual(["sourdough"]);
+    });
+
+    it("writes a strings edit to the right path, leaving the other strings nodes alone", async () => {
+      const { user, latest } = renderSection({ pack: lifestylePack, initial: lifestyleData });
+
+      await user.type(
+        within(block("Values")).getByRole("textbox"),
+        "curiosity{Enter}"
+      );
+
+      expect(latest().values).toEqual(["integrity", "growth", "curiosity"]);
+      expect(latest().personality_traits).toEqual(["analytical", "detail-oriented"]);
+      expect(latest().wellness.energy_peaks).toEqual(["early morning", "late evening"]);
+    });
+
+    it("writes a sleep edit into one day only", async () => {
+      const { user, latest } = renderSection({ pack: lifestylePack, initial: lifestyleData });
+
+      const bedtime = within(block("Sleep — weekdays")).getByLabelText("Bedtime");
+      await user.clear(bedtime);
+      await user.type(bedtime, "22:45");
+
+      expect(latest().wellness.sleep.weekday).toEqual({ bedtime: "22:45", wakeup: "07:00" });
+      expect(latest().wellness.sleep.weekend).toEqual({ bedtime: "01:00", wakeup: "09:30" });
+    });
+
+    it("never stores `day_type`, which is a router and not a storage key", async () => {
+      const { user, latest } = renderSection({ pack: lifestylePack, initial: lifestyleData });
+
+      const wakeup = within(block("Sleep — weekends")).getByLabelText("Wakeup");
+      await user.clear(wakeup);
+      await user.type(wakeup, "10:00");
+
+      expect(latest().wellness.sleep.weekend).not.toHaveProperty("day_type");
+      expect(screen.queryByLabelText(/day type/i)).not.toBeInTheDocument();
+    });
+
+    it("renders sleep times as time pickers, and a non-HH:MM value as text", () => {
+      const odd = {
+        ...lifestyleData,
+        wellness: {
+          ...lifestyleData.wellness,
+          sleep: { weekday: { bedtime: "after midnight", wakeup: "07:00" }, weekend: {} },
+        },
+      };
+      renderSection({ pack: lifestylePack, initial: odd });
+
+      const weekday = block("Sleep — weekdays");
+      // Nothing validates these on write, so a picker would show the free-text
+      // value as empty and persist that emptiness on the next edit.
+      // shadcn's Input renders no `type` attribute at all when it is a plain
+      // text field, so this asserts the absence of the picker rather than the
+      // presence of type="text".
+      expect(within(weekday).getByLabelText("Bedtime")).not.toHaveAttribute("type", "time");
+      expect(within(weekday).getByLabelText("Bedtime")).toHaveValue("after midnight");
+      expect(within(weekday).getByLabelText("Wakeup")).toHaveAttribute("type", "time");
+    });
+
+    it("gives every group a usable control on a brand-new account", () => {
+      // Waves 3 and 4 both shipped sections with no reachable way to add a
+      // first item, so each migration asserts the empty state explicitly.
+      renderSection({ pack: lifestylePack, initial: {} });
+
+      expect(screen.getByRole("button", { name: "Add hobby" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add interest" })).toBeInTheDocument();
+      for (const heading of ["Personality Traits", "Values", "Energy Peaks", "Stress Triggers"]) {
+        expect(within(block(heading)).getByRole("textbox")).toBeEnabled();
+      }
+      expect(within(block("Sleep — weekdays")).getByLabelText("Bedtime")).toHaveValue("");
+    });
+
+    it("adds the first value on an empty account at the right path", async () => {
+      const { user, latest } = renderSection({ pack: lifestylePack, initial: {} });
+
+      await user.type(within(block("Values")).getByRole("textbox"), "integrity{Enter}");
+
+      expect(latest().values).toEqual(["integrity"]);
+    });
   });
 
   it("keeps an untitled section's info beside the card title, where its only heading is", () => {

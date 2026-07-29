@@ -1,0 +1,60 @@
+{
+  "_note": "Shapes read off backend/server.py's execute_modify branches, recorded in docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md. Three things here are easy to mistake for mistakes: `personality_traits`, `values`, `wellness.energy_peaks` and `wellness.stress_triggers` are lists of BARE STRINGS, not objects (server.py:1772, :1793, :2314) -- the entity `trait`/`value` field names are MCP input spellings that are never stored, which is why CANONICAL_STORED_KEY maps both to None. A hobby's `references` entries store `name`, NOT the `ref_name` the entity declares as its identifier (server.py:2133). `wellness.stress_triggers` has no entity and no execute_modify branch at all; persona_store._normalize:267 seeds it and the UI is its only writer. This key itself is inert: no ui node addresses it.",
+  "hobbies": [
+    {
+      "id": "hobby_a1b2c3d4",
+      "name": "Bouldering",
+      "skill_level": "intermediate",
+      "status": "active",
+      "notes": "Two sessions a week, mostly overhangs.",
+      "specifics": ["overhangs", "slab"],
+      "references": [
+        {
+          "name": "Local gym",
+          "url": "https://example.invalid/gym",
+          "notes": "Sets change on Thursdays."
+        }
+      ],
+      "last_updated": "2026-07-20"
+    },
+    {
+      "id": "hobby_e5f6a7b8",
+      "name": "Film photography",
+      "skill_level": "beginner",
+      "status": "paused",
+      "notes": "Paused until the darkroom reopens.",
+      "specifics": [],
+      "references": []
+    },
+    {
+      "id": "hobby_c9d0e1f2",
+      "name": "Bread baking",
+      "status": "inactive",
+      "notes": "",
+      "specifics": ["sourdough"],
+      "references": []
+    }
+  ],
+  "interests": [
+    {
+      "name": "Urban planning",
+      "kind": "curiosity",
+      "notes": "Reading about transit-oriented development."
+    },
+    {
+      "name": "Typography",
+      "kind": "passion",
+      "notes": ""
+    }
+  ],
+  "personality_traits": ["analytical", "detail-oriented"],
+  "values": ["integrity", "growth"],
+  "wellness": {
+    "sleep": {
+      "weekday": { "bedtime": "23:30", "wakeup": "07:00" },
+      "weekend": { "bedtime": "01:00", "wakeup": "09:30" }
+    },
+    "energy_peaks": ["early morning", "late evening"],
+    "stress_triggers": ["context switching"]
+  }
+}
