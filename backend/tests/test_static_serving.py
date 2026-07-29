@@ -136,6 +136,28 @@ def test_docs_site_is_served(static_app):
     assert "Docs" in resp.text
 
 
+def test_bare_docs_path_redirects_to_the_index(static_app):
+    """`/docs` without the trailing slash must reach the docs, not a 404.
+
+    A mount at "/docs" serves everything UNDER /docs/ and does not match the
+    bare path, so it fell through to the MCP mount at "/" and 404'd. Easy to
+    miss, because StaticFiles issues its own redirect for sub-directories
+    (/docs/use -> /docs/use/) -- only the mount root was affected.
+
+    It is also the form every human types and every link in the README uses,
+    so this is the common case, not an edge one.
+    """
+    resp = TestClient(static_app).get("/docs", follow_redirects=False)
+    assert resp.status_code == 308
+    assert resp.headers["location"] == "/docs/"
+
+
+def test_bare_docs_path_follows_through_to_content(static_app):
+    resp = TestClient(static_app).get("/docs")
+    assert resp.status_code == 200
+    assert "Docs" in resp.text
+
+
 def test_docs_mount_is_optional(tmp_path):
     """Phase 1 ships without docs-site/; /docs simply is not mounted."""
     (tmp_path / "index.html").write_text("<!doctype html>")
