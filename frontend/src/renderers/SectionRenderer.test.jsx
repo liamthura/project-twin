@@ -319,6 +319,55 @@ function describeGuards({ pack, listKey, data, exclusions }) {
 }
 
 describe("SectionRenderer", () => {
+  // ---------------------------------------------------------------------------
+  // wave 12: the title field is a renderer guarantee, not a manifest opt-in
+  //
+  // `editFields` came from badges + detail_fields, so a node that omitted its
+  // own title_field from detail_fields offered no control for it: the Add
+  // dialog (which has always given the title its own input) could name a row,
+  // and nothing could ever rename it. Three shipped nodes did exactly that --
+  // goals, media, aesthetics. Fixing it in the renderer rather than in three
+  // manifests is what stops the fourth one happening.
+  // ---------------------------------------------------------------------------
+  describe("title field is always editable", () => {
+    const cases = [
+      ["goals", goalsPack, goalsData, "goals", "title", "Ship MyGist v3"],
+      ["media", mediaPack, mediaData, "items", "title", undefined],
+      ["aesthetics", aestheticsPack, aestheticsData, "styles", "name", undefined],
+    ];
+
+    for (const [label, pack, data, listKey, titleField] of cases) {
+      it(`renders a control for ${label}'s ${titleField}, which detail_fields omits`, async () => {
+        const node = normalizeUi(pack).sections.find(
+          (s) => Array.isArray(s.path) && s.path[0] === listKey
+        );
+        // The premise of this test: if a manifest later adds the title to
+        // detail_fields, this case is no longer testing the renderer.
+        expect(node.detail_fields || []).not.toContain(titleField);
+
+        const first = data[listKey][0];
+        const { user } = renderSection({ pack, initial: data });
+        await user.click(screen.getByText(first[titleField]));
+        expect(screen.getByDisplayValue(first[titleField])).toBeInTheDocument();
+      });
+    }
+
+    it("round-trips a rename through the body control", async () => {
+      const { user, latest } = renderSection({ pack: goalsPack, initial: goalsData });
+      await user.click(screen.getByText("Ship MyGist v3"));
+      await user.type(screen.getByDisplayValue("Ship MyGist v3"), "!");
+      expect(latest().goals.map((g) => g.title)).toContain("Ship MyGist v3!");
+    });
+
+    it("does not render the title twice when detail_fields DOES name it", async () => {
+      // learning_log names `topic` in detail_fields. The title must lead the
+      // body, not appear once from the guarantee and once from detail_fields.
+      const { user } = renderSection({ pack: learningLogPack, initial: learningLogData });
+      await user.click(screen.getByText("React Server Components"));
+      expect(screen.getAllByDisplayValue("React Server Components")).toHaveLength(1);
+    });
+  });
+
   it("renders every item's title", () => {
     renderSection({ pack: goalsPack, initial: goalsData });
     expect(screen.getByText("Ship MyGist v3")).toBeInTheDocument();
@@ -359,7 +408,54 @@ describe("SectionRenderer", () => {
         // structured data the backend writes and nothing renders.
         related_entries: "structured cross-entity link data; no control models it, it only has to survive an edit untouched.",
         conversation_metadata: "write-only diagnostic blob (model, turn count); no control models it, it only has to survive an edit untouched.",
+        // Both were `array_fields` chips on this node until wave 12. They are
+        // sentences, not word-like tags, so they became child `strings` nodes
+        // with item_control:"input" -- one editable row each, the treatment
+        // profile's work highlights already had. Bound by those child nodes,
+        // not by this one.
+        key_decisions: "a child strings node, not a field of the parent row -- an editable row per entry, like work highlights.",
+        followup_items: "a child strings node, not a field of the parent row -- an editable row per entry, like work highlights.",
       },
+    });
+
+    // -----------------------------------------------------------------------
+    // wave 12: what an expanded entry shows and what it lets you edit
+    // -----------------------------------------------------------------------
+
+    it("shows the full timestamp in the body, not only as a collapsed-row chip", async () => {
+      // The chip is a glance. The body is where an entry is read, and a
+      // learning entry's time of day was reachable nowhere once the chip
+      // rendered a date-shaped value.
+      const { user } = renderSection({ pack: learningLogPack, initial: learningLogData });
+      await user.click(screen.getByText("React Server Components"));
+      // TZ is pinned to America/New_York for the suite, so 09:30Z is 04:30.
+      expect(screen.getAllByText("2026-01-15 04:30").length).toBeGreaterThan(1);
+    });
+
+    it("labels the body timestamp so it reads as a field, not a stray string", async () => {
+      const { user } = renderSection({ pack: learningLogPack, initial: learningLogData });
+      await user.click(screen.getByText("React Server Components"));
+      expect(screen.getByText("timestamp")).toBeInTheDocument();
+    });
+
+    it("gives each key decision its own editable row", async () => {
+      // They were ArrayInput chips until wave 12, so fixing a typo meant
+      // deleting the chip and retyping the whole sentence.
+      const { user, latest } = renderSection({ pack: learningLogPack, initial: learningLogData });
+      await user.click(screen.getByText("React Server Components"));
+      const row = screen.getByDisplayValue("Adopt RSC for the docs site only");
+      await user.type(row, "!");
+      expect(latest().entries[0].key_decisions).toEqual([
+        "Adopt RSC for the docs site only!",
+      ]);
+    });
+
+    it("gives each follow-up item its own editable row", async () => {
+      const { user, latest } = renderSection({ pack: learningLogPack, initial: learningLogData });
+      await user.click(screen.getByText("React Server Components"));
+      const row = screen.getByDisplayValue("Read the migration guide");
+      await user.type(row, "!");
+      expect(latest().entries[0].followup_items).toEqual(["Read the migration guide!"]);
     });
 
     it("renders newest first even though the stored array is oldest first", () => {

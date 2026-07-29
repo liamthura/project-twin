@@ -6,6 +6,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger,
 } from "@/components/ui/select";
+import { useMediaQuery, SM_UP } from "@/lib/useMediaQuery";
 
 // Enums with this many values or fewer render as a segmented control;
 // larger sets render as a compact dropdown selector to save space.
@@ -186,7 +187,14 @@ export function SelectControl({ options, value, onChange }) {
 // Convenience wrapper: picks segmented-vs-chips based on option count so
 // call sites don't have to.
 export function EnumControl({ options, value, onChange }) {
-  if (options.length > SEGMENTED_MAX) {
+  // On a phone a four-value segmented control with word labels ("in progress")
+  // eats the whole width and wraps to three lines, which is most of why a
+  // status field looked broken there. Narrow screens get the dropdown the
+  // larger enums already use. Deliberately a JS branch rather than two
+  // rendered controls with one `sm:hidden`: two controls for one field would
+  // both sit in the accessibility tree and both answer to a screen reader.
+  const wide = useMediaQuery(SM_UP);
+  if (options.length > SEGMENTED_MAX || !wide) {
     // Large enums: compact dropdown (legacy values render dashed in-trigger).
     return <SelectControl options={options} value={value} onChange={onChange} />;
   }

@@ -114,6 +114,16 @@ export default function ListRenderer({
   const editFields = [...new Set([...badges, ...detailFields])].filter(
     (f) => f !== pinnedField
   );
+  // What the expanded row actually offers a control for. The title field leads
+  // whether or not the manifest named it in detail_fields: it is the one field
+  // every row has, the Add dialog has always given it its own input, and three
+  // shipped nodes (goals, media, aesthetics) omitted it -- so an entry could be
+  // named once and never renamed. Making it a renderer guarantee stops the
+  // omission recurring in the next manifest, which naming it in three
+  // manifests would not.
+  const bodyEditFields = [...new Set([titleField, ...editFields])].filter(
+    (f) => f && f !== pinnedField
+  );
   const fieldDefaults = node.field_defaults ?? entity?.field_defaults ?? {};
   // What this list holds, for the Add affordances. Was inline in the dialog
   // heading only; the header button said a bare "Add", which reads fine beside
@@ -412,6 +422,11 @@ export default function ListRenderer({
   // hoist, which keeps 130 lines of JSX where they already were.
   function renderRow(idx) {
     const item = items[idx];
+    // Only the fields this row actually carries a value for -- a blank line
+    // labelled "timestamp" is worse than no line.
+    const bodyDisplayFields = (node.display_fields || []).filter(
+      (f) => item[f] != null && item[f] !== ""
+    );
     return (
             // Keyed by the row's stored index, not its id or title: every
             // writer here (updateItem, updateItemAt, removeItem, and
@@ -427,11 +442,22 @@ export default function ListRenderer({
             // changed along with the value being typed.
             <div key={idx}
               className="border-b border-border last:border-b-0">
-              <div className="flex cursor-pointer items-center gap-2 px-3 py-2.5 hover:bg-muted/40"
+              {/* items-start, not items-center: on a phone the title and the
+                  badges are two stacked lines, and centring would float the
+                  chevron and the buttons against the middle of a two-line
+                  block. From `sm` up the inner div goes back to one row and
+                  everything lines up as before. */}
+              <div className="flex cursor-pointer items-start gap-2 px-3 py-2.5 hover:bg-muted/40 sm:items-center"
                 onClick={() => setExpanded({ ...expanded, [idx]: !expanded[idx] })}>
-                <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expanded[idx] ? "" : "-rotate-90"}`} />
-                <span className="truncate text-sm font-medium">{item[titleField]}</span>
-                <span className="flex flex-1 items-center gap-1.5">
+                <ChevronDown className={`mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform sm:mt-0 ${expanded[idx] ? "" : "-rotate-90"}`} />
+                {/* The badges used to sit beside the title in one row, and on a
+                    375px screen a source chip plus a timestamp chip left the
+                    title nothing to truncate into -- entries were unreadable,
+                    which is the one thing a collapsed row has to do. `min-w-0`
+                    is what lets `truncate` work at all inside a flex child. */}
+                <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
+                <span className="block truncate text-sm font-medium">{item[titleField]}</span>
+                <span className="mt-1 flex flex-wrap items-center gap-1.5 sm:mt-0 sm:flex-1 sm:flex-nowrap">
                   {(node.display_fields || [])
                     .filter((f) => item[f] != null && item[f] !== "")
                     .map((f) => (
@@ -478,6 +504,7 @@ export default function ListRenderer({
                     );
                   })}
                 </span>
+                </div>
                 {pinnedField && (
                   <Button variant="ghost" size="icon"
                     className={`h-7 w-7 shrink-0 ${
@@ -508,8 +535,26 @@ export default function ListRenderer({
                     16px chevron + an 8px gap). That indent is worth 72px of a
                     375px screen, which is most of why an enum control had
                     nowhere to go -- so it only applies from sm up. */}
+                {/* Read-only machine-written values, shown in the body and not
+                    only as a collapsed-row chip. The chip is a glance; the body
+                    is where you go to read an entry, and a learning entry whose
+                    only timestamp was a chip lost the time of day entirely
+                    whenever that chip rendered a date-shaped value. Same
+                    formatter as the chip, so the two never disagree. */}
+                {bodyDisplayFields.length > 0 && (
+                  <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 pb-2 sm:px-9">
+                    {bodyDisplayFields.map((f) => (
+                      <div key={f}>
+                        <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {formatDisplay(item[f], node.display_formats?.[f])}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="grid gap-3 px-4 pb-3 sm:grid-cols-2 sm:px-9">
-                  {editFields.map((f) => (
+                  {bodyEditFields.map((f) => (
                     <div key={f} className={needsFullRow(f) ? "sm:col-span-2" : ""}>
                       <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
                       <ScalarField
