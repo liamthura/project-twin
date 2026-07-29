@@ -241,22 +241,31 @@ beyond wave 5.
 
 ## 4. Backend follow-ups this reading surfaced
 
-Not wave 5 work — recorded so they are not rediscovered:
+Not wave 5 work — recorded so they are not rediscovered. **All five are now
+closed**; the strikethroughs are kept rather than deleted so the list stays
+readable as a record of what a single wave's reading turns up.
 
 1. ~~**`hobby.status` (§1.1.1)**~~ — **taken into wave 5 as task 1**, not
    deferred: the branch stops collapsing `"paused"`, so all three declared
    values become storable.
-2. **`stress_triggers` (§1.7)** has no entity and no branch — a stored key no
-   AI client can read into or write.
-3. **`code_style.*` / `learning_style.*` (§2.4)** — `preference` can overwrite
-   these arrays with a scalar. A guard in that branch, or dedicated entities,
-   would close it.
-4. **`like`/`dislike` omit `stance` (§2.3)** from both `required` and
-   `optional`, so the discriminator is invisible to the entity vocabulary.
-5. **`hobby.notes` cannot be cleared over MCP (§1.1)** — `if notes:` skips the
-   empty string.
+2. ~~**`stress_triggers` (§1.7)** has no entity and no branch~~ — **closed in
+   wave 7**: a `stress_trigger` entity mirroring `energy_peak`, plus its
+   `execute_modify` branch. It was a stored key with a UI node and no MCP write
+   path at all.
+3. ~~**`code_style.*` / `learning_style.*` (§2.4)** — `preference` can overwrite
+   these arrays with a scalar~~ — **closed in wave 7** with the guard, not with
+   dedicated entities: replacing a stored list is still allowed, doing it with a
+   scalar is not, and `remove` is the escape hatch.
+4. ~~**`like`/`dislike` omit `stance` (§2.3)**~~ — **closed in wave 7**:
+   `stance` is `optional` on both entities with its two valid values, and an
+   explicit value now beats the entity-implied default, so `update` can flip a
+   row without the client switching entity to do it. The UI node's
+   `fields_outside_entity` declaration went away with it.
+5. ~~**`hobby.notes` cannot be cleared over MCP (§1.1)**~~ — **closed in wave
+   7**: presence, not truthiness, across all three input spellings.
 
-These accrete toward
+These accreted toward
 [`2026-07-28-entity-field-schema-design.md`](../specs/2026-07-28-entity-field-schema-design.md),
 per the agreed approach of reading each wave rather than scheduling the schema
-project up front.
+project up front. Wave 7 took the whole accumulated list —
+[`2026-07-29-wave-7-mcp-contract-gaps.md`](2026-07-29-wave-7-mcp-contract-gaps.md).

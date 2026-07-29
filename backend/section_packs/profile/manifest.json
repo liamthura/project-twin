@@ -86,14 +86,19 @@
     "link": {
       "actions": [
         "add",
+        "update",
         "remove"
       ],
       "required": [
         "url",
         "label"
       ],
-      "optional": [],
-      "identifier": "label"
+      "optional": [
+        "new_label"
+      ],
+      "identifier": "label",
+      "description": "A profile link. `label` identifies the row, so renaming one on update means sending `new_label`.",
+      "$comment": "`update` was absent until wave 7: fixing a typo'd URL meant remove + re-add. See the wave 6 storage-keys reference, follow-up 5."
     },
     "language": {
       "actions": [

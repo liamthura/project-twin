@@ -6,12 +6,22 @@ refactor changed behavior — fix the refactor, never the fixture.
 
 The one thing that legitimately moves this fixture is a DELIBERATE change to
 the tool contract, which is not a refactor and must be argued for on its own.
-That has happened once: wave 6 corrected `profile`'s vocabulary, which declared
-seven field names nothing stored (`language.proficiency`, `email.label`,
+That has happened twice.
+
+Wave 6 corrected `profile`'s vocabulary, which declared seven field names
+nothing stored (`language.proficiency`, `email.label`,
 `education.degree`/`field`/`period`) and omitted seven that were stored. Values
 sent under the phantoms were discarded on arrival, and `email.add` demanded a
 `purpose` the contract never mentioned, so no MCP client could add an email.
 See docs/superpowers/plans/2026-07-29-wave-6-storage-keys-reference.md.
+
+Wave 7 moved four entities, each closing a recorded follow-up: `profile.link`
+gained `update` (and `new_label`, since `label` identifies the row);
+`preferences.like`/`dislike` gained `stance`, the key that decides which entity
+a row IS and which was in neither entity's `required` nor `optional`; and
+`lifestyle.stress_trigger` is new, for a stored key that had a UI node but no
+MCP write path at all. Nothing else in the schema moved -- the diff was checked
+entity by entity before this fixture was regenerated.
 
 Before editing this fixture, diff `server.ENTITY_SCHEMA` against it and confirm
 every changed entity is one you meant to change. A refactor that quietly widens

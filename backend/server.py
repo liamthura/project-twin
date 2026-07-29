@@ -1501,6 +1501,26 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             links.append({"url": url, "label": label})
             save_json("profile.json", profile)
             return f"✅ Added link: {label}"
+        elif action == "update":
+            # `label` identifies the row, so a rename needs a second key --
+            # `new_label` -- otherwise it is indistinguishable from an edit to
+            # a row that does not exist yet. Without this action the only way
+            # to fix a typo'd URL was remove + re-add, which loses position.
+            idx, link = find_in_array(links, label or "", "label")
+            if idx == -1:
+                return f"❌ Link '{label}' not found"
+            new_label = get_field(data, "new_label", "new_name", "new_title")
+            updated = []
+            if url:
+                link["url"] = url
+                updated.append(f"url={url}")
+            if new_label:
+                link["label"] = new_label
+                updated.append(f"label={new_label}")
+            if not updated:
+                return "❌ Link update requires 'url' or 'new_label'"
+            save_json("profile.json", profile)
+            return f"✅ Updated link {link['label']}: {', '.join(updated)}"
         elif action == "remove":
             idx, _ = find_in_array(links, label or "", "label")
             if idx == -1:
@@ -1575,6 +1595,12 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             # `add` already accepts `skills` the same way.
             if isinstance(data.get("skills"), list):
                 exp["skills"] = data["skills"]
+            # `highlights` was declared optional on this entity and honoured by
+            # `add`, but not here -- so once a row existed, `work_highlight` was
+            # the only way to touch them, and it only appends. Same wholesale
+            # replacement as `skills`, which means `[]` clears.
+            if isinstance(data.get("highlights"), list):
+                exp["highlights"] = data["highlights"]
             save_json("profile.json", profile)
             return f"✅ Updated work experience at {data['company']}"
         elif action == "remove":
@@ -1750,9 +1776,19 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                       "location", "nationality", "bio"]
             updated = []
             for field in fields:
-                if data.get(field):
-                    profile[field] = data[field]
-                    updated.append(f"{field}={data[field]}")
+                # Presence, not truthiness. `if data.get(field)` skipped the
+                # empty string, so every one of these could be set over MCP and
+                # then never cleared again -- a `bio` written once was
+                # permanent. `name` is the one field a blank would ruin, since
+                # it is what most readers title the persona with, so it keeps
+                # the old guard.
+                if field not in data:
+                    continue
+                value = data[field]
+                if field == "name" and not value:
+                    return "❌ basic_info 'name' cannot be cleared"
+                profile[field] = value
+                updated.append(f"{field}={value}" if value else f"{field} cleared")
             if not updated:
                 return f"❌ basic_info update requires at least one of: {', '.join(fields)}"
             save_json("profile.json", profile)
@@ -1840,7 +1876,10 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 hobby["skill_level"] = skill_level
             if data.get("status") or data.get("state") or data.get("is_active") is not None:
                 hobby["status"] = status
-            if notes:
+            # Presence, not truthiness: `if notes:` meant a hobby's notes could
+            # be written but never emptied. `notes` above has already collapsed
+            # the aliases, so the presence test has to check all three of them.
+            if any(k in data for k in ("notes", "description", "details")):
                 hobby["notes"] = notes
             if "specifics" in data:
                 hobby["specifics"] = data["specifics"]
@@ -2070,7 +2109,14 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         blob = load_json("preferences.json")
         items = blob.setdefault("likes_dislikes", [])
         item = get_field(data, "item", "name", "dislike", "like")
-        stance = entity  # entity name IS the stance
+        # The entity name is the default stance -- that is what it has always
+        # meant -- but `stance` is a real stored key, and is now declared on
+        # both entities rather than being invisible to `get_schema`. An
+        # explicit value therefore wins, which lets `update` flip a row without
+        # the client having to know it must switch entity to do it.
+        stance = get_field(data, "stance", default=entity)
+        if stance not in ("like", "dislike"):
+            return f"❌ stance must be 'like' or 'dislike', got '{stance}'"
         if action == "add":
             if not item:
                 return f"❌ {entity} requires 'item'"
@@ -2298,6 +2344,15 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         if action in ["add", "update"]:
             if not key:
                 return "❌ Preference requires 'key'"
+            # This is the generic escape hatch: it writes any key under any
+            # category, which is exactly why it could replace a stored LIST --
+            # code_style.tools, learning_style.preferred -- with a bare string.
+            # No reader expects that shape and no other branch can produce it.
+            # Replacing a list is still allowed; doing it with a scalar is not.
+            existing = cat_prefs.get(key)
+            if isinstance(existing, list) and not isinstance(value, list):
+                return (f"❌ {category}.{key} holds a list -- pass 'value' as a "
+                        f"list to replace it, or use 'remove' to drop the key")
             cat_prefs[key] = value
             save_json("preferences.json", preferences)
             return f"✅ Set {category}.{key}"
@@ -2457,7 +2512,34 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
             peaks.remove(found)
             save_json("lifestyle.json", lifestyle)
             return f"✅ Removed energy peak: {item}"
-    
+
+    elif entity == "stress_trigger":
+        # `wellness.stress_triggers` had a seeded key, a UI node and an editor,
+        # but no entity and no branch: the UI was its only writer, so an AI
+        # client could see the value in context and never change it. Mirrors
+        # `energy_peak` above -- same sub-object, same bare-string list.
+        lifestyle = load_json("lifestyle.json")
+        wellness = lifestyle.setdefault("wellness", {})
+        triggers = wellness.setdefault("stress_triggers", [])
+        item = get_field(data, "trigger", "stress_trigger", "item", "name", default="")
+
+        if action == "add":
+            if not item:
+                return "❌ Stress trigger requires 'trigger'"
+            if any(t.lower() == item.lower() for t in triggers):
+                return f"ℹ️ '{item}' already in stress triggers"
+            triggers.append(item)
+            save_json("lifestyle.json", lifestyle)
+            return f"✅ Added stress trigger: {item}"
+        elif action == "remove":
+            found = next((t for t in triggers if t.lower() == item.lower()), None)
+            if not found:
+                return f"❌ Stress trigger '{item}' not found"
+            triggers.remove(found)
+            save_json("lifestyle.json", lifestyle)
+            return f"✅ Removed stress trigger: {item}"
+
+
     # === PROJECT EXTRAS ===
     elif entity == "project_tag":
         projects = load_json("projects.json")
@@ -2727,15 +2809,25 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 return f"✅ Removed club: {name}"
             return f"❌ Club not found"
 
-    elif entity == "coursework":
+    elif entity in ("coursework", "coursework_topic"):
+        # One branch, two entity names. `coursework_topic` used to be a second
+        # branch duplicating this one verbatim -- same file, same list, same
+        # object shape -- which meant every future fix had to be made twice or
+        # the two would drift. It stays in the vocabulary because clients call
+        # it; it no longer stays as a copy.
+        noun = "coursework" if entity == "coursework" else "coursework topic"
         profile = load_json("profile.json")
         education = profile.get("education", [])
         idx, edu = find_in_array(education, data.get("institution", ""), "institution")
         if idx == -1:
             return f"❌ Education at '{data.get('institution')}' not found"
-        
+
         coursework = edu.setdefault("coursework", [])
-        course = get_field(data, "course", "coursework", "class", "subject")
+        # The union of the two branches' alias lists. `course` is first either
+        # way, so a client sending both `course` and `topic` gets what it got
+        # before; the only behaviour change is that each entity now also
+        # answers to the other's spelling.
+        course = get_field(data, "course", "coursework", "class", "topic", "subject")
 
         # A course is an OBJECT: {"name": ..., "topics": [...]}. This branch
         # used to append the bare string, while the editor wrote and read
@@ -2745,49 +2837,19 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
         # coerced on read by persona_store._normalize.
         if action == "add":
             if not course:
-                return "❌ Coursework requires 'course' or 'coursework'"
+                return f"❌ {noun.capitalize()} requires 'course' or 'topic'"
             if _find_course(coursework, course) is not None:
                 return f"ℹ️ '{course}' already in coursework"
             coursework.append({"name": course, "topics": list(data.get("topics") or [])})
             save_json("profile.json", profile)
-            return f"✅ Added coursework: {course}"
+            return f"✅ Added {noun}: {course}"
         elif action == "remove":
             existing = _find_course(coursework, course)
             if existing is not None:
                 coursework.remove(existing)
                 save_json("profile.json", profile)
-                return f"✅ Removed coursework: {course}"
-            return f"❌ Coursework not found"
-    
-    elif entity == "coursework_topic":
-        # Alias for coursework - same functionality
-        profile = load_json("profile.json")
-        education = profile.get("education", [])
-        idx, edu = find_in_array(education, data.get("institution", ""), "institution")
-        if idx == -1:
-            return f"❌ Education at '{data.get('institution')}' not found"
-        
-        coursework = edu.setdefault("coursework", [])
-        course = get_field(data, "course", "coursework", "topic", "subject")
-
-        # Same object shape as `coursework` above, which this branch has always
-        # duplicated verbatim. Kept as an alias so existing clients keep
-        # working; see the wave 6 storage-keys reference for the dedupe.
-        if action == "add":
-            if not course:
-                return "❌ Coursework topic requires 'course' or 'topic'"
-            if _find_course(coursework, course) is not None:
-                return f"ℹ️ '{course}' already in coursework"
-            coursework.append({"name": course, "topics": list(data.get("topics") or [])})
-            save_json("profile.json", profile)
-            return f"✅ Added coursework topic: {course}"
-        elif action == "remove":
-            existing = _find_course(coursework, course)
-            if existing is not None:
-                coursework.remove(existing)
-                save_json("profile.json", profile)
-                return f"✅ Removed coursework topic: {course}"
-            return f"❌ Coursework topic not found"
+                return f"✅ Removed {noun}: {course}"
+            return f"❌ {noun.capitalize()} not found"
 
     elif (_gspec := _generic_entity_spec(entity)) is not None:
         section, list_key, espec = _gspec
@@ -3794,7 +3856,7 @@ DUPLICATE_DISTANCE_CUTOFF = 0.4
 # hobby_specific, project_tag, project_reference, project_highlight,
 # mental_tab_reference, domain_reference) are excluded, as are
 # non-id-list top-level entities: personality_trait/value/energy_peak/
-# preference (plain-value lists, no id_lists entry), the update-only
+# stress_trigger/preference (plain-value lists, no id_lists entry), the update-only
 # singletons basic_info/communication_default/sleep, and `knowledge` (writes
 # into a caller-chosen category via `data["category"]`, not one fixed
 # list_key -- `domain` already covers the one fixed id-list, `domains`).

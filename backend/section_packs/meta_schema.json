@@ -462,6 +462,10 @@
       ],
       "additionalProperties": false,
       "properties": {
+        "$comment": {
+          "type": "string",
+          "description": "Authoring note about this entity, on the same terms as uiSection's `$comment`: ignored by the loader, never shown to anyone. `description` is the MCP-facing text a client reads in get_schema, so provenance notes -- when a field was added and which follow-up it closed -- belong here, not there."
+        },
         "actions": {
           "type": "array",
           "items": {

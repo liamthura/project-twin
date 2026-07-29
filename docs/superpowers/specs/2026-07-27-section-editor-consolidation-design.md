@@ -580,6 +580,39 @@ across waves 5 and 6.
 `needsFullRow` were extracted. `describeGuards` locates a node by `path[0]` and cannot address a
 nested list. No Storybook story exists for any migrated section.
 
+### State after wave 7 — the follow-ups are closed, the sequel is not
+
+Wave 7 is not a section migration. It touches no renderer and no UI: it closes the eight
+remaining backend follow-ups waves 5 and 6 recorded and deferred, so the reference documents stop
+pointing at work that is either done or waiting. See
+[`2026-07-29-wave-7-mcp-contract-gaps.md`](../plans/2026-07-29-wave-7-mcp-contract-gaps.md).
+
+The eight are one failure in eight forms: **what an MCP client can do diverges from what
+`get_schema` says it can do**, in either direction. A contract promising what the code does not
+do (`work_experience.highlights` on update; `link.update`). Code doing what the contract never
+mentions (`stance`, the key that decides which entity a `likes_dislikes` row *is*). Neither
+offering it at all (`wellness.stress_triggers` — a stored key with a UI node and no entity). Code
+more restrictive than any reader expects (`basic_info`, `hobby.notes` — writable, never
+clearable). Code less restrictive than any reader expects (`preference` replacing a stored list
+with a bare string). And two implementations of one contract (`coursework_topic`, a verbatim copy
+of `coursework`).
+
+Two things surfaced that were not on the list. The meta-schema rejected `$comment` on an
+`entity` — the same trap wave 6 hit with `exclusive_fields`, and it made the `profile` pack fail
+to load outright. It surfaced immediately only because `profile` is a **core** pack; for any
+non-core pack a meta-schema violation is a warning and a silently missing section. And adding it
+revealed that `pack_loader.build_entity_schema` passed entity dicts through wholesale, so an
+authoring note would have shipped inside `get_schema`'s output as part of the tool contract. Both
+fixed.
+
+**The tally on the reading discipline stands, and is now the argument.** Twelve follow-ups across
+waves 5 and 6, every one found by reading a branch beside its manifest entity, none by a guard.
+§2.4 of the wave 7 plan — a field declared `optional`, honoured by `add`, dropped by `update` —
+is the phantom-key bug in miniature, and it survived six waves of reading. The backend
+reconciliation is as well-resourced as it will get without doing it: three storage-key reference
+documents, twelve worked examples, and a test file that states the class rather than the
+instances. 643 backend tests, 398 frontend, build clean.
+
 ## Sourcing UI primitives
 
 Convergence means every migrated section funnels through one small set of controls, so the
