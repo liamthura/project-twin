@@ -113,3 +113,6 @@ frontend/test-results
 .claude/
 .agents/
 skills-lock.json
+
+# Local database dumps taken before container surgery
+.docker-backup/

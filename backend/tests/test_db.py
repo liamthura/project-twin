@@ -82,7 +82,7 @@ def test_persona_search_table_exists():
         }
     assert {"user_id", "file_type", "entity_id", "title", "text",
             "tsv", "content_hash", "updated_at"} <= cols
-    assert db.VECTOR_AVAILABLE is True  # test-db image ships pgvector
+    assert db.VECTOR_AVAILABLE is True  # the pgvector image ships the extension
     assert "embedding" in cols
 
 

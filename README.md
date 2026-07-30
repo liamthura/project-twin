@@ -75,7 +75,7 @@ it.
 ```bash
 cd backend && python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-docker compose up -d test-db
+docker compose up -d
 DATABASE_URL="postgresql://mygist:mygist@localhost:5433/mygist_test" uvicorn main:app --reload --port 1120
 ```
 
