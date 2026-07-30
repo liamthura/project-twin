@@ -8,59 +8,76 @@ dashboard state, and dashboard state is what gets forgotten.
 
 <Callout>
 Everything here is specific to how *this* instance is deployed. If you are
-self-hosting, none of it is required — see [Self-hosting](/run/self-hosting)
-for what actually is.
+self-hosting your own, none of it is required — see
+[Self-hosting](/run/self-hosting) for what actually is.
 </Callout>
 
-## Shape
+## The shape of it
 
 ```text
-Cloudflare (DNS + proxy)
-        ↓
-   Coolify on a VPS
-        ↓
-   one container  →  /  /api  /mcp  /docs
-        ↓
-   Postgres + pgvector (same host)
+Cloudflare  (DNS + proxy, TLS terminates here)
+      ↓
+Coolify on a VPS  (builds and runs the container)
+      ↓
+one container  →  /   /api   /mcp   /docs
+      ↓
+Postgres + pgvector  (same host)
 ```
 
 ## Cloudflare
 
 Both hostnames are proxied through Cloudflare rather than pointing at the origin
-directly, so the origin IP is not public and TLS terminates at the edge.
+directly. The origin IP stays private and TLS terminates at the edge.
 
-**Both hostnames stay attached.** Existing MCP client configs point at the older
-`mygist-api` host, and those keep working — a client config is not something you
-can migrate on someone else's behalf.
+**Both hostnames stay attached.** Existing MCP client configurations point at
+the older `mygist-api` host, and those keep working. A client config is not
+something you can migrate on someone else's behalf.
 
-A hostname whose DNS record survives its origin returns Cloudflare's
-`no available server` rather than a DNS failure. That reads like a database
-problem and is not one — it means a tunnel or route with nothing behind it. If
-a host that should be retired still resolves, remove the route.
+<Callout type="warn">
+A hostname whose DNS record outlives its origin returns Cloudflare's
+**`no available server`**, not a DNS failure.
+
+That reads like a database problem and is not one. It means a tunnel or route
+with nothing behind it. If a host that should have been retired still resolves,
+remove the route.
+</Callout>
 
 ## Coolify
 
-Deploys are triggered by pushes to `main`. The build uses the **repository root**
-as its context with `./Dockerfile`, because the image builds the frontend and the
-docs before assembling the Python image.
+Deploys trigger on pushes to `main`.
 
-`SOURCE_COMMIT` is injected at build time and ends up as the version label in the
-UI.
+| Setting | Value |
+|---|---|
+| Build context | The **repository root** |
+| Dockerfile | `./Dockerfile` |
+| Trigger | Push to `main` |
 
-Health gating matters here: the image's `HEALTHCHECK` has a 10-second start
-period, which is what makes a deploy report healthy at ~10s rather than ~31s.
-Without it there is a window where a working container is still marked unhealthy
-and the platform answers 502.
+The context is the repository root because the image builds the frontend and
+the documentation before assembling the Python image.
+
+`SOURCE_COMMIT` is injected at build time and ends up as the version label in
+the web UI — which is how you tell what is actually deployed.
+
+### Health gating
+
+The image's `HEALTHCHECK` has a **10-second start period**, and that is what
+makes a deploy report healthy at around 10 seconds rather than around 31.
+
+Without it there is a window where a perfectly working container is still marked
+unhealthy and the platform answers 502. Worth remembering before blaming the
+application for a flaky deploy.
 
 ## Database
 
-Self-hosted Postgres with pgvector on the same VPS. Not a managed provider —
-older documentation describing Neon as the production database is out of date,
-though Neon remains a fine option for anyone else.
+Self-hosted Postgres with pgvector, on the same VPS.
 
-## What to write down when it changes
+Not a managed provider. Older documentation describing Neon as the production
+database is out of date — though Neon remains a fine option for anyone else.
 
-If you move any of this, update this page in the same change. The failure mode
-is not that something breaks — it is that six months later nobody can say where
-the DNS record points, and the only way to find out is to log into three
-dashboards.
+## Keeping this page true
+
+If you move any of this, update this page in the same change.
+
+The failure mode is not that something breaks. It is that six months later
+nobody can say where the DNS record points, and the only way to find out is to
+log into three dashboards.

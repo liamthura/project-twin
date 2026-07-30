@@ -3,72 +3,206 @@ title: Troubleshooting
 description: Symptoms, and what each one usually means.
 ---
 
+Organised by what you are seeing, not by what is wrong.
+
 ## The server will not start
 
-**`core section pack(s) failed to load`** — a manifest in
-`backend/section_packs/` is invalid. The message names it. Since packs shipped in
-the repo now raise rather than being skipped, this is the loader doing its job:
-fix the manifest.
+<Accordions>
 
-**`PackError: section pack <name>: invalid manifest`** — the same thing for a
-non-core pack. Before this behaviour existed, such a pack disappeared silently
-and the symptom surfaced much later as an unknown entity type.
+<Accordion title="core section pack(s) failed to load">
 
-**A migration failed** — the container runs `alembic upgrade head` before
-binding, deliberately, so a failed migration stops the deploy instead of leaving
-a half-migrated database serving traffic. Read the Alembic error; the app never
-started.
+A manifest in `backend/section_packs/` is invalid, and the message names it.
+
+Packs shipped in the repository raise rather than being skipped, so this is the
+loader doing its job. Fix the manifest — the error names the offending key.
+
+See [Section packs](/run/section-packs#an-invalid-pack-stops-the-server).
+
+</Accordion>
+
+<Accordion title="PackError: section pack <name>: invalid manifest">
+
+The same thing, reported for a pack the server does not own.
+
+Before this behaviour existed, such a pack disappeared silently and the symptom
+surfaced much later as an unknown entity type.
+
+</Accordion>
+
+<Accordion title="A migration failed and the container never bound a port">
+
+Working as designed. The container runs `alembic upgrade head` before binding,
+so a failed migration stops the deploy instead of leaving a half-migrated
+database serving traffic.
+
+Read the Alembic error. The application never started, so nothing after that
+point is relevant.
+
+</Accordion>
+
+<Accordion title="Cannot connect to the database">
+
+Check `DATABASE_URL` reaches the host from *inside* the container, not from your
+laptop. `localhost` in a container is the container.
+
+</Accordion>
+
+</Accordions>
 
 ## A client cannot see the tools
 
-Work outwards:
+Work outwards from the server. Each check rules out one layer.
 
 ```bash
-curl -s https://your-instance/api/health                 # public
+# 1. is the server up? (public, no token)
+curl -s https://your-instance/api/health
+
+# 2. does the token work?
 curl -s https://your-instance/api/auth/whoami \
-  -H "Authorization: Bearer YOUR_TOKEN"                  # token
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
-- **Connection refused / DNS failure** — the server or the network.
-- **`no available server` from Cloudflare** — a proxied hostname with nothing
-  behind it. This is a routing problem, not a database one.
-- **401** — the token is wrong, revoked, or not being sent. Check the client is
-  passing `Authorization` and not stripping it.
-- **Both pass, client still blank** — it is the client's config. See
-  [Other clients](/use/clients).
+| Symptom | Means |
+|---|---|
+| Connection refused, or a DNS failure | The server or the network — not your config |
+| `no available server` from Cloudflare | A proxied hostname with nothing behind it. A routing problem, **not** a database one. |
+| `401` on whoami | The token is wrong, revoked, or not being sent. Check the client is passing `Authorization` and not stripping it. |
+| Both checks pass, client still blank | The client's configuration — see [Other clients](/use/clients) |
+
+<Callout type="warn">
+If you put a reverse proxy in front, check it is not rewriting `/mcp` or adding
+a trailing slash. The endpoint is mounted at the root of the app so it resolves
+exactly, and a redirect breaks clients that do not follow redirects on POST.
+</Callout>
 
 ## Search behaves oddly
 
-**Paraphrases miss, exact words hit** — you are in FTS-only mode. Either
-pgvector is absent or no embedding provider is configured. Check the startup log.
+<Accordions>
 
-**`persona_search.embedding is vector(N) but EMBEDDING_DIM=M`** — the column and
-the configured width disagree, so the server fell back to FTS-only. Run the
-backfill with `--recreate`, **then restart the server** — the running process
-cached the decision at startup and will not re-check until it reboots.
+<Accordion title="Paraphrases miss, exact words hit">
 
-**`days` returns nothing, everything looks edited today** — expected right after
-a `--recreate` backfill, which resets every entry's last-change time. It settles
-as entries change. See [Search index](/run/search-index).
+You are in FTS-only mode. Either pgvector is absent, or no embedding provider is
+configured. Check the startup log.
 
-**Nothing is indexed at all** — imported personas land in `persona_data` but not
-`persona_search`. Backfill.
+See [Database](/run/database#pgvector-and-life-without-it).
+
+</Accordion>
+
+<Accordion title="persona_search.embedding is vector(N) but EMBEDDING_DIM=M">
+
+The column and the configured width disagree, so the server fell back to
+FTS-only rather than writing vectors it could never compare.
+
+Run the backfill with `--recreate`, **then restart the server**. The running
+process cached the decision at startup and will not re-check until it reboots.
+
+</Accordion>
+
+<Accordion title="days returns nothing, and everything looks edited today">
+
+Expected right after a `--recreate` backfill, which resets every entry's
+last-change time. It settles as entries change.
+
+See [Search index](/run/search-index).
+
+</Accordion>
+
+<Accordion title="Nothing is indexed at all">
+
+An imported persona lands in `persona_data` but not in `persona_search`.
+Backfill it.
+
+</Accordion>
+
+</Accordions>
 
 ## Data looks wrong
 
-**Stored JSON does not match the editor** — probably read-time normalisation of a
-legacy shape, which is lossless. See [Migrating](/run/migrating#read-time-normalisation).
+<Accordions>
 
-**An entry has no id** — some nested lists (a project's references, a hobby's
-specifics) have no ids by design and are addressed through their parent. Rows
-written before an id backfill also lack them until the next save.
+<Accordion title="The raw JSON doesn't match what the editor shows">
 
-**A field an AI client sent was not saved** — check `get_schema` for that entity.
-Historically the most common cause was a field that was documented but never
-stored; the stored-key audit now makes that impossible to introduce, but a field
-simply not being in the vocabulary is still a plain rejection.
+Almost always read-time normalisation. `persona_store` coerces a handful of
+shapes as data is read — every coercion is lossless and idempotent, and the
+editor shows the normalised form.
+
+This is not corruption, and there is nothing to do about it.
+
+</Accordion>
+
+<Accordion title="An entry has no id">
+
+Some nested lists — a project's references, a hobby's specifics — have no ids by
+design, and are addressed through their parent instead.
+
+Rows written before an id backfill also lack them until the next time they are
+saved.
+
+</Accordion>
+
+<Accordion title="A field an AI client sent was not saved">
+
+Check `get_schema` for that entity. The field is probably not in the vocabulary,
+and a rejection is the correct outcome.
+
+Historically the most common cause was different: a field that was *documented*
+but never stored. The stored-key audit now makes that impossible to introduce —
+see [Section packs](/run/section-packs#guards-you-will-meet).
+
+</Accordion>
+
+<Accordion title="Two clients disagree about what is stored">
+
+They cannot. There is one copy, with no caching between clients.
+
+Check they are authenticating as the same account — two tokens can belong to two
+different users on the same server.
+
+</Accordion>
+
+</Accordions>
+
+## Deploys
+
+<Accordions>
+
+<Accordion title="The container serves an old build after a restart">
+
+`docker restart` reuses the existing container and its image layer. Recreate it
+instead:
+
+```bash
+docker rm -f mygist && docker run … mygist
+```
+
+A quick way to confirm which build is actually being served is to compare the
+hashed asset filename in the served HTML against the one the build produced.
+
+</Accordion>
+
+<Accordion title="A stream of 502s just after deploying">
+
+Health gating. The image's `HEALTHCHECK` has a 10-second start period; if your
+platform routes on health, there is a window where a working container is still
+marked unhealthy.
+
+See [Infrastructure](/run/infrastructure#health-gating).
+
+</Accordion>
+
+<Accordion title="/docs 404s but /docs/ works">
+
+Fixed — the bare path now redirects. If you see it, you are on an older build.
+
+</Accordion>
+
+</Accordions>
 
 ## Getting more detail
 
-`get_raw` dumps a persona file verbatim, bypassing every scope — the fastest way
-to see what is actually stored rather than what a scope chose to show.
+`get_raw` dumps a section file verbatim, bypassing every read scope. It is the
+fastest way to see what is *actually* stored, rather than what a scope chose to
+show.
+
+For the REST side, `/api/docs` is a live Swagger UI against the running
+instance.

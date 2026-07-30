@@ -1,15 +1,15 @@
 ---
 title: Relations
-description: Linking entries to each other, and the neighbours MyGist derives on its own.
+description: Linking entries to each other, and the neighbours MyGist works out on its own.
 ---
 
-Entries can be connected in two ways. One you author, one is computed.
+Entries can be connected in two ways. One you author. One is computed for you.
 
-## Explicit links (`related`)
+## Links you make
 
-Any entry can link to any other — across sections and entity types. A project can
-point at the domain it exercises, a learning-log entry at the project it came out
-of.
+Any entry can link to any other, across sections and across entity types. A
+project can point at the domain it exercises. A learning-log entry can point at
+the project it came out of.
 
 ```json
 {
@@ -18,42 +18,75 @@ of.
 }
 ```
 
-Rules worth knowing:
+Both values are [ids](/use/concepts#ids), which you get from
+`search_context` or from a titles-mode read.
 
-- **One-directional.** The link is stored on the source entry only. Linking A→B
-  does not create B→A; make it twice if you want both.
-- **Capped at 10** per entry. The cap keeps a scope payload bounded.
-- **Validated at both ends.** Both ids must resolve, or the call fails.
-- **Stripped from scope payloads.** `get_context` never carries them.
+Four rules are worth knowing:
 
-Remove one with `action: "unlink"` and the same `from`/`to`.
+| Rule | Meaning |
+|---|---|
+| **One-directional** | The link is stored on the source only. A→B does not create B→A. Make it twice if you want both. |
+| **Capped at 10** per entry | Keeps a read payload bounded. |
+| **Validated at both ends** | Both ids must resolve, or the call fails. |
+| **Never in scope payloads** | `get_context` does not carry links, whatever the scope. |
 
-## Derived neighbours (`similar`)
+Remove one with `action: "unlink"` and the same `from` and `to`.
 
-Separately, MyGist can compute semantically similar entries from the search
-index. You do not author these and they are not stored — they are found at read
-time, and they only exist where an embedding provider is configured.
+## Neighbours MyGist derives
+
+Separately, MyGist can work out which entries are *semantically* similar, using
+the search index.
+
+You do not author these and they are not stored anywhere. They are computed at
+read time, and they only exist where an embedding provider is configured — see
+[Search index](/run/search-index).
+
+The distinction in one line:
+
+- **`related`** — what you said belongs together.
+- **`similar`** — what the index thinks belongs together.
 
 ## Reading either
 
-Both arrive through `get_entity`:
+Both come back through `get_entity`:
 
 ```text
 get_entity(["proj_a1b2c3"], include_related=true)
 ```
 
-You get `related` (what you linked) and `similar` (what was derived), each as
-`{id, title, section}` stubs. Fetch the stubs you care about in a second call.
+You get `related` and `similar`, each as a list of `{id, title, section}` stubs.
+Fetch the stubs you care about in a second call.
 
 <Callout>
-`related` is always resolved when an entry has links, whether or not you pass
-`include_related` — the flag adds the derived `similar` neighbours. A link whose
-target has since been deleted comes back with `title` and `section` null rather
-than vanishing, so a dangling reference is visible instead of silent.
+`related` is resolved whenever an entry has links, whether or not you pass
+`include_related`. The flag adds the derived `similar` neighbours.
+
+A link whose target has since been deleted comes back with `title` and `section`
+set to null rather than disappearing. A dangling reference stays visible instead
+of going silent.
 </Callout>
 
-## Where links come from
+## Where links come from in practice
 
-Mostly from the assistant. When an `add` closely matches an existing entry, the
-response carries a nudge suggesting a link. The client can act on it or ignore
-it — nothing is linked automatically.
+Mostly from the assistant. When you add something that closely matches an
+existing entry, the response carries a nudge suggesting a link. The client can
+act on it or ignore it — nothing is ever linked automatically.
+
+You can also just ask:
+
+> Link that learning-log entry to the Solterra project.
+
+The client finds both ids and makes the call.
+
+## When linking is worth it
+
+Links are most useful for things that would otherwise be found separately:
+
+- A project and the domains it uses.
+- A learning-log entry and what it came out of.
+- A goal and the project meant to achieve it.
+- A person and the project you work on with them.
+
+They are not worth it as a general filing system. Ten links per entry is a low
+cap on purpose — semantic similarity already covers the loose associations, so
+save explicit links for the connections that are not obvious from the text.

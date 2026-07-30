@@ -1,0 +1,182 @@
+---
+title: FAQ
+description: Short answers to the questions that come up most.
+---
+
+## Privacy and data
+
+<Accordions>
+
+<Accordion title="Does MyGist read my conversations?">
+
+No. MCP tools only run when a client calls them. MyGist never sees a message
+that a client did not explicitly send it, and it has no background process
+watching anything.
+
+This is covered properly on [Capture](/use/capture).
+
+</Accordion>
+
+<Accordion title="Where is my data actually stored?">
+
+In a Postgres database, as JSON — one row per section, per account. If you are
+self-hosting, that database is yours. If someone else hosts your instance, it is
+theirs, and you should trust them accordingly.
+
+Either way you can see all of it: **Account → Data → Export**, or ask your
+assistant for `get_raw`.
+
+</Accordion>
+
+<Accordion title="Can other users on the same server see my persona?">
+
+No. Every read and write is scoped to the account behind the credential.
+
+</Accordion>
+
+<Accordion title="Is my data sent anywhere else?">
+
+Two cases where it leaves the server:
+
+1. **To your AI client**, when it asks — that is the whole point, and it means
+   your persona reaches whatever provider is behind your client.
+2. **To an embedding provider**, if the instance is configured with one. Text is
+   sent to compute search vectors. A self-hosted instance can use a local
+   embedding server, or none at all — see
+   [Database](/run/database#pgvector-and-life-without-it).
+
+</Accordion>
+
+<Accordion title="How do I delete everything?">
+
+Delete the entries in the editor, or ask the person running the instance to drop
+your account. Export first if you want a copy.
+
+</Accordion>
+
+</Accordions>
+
+## Everyday use
+
+<Accordions>
+
+<Accordion title="I told the assistant something and it wasn't saved.">
+
+Expected, unless you asked for it to be saved. Tools are passive — see
+[Capture](/use/capture).
+
+To have things noticed as you go, tell the client at the start of the
+conversation to call `suggest_persona_update` on your messages.
+
+</Accordion>
+
+<Accordion title="The assistant doesn't seem to know anything about me.">
+
+Work through it in order:
+
+1. Is the persona actually populated? Open the editor and look.
+2. Are the MyGist tools visible in the client at all? If not, see
+   [Checking the connection](/use/clients#checking-the-connection).
+3. Is the client calling them? Many clients only call tools when the question
+   makes it obvious. Try asking directly: *"use MyGist to look up what you know
+   about me"*.
+
+</Accordion>
+
+<Accordion title="It stored something in the wrong place.">
+
+Fix it in the [web editor](/use/editor) — that is immediate and unambiguous.
+
+To stop it recurring, tell the client to check `get_schema` for the entity
+before writing. Guessing is the usual cause.
+
+</Accordion>
+
+<Accordion title="I have duplicates of the same thing.">
+
+Remove the extras in the editor.
+
+MyGist warns about near-duplicates when you add one, but it never blocks or
+merges automatically — see
+[Duplicate advisories](/use/writing#duplicate-advisories). Capture suggestions
+are deduplicated more aggressively, and are rewritten into updates when they
+match something you already have.
+
+</Accordion>
+
+<Accordion title="How much should I put in?">
+
+Enough to stop repeating yourself, and no more. Every entry costs tokens in
+every conversation that reads it.
+
+Good test: would this still be true and still be useful next month? If not, it
+is probably a task or a mood, not context.
+
+</Accordion>
+
+<Accordion title="Can I use it from more than one AI client?">
+
+Yes. Issue a token each and point them at the same URL. They share one persona
+with no sync step, because there is only one copy.
+
+</Accordion>
+
+</Accordions>
+
+## Concepts
+
+<Accordions>
+
+<Accordion title="What is MCP?">
+
+The [Model Context Protocol](https://modelcontextprotocol.io) — an open standard
+for connecting AI assistants to external tools and data. MyGist is an MCP
+server; your AI client is an MCP client.
+
+Being a standard is the point: nothing about MyGist is tied to one AI vendor.
+
+</Accordion>
+
+<Accordion title="What's the difference between this and my client's built-in memory?">
+
+Built-in memory lives inside one product. Move tools, and it does not come with
+you.
+
+MyGist is a database you control, reachable by anything that speaks MCP. It is
+also structured rather than a pile of notes, which is what lets a client ask for
+a slice instead of everything.
+
+</Accordion>
+
+<Accordion title="What is an 'entity'?">
+
+The name of a form a client fills in to write something — `hobby`, `goal`,
+`project`. It is not the same as where the data is stored. See
+[Concepts](/use/concepts#entities).
+
+</Accordion>
+
+<Accordion title="Why don't these docs list all the entities and their fields?">
+
+Because a hand-copied list has been wrong more than once. The server publishes
+the real one through `get_schema`, generated from the same files it enforces, so
+that copy cannot drift.
+
+Ask your assistant: *"show me the MyGist schema for hobbies"*.
+
+</Accordion>
+
+<Accordion title="What's a 'scope'?">
+
+A named slice of your persona — `minimal`, `professional`, `personal`,
+`learning`, `full`, or any single section. Clients ask for one instead of
+pulling everything. See [Reading](/use/reading).
+
+</Accordion>
+
+</Accordions>
+
+## Still stuck?
+
+If the server itself looks unhealthy rather than the client, the operational
+symptoms are catalogued in [Troubleshooting](/run/troubleshooting).

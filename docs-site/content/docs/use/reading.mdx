@@ -1,92 +1,152 @@
 ---
 title: Reading
-description: Scopes, search, and the lean-retrieval pattern the tools are built around.
+description: Scopes, search, and the two-step pattern the tools are built around.
 ---
 
-There are two ways to get context out of MyGist, and the difference matters at
-scale: **load a scope**, or **search and fetch**. A well-behaved client does the
-first once at the start of a conversation and the second every time afterwards.
+There are two ways to get context out of MyGist:
 
-## Scoped context
+1. **Load a scope** — a pre-shaped slice of your persona.
+2. **Search, then fetch** — find the handful of entries that matter, and pull
+   only those.
 
-`get_context` returns a slice of your persona rather than all of it. Each scope
-is assembled from what every section pack declares it contributes.
+A well-behaved client does the first once at the start of a conversation, and
+the second every time after that. The difference matters more the bigger your
+persona gets.
 
-| Scope | Roughly | Includes |
+## Scopes
+
+`get_context` returns a slice, not the whole thing. There are five global
+scopes:
+
+| Scope | Roughly | What it is for |
 |---|---|---|
-| `minimal` | ~150 tokens | Name, bio, location, current role, top of mind, first few active goal titles |
-| `professional` | ~3,600 | Work, skills, projects, domains, active goals |
+| `minimal` | ~150 tokens | A quick "who is this" — name, bio, location, role, top of mind, a few goal titles |
+| `professional` | ~3,600 | Work context — jobs, skills, projects, domains, active goals |
 | `personal` | ~1,400 | Hobbies, values, personality, wellness, active goals |
-| `learning` | ~3,400 | Domains, current learning, active goals |
-| `full` | ~8,000 | Everything enabled |
+| `learning` | ~3,400 | Domains, current learning, the learning log, active goals |
+| `full` | ~8,000 | Everything that is enabled |
 
-Token figures are indicative and drift as your persona grows — treat them as
-relative sizes, not budgets.
+<Callout>
+Token figures are indicative, and they grow as your persona does. Read them as
+relative sizes, not as budgets.
+</Callout>
 
-**Any section key is also a scope**, alone or in a list:
+### Which sections each scope pulls from
+
+| | minimal | professional | personal | learning |
+|---|:--:|:--:|:--:|:--:|
+| Profile | ● | ● | ● | ● |
+| Goals | ● | ● | ● | ● |
+| Preferences | ● | ● | ● | ● |
+| Knowledge | | ● | ● | ● |
+| Projects | ● | ● | | ● |
+| Lifestyle | | | ● | |
+| Circle | | | ● | |
+| Learning log | | | | ● |
+| Media *(opt-in)* | | | ● | |
+| Aesthetics *(opt-in)* | ● | | ● | |
+
+Preferences appear in every row on purpose. However narrow the request, a client
+still learns how you want answers written.
+
+`full` includes every enabled section. A section you have disabled appears in
+nothing.
+
+### Reading one section
+
+Any section name is also a scope, on its own or in a list:
 
 ```text
 get_context(scope="lifestyle")
 get_context(scope=["lifestyle", "circle"])
 ```
 
-### Narrowing further
+## Narrowing further
 
-**Topic filtering** keeps only entries relevant to a subject, routed through the
-search index — semantic matching where embeddings are configured, ranked keyword
-matching otherwise:
+Two options cut a scope down without changing which sections it covers.
+
+### Filter by topic
 
 ```text
 get_context(scope="professional", topic="Python")
 ```
 
-**Titles mode** replaces every list entry with an `{id, title, updated_at}` stub:
+Only entries relevant to the topic survive. This routes through the search
+index — semantic matching where embeddings are configured, ranked keyword
+matching otherwise.
+
+### Titles only
 
 ```text
 get_context(scope="professional", detail="titles")
 ```
 
-On a real persona that took a professional scope from ~7,100 tokens to ~1,600.
-Skim the stubs, then fetch the handful that matter. `updated_at` is there so a
-client can discount stale context; top-of-mind entries untouched for more than
-30 days add a one-line staleness note to the output.
+Every list entry collapses to a stub: `{id, title, updated_at}`. On a real
+persona this took a professional scope from around 7,100 tokens to around 1,600.
+
+The client skims the stubs, then fetches the few that matter by id. The
+`updated_at` field is there so it can discount stale context — and top-of-mind
+entries untouched for over 30 days add a one-line staleness note to the output.
 
 ## Search and fetch
 
-This is the pattern the tools are designed around:
+This is the pattern the tools were designed around:
 
 ```text
-search_context("postgres")   → ~10 ranked snippets, each with an entity id
-get_entity(["proj_a1b2c3"])  → full detail, only for the hits worth having
+search_context("postgres")   → about ten ranked snippets, each with an entity id
+get_entity(["proj_a1b2c3"])  → full detail, for only the hits worth having
 ```
 
-`search_context` is hybrid where an embedding provider is configured — full-text
-*and* vector similarity, so paraphrases match — and full-text only otherwise.
-It accepts `sections` to narrow, `limit` (max 25), and `days` for a recency
-window.
+**`search_context`** is hybrid where an embedding provider is configured —
+full-text *and* vector similarity, so paraphrases match. Without one it is
+full-text only, and needs a shared keyword to hit. It accepts:
 
-`get_entity` takes one id or up to 25. Pass `include_related=true` to get an
-entry's explicit links and its derived semantic neighbours.
+| Option | Does |
+|---|---|
+| `sections` | Restrict to certain sections |
+| `limit` | Cap the results, maximum 25 |
+| `days` | Only entries changed in the last N days |
+
+**`get_entity`** takes one id, or up to 25 at once. Pass
+`include_related=true` to also get an entry's links and its derived semantic
+neighbours — see [Relations](/use/relations).
 
 <Callout>
-Prefer this over widening a scope. Pulling a whole section to answer one question
-costs tokens on every turn afterwards; two small calls cost them once.
+Prefer this over widening a scope. Pulling a whole extra section to answer one
+question costs tokens on every turn afterwards. Two small calls cost them once.
 </Callout>
 
 ## Raw access
 
-`get_raw` dumps whole persona files verbatim. It is for export and debugging, not
-for conversation — it bypasses every scope and returns storage keys rather than
-the entity vocabulary.
+`get_raw` dumps whole section files verbatim. It bypasses every scope and
+returns raw storage keys rather than the entity vocabulary.
 
-## Asking in practice
+Use it for export and for debugging — "what is *actually* stored?" — and not in
+normal conversation, where it is both large and harder to read.
 
-You do not call any of this yourself. You ask, and the client chooses:
+## What this looks like in practice
 
-> What do you know about me?
-> What am I currently working on?
-> What did I decide about the database last month?
+You never call any of this. You ask, and the client picks:
 
-The last one is the interesting case: it is a search, not a scope, and a client
-that reaches for `search_context` will answer it from your learning log without
-loading anything else.
+| You say | The client probably calls |
+|---|---|
+| "What do you know about me?" | `get_context(scope="minimal")` |
+| "Help me update my CV" | `get_context(scope="professional")` |
+| "What am I working on?" | `get_context(scope="minimal")` or projects |
+| "What did I decide about the database last month?" | `search_context`, then `get_entity` |
+
+That last one is the interesting case. It is not a scope at all — a client that
+reaches for `search_context` answers it straight out of your learning log
+without loading anything else.
+
+<Screenshot
+  caption="Search and fetch in one conversation"
+  hint="A conversation where the assistant runs search_context and then get_entity, with both tool calls visible."
+/>
+
+## Next
+
+<Cards>
+  <Card title="Writing" href="/use/writing" description="Putting things in, not just getting them out." />
+  <Card title="Relations" href="/use/relations" description="Connecting entries so one read surfaces the others." />
+</Cards>

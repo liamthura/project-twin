@@ -1,39 +1,78 @@
 ---
 title: Running MyGist
-description: Self-hosting, operations, and extending the persona schema.
+description: Self-hosting, day-to-day operations, and extending the persona schema.
 ---
 
-MyGist ships as **one container** serving four things on a single origin: the
-web UI at `/`, the REST API under `/api`, the MCP endpoint at `/mcp`, and this
-documentation at `/docs`. There is no separate frontend service and no Node
-runtime in production — the SPA and these docs are both static output built
-into the image.
+This half of the documentation is for whoever runs the server — hosting it,
+keeping it healthy, and changing what it can store.
 
-<Cards>
-  <Card title="Self-hosting" href="/run/self-hosting" description="Requirements, docker run, environment variables." />
-  <Card title="Database" href="/run/database" description="Postgres, pgvector, and the FTS-only fallback." />
-  <Card title="Search index" href="/run/search-index" description="Backfilling, and the --recreate gotcha." />
-  <Card title="Section packs" href="/run/section-packs" description="Adding a section of your own." />
-  <Card title="Migrating" href="/run/migrating" description="Importing legacy mygist_data JSON." />
-  <Card title="Troubleshooting" href="/run/troubleshooting" description="When something is not answering." />
-</Cards>
+If you only want to *use* MyGist, [Using MyGist](/use) is the other half.
 
-## What you are running
+## The whole system
 
-| Piece | Where | Notes |
+MyGist ships as **one container** serving four things on a single origin. There
+is no separate frontend service and no Node runtime in production — the web UI
+and this documentation are both static output built into the image.
+
+```text
+                    one container
+   ┌──────────────────────────────────────────────┐
+   │  /          web UI (static)                  │
+   │  /api       REST API                         │
+   │  /mcp       MCP endpoint                     │
+   │  /docs      this documentation (static)      │
+   └──────────────────────────────────────────────┘
+                          │
+                   ┌──────────────┐
+                   │   Postgres   │  (+ pgvector, optional)
+                   └──────────────┘
+```
+
+| Path | What | Auth |
 |---|---|---|
-| Web UI | `/` | Vite + React, built into the image |
-| REST API | `/api` | Bearer-token auth; `/api/health` is public |
-| MCP endpoint | `/mcp` | Mounted at root so it resolves without a redirect |
-| Docs | `/docs` | This site, statically exported |
-| Interactive API docs | `/api/docs` | Swagger; ReDoc at `/api/redoc` |
+| `/` | Web UI — Vite and React, built into the image | Signs in at the client |
+| `/api` | REST API | Bearer token |
+| `/api/health` | Liveness probe | Public |
+| `/mcp` | MCP endpoint | Bearer token |
+| `/docs` | This site, statically exported | Public |
+| `/api/docs`, `/api/redoc` | Swagger and ReDoc for the REST API | Public |
 
 ## What you need
 
-Postgres, and nothing else. [pgvector](/run/database) is optional — without
-it search degrades to full-text only rather than breaking. An embedding provider
-is optional on top of that.
+**Postgres, and somewhere to run one container.** That is the whole
+requirement list.
 
-State that lives outside the repo — DNS, the reverse proxy, the deployment
-platform — is written down in [Infrastructure](/run/infrastructure), because
-it is otherwise only in a dashboard.
+[pgvector](/run/database) is optional — without it, search degrades to
+full-text only rather than breaking. An embedding provider is optional on top of
+that.
+
+## Where to go
+
+<Cards>
+  <Card title="Self-hosting" href="/run/self-hosting" description="Requirements, running the container, and every environment variable that does something." />
+  <Card title="Database" href="/run/database" description="Postgres, pgvector, what is stored, and backups." />
+  <Card title="Search index" href="/run/search-index" description="Backfilling, and the restart step that is easy to miss." />
+  <Card title="Section packs" href="/run/section-packs" description="Adding a persona section of your own, with no backend code." />
+  <Card title="Development" href="/run/development" description="Running from source, the test suite, and what CI checks." />
+  <Card title="Infrastructure" href="/run/infrastructure" description="The deployment layer that lives in dashboards rather than the repository." />
+  <Card title="Troubleshooting" href="/run/troubleshooting" description="Symptoms, and what each one usually means." />
+</Cards>
+
+## Design decisions worth knowing up front
+
+A few choices explain most of the behaviour you will meet:
+
+**One image, one origin.** The frontend, the docs, the API and the MCP endpoint
+all come out of one build and one deployment. There is no CORS configuration and
+no second service to keep in step. The cost is that a broken frontend build
+blocks a backend fix, which is why CI builds both.
+
+**Migrations run before the server binds.** The container runs
+`alembic upgrade head` first, so a failed migration stops the deploy instead of
+leaving a half-migrated database serving traffic.
+
+**An invalid section pack halts startup.** It is not skipped with a warning. The
+reasoning is on [Section packs](/run/section-packs#an-invalid-pack-stops-the-server).
+
+**The search index is derived.** `persona_search` can always be rebuilt from
+`persona_data`, which makes it the safe thing to drop when it looks wrong.

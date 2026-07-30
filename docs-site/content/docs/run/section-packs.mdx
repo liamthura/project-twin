@@ -4,28 +4,117 @@ description: Adding a persona section with one file and no backend code.
 ---
 
 A **section pack** adds a whole persona section — storage, write vocabulary,
-read scopes, search indexing and editor UI — from a single
-`backend/section_packs/<key>/manifest.json`. There is no per-pack Python and no
-per-pack React.
+read scopes, search indexing and editor UI — from a single file:
 
-The full walkthrough lives in
+```text
+backend/section_packs/<key>/manifest.json
+```
+
+There is no per-pack Python and no per-pack React. That is the point: a
+declarative pack cannot ship code, so community packs are safe to accept.
+
+The full step-by-step walkthrough lives in
 [`docs/CONTRIBUTING-PACKS.md`](https://github.com/liamthura/project-twin/blob/main/docs/CONTRIBUTING-PACKS.md)
-in the repository. This page covers what you need to know before you start.
+in the repository. This page covers what you should understand before you open
+it.
 
 ## What a manifest declares
 
 | Key | Purpose |
 |---|---|
+| `key`, `title`, `description` | Identity, and what the Sections manager shows |
 | `defaults` | The empty skeleton for the section |
-| `id_lists` | `[list_field, id_prefix]` pairs; prefixes must be unique across all packs |
-| `entities` | The write vocabulary — actions, required/optional fields, enum values, the `identifier` used for update and remove |
+| `id_lists` | `[list_field, id_prefix]` pairs. Every listed field must exist in `defaults` as a list, and prefixes must be unique across all packs. |
+| `entities` | The write vocabulary — actions, required and optional fields, enum values, and the `identifier` used for update and remove |
 | `scope_contributions` | What each global scope pulls from this section |
 | `capture_triggers` | Phrases that hint `suggest_persona_update` |
-| `ui` | How the editor renders the section |
+| `ui` | How the web editor renders the section |
+| `core` | Whether the section can be disabled at all |
 | `default_enabled` | Whether it starts on, or is opt-in |
+| `position` | Where it sits in the editor's section order |
 
 Entity names must be unique across every pack, so a new pack cannot shadow an
 existing entity.
+
+## Getting started
+
+<Steps>
+
+<Step>
+
+### Copy the template
+
+```bash
+cp -r backend/section_packs/_template backend/section_packs/<key>
+```
+
+`<key>` is lowercase snake_case, and the manifest's `"key"` must equal the
+directory name.
+
+</Step>
+
+<Step>
+
+### Edit the manifest
+
+Work through the table above. Two things are easy to get wrong:
+
+- **Give every entity an explicit `list`** naming which id-list it writes into,
+  such as `"list": "items"`. The fallback for a section with a single id-list
+  has an ambiguity guard and will decline entities rather than guess. Declaring
+  it always is the safe habit.
+- **Omit a scope to stay out of it.** Your section always gets its own scope
+  token for free, so it is reachable even if it contributes to no global scope.
+
+</Step>
+
+<Step>
+
+### Boot until it starts
+
+```bash
+cd backend && python main.py
+```
+
+A schema violation raises a `PackError` naming your pack and the offending key.
+Fix, repeat. This is the development loop — the error message is the
+documentation.
+
+</Step>
+
+<Step>
+
+### Run the tests
+
+```bash
+python -m pytest tests/test_pack_loader.py -q
+```
+
+Then the full suite, which is where the mechanical guards below live:
+
+```bash
+python -m pytest -q
+```
+
+</Step>
+
+<Step>
+
+### Open a PR
+
+Exactly one new directory under `backend/section_packs/`.
+
+</Step>
+
+</Steps>
+
+## New packs default to off
+
+Set `default_enabled: false`. Users opt in from the Sections manager.
+
+This matters more than it sounds: every enabled section costs context tokens for
+every user who has it on. An opt-in default means your pack costs nothing to the
+people who do not want it.
 
 ## An invalid pack stops the server
 
@@ -33,51 +122,81 @@ existing entity.
 A manifest that violates `meta_schema.json` raises and **halts startup**. It is
 not skipped with a warning.
 
-This changed deliberately. Warn-and-skip meant a mistyped key removed an entire
-section silently: the pack vanished, and the first symptom appeared much later
-and far from the cause — a client being told an entity type was unknown. Twice.
-Failing at boot puts the error where the mistake is.
+This changed deliberately. Warn-and-skip meant that a single mistyped key
+removed an entire section silently: the pack vanished, and the first symptom
+appeared much later and nowhere near the cause — an AI client being told an
+entity type was unknown. It happened twice.
 
-Warn-and-skip survives only for pack directories the server does not own.
+Failing at boot puts the error where the mistake is. Warn-and-skip survives only
+for pack directories the server does not own.
 </Callout>
-
-So the development loop is: edit the manifest, start the server, read the error,
-repeat until it boots.
-
-```bash
-cd backend && python main.py
-python -m pytest tests/test_pack_loader.py -q
-```
 
 ## The `ui` block
 
 `ui.sections` is a list of nodes. The shared renderer kit
 (`frontend/src/renderers/`) implements four kinds:
 
-| Kind | Renders |
-|---|---|
-| `list` | A list of objects — expandable rows with fields, badges and an Add dialog |
-| `fields` | Named scalar fields of one object |
-| `strings` | A bare `string[]` — either tag chips or one editable row per item |
-| `group` | A heading with nested nodes under it; binds no storage of its own |
+| Kind | Binds | Renders |
+|---|---|---|
+| `list` | A list of objects | Expandable rows with fields, badges and an Add dialog |
+| `fields` | Named keys of one object | A form; `path: []` addresses the section root |
+| `strings` | A bare `string[]` | Tag chips, or one editable row per item |
+| `group` | Nothing | A heading with nested nodes under it |
 
-A `list` node can carry `children`, which render against each row — that is how a
-project's references and an education entry's coursework are edited.
+A `list` node can also carry `children`, which render against each row. That is
+how a project's references and an education entry's coursework are edited.
+
+Everything the editor draws comes from here. There is no per-pack React to
+write, and no way to add any.
 
 ## Guards you will meet
 
 The test suite checks packs mechanically, and it will reject things that look
-fine:
+fine to a human. Each of these exists because it caught a real defect.
 
-- **Every field an entity declares must actually be stored.** A field nothing
-  writes fails the stored-key audit, for both `add` and `update`. If a field is
-  genuinely a router the caller must send, it gets declared as such with a
-  reason rather than quietly allowed.
-- **`required` must be enough.** An `add` built from exactly the fields you
-  declare required has to succeed.
-- **Every stored key the fixture holds must be bound by the UI or explicitly
-  excluded with a written reason.** An unbound key is unreachable in the editor
-  and therefore unsaveable.
+<Accordions>
 
-These exist because each one has caught a real defect. They are strict on
-purpose, and the reason strings they demand are the documentation.
+<Accordion title="Every field an entity declares must actually be stored">
+
+A field that nothing writes fails the **stored-key audit**, for both `add` and
+`update`. The audit is empirical: it runs each action twice with different
+values and diffs what came out, so it needs no maintenance and sweeps new
+entities automatically.
+
+If a field is genuinely a router the caller must send rather than something
+stored — `sleep.day_type` selects weekday or weekend, for instance — it is
+declared as such with a written reason, not quietly allowed.
+
+</Accordion>
+
+<Accordion title="`required` must be enough">
+
+An `add` built from exactly the fields you declared required has to succeed.
+
+A common failure is declaring one required field while the write path demands
+four. The contract and the implementation disagree, and the caller has no way to
+know.
+
+</Accordion>
+
+<Accordion title="Every stored key must be reachable in the editor">
+
+Every stored key the fixture holds must be bound by a `ui` node, or explicitly
+excluded with a written reason.
+
+An unbound key is unreachable in the editor and therefore unsaveable by hand —
+which usually means nobody notices it is broken until much later.
+
+</Accordion>
+
+</Accordions>
+
+These guards are strict on purpose, and the reason strings they demand are
+themselves the documentation for the exceptions.
+
+## Keep entries small
+
+Every field you add costs context tokens for every user who enables the pack.
+
+MyGist is a context provider. It describes a person; it does not manage their
+tasks. If a field would be stale next month, it probably does not belong.

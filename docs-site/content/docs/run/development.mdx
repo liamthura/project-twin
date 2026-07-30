@@ -1,0 +1,182 @@
+---
+title: Development
+description: Running from source, the test suite, and what CI checks before a change lands.
+---
+
+For working on MyGist itself rather than just running it.
+
+## Repository layout
+
+```text
+├── backend/            FastAPI: REST API, MCP server, persona logic
+│   ├── main.py           entry point — /api, /mcp, static routes
+│   ├── server.py         MCP tools and the persona write path
+│   ├── persona_store.py  storage, defaults, read-time normalisation
+│   ├── search_index.py   persona_search maintenance
+│   ├── sections.py       the section registry and scope assembly
+│   ├── pack_loader.py    manifest validation
+│   ├── section_packs/    one manifest per persona section
+│   ├── scripts/          backfills and one-off tools
+│   └── tests/            pytest, against a real Postgres
+├── frontend/           React SPA — the persona editor
+│   ├── src/renderers/    the shared renderer kit packs drive
+│   └── src/__fixtures__/ pack fixtures, generated from the manifests
+├── docs-site/          this documentation (Fumadocs, static export)
+└── docs/               internal specs, plans, CONTRIBUTING-PACKS.md
+```
+
+## Backend
+
+```bash
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements-dev.txt
+```
+
+Start a throwaway Postgres — the suite needs pgvector, and the compose file
+provides an image that has it:
+
+```bash
+docker compose up -d test-db     # listens on 5433
+```
+
+Run the server:
+
+```bash
+DATABASE_URL="postgresql://mygist:mygist@localhost:5433/mygist_test" \
+  uvicorn main:app --reload
+```
+
+Run the tests:
+
+```bash
+python -m pytest -q
+```
+
+<Callout>
+The suite reads **`TEST_DATABASE_URL`**, not `DATABASE_URL`. `conftest.py`
+overrides `DATABASE_URL` from it for every test, so a `DATABASE_URL` you export
+by hand is discarded.
+
+It defaults to `postgresql://mygist:mygist@localhost:5433/mygist_test`, which
+matches the compose file. Set `TEST_DATABASE_URL` only if you are pointing at
+something else.
+</Callout>
+
+These are not mocked tests. They run against real Postgres, with fixtures that
+truncate between cases and act as a signed-in user.
+
+## Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+| Command | Does |
+|---|---|
+| `npm test` | The whole suite — jsdom unit tests and browser-based Storybook tests |
+| `npm run test:watch` | Watch mode |
+| `npm run fixtures` | Regenerate `src/__fixtures__/packs.json` from the manifests |
+| `npm run build` | Production build |
+| `npm run storybook` | Storybook on port 6006 |
+
+<Callout type="warn">
+**Change a section pack manifest, regenerate the fixtures.** `packs.json` is
+generated from `backend/section_packs/*/manifest.json`, and the frontend tests
+assert against it. If it goes stale, the tests are checking a shape that no
+longer exists.
+
+CI runs `npm run fixtures` and then `git diff --exit-code` on the result, so a
+stale fixture fails the build rather than passing quietly.
+</Callout>
+
+The browser-based tests need a Chromium install:
+
+```bash
+npx playwright install --with-deps chromium
+```
+
+Timezone is pinned to `America/New_York` in the test config, so date-formatting
+assertions do not depend on the machine.
+
+## Documentation
+
+```bash
+cd docs-site
+npm install
+npm run dev
+```
+
+The site is a Next static export served by the backend at `/docs`. Internal
+links are written **without** the `/docs` prefix — `basePath` adds it at build
+time, and writing it by hand produces `/docs/docs/...`.
+
+Screenshots go in `docs-site/public/screenshots/` and are referenced through the
+`<Screenshot>` component. Any `<Screenshot>` without a `src` renders a labelled
+placeholder, so the outstanding shots are visible in the built site.
+
+## The Docker build
+
+One image, three stages:
+
+| Stage | Base | Produces |
+|---|---|---|
+| `web` | `node:22-alpine` | The SPA build |
+| `docs` | `node:22-alpine` | This site's static export |
+| final | `python:3.11-slim` | The API, with both copied into `static/` |
+
+Build from the **repository root**, not from `backend/`:
+
+```bash
+docker build -t mygist .
+```
+
+Static routes are conditional on the built output existing, which is why a
+source checkout serves the API and MCP normally with no UI and no docs.
+
+## What CI checks
+
+On every push and pull request:
+
+| Job | Runs |
+|---|---|
+| **backend (py3.11)** | Full pytest suite against a `pgvector/pgvector:pg16` service container |
+| **backend (py3.13)** | The same suite on the version the dev venv uses |
+| **frontend** | Fixture freshness, the full test suite, then a production build |
+
+Two versions of Python are tested because the production image runs 3.11 and
+local development tends to run 3.13. Testing both stops them drifting apart
+unnoticed.
+
+The frontend build runs in CI because the single-container merge means a broken
+frontend build blocks the whole image — and therefore any backend fix. Catching
+it in CI is much cheaper than catching it at deploy time.
+
+<Callout type="warn">
+**CI does not build `docs-site`.** A change that breaks the docs build will pass
+CI and fail at image build time instead. Worth adding if the docs get edited
+often.
+</Callout>
+
+## Conventions worth knowing
+
+**Section packs are declarative only.** A pack cannot ship Python or React. If
+something cannot be expressed in the manifest, that is a renderer-kit change,
+not a pack change.
+
+**The entity vocabulary is generated, never hand-copied.** `get_schema` is built
+from the enforced manifests. Documentation that reproduces it has been wrong
+more than once, which is why these docs do not.
+
+**Guards carry their reasons.** Where a test allows an exception, it demands a
+written reason string. Those strings are the documentation for why the exception
+exists.
+
+## Next
+
+<Cards>
+  <Card title="Section packs" href="/run/section-packs" description="Adding a section, and the guards you will meet." />
+  <Card title="Troubleshooting" href="/run/troubleshooting" description="Symptoms and their usual causes." />
+</Cards>
