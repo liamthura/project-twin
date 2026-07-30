@@ -26,20 +26,36 @@ Postgres + pgvector  (same host)
 
 ## Cloudflare
 
-Both hostnames are proxied through Cloudflare rather than pointing at the origin
-directly. The origin IP stays private and TLS terminates at the edge.
+**One hostname: `mygist.thuradev.qzz.io`.** It is proxied through Cloudflare
+rather than pointing at the origin directly, so the origin IP stays private and
+TLS terminates at the edge.
 
-**Both hostnames stay attached.** Existing MCP client configurations point at
-the older `mygist-api` host, and those keep working. A client config is not
-something you can migrate on someone else's behalf.
+### `mygist-api.thuradev.qzz.io` is retired
+
+The API and MCP endpoint once had their own hostname, separate from the UI. The
+single-container merge made that unnecessary, and it has now been retired
+outright.
 
 <Callout type="warn">
-A hostname whose DNS record outlives its origin returns Cloudflare's
-**`no available server`**, not a DNS failure.
+**Anything still configured against `mygist-api` is broken, not degraded.** A
+client config is not something you can migrate on someone else's behalf, so the
+only fix is for each client to be repointed at `mygist.thuradev.qzz.io/mcp` by
+hand.
 
-That reads like a database problem and is not one. It means a tunnel or route
-with nothing behind it. If a host that should have been retired still resolves,
-remove the route.
+If you are the one who retired it, that is a decision to communicate, not just
+to make.
+</Callout>
+
+<Callout>
+While the DNS record survives its origin, the hostname returns Cloudflare's
+**`no available server`** rather than a DNS failure — a 503 from the edge, with
+nothing behind it.
+
+That reads like a database or application problem and is neither. It means a
+route with nothing attached. **Removing the DNS record is the tidy end of a
+retirement**: until it goes, the name keeps resolving and keeps answering 503,
+which is a slower and more confusing way to tell someone the host is gone than a
+clean NXDOMAIN.
 </Callout>
 
 ## Coolify
