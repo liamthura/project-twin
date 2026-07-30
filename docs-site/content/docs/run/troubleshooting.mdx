@@ -65,7 +65,7 @@ curl -s https://your-instance/api/auth/whoami \
 | Symptom | Means |
 |---|---|
 | Connection refused, or a DNS failure | The server or the network — not your config |
-| `no available server` from Cloudflare | A proxied hostname with nothing behind it. A routing problem, **not** a database one. |
+| `no available server` from Cloudflare | A proxied hostname with nothing behind it. A routing problem, **not** a database one. On this instance the likely cause is a config still pointing at the retired `mygist-api` host — see [Infrastructure](/run/infrastructure#mygist-apithuradevqzzio-is-retired). |
 | `401` on whoami | The token is wrong, revoked, or not being sent. Check the client is passing `Authorization` and not stripping it. |
 | Both checks pass, client still blank | The client's configuration — see [Other clients](/use/clients) |
 
