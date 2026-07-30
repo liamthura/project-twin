@@ -39,6 +39,12 @@
   --color-fd-accent-foreground: hsl(228 69% 55%);
   --color-fd-border: hsl(20 6% 90%);
   --color-fd-ring: hsl(228 69% 55%);
+
+  /* The product mark's colour. Deliberately separate from --color-fd-primary:
+     primary is re-pointed per root below, and the MyGist mark is the one thing
+     on the page that must not change colour depending on which half of the
+     docs you happen to be reading. */
+  --color-fd-brand: hsl(228 69% 55%);
 }
 
 /* Callout and status colours, from the app's --destructive / --warning /
@@ -68,11 +74,41 @@
   --color-fd-accent-foreground: hsl(228 94% 67%);
   --color-fd-border: hsl(60 2% 16%);
   --color-fd-ring: hsl(228 94% 67%);
+  --color-fd-brand: hsl(228 94% 67%);
 
   --color-fd-error: hsl(0 74% 54%);
   --color-fd-warning: hsl(43 90% 55%);
   --color-fd-success: hsl(142 60% 50%);
   --color-fd-info: hsl(228 94% 67%);
+}
+
+/* ---------------------------------------------------------------------------
+   Per-root accent.
+
+   The two halves of the site are for different readers, and the sidebar is the
+   only place that says which one you are in. Using MyGist keeps the app's
+   indigo; Running MyGist takes an orange, so the operator docs are
+   distinguishable at a glance from the reader docs.
+
+   The orange is picked to sit in the app's warm-neutral family (hue 25, next to
+   the 20-60 range the greys use) rather than borrowed from --warning, which
+   would read as a status colour rather than a section one.
+
+   components/docs-root-scope.tsx sets the attribute.
+   --------------------------------------------------------------------------- */
+
+[data-docs-root='run'] {
+  --color-fd-primary: hsl(25 85% 42%);
+  --color-fd-accent: hsl(28 100% 95%);
+  --color-fd-accent-foreground: hsl(25 85% 42%);
+  --color-fd-ring: hsl(25 85% 42%);
+}
+
+.dark [data-docs-root='run'] {
+  --color-fd-primary: hsl(25 95% 62%);
+  --color-fd-accent: hsl(25 26% 19%);
+  --color-fd-accent-foreground: hsl(25 95% 62%);
+  --color-fd-ring: hsl(25 95% 62%);
 }
 
 /* neutral.css lifts the dark sidebar off the page background with its own

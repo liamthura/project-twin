@@ -7,7 +7,7 @@ export function baseOptions(): BaseLayoutProps {
     nav: {
       title: (
         <span className="inline-flex items-center gap-2">
-          <Logo className="size-5 text-fd-primary" />
+          <Logo className="size-5 text-fd-brand" />
           <span className="font-semibold">{appName}</span>
           {/* The site lives at /docs on the app's own origin, so the wordmark
               alone would not say which of the two you are looking at. */}

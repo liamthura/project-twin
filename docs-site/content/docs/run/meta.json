@@ -1,6 +1,7 @@
 {
   "title": "Running MyGist",
   "description": "Self-hosting, operations, and extending the schema",
+  "icon": "Server",
   "root": true,
   "pages": [
     "index",

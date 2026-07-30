@@ -49,7 +49,7 @@ export function Screenshot({ src, alt, caption, hint, ratio = '16 / 10' }: Scree
     return (
       <figure className="my-6">
         <div
-          className="mx-auto flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-fd-border bg-fd-muted/40 px-6 py-8 text-center"
+          className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-fd-border bg-fd-muted/40 px-6 py-8 text-center"
           style={style}
         >
           <ImageIcon className="size-6 text-fd-muted-foreground/60" aria-hidden />
