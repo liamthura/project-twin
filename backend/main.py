@@ -24,7 +24,7 @@ from typing import Any, Dict, Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import Response, JSONResponse, FileResponse
+from fastapi.responses import Response, JSONResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -616,6 +616,20 @@ def register_static_routes(app: FastAPI, static_dir: Path) -> bool:
 
     docs_dir = static_dir / "docs"
     if docs_dir.is_dir():
+        # A mount at "/docs" serves everything UNDER /docs/ but does not match
+        # the bare "/docs" itself -- that fell through to the MCP mount at "/"
+        # and 404'd. StaticFiles issues its own 307 for sub-directories
+        # ("/docs/use" -> "/docs/use/"), which is what made the gap easy to
+        # miss: only the mount root was affected, and only without the slash.
+        #
+        # Every human-typed link is the bare form, and so is every link in the
+        # README and the docs themselves, so this is the common case rather
+        # than an edge one. Registered BEFORE the mount because FastAPI matches
+        # in registration order.
+        @app.get("/docs", include_in_schema=False)
+        async def docs_index_redirect() -> Response:
+            return RedirectResponse("/docs/", status_code=308)
+
         app.mount("/docs", StaticFiles(directory=docs_dir, html=True), name="docs")
 
     @app.get("/", include_in_schema=False)
@@ -655,7 +669,7 @@ app.mount("/", mcp_app)
 if __name__ == "__main__":
     import uvicorn
     
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("PORT", 1120))
     host = os.getenv("HOST", "127.0.0.1")
     
     print(f"Starting MyGist API...")

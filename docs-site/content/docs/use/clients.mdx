@@ -1,0 +1,114 @@
+---
+title: Other clients
+description: Connecting anything that speaks MCP over HTTP.
+---
+
+MyGist exposes a standard MCP endpoint at `/mcp`, over plain HTTP. Any client
+that can reach a URL and send a header can use it. There is nothing
+Claude-specific in the server.
+
+Two things are always needed, whatever the client:
+
+| | |
+|---|---|
+| **URL** | `https://your-instance/mcp`, or `http://127.0.0.1:1120/mcp` locally |
+| **Auth** | `Authorization: Bearer YOUR_TOKEN` |
+
+Create a separate token per client in **Account → API tokens**, so revoking one
+does not disconnect the rest.
+
+## Claude Desktop
+
+Covered step by step in the
+[quick start](/use/quick-start#connect-your-ai-client).
+
+## Claude Code
+
+```bash
+claude mcp add --transport http mygist https://mygist.thuradev.qzz.io/mcp \
+  --header "Authorization: Bearer YOUR_TOKEN"
+```
+
+Check it registered:
+
+```bash
+claude mcp list
+```
+
+## Anything else
+
+Most clients want the same three things under some spelling: a name, the URL,
+and a set of headers. In MCP terms this is a **streamable HTTP** server — not a
+stdio one, so there is no command to run and no process to launch.
+
+If a client only offers stdio, it can usually still reach an HTTP server through
+a bridge such as `mcp-remote`. That is outside what MyGist controls; check the
+bridge's own documentation.
+
+<Callout>
+Config shapes for remote MCP servers have changed more than once across client
+versions, and clients disagree about where headers belong. If a config you found
+online does not match what your client expects, trust the client's current
+documentation. The URL and the bearer token are the only parts that never
+change.
+</Callout>
+
+## Checking the connection
+
+When a client shows no tools, work outwards from the server. Each check rules
+out one layer.
+
+<Steps>
+
+<Step>
+
+### Is the server up?
+
+```bash
+curl -s https://mygist.thuradev.qzz.io/api/health
+```
+
+This endpoint is public — no token needed. A connection error or a DNS failure
+means the server or the network, not your config.
+
+</Step>
+
+<Step>
+
+### Does the token work?
+
+```bash
+curl -s https://mygist.thuradev.qzz.io/api/auth/whoami \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+You should get your user id and username back. A **401** means the token is
+wrong, revoked, or not being sent — check for a trailing space when you pasted
+it.
+
+</Step>
+
+<Step>
+
+### Both pass, still nothing?
+
+Then it is the client's configuration. Common causes:
+
+- The client was not fully restarted after the config change.
+- The config file has a JSON syntax error, so the whole file was ignored.
+- The URL is missing `/mcp`, or has a trailing slash that the client adds.
+- The client strips custom headers on the transport you chose.
+
+[Troubleshooting](/run/troubleshooting) covers the server-side symptoms in more
+detail.
+
+</Step>
+
+</Steps>
+
+## Using more than one client
+
+Nothing special is required. Point them all at the same URL with their own
+tokens, and they share one persona. A fact written from Claude Code is
+immediately visible in Claude Desktop — there is no sync step, because there is
+only one copy.

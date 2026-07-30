@@ -1,0 +1,78 @@
+---
+title: MyGist
+description: Portable personal context for AI — one persona, every assistant, under your control.
+---
+
+Every new AI conversation starts from nothing. You explain your role again. Your
+stack again. How you like answers written, and what you are in the middle of.
+
+MyGist stores all of that once and hands it to any AI assistant that asks. Your
+context follows you between tools instead of being locked inside one of them.
+
+<Screenshot
+  caption="An assistant answering from a MyGist persona"
+  hint="A chat window where the assistant clearly knows the user's role and current project, with the MyGist tool call visible."
+/>
+
+## Where to start
+
+<Cards>
+  <Card
+    title="Using MyGist"
+    href="/use"
+    description="Connect an AI client, fill in your persona, and keep it current. Start here if you just want to use it."
+  />
+  <Card
+    title="Running MyGist"
+    href="/run"
+    description="Host the server, look after the database and search index, add sections of your own. Start here if you run it."
+  />
+</Cards>
+
+## What it is, in one screen
+
+**Your data lives in your own Postgres database.** It is plain, readable JSON.
+You can view it, edit it, export it, and delete it. There is no proprietary
+format to get stuck in.
+
+**Assistants connect over [MCP](https://modelcontextprotocol.io)** — the Model
+Context Protocol, an open standard for giving AI clients access to tools and
+data. Claude Desktop, Claude Code and a growing list of others speak it.
+
+**Nothing happens unless a client asks.** MyGist does not watch your
+conversations. It answers questions and it accepts changes, and it does neither
+on its own. [Capture](/use/capture) explains what that means day to day.
+
+**Assistants read a slice, not the lot.** A client asks for a *scope* — say
+`professional` — and gets a summary sized for it. When it needs something
+specific, it searches instead of loading more. That is how a persona can grow
+for years without every conversation paying for it.
+
+## What you can store
+
+Ten sections, covering the things that usually get re-explained:
+
+| Section | Holds |
+|---|---|
+| **Profile** | Name, role, where you work, education, languages, contact |
+| **Goals** | What you are working toward, and how it is going |
+| **Knowledge** | Subjects you know, and topics you are currently tracking |
+| **Preferences** | How you like code written, and answers written |
+| **Projects** | What you are building, and what is top of mind this week |
+| **Lifestyle** | Hobbies, values, personality, routines |
+| **Circle** | People in your life and how you relate to them |
+| **Learning log** | Things you learned, decided, or realised |
+| **Media** *(optional)* | Films, books, music, games — taste, not a watchlist |
+| **Aesthetics** *(optional)* | Visual styles you like and dislike |
+
+Each one is covered on [What goes in each section](/use/sections).
+
+## Two ways to edit
+
+Talk to your assistant, or open the web editor. Both write to the same place,
+and neither is the "real" one.
+
+<Screenshot
+  caption="The MyGist web editor"
+  hint="The editor at the root of the instance, showing several section cards with one list expanded."
+/>

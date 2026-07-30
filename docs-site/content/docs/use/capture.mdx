@@ -1,0 +1,112 @@
+---
+title: Capture
+description: Why nothing is saved unless you ask, and how to turn suggestions on.
+---
+
+This is the page that surprises people, so it comes with the blunt version
+first.
+
+<Callout type="warn">
+**Nothing reads your messages in the background.**
+
+MCP tools only run when a client calls them. MyGist does not observe your
+conversation. It cannot notice that you said something worth remembering unless
+the client explicitly asks it to look.
+</Callout>
+
+So, by default:
+
+- The assistant **reads** your persona when you ask about yourself.
+- The assistant **writes** to it when you explicitly ask it to.
+- Saying *"I've started learning Rust"* halfway through a chat about something
+  else changes **nothing**.
+
+That is deliberate. A tool that silently recorded everything you typed would be
+a different product, and a harder one to trust with this kind of data.
+
+## Turning suggestions on
+
+If you want a conversation where things do get noticed, say so at the start:
+
+> For this conversation, call `suggest_persona_update` on my messages and tell
+> me when something is worth saving.
+
+From then on the client passes what you say to `suggest_persona_update`, which
+returns candidate updates. You still approve them. The tool proposes; it does
+not write.
+
+<Screenshot
+  caption="A capture suggestion offered mid-conversation"
+  hint="The assistant noticing a fact in passing and asking whether to save it, with the suggest_persona_update call visible."
+/>
+
+<Callout>
+Worth putting in your client's system prompt or project instructions if you want
+it always on. That is the closest thing to automatic capture that exists — and
+it is still the client doing the work, not the server.
+</Callout>
+
+## How suggestions are judged
+
+`suggest_persona_update` weighs what kind of statement it is looking at, because
+not everything said is meant.
+
+| Kind | Example | Treatment |
+|---|---|---|
+| Declarative | "I am a developer" | High confidence |
+| Insight or reflection | "This helped me understand pricing" | High confidence, goes to the learning log |
+| Hypothetical | "Maybe I should try Rust" | Low confidence |
+| Venting | "TypeScript is killing me" | Usually ignored, unless there is an insight in it |
+| Question | "Should I learn Rust?" | Ignored, unless it also states something |
+
+Long messages are analysed sentence by sentence, so a paragraph of solid
+statements ending in a question still yields the statements.
+
+Confidence then decides what happens:
+
+| Confidence | Result |
+|---|---|
+| 0.8 and above | Applied, and mentioned to you |
+| 0.5 to 0.8 | You are asked first |
+| Below 0.5 | Dropped silently |
+
+### Insights go to the learning log
+
+Conceptual and soft-skill learning counts, not just technical facts. "I realised
+titles don't guarantee commitment" is a valid learning-log entry.
+
+Those entries get a topic extracted from the surrounding conversation, a summary
+of what led to the insight, and automatic tags — so the context of *why* you
+learned something survives alongside the fact.
+
+### Duplicates are checked first
+
+Every suggestion is compared against what you already have, through the search
+index. If it matches something, the suggestion is rewritten from an `add` into
+an update targeting that entry.
+
+Mentioning the same thing across five conversations does not leave you with five
+copies of it.
+
+## The honest limitation
+
+Capture depends on the client actually calling the tool, and clients vary:
+
+- Some do it readily when asked.
+- Some forget after a handful of turns.
+- None do it unprompted.
+
+If accuracy matters more than convenience, write the entry yourself — see
+[Writing](/use/writing) — or use [the editor](/use/editor). Treat capture as a
+way to catch things you would otherwise lose, not as a reliable record.
+
+## What to do at the end of a good conversation
+
+The practical middle ground: when a conversation has produced something worth
+keeping, ask for it directly.
+
+> Anything from this conversation worth saving to my persona?
+
+The client reviews the thread, proposes entries, and you approve them in one
+pass. That gets you most of what automatic capture would, with none of the
+guessing.

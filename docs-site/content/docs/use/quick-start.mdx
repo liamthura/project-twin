@@ -1,0 +1,208 @@
+---
+title: Quick start
+description: From nothing to a connected assistant in about ten minutes.
+---
+
+By the end of this page you will have an account, an access token, a connected
+AI client, and a few real facts stored.
+
+<Callout>
+This page assumes a MyGist server is already running — either a hosted instance
+or one you started. If you need to stand one up first, follow
+[Self-hosting](/run/self-hosting) and come back here.
+</Callout>
+
+Throughout, `https://mygist.thuradev.qzz.io` stands in for a hosted instance and
+`http://127.0.0.1:1120` for one running on your own machine. Swap in your own
+address.
+
+<Steps>
+
+<Step>
+
+## Create an account
+
+Open the instance in a browser. On the welcome screen, choose **Create an
+account**, pick a username, and set a password of at least 8 characters.
+
+<Screenshot
+  caption="The welcome screen, with 'Create an account' selected"
+  hint="The unauthenticated landing state of the SPA, showing the username and password fields."
+/>
+
+<Accordions>
+<Accordion title="Prefer to do it from a terminal?">
+
+```bash
+curl -X POST https://mygist.thuradev.qzz.io/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "you", "password": "your-password"}'
+```
+
+The response carries your first token:
+
+```json
+{ "user_id": "…", "username": "you", "token": "…" }
+```
+
+</Accordion>
+</Accordions>
+
+There are two kinds of credential, and it helps to know which is which:
+
+| | Used by | Expires |
+|---|---|---|
+| **Username and password** | You, in a browser | Sign-in sessions last 30 days |
+| **Bearer token** | AI clients, scripts | Never, until you revoke it |
+
+Both point at the same persona. Every read and write is scoped to the account
+behind the credential — two accounts on one server cannot see each other.
+
+</Step>
+
+<Step>
+
+## Create a token for your client
+
+Open **Account → API tokens** and create one. Give it a name that says what it
+is for, like `claude-desktop` or `laptop-cli`.
+
+<Screenshot
+  caption="Account → API tokens, with a new token being created"
+  hint="The token list showing existing tokens with their last-used dates, plus the create-token field."
+/>
+
+<Callout type="warn">
+The token is shown **once**, at the moment it is created. Copy it now. There is
+no way to read it back later — only to revoke it and issue a new one.
+</Callout>
+
+Use a separate token for each client. Then revoking one does not disconnect
+everything else you have set up.
+
+</Step>
+
+<Step>
+
+## Connect your AI client
+
+MyGist's MCP server runs over HTTP, so clients connect by **URL** rather than by
+launching a local process. The token goes in an `Authorization` header.
+
+### Claude Desktop
+
+Edit the config file:
+
+- **macOS** — `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows** — `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json title="claude_desktop_config.json"
+{
+  "mcpServers": {
+    "mygist": {
+      "url": "https://mygist.thuradev.qzz.io/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN"
+      }
+    }
+  }
+}
+```
+
+For a local server, use `http://127.0.0.1:1120/mcp`.
+
+Then restart Claude Desktop completely — quit it, do not just close the window.
+
+### Claude Code
+
+One command, no file editing:
+
+```bash
+claude mcp add --transport http mygist https://mygist.thuradev.qzz.io/mcp \
+  --header "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Something else
+
+See [Other clients](/use/clients).
+
+<Callout>
+Config shapes for remote MCP servers have changed between client versions, and
+different clients disagree about where headers go. If the shape above does not
+match what your client expects, check that client's own documentation. The URL
+and the bearer token are the parts that never change.
+</Callout>
+
+</Step>
+
+<Step>
+
+## Check it works
+
+Ask the assistant something it can only answer by looking:
+
+> What do you know about me?
+
+A connected client calls `get_context` and answers from your persona. Your
+account is empty, so the honest answer is "almost nothing" — that is the correct
+first result, and it proves the connection works.
+
+<Screenshot
+  caption="A fresh account answering honestly"
+  hint="The assistant reporting it found very little, with the get_context tool call expanded."
+/>
+
+If the tools do not appear at all, jump to
+[Checking the connection](/use/clients#checking-the-connection).
+
+</Step>
+
+<Step>
+
+## Put something in it
+
+An empty persona is not useful. Spend five minutes seeding it. Just say what is
+true:
+
+> I'm a backend developer at Acme, based in Manchester.
+> I'm building a project called Solterra — a solar output tracker in Python.
+> I prefer short answers with code first and explanation after.
+> Add Postgres to my skills as something I'm confident with.
+> I'm learning Rust at the moment.
+
+The assistant picks the right entity for each and calls `persona_modify`. You
+should see the tool calls happen, and a confirmation of what was stored.
+
+<Screenshot
+  caption="Several facts being written in one conversation"
+  hint="A conversation where the user states a few facts and the assistant confirms each write."
+/>
+
+Prefer clicking to typing? Everything is editable in the
+[web editor](/use/editor) too.
+
+</Step>
+
+<Step>
+
+## Try it in a real conversation
+
+Start a fresh chat and ask something that needs the context:
+
+> Help me plan next week's work.
+
+A client that reads your persona first will already know your role, your current
+project, and that you want short answers. That is the whole point.
+
+</Step>
+
+</Steps>
+
+## What to read next
+
+<Cards>
+  <Card title="What goes in each section" href="/use/sections" description="A tour of all ten sections, so you know what belongs where." />
+  <Card title="Writing" href="/use/writing" description="Everything you can add, change and remove." />
+  <Card title="Capture" href="/use/capture" description="Getting things saved without asking every time." />
+  <Card title="FAQ" href="/use/faq" description="Short answers to the common questions." />
+</Cards>

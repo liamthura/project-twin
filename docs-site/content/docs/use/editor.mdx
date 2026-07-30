@@ -1,0 +1,149 @@
+---
+title: The web editor
+description: Editing your persona by hand, managing tokens, and exporting your data.
+---
+
+The web UI at the root of your instance is a full editor for everything MyGist
+stores. Open the instance in a browser and sign in with your username and
+password.
+
+It is often the faster tool. Correcting six fields is a few clicks, against
+several turns of conversation.
+
+<Screenshot
+  caption="The editor, with a section open"
+  hint="The main view: the section tab strip along the top, one section's card open with a list of entries."
+/>
+
+## Getting around
+
+Sections appear as tabs. Within a section:
+
+- **Lists** show one row per entry. Click a row to expand it and see its fields.
+- **Scalar fields** — your name, role and bio, for example — are plain forms.
+- **Tag-style fields** are chips: type to add, click the × to remove.
+- **Nested lists** live inside an expanded row. A job's highlights and skills, a
+  course's topics, a project's references.
+
+## Saving
+
+**Auto-save is on by default.** Changes are written a moment after you stop
+typing, and the status next to the toggle tells you where things stand —
+*Saving…*, *Saved just now*, or *Unsaved changes*.
+
+Turn auto-save off and a **Save changes** button appears instead, so you can
+make a batch of edits and commit them in one go. The status then reads *Unsaved
+changes* until you press it.
+
+<Screenshot
+  caption="An expanded list entry"
+  hint="One row expanded to show its detail fields, tag inputs and nested lists."
+/>
+
+The editor is **generated from the same section packs** the server writes
+through. A pack that declares a field gets a control for it. That is why the UI
+and the AI tool vocabulary stay in step — there is no second definition to fall
+out of date.
+
+## On a phone
+
+The editor works on a small screen. A few things move:
+
+- Entry titles get the full width of the row, and status chips drop to a second
+  line underneath.
+- Section navigation collapses into a dropdown rather than a wide tab strip.
+
+<Screenshot
+  caption="The editor on a phone"
+  ratio="9 / 16"
+  hint="A narrow-viewport view showing the collapsed section dropdown and a list entry with its chip on the second row."
+/>
+
+## Sections
+
+Open the **Sections** manager to turn sections on and off.
+
+- **Media** and **aesthetics** start off. Turn them on if you want them.
+- **Profile**, **preferences** and the **learning log** are always on and cannot
+  be disabled.
+- Everything else is on by default and can be switched off.
+
+Disabling a section keeps its data exactly as it is. The section stops being
+offered to AI clients and stops appearing in the editor, and comes back
+unchanged when you re-enable it.
+
+<Screenshot
+  caption="The Sections manager"
+  hint="The toggle list showing enabled, opt-in and locked-on sections."
+/>
+
+## Account
+
+The account dialog has three tabs.
+
+### Connection
+
+Which server you are pointed at, and your password. Set one if you registered
+without, or change the one you have. Minimum eight characters.
+
+### API tokens
+
+Issue named tokens for AI clients, see when each was last used, and revoke any
+of them.
+
+<Callout type="warn">
+A new token's value is shown **once**, when you create it. Copy it immediately —
+it cannot be read back, only replaced.
+</Callout>
+
+Use one token per client, so revoking a token from a machine you no longer have
+does not disconnect everything else.
+
+<Screenshot
+  caption="The API tokens tab"
+  hint="The token list with names and last-used dates, and the create-token control."
+/>
+
+### Data
+
+**Export** downloads your whole persona as JSON. This is the honest backup: it
+is the same structured data the tools read, and nothing about it is proprietary.
+
+**Import** takes one back. Two modes:
+
+| Mode | Does |
+|---|---|
+| **Replace** | Overwrites your existing data with the backup's contents |
+| **Merge** | Combines the backup with what is already there |
+
+Export then import is also how you move between servers. It needs no database
+access at either end.
+
+<Screenshot
+  caption="The Data tab"
+  hint="Export button plus the import control with the replace/merge segmented choice."
+/>
+
+## What only the editor does
+
+- **Bulk corrections** that would be tedious one tool call at a time.
+- **Seeing everything at once**, including fields no read scope surfaces.
+- **Fixing a bad write** — if a client stored something under the wrong entry,
+  correcting it here is immediate.
+- **Exporting and importing** your data.
+
+## What only the AI tools do
+
+- **Linking entries** — the editor shows relationships but does not author them.
+  See [Relations](/use/relations).
+- **Capture suggestions**, which are a conversation feature by nature.
+
+## Editing in both at once
+
+<Callout>
+Both write to the same rows. There is no sync step and no conflict resolution:
+whichever wrote last wins.
+
+So avoid editing the same entry in the browser and in a conversation at the same
+moment. Between the two, at different times, is completely fine.
+</Callout>

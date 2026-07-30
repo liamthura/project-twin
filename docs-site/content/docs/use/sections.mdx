@@ -1,0 +1,215 @@
+---
+title: What goes in each section
+description: A tour of all ten sections, what belongs in them, and what to say to get something stored.
+---
+
+The most common question about MyGist is "what am I supposed to put in it?"
+This page answers that section by section.
+
+For each one you get: what it holds, what to say out loud to add something, and
+what *not* to put there. Field names are named where they help, but the full,
+authoritative list always comes from asking `get_schema` — see
+[Concepts](/use/concepts#entities) for why these docs do not copy it.
+
+<Callout>
+**A rule of thumb for all ten.** MyGist is a context provider, not a task
+manager or a diary. Store things that would still be true and still be useful
+next month. Every entry costs tokens in every conversation that reads it.
+</Callout>
+
+## Profile
+
+**Who you are.** Name, preferred name, current role, organisation, location,
+nationality, languages, a short bio, contact links, plus your work history and
+education.
+
+Work experience and education are lists, and each entry can carry its own
+highlights — the two or three things worth remembering about that job or that
+course. A job entry can also carry the skills it involved. Education entries can
+hold coursework and clubs.
+
+> I'm a backend developer at Acme, based in Manchester.
+> Add my Northumbria BSc in Computer Science, 2022 to 2025.
+> Add "Led the migration to Postgres" as a highlight at Acme.
+> My GitHub is github.com/liamthura.
+
+**Not here:** career ambitions. Those are goals now — see below.
+
+<Screenshot
+  caption="The profile section in the web editor"
+  hint="Profile expanded, showing the scalar fields plus the work experience list."
+/>
+
+## Goals
+
+**What you are working toward.** Each goal has a title, and optionally a type
+(career, learning, personal, and so on), a status, a target date, why it matters
+to you, and free notes.
+
+The `why` field earns its keep. A goal with a reason attached lets an assistant
+tell you when a suggestion actually conflicts with what you want.
+
+> I want to move into a platform engineering role within two years.
+> My goal is to finish the Rust book by December.
+> Mark the "learn Rust" goal as in progress.
+
+**Not here:** this week's to-do list. Goals should outlive a sprint.
+
+## Knowledge
+
+**What you know, and what you are keeping an eye on.** Two separate lists.
+
+**Domains** are subjects you have a relationship with — Postgres, distributed
+systems, French cooking. Each has a level, so "I know a bit of Rust" and "I have
+worked in Python for eight years" are stored differently. Domains can carry
+reference links.
+
+**Mental tabs** are topics you are currently tracking but have not resolved:
+an approach you are evaluating, a debate you are following, a decision you are
+sitting with. They have a status, so a tab can be closed once it is settled.
+
+> Add Postgres to my skills — I'm confident with it.
+> I'm learning Rust at the moment.
+> I'm keeping an eye on whether to move off Alembic. Add that as a mental tab.
+
+**Not here:** things you learned. Those go in the learning log.
+
+## Preferences
+
+**How you want to be worked with.** Four things live here:
+
+| | Holds |
+|---|---|
+| **Code style** | Language conventions, formatting, patterns you want or avoid |
+| **Communication** | Tone, detail level, locale, and the shape of a good answer |
+| **Learning style** | How you take in new material |
+| **Likes and dislikes** | Small taste facts, each with a stance |
+
+You can also store **mood overrides** — a named mood, with the tone and detail
+level that suits it. "When I'm debugging, be terse."
+
+> I prefer short answers with the code first and the explanation after.
+> Use British spelling.
+> I don't like meetings before 10am.
+> When I'm tired, keep it to bullet points.
+
+<Callout>
+Preferences are special: this section rides along with **every** read scope, not
+just some. However narrow a client's request, it still finds out how you like
+answers written. That is deliberate — it is the one thing that should never be
+scoped away.
+</Callout>
+
+## Projects
+
+**What you are building.** Two lists.
+
+**Projects** have a name, a description, a status, tags, notes, highlights, and
+reference links. Both work projects and side projects belong here.
+
+**Top of mind** is the short list of what is occupying you right now. It is
+meant to be small and churny — a handful of items, replaced often. Entries that
+have not been touched in 30 days get flagged as possibly stale when read.
+
+> I'm building Solterra, a solar output tracker in Python.
+> Set Solterra's status to active.
+> Top of mind: getting the deploy pipeline green.
+
+**Not here:** individual tasks. "Fix the login bug" is a ticket, not context.
+
+## Lifestyle
+
+**Life outside work.** Five lists:
+
+- **Hobbies** — with a skill level, a status (still doing it or not), notes, and
+  "specifics" for the details that matter, like which instrument or which route.
+- **Interests** — lighter than a hobby. Things you are into without practising.
+- **Personality traits** — how you would describe yourself.
+- **Values** — what you care about.
+- **Wellness** — sleep patterns per day type, when your energy peaks, what
+  reliably stresses you out.
+
+> I play badminton, intermediate level, about twice a week.
+> I usually sleep around 1am on weekdays and wake at 8.
+> My energy peaks late at night.
+> Tight deadlines with unclear scope stress me out.
+
+## Circle
+
+**People in your life.** Each connection has a name, the relationship, traits
+you associate with them, and notes.
+
+This is context, not a contact book. Store what an assistant would need in order
+to help you write to that person or think about that relationship — not their
+phone number.
+
+> My manager is Dana. She's direct and prefers written updates over meetings.
+> Add my brother Sam — we talk about running.
+
+## Learning log
+
+**What you learned, decided, or realised.** The most conversational of the
+sections, and the one capture fills most often.
+
+Each entry has a topic and details. It can also carry the source, tags, key
+decisions made, follow-up items, and metadata about the conversation it came out
+of. Decisions and follow-ups are their own editable lists, not free text.
+
+Crucially, this is not just for technical facts. "I realised that job titles
+don't guarantee commitment" is exactly the kind of entry it is for.
+
+> Log this: I worked out why our search was missing paraphrases — no embeddings
+> were configured.
+> Add a follow-up to that entry: check the backfill after deploying.
+
+<Screenshot
+  caption="A learning log entry expanded in the editor"
+  hint="One entry showing its topic, details, decisions and follow-up items, plus the timestamp."
+/>
+
+**Not here:** things you know. Those are knowledge domains. The log is about
+the moment of learning, with its context attached.
+
+## Media *(optional, off by default)*
+
+**Taste, not a watchlist.** Films, books, music, games — with a kind, a status,
+your reaction, a link and notes.
+
+The point is to let an assistant recommend well, or catch a reference. It is not
+meant to track what you consumed and when.
+
+> I loved Arrival. Add it to my media.
+> I'm halfway through Project Hail Mary and enjoying it.
+
+Turn it on in the Sections manager first — see [the editor](/use/editor#sections).
+
+## Aesthetics *(optional, off by default)*
+
+**Visual taste.** Named styles with a domain, a stance (you like it or you do
+not), whether it is a primary influence, notes, and references.
+
+Useful if you ask assistants for design or image work often, and pointless
+otherwise. That is why it is opt-in.
+
+> I like brutalist web design. I really don't like glassmorphism.
+
+## Turning sections on and off
+
+Media and aesthetics start off. Profile, preferences and the learning log can
+never be turned off. Everything else is on by default and can be disabled.
+
+Disabling a section does not delete anything. The data stays exactly where it
+is; the section simply stops being offered to clients and stops appearing in the
+editor, and comes back unchanged when you re-enable it.
+
+<Screenshot
+  caption="The Sections manager"
+  hint="The section toggle list, showing which are on, which are opt-in, and which are locked on."
+/>
+
+## Next
+
+<Cards>
+  <Card title="Writing" href="/use/writing" description="How entries actually get added and changed." />
+  <Card title="Reading" href="/use/reading" description="Which sections each scope pulls from." />
+</Cards>

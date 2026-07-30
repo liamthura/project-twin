@@ -1,0 +1,182 @@
+---
+title: Self-hosting
+description: Requirements, running the container, and every environment variable that does something.
+---
+
+## What you need
+
+- **Postgres.** Any reachable instance. [pgvector](/run/database) is optional;
+  without it, search runs full-text only.
+- **Somewhere to run one container.** Around 200 MB of image, one process.
+
+That is the list. No Node runtime, no separate frontend service, no message
+broker, no Redis.
+
+## Running it
+
+<Steps>
+
+<Step>
+
+### Build the image
+
+```bash
+docker build -t mygist .
+```
+
+<Callout type="warn">
+The build context is the **repository root**, not `backend/`. Earlier stages
+build the web UI and this documentation and copy their output into the final
+image.
+
+There is also a `backend/Dockerfile` for an API-only image with no static
+assets, if you want the MCP endpoint without the UI.
+</Callout>
+
+</Step>
+
+<Step>
+
+### Run it
+
+```bash
+docker run -p 1120:1120 \
+  -e DATABASE_URL="postgresql://user:pass@host:5432/mygist" \
+  mygist
+```
+
+On start the container runs `alembic upgrade head` before binding a port. A
+failed migration therefore stops the deploy, rather than leaving a half-migrated
+database serving traffic.
+
+</Step>
+
+<Step>
+
+### Check it
+
+```bash
+curl -s http://127.0.0.1:1120/api/health
+```
+
+Then open `http://127.0.0.1:1120` in a browser and register the first account.
+
+</Step>
+
+</Steps>
+
+Everything is on one origin from there:
+
+| Path | What |
+|---|---|
+| `/` | Web UI |
+| `/api` | REST API — bearer auth, except `/api/health` |
+| `/mcp` | MCP endpoint |
+| `/docs` | This documentation |
+| `/api/docs`, `/api/redoc` | Swagger and ReDoc |
+
+## Environment variables
+
+### Required
+
+| Variable | Notes |
+|---|---|
+| `DATABASE_URL` | Postgres connection string. The only required variable. |
+
+### Server
+
+Both are read **only** when running `main.py` directly. The container's `CMD`
+passes `--host` and `--port` to uvicorn explicitly, so setting them in Docker
+does nothing.
+
+| Variable | Default |
+|---|---|
+| `PORT` | `1120` |
+| `HOST` | `127.0.0.1` |
+
+### Search and embeddings
+
+All optional. Leave the provider variables unset and the server stays in
+FTS-only mode — see [Database](/run/database).
+
+| Variable | Notes |
+|---|---|
+| `EMBEDDING_PROVIDER` | `voyage` (default) or `openai` |
+| `VOYAGE_API_KEY` | For `voyage` |
+| `EMBEDDING_API_URL` | For `openai` — the base URL of any OpenAI-compatible `/v1/embeddings` endpoint. Ollama, LM Studio, llama.cpp, vLLM, LocalAI and OpenAI itself all qualify. |
+| `EMBEDDING_API_KEY` | For `openai`. Omit for local servers that need none. |
+| `EMBEDDING_MODEL` | Default `voyage-4-lite` |
+| `EMBEDDING_DIM` | Default `1024`. Must match your model's output width — see the warning on [Database](/run/database#embedding_dim). |
+
+<Callout type="warn">
+`backend/.env.example` used to list `DEBUG` and `MCP_TRANSPORT`. **Neither does
+anything.** `DEBUG` appears in no Python source at all, and `MCP_TRANSPORT`
+survives only in a commented-out line. Transport is HTTP, always.
+
+They have been removed from the example file. If you find them in an older copy,
+ignore them.
+</Callout>
+
+## Health checks
+
+`/api/health` is public and unauthenticated. Use it for orchestrator probes.
+
+The image also carries its own `HEALTHCHECK`, hitting `/health` with a
+**10-second start period**. That is what lets a deploy report healthy at around
+10 seconds instead of around 31.
+
+<Callout>
+If your platform gates routing on health, that window is the difference between
+a working container and a stream of 502s while it waits. Worth checking before
+you blame the application.
+</Callout>
+
+## Reverse proxies
+
+Nothing special is required — one upstream, one port. Two things must survive
+the hop:
+
+**Do not strip or rewrite `/mcp`.** It is mounted at the root of the app so that
+it resolves exactly, with no redirect. A proxy that appends a trailing slash or
+issues a redirect will break clients that do not follow redirects on POST.
+
+**Pass `Authorization` through.** Both the REST API and the MCP endpoint
+authenticate on it. Some proxies strip unknown headers by default.
+
+## Local development
+
+To run the API without building an image:
+
+```bash
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+DATABASE_URL="…" uvicorn main:app --reload --port 1120
+```
+
+A throwaway database for development:
+
+```bash
+cd backend && docker compose up -d test-db
+# DATABASE_URL=postgresql://mygist:mygist@localhost:5433/mygist_test
+```
+
+Static routes are conditional on the built output existing, so a source checkout
+serves the API and MCP normally with no UI and no docs. Backend-only work is
+unaffected by never building the frontend.
+
+The web UI runs separately in development:
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+[Development](/run/development) covers the test suite and the repository layout
+in full.
+
+## Next
+
+<Cards>
+  <Card title="Database" href="/run/database" description="pgvector, what is stored, and backups." />
+  <Card title="Infrastructure" href="/run/infrastructure" description="How this project's own instance is deployed." />
+</Cards>

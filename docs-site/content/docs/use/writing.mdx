@@ -1,0 +1,155 @@
+---
+title: Writing
+description: Adding, changing and removing entries — in conversation, or several at once.
+---
+
+You will almost never write JSON yourself. You say what changed, and the client
+translates. This page covers what it is translating *into*, so that when
+something goes in wrong you know how to correct it.
+
+## In conversation
+
+Just state the fact:
+
+> Add Rust to my skills as something I'm learning.
+> Update my Solterra project status to completed.
+> I don't really play badminton anymore.
+> Add "morning meetings" to my dislikes.
+> I usually sleep around 1am on weekdays.
+> Log that I decided to stay on Alembic rather than switch.
+
+The client picks an entity, fills in the fields, and calls the tool. You should
+see the call happen and get a confirmation of what was stored.
+
+<Screenshot
+  caption="A write, confirmed"
+  hint="A conversation where the user states a fact and the assistant shows the persona_modify call and its result."
+/>
+
+## What a write actually looks like
+
+Writes go through a tool called `persona_modify`. It takes three things: an
+**action**, an **entity**, and a **data** object.
+
+```json
+{
+  "action": "add",
+  "entity": "domain",
+  "data": { "name": "Rust", "level": "learning" }
+}
+```
+
+The actions are:
+
+| Action | Does |
+|---|---|
+| `add` | Create a new entry |
+| `update` | Change an existing one, found by its identifying field |
+| `remove` | Delete one |
+| `link` / `unlink` | Connect two entries — see [Relations](/use/relations) |
+
+Not every entity supports every action.
+
+## Ask the schema, don't guess
+
+`get_schema` is the authoritative list of what can be written. It is generated
+from the same files the server enforces, so it cannot disagree with what will
+actually be accepted.
+
+```text
+get_schema()                  → every entity, grouped by section
+get_schema(file="lifestyle")  → one section's entities
+get_schema(entity="hobby")    → one entity: required fields, optional fields,
+                                and a worked example for each action
+```
+
+<Callout type="warn">
+Do not work from an entity table you found in a README — including this
+project's own older ones. The vocabulary has changed repeatedly: entities have
+gained `update` actions, fields have become required, and at least one field
+that was documented never existed at all.
+
+`get_schema` is the only copy that cannot drift.
+</Callout>
+
+If a client keeps getting an entity wrong, say so directly: *"check `get_schema`
+for that entity first"*. That usually fixes it for the rest of the conversation.
+
+## Field aliases
+
+Entities accept several spellings for the same field. A client that sends
+`topic` where the schema says `course` still lands the write, and so does one
+that sends `description` for `notes`.
+
+This is a convenience for clients that are guessing, not a second vocabulary.
+Whatever spelling comes in, the stored shape is the same, and `get_schema`
+publishes the canonical name.
+
+## Updating and removing
+
+`update` and `remove` find the existing entry by its **identifying field** —
+usually the name or title. So:
+
+> Update my Solterra project status to completed.
+
+finds the project called Solterra and changes only `status`. Fields you do not
+mention are left alone.
+
+<Callout>
+Identifying fields are matched leniently, but they do have to match. If an
+update reports that nothing was found, check the exact name that was stored —
+`get_context(detail="titles")` or the [web editor](/use/editor) will show you.
+</Callout>
+
+## Several changes at once
+
+`persona_batch` runs a list of operations in one call, reporting each one
+separately:
+
+```json
+{
+  "operations": [
+    { "action": "add",    "entity": "domain",  "data": { "name": "Rust", "level": "learning" } },
+    { "action": "update", "entity": "project", "data": { "name": "Blog", "status": "active" } },
+    {
+      "action": "add",
+      "entity": "work_highlight",
+      "data": {
+        "company": "Acme",
+        "highlights": ["Led a team of five", "Shipped v2"]
+      }
+    }
+  ]
+}
+```
+
+Use it when one conversation produces several facts — a catch-up after a few
+weeks away, or seeding a new account.
+
+<Callout type="warn">
+A batch is **not** a transaction. If one operation fails, the others still
+apply. Read the per-operation results rather than assuming all-or-nothing.
+</Callout>
+
+## Duplicate advisories
+
+When you add something that closely resembles an existing entry, the response
+comes back with a note naming what it matched.
+
+Nothing is blocked and nothing is merged automatically. It is a prompt for the
+client to consider an `update` instead of a second near-identical entry.
+Suggestions from [capture](/use/capture) get the same treatment, and one that
+matches existing content is rewritten as an update before it ever reaches you.
+
+## Editing by hand
+
+Everything writable over MCP is also editable in the web UI, and for a batch of
+corrections that is usually faster — six fields is a few clicks, against several
+turns of conversation. See [The web editor](/use/editor).
+
+## Next
+
+<Cards>
+  <Card title="Capture" href="/use/capture" description="Getting things noticed without asking every time." />
+  <Card title="Relations" href="/use/relations" description="Linking entries together." />
+</Cards>

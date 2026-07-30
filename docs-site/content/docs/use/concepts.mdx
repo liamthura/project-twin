@@ -1,0 +1,118 @@
+---
+title: Concepts
+description: The four ideas everything else in these docs assumes — persona, sections, entities, ids.
+---
+
+Four words come up constantly. Ten minutes here saves a lot of confusion later.
+
+## Persona
+
+Your **persona** is everything MyGist stores about you.
+
+It is not a document or a profile page. It is structured data — one JSON blob
+per section, per account, in Postgres. That means it can be read a slice at a
+time, searched, and edited field by field.
+
+You can see the raw version at any point. Ask your assistant for `get_raw`, or
+use **Account → Data → Export** in the web editor. Nothing about the format is
+proprietary.
+
+## Sections
+
+A persona is split into **sections** — profile, goals, knowledge, preferences,
+projects, lifestyle, circle, learning log, and two optional ones.
+
+Each section is defined by a single file in the repository called a **pack**
+(`backend/section_packs/<name>/manifest.json`). One file states four things:
+
+- the shape of the section's data;
+- what an AI client is allowed to write into it;
+- what it contributes to each read scope;
+- how the web editor draws it.
+
+That is why the web editor and the AI tools never disagree about what a section
+contains. There is one definition, and both are generated from it.
+
+Three sections are **always on** and cannot be switched off: profile,
+preferences, and learning log. Everything else can be disabled in the Sections
+manager, and two — media and aesthetics — start off and have to be turned on.
+
+[What goes in each section](/use/sections) walks through all ten.
+
+<Callout>
+Career aspirations used to live on the profile. They are goals now — a goal with
+`type: "career"`. If you read something describing them as a profile list, it is
+out of date.
+</Callout>
+
+## Entities
+
+Sections are where things are **stored**. Entities are what a client **says** in
+order to change them.
+
+An entity is a small named form: `hobby`, `goal`, `work_experience`,
+`connection`, and so on. Each one declares which actions it supports (`add`,
+`update`, `remove`), which fields are required, which are optional, and which
+values are allowed where the choice is limited.
+
+The two are deliberately not the same thing:
+
+- Several entities can write into one stored list. `like` and `dislike` are
+  separate entities, and both end up in the same `likes_dislikes` list.
+- An entity's field names are not always the storage keys underneath.
+- Entities accept alternative spellings for the same field, so a client that
+  guesses `topic` where the schema says `course` still succeeds.
+
+Because of that indirection, the list of entities is **published by the server**
+rather than written down here:
+
+```text
+get_schema()                    → every entity, grouped by section
+get_schema(file="lifestyle")    → just one section's entities
+get_schema(entity="hobby")      → one entity, with a worked example per action
+```
+
+<Callout type="warn">
+These docs deliberately do **not** reproduce the entity table. It is generated
+from the same files the server enforces, and a hand-copied version of it has
+been wrong more than once. Ask `get_schema` — that copy cannot drift.
+
+If you are unsure whether a client is guessing, tell it: *"check `get_schema`
+first"*. That is usually enough to correct it.
+</Callout>
+
+## Ids
+
+Most list entries carry a short, stable id: `proj_a1b2c3`, `hobby_7f8e`,
+`learn_2026…`. The server assigns them; you never send one when adding
+something.
+
+Ids are how the efficient read tools address a single entry:
+
+```text
+search_context("postgres")   → snippets, each carrying an id
+get_entity(["proj_a1b2c3"])  → the full entry behind one id
+```
+
+They are also how [links between entries](/use/relations) are stored.
+
+Not everything has one. Some nested lists — a project's references, a hobby's
+specifics — have no ids of their own and are reached through their parent
+entry instead.
+
+## Putting it together
+
+| Word | What it is | Example |
+|---|---|---|
+| Persona | All your data | Everything below |
+| Section | A storage area | `lifestyle` |
+| Entity | A way to write into one | `hobby` |
+| Id | A handle on one entry | `hobby_7f8e` |
+
+## Next
+
+<Cards>
+  <Card title="What goes in each section" href="/use/sections" description="All ten, and what belongs in them." />
+  <Card title="Reading" href="/use/reading" description="Scopes, search, and getting entries back out." />
+  <Card title="Writing" href="/use/writing" description="Making changes, singly or in batches." />
+</Cards>

@@ -1,0 +1,19 @@
+{
+  "title": "Using MyGist",
+  "description": "Connect a client, read your persona, keep it current",
+  "icon": "BookOpen",
+  "root": true,
+  "pages": [
+    "index",
+    "quick-start",
+    "clients",
+    "concepts",
+    "sections",
+    "reading",
+    "writing",
+    "capture",
+    "relations",
+    "editor",
+    "faq"
+  ]
+}
