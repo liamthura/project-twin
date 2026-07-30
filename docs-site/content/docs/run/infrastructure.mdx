@@ -50,7 +50,17 @@ Deploys trigger on pushes to `main`.
 |---|---|
 | Build context | The **repository root** |
 | Dockerfile | `./Dockerfile` |
+| Container port | **1120** |
 | Trigger | Push to `main` |
+
+<Callout type="warn">
+**The container port is 1120, not 8000.** It was 8000 until it was moved off the
+generic default.
+
+Nothing in the repository can enforce this end of it: the platform's own port
+mapping lives in a dashboard. If a deploy goes out and the proxy still points at
+8000, every request 502s while the container itself is perfectly healthy.
+</Callout>
 
 The context is the repository root because the image builds the frontend and
 the documentation before assembling the Python image.

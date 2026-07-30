@@ -6,7 +6,7 @@
 # "./Dockerfile".
 #
 # Build:  docker build -t mygist .
-# Run:    docker run -p 8000:8000 -e DATABASE_URL=<postgres-url> mygist
+# Run:    docker run -p 1120:1120 -e DATABASE_URL=<postgres-url> mygist
 #
 # backend/Dockerfile is kept for API-only builds (it uses backend/ as its
 # context and produces an image with no static assets).
@@ -87,7 +87,7 @@ COPY --from=web /build/frontend/dist ./static
 # the SPA's own output.
 COPY --from=docs /build/docs-site/out ./static/docs
 
-EXPOSE 8000
+EXPOSE 1120
 
 # start-period matches backend/docker-compose.yml, and is what makes a deploy
 # go healthy promptly: during the start period Docker probes at --start-interval
@@ -96,10 +96,10 @@ EXPOSE 8000
 # 30s). That difference is a window where a working container is still reported
 # unhealthy, and an orchestrator gating routing on health answers 502 throughout.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:1120/health || exit 1
 
 # Migrations run before the app binds, not from application code: schema
 # changes should not race startup, and a failed migration should stop the
 # deploy rather than leave a half-migrated database serving traffic. `exec`
 # hands PID 1 to uvicorn so it still receives stop signals directly.
-CMD ["sh", "-c", "alembic upgrade head && exec python -m uvicorn main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && exec python -m uvicorn main:app --host 0.0.0.0 --port 1120"]

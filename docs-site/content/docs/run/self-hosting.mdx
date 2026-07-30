@@ -40,7 +40,7 @@ assets, if you want the MCP endpoint without the UI.
 ### Run it
 
 ```bash
-docker run -p 8000:8000 \
+docker run -p 1120:1120 \
   -e DATABASE_URL="postgresql://user:pass@host:5432/mygist" \
   mygist
 ```
@@ -56,10 +56,10 @@ database serving traffic.
 ### Check it
 
 ```bash
-curl -s http://127.0.0.1:8000/api/health
+curl -s http://127.0.0.1:1120/api/health
 ```
 
-Then open `http://127.0.0.1:8000` in a browser and register the first account.
+Then open `http://127.0.0.1:1120` in a browser and register the first account.
 
 </Step>
 
@@ -91,7 +91,7 @@ does nothing.
 
 | Variable | Default |
 |---|---|
-| `PORT` | `8000` |
+| `PORT` | `1120` |
 | `HOST` | `127.0.0.1` |
 
 ### Search and embeddings
@@ -151,7 +151,7 @@ To run the API without building an image:
 cd backend
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-DATABASE_URL="…" uvicorn main:app --reload
+DATABASE_URL="…" uvicorn main:app --reload --port 1120
 ```
 
 A throwaway database for development:

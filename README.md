@@ -44,14 +44,14 @@ You need Postgres and one container.
 
 ```bash
 docker build -t mygist .
-docker run -p 8000:8000 -e DATABASE_URL="postgresql://…" mygist
+docker run -p 1120:1120 -e DATABASE_URL="postgresql://…" mygist
 ```
 
 That single image serves the web UI at `/`, the REST API at `/api`, the MCP
 endpoint at `/mcp`, and the documentation at `/docs`.
 
 Then register an account, create a token, and point your client at
-`http://127.0.0.1:8000/mcp` with an `Authorization: Bearer` header — the
+`http://127.0.0.1:1120/mcp` with an `Authorization: Bearer` header — the
 [quick start](https://mygist.thuradev.qzz.io/docs/use/quick-start) walks through
 it.
 
@@ -76,7 +76,7 @@ it.
 cd backend && python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 docker compose up -d test-db
-DATABASE_URL="postgresql://mygist:mygist@localhost:5433/mygist_test" uvicorn main:app --reload
+DATABASE_URL="postgresql://mygist:mygist@localhost:5433/mygist_test" uvicorn main:app --reload --port 1120
 ```
 
 ```bash

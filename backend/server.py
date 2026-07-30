@@ -10,7 +10,7 @@ Usage:
     python server.py
     
     # Production (HTTP with SSE)
-    uvicorn server:app --host 0.0.0.0 --port 8000
+    uvicorn server:app --host 0.0.0.0 --port 1120
 
 Environment Variables:
     MYGIST_API_TOKEN: Bearer token for authentication (required in production)
@@ -4561,7 +4561,7 @@ if __name__ == "__main__":
     # # Check if running in HTTP mode
     # if "--http" in sys.argv or os.getenv("MCP_TRANSPORT") == "http":
     #     import uvicorn
-    #     port = int(os.getenv("PORT", "8000"))
+    #     port = int(os.getenv("PORT", "1120"))
     #     host = os.getenv("HOST", "0.0.0.0")
     #     uvicorn.run(app, host=host, port=port)
     # else:
