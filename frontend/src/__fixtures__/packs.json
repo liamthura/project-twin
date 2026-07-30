@@ -1761,7 +1761,7 @@
               "title": "Stress Triggers",
               "description": "Situations or patterns that tend to increase your stress",
               "placeholder": "e.g. Tight deadlines, Open-plan noise...",
-              "$comment": "Bare strings with NO MCP write path at all: there is no stress_trigger entity and no execute_modify branch. persona_store._normalize:267 seeds it as []. The UI is its only writer -- see reference doc 1.7 and follow-up 2."
+              "$comment": "Bare strings. persona_store._normalize seeds it as []. The UI was its only writer until wave 7 added the stress_trigger entity and its execute_modify branch; both writers append to this same list now."
             }
           ]
         }

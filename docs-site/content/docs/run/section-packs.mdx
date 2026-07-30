@@ -1,42 +1,48 @@
 ---
 title: Section packs
-description: Adding a persona section with one file and no backend code.
+description: Adding a persona section with one file and no backend code — a complete worked example.
 ---
 
-A **section pack** adds a whole persona section — storage, write vocabulary,
-read scopes, search indexing and editor UI — from a single file:
+A **section pack** adds a whole persona section from a single file:
 
 ```text
 backend/section_packs/<key>/manifest.json
 ```
 
-There is no per-pack Python and no per-pack React. That is the point: a
-declarative pack cannot ship code, so community packs are safe to accept.
+No Python. No React. One JSON file, and you get all of this:
 
-The full step-by-step walkthrough lives in
-[`docs/CONTRIBUTING-PACKS.md`](https://github.com/liamthura/project-twin/blob/main/docs/CONTRIBUTING-PACKS.md)
-in the repository. This page covers what you should understand before you open
-it.
-
-## What a manifest declares
-
-| Key | Purpose |
+| You get | Without writing |
 |---|---|
-| `key`, `title`, `description` | Identity, and what the Sections manager shows |
-| `defaults` | The empty skeleton for the section |
-| `id_lists` | `[list_field, id_prefix]` pairs. Every listed field must exist in `defaults` as a list, and prefixes must be unique across all packs. |
-| `entities` | The write vocabulary — actions, required and optional fields, enum values, and the `identifier` used for update and remove |
-| `scope_contributions` | What each global scope pulls from this section |
-| `capture_triggers` | Phrases that hint `suggest_persona_update` |
-| `ui` | How the web editor renders the section |
-| `core` | Whether the section can be disabled at all |
-| `default_enabled` | Whether it starts on, or is opt-in |
-| `position` | Where it sits in the editor's section order |
+| A place to store the data | Any storage code |
+| MCP tools that write into it | Any tool handlers |
+| A full editor UI | Any React |
+| Search indexing over the entries | Any indexing code |
+| Stable ids on every entry | Any id logic |
+| A read scope of its own | Any scope assembly |
+| A toggle in the Sections manager | Any settings plumbing |
 
-Entity names must be unique across every pack, so a new pack cannot shadow an
-existing entity.
+Packs are declarative *only* — a pack cannot ship code, which is what makes
+accepting one from a stranger a reasonable thing to do.
 
-## Getting started
+<Callout>
+This page is the walkthrough. [Manifest reference](/run/pack-reference) is the
+exhaustive list of every key and every UI option.
+</Callout>
+
+## Before you start
+
+Ask whether you actually need a new section. A new **field on an existing
+entity** is a smaller change with a smaller cost, and most ideas are that.
+
+A new section earns its place when the data is a genuinely separate area of a
+person's life — one that some users will want and others will not. That is why
+sections can be toggled, and why new ones default to off.
+
+## A worked example
+
+We will build a **Tools** pack: the software and hardware someone works in.
+Genuinely useful context — an assistant that knows you live in Neovim and zsh
+gives different answers — and it exercises most of what a pack can do.
 
 <Steps>
 
@@ -45,109 +51,481 @@ existing entity.
 ### Copy the template
 
 ```bash
-cp -r backend/section_packs/_template backend/section_packs/<key>
+cp -r backend/section_packs/_template backend/section_packs/tools
 ```
 
-`<key>` is lowercase snake_case, and the manifest's `"key"` must equal the
-directory name.
+The directory name is the section key: lowercase, `snake_case`. The manifest's
+`"key"` must match it exactly.
 
 </Step>
 
 <Step>
 
-### Edit the manifest
+### Identify the section
 
-Work through the table above. Two things are easy to get wrong:
+```json title="backend/section_packs/tools/manifest.json"
+{
+  "$schema": "../meta_schema.json",
+  "key": "tools",
+  "title": "Tools",
+  "description": "Software and hardware you work in day to day",
+  "core": false,
+  "default_enabled": false,
+  "position": 45
+}
+```
 
-- **Give every entity an explicit `list`** naming which id-list it writes into,
-  such as `"list": "items"`. The fallback for a section with a single id-list
-  has an ambiguity guard and will decline entities rather than guess. Declaring
-  it always is the safe habit.
-- **Omit a scope to stay out of it.** Your section always gets its own scope
-  token for free, so it is reachable even if it contributes to no global scope.
+| Key | What it does |
+|---|---|
+| `title`, `description` | Shown in the Sections manager and on the section's card |
+| `core` | `true` means it can never be disabled. Only three shipped sections are core. **Yours is not.** |
+| `default_enabled` | `false` for anything new. Users opt in. |
+| `position` | Where it sits in the editor's tab order. Pick a gap between existing packs. |
+
+<Callout>
+`$schema` points at `meta_schema.json`, so an editor with JSON schema support
+autocompletes and validates the whole file as you type. Worth having.
+</Callout>
 
 </Step>
 
 <Step>
 
-### Boot until it starts
+### Declare the storage shape
+
+`defaults` is the empty skeleton a brand-new account starts with.
+
+```json
+"defaults": {
+  "items": []
+},
+"id_lists": [
+  ["items", "tool"]
+]
+```
+
+`id_lists` pairs a list field with an id prefix. Every entry in `items` will get
+an id like `tool_a1b2c3`, which is what makes it addressable by `get_entity` and
+linkable by [relations](/use/relations).
+
+<Callout type="warn">
+Every field named in `id_lists` must exist in `defaults` **as a list**, and the
+prefix must be unique across every pack in the repository. Duplicate prefixes
+are rejected at boot.
+</Callout>
+
+</Step>
+
+<Step>
+
+### Declare the write vocabulary
+
+`entities` is what an AI client is allowed to say. One entity here:
+
+```json
+"entities": {
+  "tool": {
+    "actions": ["add", "update", "remove"],
+    "list": "items",
+    "required": ["name"],
+    "optional": ["kind", "role", "notes", "tags"],
+    "valid_values": {
+      "kind": ["editor", "language", "shell", "database", "hardware", "service"],
+      "role": ["daily", "occasional", "learning", "retired"]
+    },
+    "identifier": "name",
+    "field_defaults": { "role": "daily" }
+  }
+}
+```
+
+| Key | What it does |
+|---|---|
+| `actions` | Which of `add` / `update` / `remove` this entity supports |
+| `list` | Which id-list it writes into. **Always declare this.** |
+| `required` | Fields an `add` must carry |
+| `optional` | Fields it may carry |
+| `valid_values` | Constrains a field to an enum. Also drives the editor's dropdowns. |
+| `identifier` | The field `update` and `remove` look entries up by |
+| `field_defaults` | Preselected on a new entry |
+
+<Callout type="warn">
+**Declare `list` explicitly, always.** The fallback for a section with a single
+id-list has an ambiguity guard, and it declines entities rather than guessing.
+Leaving it out is the most common reason a new pack's writes silently do
+nothing.
+</Callout>
+
+Entity names are unique across *every* pack, so a new pack cannot shadow an
+existing entity. `tool` is free; `project` would not be.
+
+</Step>
+
+<Step>
+
+### Say what each scope pulls
+
+```json
+"scope_contributions": {
+  "professional": ["items"]
+}
+```
+
+A client asking for the `professional` scope now gets your tools. Omit a scope
+to stay out of it.
+
+Your section always gets **its own scope token for free** — `get_context(scope:
+"tools")` works whether or not it contributes to any global scope. So
+contributing to nothing is a legitimate choice for something niche.
+
+<Callout>
+Be conservative. Everything you add to a global scope costs tokens in every
+conversation of every user who has your pack enabled. `professional` alone is
+the right answer here; adding it to `minimal` would not be.
+</Callout>
+
+</Step>
+
+<Step>
+
+### Draw the editor
+
+`ui.sections` is a list of nodes. One list node is enough to start:
+
+```json
+"ui": {
+  "sections": [
+    {
+      "kind": "list",
+      "path": ["items"],
+      "entity": "tool",
+      "title_field": "name",
+      "badges": ["kind", "role"],
+      "detail_fields": ["notes", "tags"],
+      "array_fields": ["tags"]
+    }
+  ]
+}
+```
+
+That gives you a list of expandable rows. The name is the row title, `kind` and
+`role` render as editable chips on the collapsed row, and expanding a row shows
+notes and a tag input.
+
+`badges` fields with `valid_values` become dropdowns automatically — you do not
+list the options twice.
+
+</Step>
+
+<Step>
+
+### Add capture hints
+
+```json
+"capture_triggers": ["I use", "switched to", "my setup", "installed"]
+```
+
+Phrases that hint to `suggest_persona_update` that a message might belong to
+your section. They are hints, not rules — see [Capture](/use/capture).
+
+</Step>
+
+<Step>
+
+### Boot it
 
 ```bash
 cd backend && python main.py
 ```
 
-A schema violation raises a `PackError` naming your pack and the offending key.
-Fix, repeat. This is the development loop — the error message is the
-documentation.
+An invalid manifest raises a `PackError` naming your pack and the offending key.
+Fix, repeat. The error message is the development loop.
+
+Once it boots, the section is live: it appears in the Sections manager, `tool`
+appears in `get_schema`, and the editor draws it.
 
 </Step>
 
 <Step>
 
-### Run the tests
+### Test it
 
 ```bash
-python -m pytest tests/test_pack_loader.py -q
+python -m pytest tests/test_pack_loader.py -q   # your manifest
+python -m pytest -q                             # the mechanical guards
 ```
 
-Then the full suite, which is where the mechanical guards below live:
-
-```bash
-python -m pytest -q
-```
-
-</Step>
-
-<Step>
-
-### Open a PR
-
-Exactly one new directory under `backend/section_packs/`.
+The full suite is where the [guards](#guards-you-will-meet) live. Run it before
+opening a PR — they check things the loader does not.
 
 </Step>
 
 </Steps>
 
-## New packs default to off
+<Accordions>
+<Accordion title="The complete Tools manifest">
 
-Set `default_enabled: false`. Users opt in from the Sections manager.
+```json title="backend/section_packs/tools/manifest.json"
+{
+  "$schema": "../meta_schema.json",
+  "key": "tools",
+  "title": "Tools",
+  "description": "Software and hardware you work in day to day",
+  "core": false,
+  "default_enabled": false,
+  "position": 45,
 
-This matters more than it sounds: every enabled section costs context tokens for
-every user who has it on. An opt-in default means your pack costs nothing to the
-people who do not want it.
+  "defaults": {
+    "items": []
+  },
+  "id_lists": [
+    ["items", "tool"]
+  ],
 
-## An invalid pack stops the server
+  "scope_contributions": {
+    "professional": ["items"]
+  },
 
-<Callout type="warn">
-A manifest that violates `meta_schema.json` raises and **halts startup**. It is
-not skipped with a warning.
+  "entities": {
+    "tool": {
+      "actions": ["add", "update", "remove"],
+      "list": "items",
+      "required": ["name"],
+      "optional": ["kind", "role", "notes", "tags"],
+      "valid_values": {
+        "kind": ["editor", "language", "shell", "database", "hardware", "service"],
+        "role": ["daily", "occasional", "learning", "retired"]
+      },
+      "identifier": "name",
+      "field_defaults": { "role": "daily" }
+    }
+  },
 
-This changed deliberately. Warn-and-skip meant that a single mistyped key
-removed an entire section silently: the pack vanished, and the first symptom
-appeared much later and nowhere near the cause — an AI client being told an
-entity type was unknown. It happened twice.
+  "capture_triggers": ["I use", "switched to", "my setup", "installed"],
 
-Failing at boot puts the error where the mistake is. Warn-and-skip survives only
-for pack directories the server does not own.
+  "ui": {
+    "sections": [
+      {
+        "kind": "list",
+        "path": ["items"],
+        "entity": "tool",
+        "title_field": "name",
+        "badges": ["kind", "role"],
+        "detail_fields": ["notes", "tags"],
+        "array_fields": ["tags"]
+      }
+    ]
+  }
+}
+```
+
+</Accordion>
+</Accordions>
+
+## What you just got
+
+Without writing a line of code, an AI client can now do this:
+
+```text
+get_schema(entity="tool")
+  → actions, fields, valid values, a worked example per action
+
+persona_modify(
+  action="add", entity="tool",
+  data={"name": "Neovim", "kind": "editor", "role": "daily"}
+)
+  → stored as items[0], with id tool_a1b2c3
+
+get_context(scope="tools")
+  → your tools
+
+search_context("neovim")
+  → the entry, ranked, with its id
+```
+
+And the same data is fully editable in the browser.
+
+## Making it nicer
+
+The minimal version works. These options are what separate it from the shipped
+packs, and every one is a single key.
+
+### Help people fill it in
+
+```json
+"field_placeholders": {
+  "name": "e.g. Neovim, Postgres, Framework 13",
+  "notes": "How you use it, and what for..."
+},
+"suggestions": {
+  "name": ["VS Code", "Neovim", "zsh", "Docker", "Postgres"]
+}
+```
+
+`field_placeholders` sets the greyed-out example text per field.
+`suggestions` renders tap-to-add chips on the Add dialog, which is the single
+biggest thing you can do for a section nobody knows how to start filling.
+
+### Make a long list usable
+
+```json
+"searchable": true,
+"facets": ["kind", "role"],
+"sort": { "field": "name", "dir": "asc" }
+```
+
+`searchable` adds a filter box. `facets` turns enum fields into filter controls
+above the list. `sort` orders the rows for display — it never reorders the
+stored array.
+
+### Explain the section
+
+```json
+"title": "Tools",
+"description": "Software and hardware you work in day to day",
+"info": {
+  "overview": "What you actually work in, so an assistant gives advice that fits your setup rather than a generic one.",
+  "tips": [
+    "Kind: what sort of tool it is — editor, language, shell, hardware.",
+    "Role: daily, occasional, learning, or retired.",
+    "Retired entries are worth keeping: 'I moved off X' is useful context."
+  ]
+}
+```
+
+`description` is one muted line under the heading. `info` is the content of the
+section's info dialog, for anything longer.
+
+### Show more on the collapsed row
+
+```json
+"count_badges": ["tags"],
+"display_fields": ["added_at"],
+"display_formats": { "added_at": "datetime" }
+```
+
+`count_badges` renders `3 tags` style chips for array fields. `display_fields`
+shows read-only badges — right for machine-written values like a timestamp,
+which should never get an edit control.
+
+### Longer text fields
+
+```json
+"detail_fields": ["notes", "tags"],
+"long_text": ["notes"]
+```
+
+`long_text` promotes a field from a single-line input to a textarea.
+
+## Nested lists
+
+A `list` node can carry `children`, rendered inside an expanded row. This is how
+a project's references and an education entry's coursework are edited.
+
+**A child's `path` resolves against the row's item, not the section root.**
+
+```json
+{
+  "kind": "list",
+  "path": ["items"],
+  "entity": "tool",
+  "title_field": "name",
+  "children": [
+    {
+      "kind": "list",
+      "path": ["configs"],
+      "entity": "tool_config",
+      "title": "Configs",
+      "title_field": "name",
+      "detail_fields": ["name", "url", "notes"]
+    }
+  ]
+}
+```
+
+`["configs"]` addresses `tool.configs`, not `tools.configs`.
+
+A child list is a full node, so it needs its own `entity` — which means a
+second entity, one that writes into a list belonging to a parent row:
+
+```json
+"tool_config": {
+  "actions": ["add", "remove"],
+  "required": ["tool_name", "name"],
+  "optional": ["url", "notes"],
+  "identifier": "name",
+  "parent": "tool_name"
+}
+```
+
+`parent` names the field that identifies which row to write into. That is how
+`work_highlight` finds the right job and `project_reference` finds the right
+project.
+
+<Callout>
+Nested entries have **no ids of their own**. They are addressed through their
+parent, which is why a project's references cannot be linked to directly.
 </Callout>
 
-## The `ui` block
+## Grouping and non-list nodes
 
-`ui.sections` is a list of nodes. The shared renderer kit
-(`frontend/src/renderers/`) implements four kinds:
+Not everything is a list. Four node kinds exist:
 
-| Kind | Binds | Renders |
+| `kind` | Binds | Renders |
 |---|---|---|
-| `list` | A list of objects | Expandable rows with fields, badges and an Add dialog |
-| `fields` | Named keys of one object | A form; `path: []` addresses the section root |
+| `list` | A list of objects | Expandable rows, badges, an Add dialog |
+| `fields` | Named keys of one object | A form. `path: []` addresses the section root. |
 | `strings` | A bare `string[]` | Tag chips, or one editable row per item |
-| `group` | Nothing | A heading with nested nodes under it |
+| `group` | Nothing | A heading with nested `sections` under it |
 
-A `list` node can also carry `children`, which render against each row. That is
-how a project's references and an education entry's coursework are edited.
+A `group` is a visual container only. Unlike `children`, a nested section's
+`path` still resolves against the **section root**:
 
-Everything the editor draws comes from here. There is no per-pack React to
-write, and no way to add any.
+```json
+{
+  "kind": "group",
+  "title": "Environment",
+  "description": "Where the work actually happens",
+  "sections": [
+    {
+      "kind": "fields",
+      "path": ["environment"],
+      "entity": "environment",
+      "fields": ["os", "terminal"]
+    },
+    {
+      "kind": "strings",
+      "path": ["environment", "shortcuts"],
+      "title": "Shortcuts",
+      "item_control": "input",
+      "placeholder": "e.g. leader-f for fuzzy find"
+    }
+  ]
+}
+```
+
+<Callout>
+`item_control` on a `strings` node is worth getting right. The default, `"tag"`,
+renders chips — correct for short word-like values you add and remove but never
+revise. `"input"` renders one editable row per item, correct for **sentences**,
+where a typo in a chip means deleting and retyping the whole thing.
+
+Work highlights and learning-log decisions both use `"input"` for that reason.
+</Callout>
+
+## Commenting a manifest
+
+JSON has no comment syntax, so entities and UI nodes accept a `$comment` key.
+The loader ignores it and it never reaches a client.
+
+```json
+"$comment": "`primary` marks the one entry that IS the user's design language,
+             as opposed to a style they merely like. Kept to a single holder by
+             the entity's exclusive_fields, which both writers honour."
+```
+
+Use it. The shipped packs use it heavily, and it is the only place a
+non-obvious decision can live next to the thing it explains.
 
 ## Guards you will meet
 
@@ -158,24 +536,27 @@ fine to a human. Each of these exists because it caught a real defect.
 
 <Accordion title="Every field an entity declares must actually be stored">
 
-A field that nothing writes fails the **stored-key audit**, for both `add` and
-`update`. The audit is empirical: it runs each action twice with different
-values and diffs what came out, so it needs no maintenance and sweeps new
-entities automatically.
+A field nothing writes fails the **stored-key audit**, for both `add` and
+`update`.
 
-If a field is genuinely a router the caller must send rather than something
-stored — `sleep.day_type` selects weekday or weekend, for instance — it is
-declared as such with a written reason, not quietly allowed.
+The audit is empirical rather than declarative: it runs each action twice with
+two different values and diffs what came out. So it needs no maintenance and
+sweeps new entities automatically — including yours, the moment you add it.
+
+If a field is genuinely a *router* the caller must send rather than something
+stored, it gets declared as such with a written reason. `sleep.day_type` is the
+standing example: it selects whether to write the weekday or weekend sub-object
+and is never itself stored.
 
 </Accordion>
 
-<Accordion title="`required` must be enough">
+<Accordion title="An add built from exactly your required fields must succeed">
 
-An `add` built from exactly the fields you declared required has to succeed.
+If you declare `required: ["name"]` but the write path demands four fields, the
+contract and the implementation disagree, and a client has no way to find that
+out except by failing.
 
-A common failure is declaring one required field while the write path demands
-four. The contract and the implementation disagree, and the caller has no way to
-know.
+The test builds an `add` from precisely what you declared and asserts it works.
 
 </Accordion>
 
@@ -184,15 +565,74 @@ know.
 Every stored key the fixture holds must be bound by a `ui` node, or explicitly
 excluded with a written reason.
 
-An unbound key is unreachable in the editor and therefore unsaveable by hand —
-which usually means nobody notices it is broken until much later.
+An unbound key is unreachable in the editor and therefore unsaveable by hand,
+which usually means nobody notices it is broken for months.
+
+If your UI node's field names diverge from the entity's on purpose, declare them
+in `fields_outside_entity` — that states the divergence in the manifest rather
+than dropping your pack from a test list.
+
+</Accordion>
+
+<Accordion title="Frontend fixtures must be regenerated">
+
+`frontend/src/__fixtures__/packs.json` is generated from the manifests, and the
+frontend tests assert against it.
+
+```bash
+cd frontend && npm run fixtures
+```
+
+CI runs this and then `git diff --exit-code`, so a stale fixture fails the build
+rather than passing quietly.
 
 </Accordion>
 
 </Accordions>
 
 These guards are strict on purpose, and the reason strings they demand are
-themselves the documentation for the exceptions.
+themselves the documentation for every exception.
+
+## An invalid pack stops the server
+
+<Callout type="warn">
+A manifest that violates `meta_schema.json` raises and **halts startup**. It is
+not skipped with a warning.
+
+This changed deliberately. Warn-and-skip meant a single mistyped key removed an
+entire section silently: the pack vanished, and the first symptom appeared much
+later and nowhere near the cause — a client being told an entity type was
+unknown. It happened twice.
+
+Failing at boot puts the error where the mistake is. Warn-and-skip survives only
+for pack directories the server does not own.
+</Callout>
+
+## Common mistakes
+
+| Symptom | Cause |
+|---|---|
+| Writes appear to succeed but nothing is stored | The entity has no `list`, and the ambiguity guard declined it |
+| Server will not boot, `PackError` names your key | Read the message — it names the offending key |
+| A field is in `get_schema` but never saved | It fails the stored-key audit. Either wire it up or remove it. |
+| The editor shows nothing for a field | No `ui` node binds it |
+| A nested list writes to the wrong place | A child's `path` resolves against the **row**, not the section |
+| `id_lists` rejected at boot | The field is not a list in `defaults`, or the prefix is taken |
+| Frontend tests fail after a manifest edit | `npm run fixtures` |
+
+## Checklist before opening a PR
+
+- [ ] Directory name, `key`, and the manifest filename all agree
+- [ ] `default_enabled: false`, and `core` is `false`
+- [ ] Every entity declares `list`
+- [ ] Every entity name is unique across all packs
+- [ ] The id prefix is unique across all packs
+- [ ] Scope contributions are as small as you can justify
+- [ ] Every stored key is bound by a `ui` node
+- [ ] `python -m pytest -q` passes in `backend/`
+- [ ] `npm run fixtures` produces no diff in `frontend/`
+- [ ] Non-obvious decisions carry a `$comment`
+- [ ] Exactly one new directory under `backend/section_packs/`
 
 ## Keep entries small
 
@@ -200,3 +640,10 @@ Every field you add costs context tokens for every user who enables the pack.
 
 MyGist is a context provider. It describes a person; it does not manage their
 tasks. If a field would be stale next month, it probably does not belong.
+
+## Next
+
+<Cards>
+  <Card title="Manifest reference" href="/run/pack-reference" description="Every key and every UI option, exhaustively." />
+  <Card title="Development" href="/run/development" description="The test suite and what CI checks." />
+</Cards>

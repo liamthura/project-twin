@@ -1,0 +1,362 @@
+---
+title: Manifest reference
+description: Every key a section pack manifest accepts, with a real example of each.
+---
+
+The exhaustive companion to [Section packs](/run/section-packs), which is the
+walkthrough. Every example here is drawn from a pack that actually ships.
+
+The authority is `backend/section_packs/meta_schema.json`. Point your editor at
+it with `"$schema": "../meta_schema.json"` and it will validate as you type.
+
+## Top level
+
+| Key | Type | Required | Purpose |
+|---|---|:--:|---|
+| `key` | string | ● | Section key. Must equal the directory name. Lowercase `snake_case`. |
+| `title` | string | ● | Display name in the Sections manager and the editor. |
+| `description` | string | ● | One line, shown under the title in the Sections manager. |
+| `core` | boolean | ● | `true` means the section can never be disabled. Only profile, preferences and the learning log are core. |
+| `position` | number | ● | Order in the editor's section list. |
+| `defaults` | object | ● | The empty skeleton a new account starts with. |
+| `id_lists` | array | ● | `[field, prefix]` pairs. Entries in each field get ids like `prefix_a1b2c3`. |
+| `entities` | object | ● | The write vocabulary. See [Entities](#entities). |
+| `scope_contributions` | object | | `{scope: [field, ...]}`. Omit a scope to stay out of it. |
+| `capture_triggers` | array | | Phrases hinting `suggest_persona_update`. |
+| `ui` | object | | `{ "sections": [node, ...] }`. See [UI nodes](#ui-nodes). |
+| `default_enabled` | boolean | | Defaults to `true`. **New packs should set `false`.** |
+
+### `id_lists`
+
+```json
+"id_lists": [
+  ["items", "media"]
+]
+```
+
+Every named field must exist in `defaults` as a list, and every prefix must be
+unique across every pack in the repository.
+
+### `scope_contributions`
+
+```json
+"scope_contributions": {
+  "minimal": ["styles"],
+  "personal": ["styles"]
+}
+```
+
+Valid scope names are `minimal`, `professional`, `personal` and `learning`.
+An unknown name is a `PackError` at boot.
+
+`full` is not listed — it includes every enabled section automatically. Your
+section also gets its own scope token for free, whether or not it contributes
+to any global scope.
+
+<Callout>
+One section contributes to global scopes without declaring anything here:
+preferences reaches every scope through `sections.ALWAYS_ON`, a hard-coded
+field bundle. Its `scope_contributions` is empty. Do not copy that pattern —
+it is a deliberate one-off for the fields that should never be scoped away.
+</Callout>
+
+## Entities
+
+Each key under `entities` is an entity name, unique across **all** packs.
+
+| Key | Type | Required | Purpose |
+|---|---|:--:|---|
+| `actions` | array | ● | Any of `add`, `update`, `remove`. |
+| `required` | array | ● | Fields an `add` must carry. An add built from exactly these must succeed. |
+| `optional` | array | ● | Fields it may carry. May be empty. |
+| `identifier` | string or null | ● | The field `update` and `remove` look entries up by. `null` for entities that address nothing. |
+| `list` | string | | Which id-list this entity writes into. **Declare it always.** |
+| `valid_values` | object | | `{field: [value, ...]}`. Constrains a field, and drives the editor's dropdowns. |
+| `field_defaults` | object | | Values preselected on a new entry. `"@now"` becomes an ISO 8601 timestamp at add time; everything else is literal. |
+| `parent` | string | | For nested entries: the field naming which parent row to write into. |
+| `exclusive_fields` | array | | Keys at most one entry in the list may hold as true. |
+| `description` | string | | Shown in `get_schema` output. |
+| `$comment` | string | | Authoring note. Ignored by the loader, never shown to a client. |
+
+### A complete entity
+
+```json title="section_packs/media/manifest.json"
+"media_item": {
+  "actions": ["add", "update", "remove"],
+  "required": ["title"],
+  "optional": ["kind", "status", "reaction", "url", "notes", "tags"],
+  "valid_values": {
+    "kind": ["book", "article", "podcast", "show", "film", "game", "video", "music"],
+    "status": ["want", "in_progress", "finished", "dropped"],
+    "reaction": ["loved", "liked", "disliked"]
+  },
+  "identifier": "title",
+  "list": "items"
+}
+```
+
+### `parent`
+
+Nested entries are addressed through the row that owns them.
+
+```json title="section_packs/projects/manifest.json"
+"project_reference": {
+  "actions": ["add", "remove"],
+  "required": ["project_name", "ref_name"],
+  "optional": ["url", "notes"],
+  "identifier": "ref_name",
+  "parent": "project_name"
+}
+```
+
+`parent` names which field identifies the owning row. Nested entries have no ids
+of their own.
+
+### `exclusive_fields`
+
+```json title="section_packs/aesthetics/manifest.json"
+"exclusive_fields": ["primary"]
+```
+
+At most one entry in the list may hold the key as true. Setting it on one clears
+it on every other, **in both writers** — the editor and the MCP write path —
+because either alone leaves the invariant enforceable from only one side.
+
+Aesthetics is the case it exists for: the primary entry is the one that rides
+into the `minimal` scope, and two primaries would make that a coin toss.
+
+### `field_defaults` and `@now`
+
+```json
+"field_defaults": {
+  "source": "manual",
+  "timestamp": "@now"
+}
+```
+
+The exact string `"@now"` is replaced by an ISO 8601 timestamp when an entry is
+added. Every other value is used literally.
+
+## UI nodes
+
+`ui` is `{ "sections": [node, ...] }`. Only `kind` is required on a node.
+
+### The four kinds
+
+| `kind` | Binds | Renders |
+|---|---|---|
+| `list` | A list of objects | Expandable rows with badges, detail fields and an Add dialog |
+| `fields` | Named keys of one object | A form. `path: []` addresses the section root. |
+| `strings` | A bare `string[]` | Tag chips, or one editable row per item |
+| `group` | Nothing | A heading with nested `sections` under it |
+
+### Binding
+
+| Key | Applies to | Purpose |
+|---|---|---|
+| `path` | all | Storage-key path, relative to `defaults`. |
+| `entity` | `list`, `fields` | The entity whose `valid_values` and `field_defaults` back this node's controls. |
+| `title_field` | `list` | The field used as each row's title. |
+| `fields` | `fields` | Which keys of the bound object to render. |
+
+<Callout type="warn">
+**`path` resolves differently inside `children` and inside `sections`.**
+
+A node under `children` resolves against the **row's item** — `["references"]`
+on a list of projects addresses `project.references`.
+
+A node under a `group`'s `sections` resolves against the **section root**. A
+group is a visual container, not a data scope.
+</Callout>
+
+### Labels and help text
+
+| Key | Purpose |
+|---|---|
+| `title` | Heading above the node. |
+| `description` | One muted line under the title, saying what belongs here. Omit it if the title already says it. |
+| `info` | `{overview, tips[]}` — content for the section's info dialog, for anything longer. |
+| `placeholder` | Placeholder for a `strings` node's own input. |
+| `field_placeholders` | `{field: text}` for the text, textarea, date, time and chip controls a node renders. |
+| `suggestions` | `{field: [value, ...]}` — tap-to-add chips on the Add dialog. |
+| `$comment` | Authoring note. Ignored by the loader. |
+
+```json title="section_packs/lifestyle/manifest.json"
+{
+  "kind": "strings",
+  "path": ["wellness", "energy_peaks"],
+  "title": "Energy Peaks",
+  "description": "Times of day when you feel most focused and productive",
+  "placeholder": "e.g. Early morning (6-9am), Late night (10pm-1am)..."
+}
+```
+
+<Callout>
+Concrete examples earn their place in placeholders. `"e.g. Bachelor's, Master's,
+PhD"` says more about a `degree_level` field than any label can.
+</Callout>
+
+### Which fields render, and how
+
+| Key | Renders as |
+|---|---|
+| `badges` | Editable chips on the collapsed row. Enum fields become dropdowns. |
+| `detail_fields` | Controls inside an expanded row. |
+| `array_fields` | A subset of `detail_fields` holding `string[]`, as tag inputs. |
+| `long_text` | A subset of `detail_fields`, as a textarea instead of one line. |
+| `date_fields` | A date picker. Values must be `yyyy-mm-dd`. |
+| `time_fields` | A time picker. Values must be `HH:MM`. |
+| `bool_fields` | An on/off switch, for keys genuinely stored as JSON booleans. |
+| `item_control` | `strings` only: `"tag"` (default) or `"input"`. |
+
+<Callout>
+`date_fields`, `time_fields` and `bool_fields` all degrade rather than discard.
+A value a picker cannot parse falls back to a plain text input, so it survives
+instead of being silently dropped by a control that could not read it.
+
+Nothing validates these on write, so an MCP client can still store
+`"after midnight"` in a time field.
+</Callout>
+
+**`item_control` in one line:** `"tag"` for short word-like values you add and
+remove but never revise; `"input"` for sentences, where a typo in a chip means
+retyping the whole line.
+
+```json title="section_packs/learning_log/manifest.json"
+{
+  "kind": "strings",
+  "path": ["key_decisions"],
+  "title": "Key Decisions",
+  "item_control": "input",
+  "placeholder": "e.g. Chose Postgres over SQLite for the vector index"
+}
+```
+
+### Read-only display
+
+Never rendered as editable controls. For machine-written values.
+
+| Key | Renders |
+|---|---|
+| `display_fields` | Read-only badges on the collapsed row. |
+| `display_formats` | `{field: format}` — parsed as dates, rendered in local time. Unparseable values shown verbatim. |
+| `count_badges` | `"3 references"` style chips for array-valued keys. Absent, empty or non-array keys render nothing. |
+
+```json title="section_packs/learning_log/manifest.json"
+"display_fields": ["timestamp"],
+"display_formats": { "timestamp": "datetime" }
+```
+
+<Callout>
+`count_badges` renders nothing rather than `0 references` for an item that has
+not used the feature. A zero chip on every untouched row is noise.
+</Callout>
+
+### Finding things in a long list
+
+| Key | Purpose |
+|---|---|
+| `searchable` | A search box filtering on the title field, badges, detail fields and array entries. |
+| `facets` | Enum keys rendered as filters above the list. Display only; never writes. |
+| `sort` | `{field, dir}`. **Display order only** — the stored array is never reordered. |
+
+```json title="section_packs/learning_log/manifest.json"
+"searchable": true,
+"sort": { "field": "timestamp", "dir": "desc" }
+```
+
+Sorting compares two numbers numerically and everything else as text. Items
+where the key is missing or empty sort last, whichever direction you chose.
+
+### `pinned`
+
+Lifts the one row holding `field` out of the list and renders it above, as the
+section's answer to a question the list cannot answer.
+
+```json title="section_packs/aesthetics/manifest.json"
+"pinned": {
+  "field": "primary",
+  "title": "Primary aesthetic",
+  "empty": "No primary set yet. Star a style below to make it your design language.",
+  "noun": "primary"
+}
+```
+
+All four keys are required. The lifted row is excluded from the list below
+rather than shown twice, `field` never renders as an editable control or appears
+in the Add dialog, and every other row gets a star to claim the slot.
+
+<Callout type="warn">
+Pair `pinned` with the entity's `exclusive_fields`. `pinned` governs the editor;
+`exclusive_fields` governs both writers. Without the pair, an MCP client can set
+a second one.
+</Callout>
+
+### Nesting
+
+| Key | Purpose |
+|---|---|
+| `children` | Nodes rendered inside an expanded list row. `path` resolves against the **row's item**. |
+| `sections` | Nodes nested under a `group` heading. `path` resolves against the **section root**. |
+
+Both are recursive — a child is a full node, so a child list must name its own
+`entity` like any other.
+
+```json title="section_packs/projects/manifest.json"
+"children": [
+  {
+    "kind": "list",
+    "path": ["references"],
+    "entity": "project_reference",
+    "title": "References",
+    "title_field": "name",
+    "detail_fields": ["name", "url", "notes"]
+  }
+]
+```
+
+### Overrides and escape hatches
+
+| Key | Purpose |
+|---|---|
+| `enum` | Inline override of the entity's `valid_values`. |
+| `optional` | Inline override of the entity's `optional`. |
+| `field_defaults` | Inline override of the entity's `field_defaults`. Same `"@now"` rule. |
+| `fields_outside_entity` | Storage keys this node binds that the entity's vocabulary deliberately does not carry. |
+
+The first three exist for the rare case where a node's fields are not the
+entity's field names one-to-one.
+
+`fields_outside_entity` is **documentation only** — the renderer ignores it. It
+is how a pack whose UI names diverge from its entity names states that in the
+manifest, rather than being dropped from a test list:
+
+```json title="section_packs/projects/manifest.json"
+"title_field": "idea",
+"detail_fields": ["idea", "note"],
+"fields_outside_entity": ["idea"]
+```
+
+## The legacy `ui` form
+
+Older packs may use a flat form:
+
+```json
+"ui": { "<listKey>": { /* same keys, minus kind/path/entity */ } }
+```
+
+The schema still accepts it and the loader normalises it into `ui.sections`.
+**New packs should use the explicit form** — it is the only one documented going
+forward, and the only one that can express groups, children or non-list nodes.
+
+## Where the authority is
+
+| Question | Ask |
+|---|---|
+| What keys does a manifest accept? | `backend/section_packs/meta_schema.json` |
+| What entities exist right now? | `get_schema()` against a running server |
+| What does a real pack look like? | `backend/section_packs/*/manifest.json` |
+| Does my pack validate? | Boot the server; a `PackError` names the key |
+
+Every table on this page is a summary of the first of those. Where they
+disagree, the schema is right and this page is stale — please fix it.

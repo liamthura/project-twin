@@ -34,7 +34,9 @@ MCP tools are passive and run only when a client calls them.
   through, so the UI and the tool vocabulary cannot drift apart.
 - **Extensible sections.** A new persona section is one declarative manifest —
   no backend or frontend code. See
-  [docs/CONTRIBUTING-PACKS.md](docs/CONTRIBUTING-PACKS.md).
+  [docs/CONTRIBUTING-PACKS.md](docs/CONTRIBUTING-PACKS.md), which points at the
+  [walkthrough](https://mygist.thuradev.qzz.io/docs/run/section-packs) and the
+  [manifest reference](https://mygist.thuradev.qzz.io/docs/run/pack-reference).
 
 ## Quick start
 

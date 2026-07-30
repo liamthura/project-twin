@@ -109,3 +109,7 @@ backend/archive/
 # Storybook / Playwright test artifacts
 frontend/storybook-static
 frontend/test-results
+# Local agent tooling — not part of the project
+.claude/
+.agents/
+skills-lock.json
