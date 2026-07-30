@@ -126,3 +126,45 @@ jobs:
             exit 1
           fi
           echo "no placeholder URLs in dist/"
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the docs build stage in the root Dockerfile.
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+
+      # No --ignore-scripts here, unlike the Dockerfile: the postinstall runs
+      # `fumadocs-mdx`, which needs the content to exist. In the image, install
+      # happens before the source is copied; here checkout came first.
+      - name: Install dependencies
+        working-directory: docs-site
+        run: npm ci
+
+      - name: Type check
+        working-directory: docs-site
+        run: npm run types:check
+
+      # docs-site is built into the same image as everything else, so a break
+      # here blocks the whole deploy -- including an unrelated backend fix.
+      # Until this job existed it was caught at image build time, which is
+      # after review and after merge.
+      - name: Build
+        working-directory: docs-site
+        run: npm run build
+
+      # basePath auto-prefixes /docs, so an author writing "/docs/use/..." by
+      # hand emits "/docs/docs/use/...". Every internal link on the site was
+      # wrong this way once, and nothing failed: the pages built, the links
+      # 404'd. Anchors drift the same way when a heading is reworded.
+      - name: Check internal links and anchors
+        working-directory: docs-site
+        run: npm run check:links
