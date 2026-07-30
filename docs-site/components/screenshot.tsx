@@ -25,13 +25,32 @@ interface ScreenshotProps {
  * placeholder renders in the page, so the remaining work is visible to readers
  * and to whoever fills it in. Adding the real image is one prop.
  */
+/** Placeholder height cap. A full-width 16:10 box in a wide prose column comes
+ *  out over 700px tall and swamps the page it is only marking a gap in. */
+const MAX_PLACEHOLDER_HEIGHT = 340;
+
+/** "16 / 10" -> 1.6. Falls back to landscape on anything unparseable. */
+function parseRatio(ratio: string): number {
+  const [w, h] = ratio.split('/').map((part) => Number(part.trim()));
+  return Number.isFinite(w) && Number.isFinite(h) && h > 0 ? w / h : 1.6;
+}
+
 export function Screenshot({ src, alt, caption, hint, ratio = '16 / 10' }: ScreenshotProps) {
   if (!src) {
+    // Portrait placeholders get an explicit width so a phone shot reads as a
+    // phone rather than a full-width band. Landscape ones keep the column
+    // width and are simply capped in height.
+    const r = parseRatio(ratio);
+    const style =
+      r < 1
+        ? { width: MAX_PLACEHOLDER_HEIGHT * r, height: MAX_PLACEHOLDER_HEIGHT }
+        : { aspectRatio: ratio, maxHeight: MAX_PLACEHOLDER_HEIGHT };
+
     return (
       <figure className="my-6">
         <div
-          className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-fd-border bg-fd-muted/40 px-6 py-8 text-center"
-          style={{ aspectRatio: ratio }}
+          className="mx-auto flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-fd-border bg-fd-muted/40 px-6 py-8 text-center"
+          style={style}
         >
           <ImageIcon className="size-6 text-fd-muted-foreground/60" aria-hidden />
           <p className="text-sm font-medium text-fd-muted-foreground">{caption}</p>

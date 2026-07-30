@@ -2,11 +2,128 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 
+/* ---------------------------------------------------------------------------
+   MyGist theme.
+
+   The values below are lifted from the app's own tokens in
+   frontend/src/globals.css, so the docs and the editor read as one product.
+   Fumadocs names its tokens --color-fd-*; the app names them --background,
+   --primary and so on, in bare "H S% L%" form. The mapping is one-to-one --
+   nothing is invented here, and when the app's palette changes this block is
+   the only thing to update.
+
+   `neutral.css` is still imported above so that any token not overridden here
+   keeps a sane default rather than falling back to nothing.
+   --------------------------------------------------------------------------- */
+
+@theme {
+  /* Geist, matching frontend/tailwind.config.js. The variables come from the
+     `geist` package via the .variable classes on <html> in app/layout.tsx. */
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+
+  /* Light -- app :root */
+  --color-fd-background: hsl(60 9% 98%);
+  --color-fd-foreground: hsl(24 10% 10%);
+  --color-fd-card: hsl(0 0% 100%);
+  --color-fd-card-foreground: hsl(24 10% 10%);
+  --color-fd-popover: hsl(0 0% 100%);
+  --color-fd-popover-foreground: hsl(24 10% 10%);
+  --color-fd-primary: hsl(228 69% 55%);
+  --color-fd-primary-foreground: hsl(0 0% 100%);
+  --color-fd-secondary: hsl(60 5% 96%);
+  --color-fd-secondary-foreground: hsl(24 10% 10%);
+  --color-fd-muted: hsl(60 5% 96%);
+  --color-fd-muted-foreground: hsl(25 5% 45%);
+  --color-fd-accent: hsl(223 100% 96%);
+  --color-fd-accent-foreground: hsl(228 69% 55%);
+  --color-fd-border: hsl(20 6% 90%);
+  --color-fd-ring: hsl(228 69% 55%);
+}
+
+/* Callout and status colours, from the app's --destructive / --warning /
+   --success. Fumadocs ships these in oklch; the app's are the authority. */
+@theme {
+  --color-fd-error: hsl(0 65% 48%);
+  --color-fd-warning: hsl(43 96% 40%);
+  --color-fd-success: hsl(142 71% 35%);
+  --color-fd-info: hsl(228 69% 55%);
+}
+
+/* Dark -- app .dark */
+.dark {
+  --color-fd-background: hsl(60 3% 7%);
+  --color-fd-foreground: hsl(60 5% 96%);
+  --color-fd-card: hsl(60 2% 10%);
+  --color-fd-card-foreground: hsl(60 5% 96%);
+  --color-fd-popover: hsl(60 2% 10%);
+  --color-fd-popover-foreground: hsl(60 5% 96%);
+  --color-fd-primary: hsl(228 94% 67%);
+  --color-fd-primary-foreground: hsl(0 0% 100%);
+  --color-fd-secondary: hsl(60 1% 14%);
+  --color-fd-secondary-foreground: hsl(60 5% 96%);
+  --color-fd-muted: hsl(60 1% 14%);
+  --color-fd-muted-foreground: hsl(24 5% 64%);
+  --color-fd-accent: hsl(227 22% 20%);
+  --color-fd-accent-foreground: hsl(228 94% 67%);
+  --color-fd-border: hsl(60 2% 16%);
+  --color-fd-ring: hsl(228 94% 67%);
+
+  --color-fd-error: hsl(0 74% 54%);
+  --color-fd-warning: hsl(43 90% 55%);
+  --color-fd-success: hsl(142 60% 50%);
+  --color-fd-info: hsl(228 94% 67%);
+}
+
+/* neutral.css lifts the dark sidebar off the page background with its own
+   greys. Keep the lift, in this palette's warm neutrals rather than pure grey,
+   or the sidebar reads as a slightly different product to the page beside it. */
+.dark #nd-sidebar {
+  --color-fd-muted: hsl(60 1% 16%);
+  --color-fd-secondary: hsl(60 1% 18%);
+  --color-fd-muted-foreground: hsl(24 5% 72%);
+}
+
+/* Tailwind's preflight derives the document font from --font-sans, but state it
+   outright: the font is not something to leave to a default. */
 html {
+  font-family: var(--font-sans);
   scrollbar-gutter: stable;
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
 }
 
 html > body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
+}
+
+/* The app sets lucide icons to a lighter stroke than the library default.
+   Matching it here keeps icon weight consistent across the two surfaces. */
+svg.lucide {
+  stroke-width: 1.75;
+}
+
+/* The app's scrollbar treatment (frontend/src/globals.css). */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-fd-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--color-fd-muted-foreground) 30%, transparent);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--color-fd-muted-foreground) 50%, transparent);
 }
