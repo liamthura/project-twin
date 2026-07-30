@@ -18,7 +18,7 @@ PORT="${PORT:-8100}"
 IMAGE="mygist-preview"
 NAME="mygist-preview"
 NETWORK="backend_default"           # created by backend/docker-compose.yml
-DB_URL="postgresql://mygist:mygist@test-db:5432/mygist_local"
+DB_URL="postgresql://mygist:mygist@db:5432/mygist_local"
 
 cd "$(dirname "$0")/.."
 
@@ -32,7 +32,7 @@ commit="$(git rev-parse --short HEAD)"
 
 if ! docker network inspect "$NETWORK" >/dev/null 2>&1; then
   echo "The '$NETWORK' network is missing -- the local database stack is not up."
-  echo "Start it first:  cd backend && docker compose up -d test-db"
+  echo "Start it first:  cd backend && docker compose up -d"
   exit 1
 fi
 
@@ -43,9 +43,8 @@ docker rm -f "$NAME" >/dev/null 2>&1 || true
 
 echo "Starting container ..."
 docker run -d --name "$NAME" --network "$NETWORK" \
-  -p "${PORT}:8000" \
+  -p "${PORT}:1120" \
   -e DATABASE_URL="$DB_URL" \
-  -e DEBUG=true \
   -e EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER:-voyage}" \
   -e VOYAGE_API_KEY="${VOYAGE_API_KEY:-}" \
   "$IMAGE" >/dev/null
