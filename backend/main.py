@@ -21,6 +21,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
+from urllib.parse import urljoin
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -80,38 +81,79 @@ db.ensure_vector_schema()
 _ACCOUNT_PATHS = frozenset({"/api/auth/set-password", "/api/auth/tokens"})
 
 
+def _resource_metadata_url() -> str:
+    """The absolute URL of the protected-resource metadata document.
+
+    RFC 9728 derives it by inserting the well-known path at the resource URI's
+    origin; `urljoin` with an absolute path does exactly that, discarding
+    MCP_RESOURCE's own path rather than string-concatenating a second copy of
+    the origin. `oauth_metadata.protected_resource_metadata()`'s `resource` key
+    is already absolute, so a relative value here would be inconsistent within
+    the same feature -- and MCP clients commonly do `new URL(value)` on it,
+    which throws on a relative reference.
+    """
+    return urljoin(jwt_auth.MCP_RESOURCE, "/.well-known/oauth-protected-resource/mcp")
+
+
 def _challenge(error: str = "", scope: str = "") -> str:
     """An RFC 6750 Bearer challenge naming where to find the metadata.
 
-    Only sent on /mcp. The SPA has always received a plain JSON 401 from /api
-    and its fetch path is written against that; adding a challenge there would
-    be a change nobody asked for.
+    Only sent on /mcp, and only once OAuth is actually configured -- see the
+    call sites' `jwt_auth.mcp_resource_configured()` guard. The SPA has always
+    received a plain JSON 401 from /api and its fetch path is written against
+    that; adding a challenge there would be a change nobody asked for.
     """
     parts = []
     if error:
         parts.append(f'error="{error}"')
     if scope:
         parts.append(f'scope="{scope}"')
-    parts.append('resource_metadata="/.well-known/oauth-protected-resource/mcp"')
+    parts.append(f'resource_metadata="{_resource_metadata_url()}"')
     return "Bearer " + ", ".join(parts)
 
 
 def _unauthorized(is_mcp: bool) -> JSONResponse:
+    # A deployment without OAuth configured must behave exactly as it did
+    # before OAuth existed: oauth_metadata.register() never mounts the four
+    # discovery routes when jwt_auth.MCP_RESOURCE is unset, so a client sent a
+    # resource_metadata URL here would follow it to a 404. Gating on
+    # mcp_resource_configured() keeps the plain 401 that predates this feature.
+    send_challenge = is_mcp and jwt_auth.mcp_resource_configured()
     headers = (
         {"WWW-Authenticate": _challenge(scope=" ".join(scopes.ALL_SCOPES))}
-        if is_mcp
+        if send_challenge
         else None
     )
     return JSONResponse({"error": "Unauthorized"}, status_code=401, headers=headers)
 
 
 def _insufficient_scope(is_mcp: bool, required: str) -> JSONResponse:
+    send_challenge = is_mcp and jwt_auth.mcp_resource_configured()
     headers = (
         {"WWW-Authenticate": _challenge(error="insufficient_scope", scope=required)}
-        if is_mcp
+        if send_challenge
         else None
     )
     return JSONResponse({"error": "Forbidden"}, status_code=403, headers=headers)
+
+
+def _oauth_scopes(claims: dict) -> frozenset:
+    """The scopes an OAuth access token's `scope` claim grants.
+
+    Better Auth emits a space-delimited string, per RFC 8693 -- but this claim
+    rides in on a token an outside authorization server signed, so a value
+    that is not a string (an array, say) must not raise `AttributeError` out
+    of the middleware and surface as a 500. Anything other than a string or a
+    list of strings is treated as no scopes rather than guessed at.
+    """
+    claim = claims.get("scope", "")
+    if isinstance(claim, str):
+        parts = claim.split()
+    elif isinstance(claim, list):
+        parts = claim
+    else:
+        parts = []
+    return scopes.expand(parts)
 
 
 # Bearer auth middleware for /mcp and /api routes
@@ -167,7 +209,7 @@ async def auth_middleware(request: Request, call_next):
             claims = jwt_auth.verify_access_token(credential)
             if claims:
                 kind = "oauth"
-                granted = scopes.expand(claims.get("scope", "").split())
+                granted = _oauth_scopes(claims)
             else:
                 claims = jwt_auth.verify(credential)
                 kind = "session"
