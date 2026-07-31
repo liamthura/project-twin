@@ -134,14 +134,28 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
 
     setImportMode("replace");
 
-    const signedIn = !!config?.token;
-    setIsSignedIn(signedIn);
+    // Ask the server rather than inferring from localStorage. There used to be
+    // a token there for every signed-in account, so `!!config?.token` was a
+    // fair proxy; with Better Auth the credential is an HttpOnly cookie that
+    // JavaScript cannot see, so that test reported "signed out" for everyone
+    // who signed in through it -- hiding the account details, disabling the
+    // tokens and data tabs, and hiding the sign-out button, which left no way
+    // to sign out at all.
+    //
+    // whoami() resolves whichever credential applies, so this is right for a
+    // session, a stored token, or neither. It also catches a token that has
+    // stopped working, which the old check would still have called signed in.
+    setIsSignedIn(false);
     setSignedInUsername(null);
-    if (signedIn) {
-      whoami()
-        .then((me) => setSignedInUsername(me.username))
-        .catch(() => setSignedInUsername("your account"));
-    }
+    whoami()
+      .then((me) => {
+        setIsSignedIn(true);
+        setSignedInUsername(me.username || "your account");
+      })
+      .catch(() => {
+        setIsSignedIn(false);
+        setSignedInUsername(null);
+      });
   }, [isOpen]);
 
   const loadTokens = async () => {

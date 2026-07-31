@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import { ConnectionSettings } from "@/components/ConnectionSettings";
 import { api, getAuthToken } from "@/lib/api.js";
+import { hasSession } from "@/lib/session.js";
 import { WelcomeAuth } from "@/components/WelcomeAuth";
 import SectionRenderer from "@/renderers/SectionRenderer";
 
@@ -187,6 +188,22 @@ export default function App() {
   const handleCancel = () => {
     setConfirmDialog({ ...confirmDialog, isOpen: false });
   };
+
+  // Whether any credential exists -- a stored token, or a Better Auth session.
+  // Seeded from the token synchronously so the first render is right when one
+  // is present, then corrected once the session check resolves.
+  const [hasCredential, setHasCredential] = useState(() => !!getAuthToken());
+
+  useEffect(() => {
+    if (getAuthToken()) return;
+    let cancelled = false;
+    hasSession().then((present) => {
+      if (!cancelled) setHasCredential(present);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     loadAllData();
@@ -379,8 +396,13 @@ export default function App() {
     );
   }
 
-  // First run: no token configured yet. Welcome instead of an error.
-  if (error && !getAuthToken()) {
+  // First run: no credential at all. Welcome instead of an error.
+  //
+  // `hasCredential` rather than getAuthToken() alone: a Better Auth session is
+  // an HttpOnly cookie, so a signed-in account has no token here and would
+  // otherwise be shown the sign-in screen the moment any request failed --
+  // told to sign in while already signed in.
+  if (error && !hasCredential) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-sm space-y-6 text-center">
