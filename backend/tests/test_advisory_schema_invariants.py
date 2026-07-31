@@ -5,7 +5,6 @@ import embeddings
 import persona_store
 import search_index
 import server
-from tests.test_suggest_dedupe import _fixed_analysis
 
 
 def test_advisory_entities_rewrite_eligibility_is_derivable():
@@ -14,9 +13,12 @@ def test_advisory_entities_rewrite_eligibility_is_derivable():
 
       - rewrite-eligible: its ENTITY_SCHEMA identifier is a
         search_index.TITLE_FIELDS member AND "update" is one of its
-        supported actions -- suggest_persona_update's add->update rewrite
-        can safely derive an executable identifier value from a search hit's
-        title. For these, the identifier must also be the FIRST
+        supported actions -- an executable identifier value can be derived
+        from a search hit's title. (The add->update rewrite this originally
+        guarded lived in suggest_persona_update, retired 2026-07-31; the
+        ordering property still governs which field flatten_entity picks as
+        a document title, so the invariant outlived the caller.)
+        For these, the identifier must also be the FIRST
         TITLE_FIELDS member appearing (in flatten-priority order) among the
         entity's own required+optional fields -- otherwise flatten_entity
         would pick a *different* field as the title, and rewriting the
@@ -79,23 +81,27 @@ def _seed_work_experience(monkeypatch, provider,
                             embed_sync=True)
 
 
-def test_hint_only_suggest_stays_add_with_existing_entity(as_user, monkeypatch):
-    """F2(b): behavioral counterpart to the schema guard above. For a
-    hint-only entity (work_experience), suggest_persona_update's dedupe pass
-    must still find and attach the near-dupe (existing_entity), but must
-    NOT rewrite the suggestion's action to "update" -- there's no safe,
-    executable identifier value to rewrite it to."""
+def test_hint_only_entity_still_surfaces_the_near_dupe(as_user, monkeypatch):
+    """F2(b): behavioral counterpart to the schema guard above, carried over
+    to propose_update.
+
+    For a hint-only entity (work_experience), the dedupe pass must still find
+    and attach the near-dupe so the user can compare -- what it must NOT do is
+    silently rewrite the proposal to target an identifier it cannot derive.
+    propose_update never rewrites at all: it reports conflicts_with_existing
+    and leaves the agent's action alone, so the hazard the old rewrite carried
+    is now structurally absent rather than guarded against.
+    """
     _seed_work_experience(monkeypatch, None)
-    monkeypatch.setattr(server, "analyze_message_for_capture", _fixed_analysis([
-        {"action": "add", "entity": "work_experience",
-         "data": {"company": "Acme", "role": "Senior Engineer"},
-         "reason": "test", "confidence": 0.8},
-    ]))
-    out = json.loads(server.suggest_persona_update.fn(
-        "I'm now a Senior Engineer at Acme"))
-    assert out["dedupe_checked"] is True
-    matched = [s for s in out["suggestions"] if s.get("existing_entity")]
-    assert matched  # sanity: dedupe actually fired
-    for s in matched:
-        assert s["action"] == "add"
-        assert s["existing_entity"]["entity_id"].startswith("work_")
+    out = json.loads(server.propose_update.fn(
+        proposals=[{
+            "kind": "entity", "action": "add", "entity": "work_experience",
+            "data": {"company": "Acme", "role": "Senior Engineer"},
+            "rationale": "They described the role as current.",
+            "evidence": "I'm now a Senior Engineer at Acme",
+        }],
+        client="Claude Desktop",
+    ))
+    [result] = out["results"]
+    assert result["result"] == "conflicts_with_existing"
+    assert result["existing_entity"]["entity_id"].startswith("work_")

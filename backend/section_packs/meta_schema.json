@@ -76,12 +76,6 @@
         "$ref": "#/$defs/entity"
       }
     },
-    "capture_triggers": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
     "ui": {
       "$ref": "#/$defs/ui"
     },

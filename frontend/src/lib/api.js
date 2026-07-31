@@ -282,9 +282,47 @@ async function revokeToken(id) {
   return api(`/auth/tokens/${id}`, { method: "DELETE" });
 }
 
+// Pending proposals of one kind. Listing marks them seen server-side, which
+// is what protects a row from eviction -- so this is not a free read.
+async function listProposals(kind) {
+  const data = await api(`/proposals?kind=${encodeURIComponent(kind)}`);
+  return data.proposals || [];
+}
+
+// How many proposals are waiting. Unlike listProposals this does not mark
+// rows seen, which matters because the sidebar dot polls it from every tab.
+async function proposalCount() {
+  const data = await api("/proposals/count");
+  return data?.total ?? 0;
+}
+
+// `data` overrides the proposal's own payload, for edit-then-approve.
+async function approveProposal(id, data) {
+  return api(`/proposals/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify(data ? { data } : {}),
+  });
+}
+
+async function rejectProposal(id) {
+  return api(`/proposals/${id}/reject`, { method: "POST" });
+}
+
+async function promoteProposal(id, entity, data) {
+  return api(`/proposals/${id}/promote`, {
+    method: "POST",
+    body: JSON.stringify({ entity, data }),
+  });
+}
+
 export {
   CLOUD_API_URL,
   api,
+  listProposals,
+  proposalCount,
+  approveProposal,
+  rejectProposal,
+  promoteProposal,
   getConfig,
   saveConfig,
   clearConfig,

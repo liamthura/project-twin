@@ -66,14 +66,6 @@
       "identifier": "title"
     }
   },
-  "capture_triggers": [
-    "goal is",
-    "aiming to",
-    "planning to",
-    "hoping to",
-    "want to",
-    "working toward"
-  ],
   "ui": {
     "sections": [
       {

@@ -219,14 +219,13 @@ list the options twice.
 
 <Step>
 
-### Add capture hints
+### Nothing to declare for capture
 
-```json
-"capture_triggers": ["I use", "switched to", "my setup", "installed"]
-```
-
-Phrases that hint to `suggest_persona_update` that a message might belong to
-your section. They are hints, not rules — see [Capture](/use/capture).
+Earlier versions took a `capture_triggers` array of phrases that hinted a
+message might belong to your section. That fed a keyword matcher, retired in
+favour of [proposals](/use/capture): the agent reads the conversation and
+names the entity itself, so your section is reachable the moment its entities
+exist. There is nothing to add here.
 
 </Step>
 

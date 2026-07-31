@@ -11,6 +11,7 @@ import {
   Loader2,
   Users,
   SlidersHorizontal,
+  Inbox,
   Sun,
   Moon,
   Monitor,
@@ -33,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Toaster } from "@/components/ui/toaster";
+import ProposalsPanel from "@/components/ProposalsPanel";
 import { useToast } from "@/components/ui/use-toast";
 import {
   Dialog,
@@ -146,6 +148,13 @@ export default function App() {
 
   const [disabledSections, setDisabledSections] = useState([]);
   const [packs, setPacks] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  // The tab lives in the URL so a refresh keeps your place. Without it, any
+  // reload drops you back on Profile, which is worst exactly when you have
+  // just been sent somewhere by a "View in ..." link.
+  const [activeTab, setActiveTab] = useState(
+    () => window.location.hash.replace(/^#\/?/, "") || "profile",
+  );
   // Tab count changes when sections are toggled, so re-measure the strip then.
   const [tabStripRef, tabStripEdges] = useEdgeFade([disabledSections, packs]);
   // Data for enabled sections WITHOUT a bespoke editor, keyed by section key.
@@ -182,6 +191,71 @@ export default function App() {
   useEffect(() => {
     loadAllData();
     loadSettings();
+  }, []);
+
+  // Controlling the tab strip means nothing re-picks a valid tab for us. Turn
+  // off the section you are looking at and `activeTab` would name a tab that
+  // no longer exists, which renders as an empty page with no way back.
+  // Must sit above the loading/error early returns -- hooks cannot be
+  // conditional.
+  const enabledKeys = packs.filter((p) => p.enabled).map((p) => p.key).join(",");
+  useEffect(() => {
+    if (!enabledKeys) return;
+    const valid = new Set([...enabledKeys.split(","), "review", "sections"]);
+    if (!valid.has(activeTab)) setActiveTab("profile");
+  }, [enabledKeys, activeTab]);
+
+  useEffect(() => {
+    if (window.location.hash.replace(/^#\/?/, "") !== activeTab) {
+      // replaceState, not a hash assignment: switching tabs should not stack
+      // up history entries that the back button then has to walk through.
+      window.history.replaceState(null, "", `#/${activeTab}`);
+    }
+  }, [activeTab]);
+
+  // The dot on the Review tab. Counted rather than listed: listing marks rows
+  // seen, which is what protects them from eviction, and this polls from every
+  // tab -- so sitting on Profile would quietly strip that protection off
+  // observations you have never opened.
+  const refreshPendingCount = useCallback(async () => {
+    try {
+      const data = await api("/proposals/count");
+      setPendingCount(data?.total ?? 0);
+    } catch (_) {
+      // Non-fatal: a missing dot is better than a broken page.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    refreshPendingCount();
+    const tick = () => {
+      // The panel refreshes itself while it is open, and a hidden tab has
+      // nobody to tell.
+      if (document.visibilityState === "visible" && activeTab !== "review") {
+        refreshPendingCount();
+      }
+    };
+    const timer = setInterval(tick, 30000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [isConnected, activeTab, refreshPendingCount]);
+
+  // Approving or promoting writes server-side, so the section it landed in is
+  // stale in this page until we go and get it. We know which one changed, so
+  // refetch exactly that -- no polling, and no window where the "View in ..."
+  // link shows the old data.
+  const refreshSection = useCallback(async (key) => {
+    try {
+      const response = await api(`/files/${key}`);
+      setPackData((prev) => ({ ...prev, [key]: response.data ?? {} }));
+    } catch (_) {
+      // Non-fatal: the toast already said the change went through, and the
+      // next load will pick it up.
+    }
   }, []);
 
   const loadAllData = async () => {
@@ -405,6 +479,9 @@ export default function App() {
   }
 
   const dynamicPacks = packs.filter((p) => p.enabled);
+  // The Review tab's toasts link to whatever section just changed, so the tab
+  // strip has to be steerable from outside itself.
+  const sectionTitles = Object.fromEntries(packs.map((p) => [p.key, p.title]));
 
   return (
     <div className="min-h-dvh bg-background">
@@ -503,7 +580,8 @@ export default function App() {
 
       <div className="mx-auto max-w-6xl px-4 py-8">
         <Tabs
-          defaultValue="profile"
+          value={activeTab}
+          onValueChange={setActiveTab}
           orientation="vertical"
           className="flex flex-col gap-6 md:flex-row"
         >
@@ -523,6 +601,22 @@ export default function App() {
                 </TabsTrigger>
               );
             })}
+            <TabsTrigger value="review" className={TAB_TRIGGER_CLASS}>
+              <Inbox className="h-4 w-4" />
+              <span>Review</span>
+              {pendingCount > 0 && (
+                <>
+                  <span
+                    data-pending-dot
+                    aria-hidden="true"
+                    className="ml-auto h-2 w-2 shrink-0 rounded-full bg-primary"
+                  />
+                  {/* The dot is decoration; this is the part a screen reader
+                      can actually convey. */}
+                  <span className="sr-only">{pendingCount} waiting</span>
+                </>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="sections" className={TAB_TRIGGER_CLASS}>
               <SlidersHorizontal className="h-4 w-4" />
               <span>Sections</span>
@@ -545,6 +639,15 @@ export default function App() {
               />
             </TabsContent>
           ))}
+          <TabsContent value="review">
+            <ProposalsPanel
+              onViewSection={setActiveTab}
+              onSectionChanged={refreshSection}
+              onResolved={refreshPendingCount}
+              sectionTitles={sectionTitles}
+              packs={packs}
+            />
+          </TabsContent>
           <TabsContent value="sections">
             <Card>
               <CardHeader className="border-b">

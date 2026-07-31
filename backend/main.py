@@ -37,6 +37,7 @@ import auth_proxy
 import db
 import jwt_auth
 import persona_store
+import proposals_store
 import sections
 import settings_store
 from persona_store import VALID_FILES
@@ -47,6 +48,7 @@ read_json_file = persona_store.load
 write_json_file = persona_store.save
 
 # Import MCP server
+import server
 from server import mcp
 
 # Create MCP HTTP app. Default path is "/mcp" - FastMCP registers this as an
@@ -592,6 +594,115 @@ async def import_data(file: UploadFile = File(...), mode: str = "replace"):
             return {"status": "success", "mode": mode, "imported_files": imported_files}
     except zipfile.BadZipFile:
         raise HTTPException(status_code=400, detail="Invalid zip file")
+
+
+# ============================================================================
+# The review queue: what agents proposed and the user has not resolved yet
+# ============================================================================
+
+
+class ResolveRequest(BaseModel):
+    """Optional overrides supplied when resolving a proposal.
+
+    `data` lets the user correct an entity proposal before approving it --
+    agents get details slightly wrong often enough that edit-then-approve is
+    the difference between a usable queue and an abandoned one.
+    `entity` names the destination when promoting a note.
+    """
+    data: Optional[Dict[str, Any]] = None
+    entity: Optional[str] = None
+
+
+@app.get("/api/proposals")
+async def list_proposals(kind: str = "entity"):
+    """Pending proposals of one kind. Listing marks them seen, which is what
+    protects a row from eviction."""
+    if kind not in ("entity", "note"):
+        raise HTTPException(status_code=400, detail="kind must be 'entity' or 'note'")
+    return {"proposals": proposals_store.list_pending(kind)}
+
+
+@app.get("/api/proposals/count")
+async def count_proposals():
+    """How many proposals are waiting. Drives the sidebar dot, so it is polled
+    from every tab -- and unlike listing, it does not mark anything seen."""
+    return proposals_store.pending_counts()
+
+
+def _load_pending(proposal_id: str) -> dict:
+    try:
+        proposal = proposals_store.get(proposal_id)
+    except Exception:  # malformed uuid, etc -- indistinguishable from absent
+        proposal = None
+    if proposal is None or proposal["status"] != "pending":
+        raise HTTPException(status_code=404, detail="proposal not found")
+    return proposal
+
+
+@app.post("/api/proposals/{proposal_id}/approve")
+async def approve_proposal(proposal_id: str, body: Optional[ResolveRequest] = None):
+    """Approve an entity proposal, writing it through the same path
+    persona_modify uses so every existing validation and advisory applies."""
+    proposal = _load_pending(proposal_id)
+    if proposal["kind"] != "entity":
+        raise HTTPException(status_code=400, detail="notes are promoted, not approved")
+
+    data = (body.data if body and body.data else proposal["data"]) or {}
+    result = server.execute_modify(proposal["action"], proposal["entity"], data)
+    if result.startswith("❌"):
+        raise HTTPException(status_code=400, detail=result)
+
+    proposals_store.resolve(proposal_id, "approved")
+    return {
+        "status": "approved",
+        "result": result,
+        # Which section moved, so the UI can link the user straight to it.
+        # Derived here rather than in the frontend: the entity -> section map
+        # is manifest-owned and should have exactly one reader.
+        "section": server._section_for_entity(proposal["entity"]),
+    }
+
+
+@app.post("/api/proposals/{proposal_id}/reject")
+async def reject_proposal(proposal_id: str):
+    """Reject it. The row becomes a tombstone so no agent raises it again."""
+    _load_pending(proposal_id)
+    proposals_store.resolve(proposal_id, "rejected")
+    # Nothing changed, so there is nothing for the UI to link to.
+    return {"status": "rejected", "section": None}
+
+
+@app.post("/api/proposals/{proposal_id}/promote")
+async def promote_proposal(proposal_id: str, body: ResolveRequest):
+    """Turn a note into typed data.
+
+    Provenance is recorded on the ledger row regardless -- `promoted_to` says
+    what the note became, and the row keeps the evidence and the client that
+    proposed it. The agent-observation tag is applied on top wherever the
+    target entity declares a `tags` field, which today is four of them.
+    """
+    proposal = _load_pending(proposal_id)
+    if proposal["kind"] != "note":
+        raise HTTPException(status_code=400, detail="only notes are promoted")
+    if not body.entity or not body.data:
+        raise HTTPException(status_code=400, detail="entity and data are required")
+
+    entity = body.entity.lower()
+    data = dict(body.data)
+    section = server._section_for_entity(entity)
+    spec = server.ENTITY_SCHEMA.get(section, {}).get(entity, {}) if section else {}
+    if "tags" in set(spec.get("required", [])) | set(spec.get("optional", [])):
+        tags = list(data.get("tags") or [])
+        if "agent-observation" not in tags:
+            tags.append("agent-observation")
+        data["tags"] = tags
+
+    result = server.execute_modify("add", entity, data)
+    if result.startswith("❌"):
+        raise HTTPException(status_code=400, detail=result)
+
+    proposals_store.resolve(proposal_id, "promoted", promoted_to=entity)
+    return {"status": "promoted", "result": result, "section": section}
 
 
 # ============================================================================

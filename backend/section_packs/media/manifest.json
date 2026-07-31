@@ -65,12 +65,6 @@
       "list": "items"
     }
   },
-  "capture_triggers": [
-    "reading",
-    "watched",
-    "listening to",
-    "finished playing"
-  ],
   "ui": {
     "sections": [
       {

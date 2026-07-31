@@ -60,7 +60,7 @@ const ALL_DATA = {
   learning_log: learningLogData,
 };
 
-function mockApi({ packs, disabledSections = [] }) {
+function mockApi({ packs, disabledSections = [], pendingCount = 0 }) {
   api.mockImplementation((endpoint, opts) => {
     if (endpoint === "/all" && opts?.method === "PUT") {
       return Promise.resolve({});
@@ -71,9 +71,52 @@ function mockApi({ packs, disabledSections = [] }) {
     if (endpoint === "/settings") {
       return Promise.resolve({ disabled_sections: disabledSections, packs });
     }
+    if (endpoint === "/proposals/count") {
+      return Promise.resolve({ entity: pendingCount, note: 0, total: pendingCount });
+    }
     return Promise.resolve({});
   });
 }
+
+describe("App: the Review tab says when something is waiting", () => {
+  function reviewTab() {
+    return screen.getAllByRole("tab").find((t) => t.textContent.includes("Review"));
+  }
+
+  it("marks the Review tab when proposals are pending", async () => {
+    mockApi({ packs: packsFixture, pendingCount: 3 });
+    render(<App />);
+    await waitFor(() =>
+      expect(reviewTab().querySelector("[data-pending-dot]")).toBeTruthy(),
+    );
+  });
+
+  it("leaves it unmarked when the queue is empty", async () => {
+    mockApi({ packs: packsFixture, pendingCount: 0 });
+    render(<App />);
+    await waitFor(() => expect(reviewTab()).toBeTruthy());
+    expect(reviewTab().querySelector("[data-pending-dot]")).toBeNull();
+  });
+
+  it("says out loud what the dot means, for anyone not looking at it", async () => {
+    mockApi({ packs: packsFixture, pendingCount: 2 });
+    render(<App />);
+    // A bare coloured circle is invisible to a screen reader.
+    await waitFor(() =>
+      expect(reviewTab().textContent).toMatch(/2 waiting/i),
+    );
+  });
+
+  it("counts without marking anything seen", async () => {
+    // The dot polls from every tab. Listing marks rows seen, which is what
+    // protects them from eviction -- so the dot must never use that route.
+    mockApi({ packs: packsFixture, pendingCount: 1 });
+    render(<App />);
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/proposals/count"));
+    const listed = api.mock.calls.filter(([e]) => String(e).startsWith("/proposals?"));
+    expect(listed).toHaveLength(0);
+  });
+});
 
 describe("App: circle and learning_log render through the renderer kit", () => {
   it("renders Circle and Learning Log after Preferences, in manifest position order, keeping their original icons", async () => {
