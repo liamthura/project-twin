@@ -30,7 +30,18 @@ export const SCOPES = [READ, PROPOSE, WRITE];
 export const MCP_RESOURCE = (publicOrigin) =>
   `${publicOrigin.replace(/\/+$/, "")}/mcp`;
 
-/** The plugin's options, exported separately so they can be asserted on. */
+/**
+ * The plugin's options, exported separately so they can be asserted on.
+ *
+ * @param {string} baseURL Better Auth's own EFFECTIVE base -- what
+ *   `ctx.context.baseURL` resolves to, i.e. the public origin plus its
+ *   `basePath` (".../auth"). NOT the bare origin: the auth service's own
+ *   token endpoint lives at that effective base, and if this is passed the
+ *   origin instead, `validAudiences` silently omits it. See auth.js, which
+ *   derives this from the same `AUTH_BASE_PATH` its `basePath` option uses.
+ * @param {string} publicOrigin The bare public origin, no path -- used only
+ *   to build the MCP resource URI.
+ */
 export function oauthOptions({ baseURL, publicOrigin }) {
   return {
     // Real paths, not hash routes: Better Auth appends query parameters to
@@ -46,6 +57,18 @@ export function oauthOptions({ baseURL, publicOrigin }) {
     // Auth throws invalid_request and EVERY connection attempt fails at the
     // token endpoint, with an error that names neither this option nor the fix.
     validAudiences: [baseURL, MCP_RESOURCE(publicOrigin)],
+
+    // Explicit, because the plugin's own default is
+    // ["authorization_code", "client_credentials", "refresh_token"] -- and an
+    // object spread means a key this file does not set falls through to that
+    // default rather than being absent. It is enforced server-wide at the
+    // token endpoint regardless of what any individual registered client
+    // asks for, so leaving this unset would let client_credentials through.
+    //
+    // client_credentials is excluded on purpose: it mints a token with no
+    // `sub`, and every persona query in this system keys off a user id --
+    // there is nothing to scope a subject-less token to.
+    grantTypes: ["authorization_code", "refresh_token"],
 
     // Claude and ChatGPT have no pre-issued client_id for this server; they
     // register at connect time. The MCP specification now marks dynamic

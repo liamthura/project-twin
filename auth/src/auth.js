@@ -22,6 +22,7 @@ import { username } from "better-auth/plugins";
 import bcrypt from "bcryptjs";
 import { Pool } from "pg";
 
+import { AUTH_BASE_PATH } from "./base-path.js";
 import { poolConfig } from "./db-config.js";
 import { createMailer } from "./email.js";
 import * as invite from "./invite.js";
@@ -110,7 +111,13 @@ export const auth = betterAuth({
 
   // Mounted at /auth, matching what FastAPI forwards. The proxy passes the
   // path through unchanged, so both sides must agree on this prefix.
-  basePath: "/auth",
+  //
+  // Pulled from base-path.js rather than written here as a literal, because
+  // the OAuth plugin below needs this exact value too: Better Auth's own
+  // effective base (ctx.context.baseURL) is baseURL + basePath, not the bare
+  // origin, and oauthOptions' validAudiences has to contain that effective
+  // base or every token request 400s.
+  basePath: AUTH_BASE_PATH,
 
   // Minimum 32 characters, per the installation docs. BETTER_AUTH_SECRETS
   // (plural) is also read by Better Auth for rotation without invalidating
@@ -309,7 +316,15 @@ export const auth = betterAuth({
     // plugin registers /oauth2/token and never a bare /token, so there is no
     // collision -- and disabling /token would break the SPA, which exchanges
     // its session cookie for a JWT there on every page load.
-    oauthPlugin({ baseURL, publicOrigin: new URL(baseURL).origin }),
+    oauthPlugin({
+      // baseURL here is Better Auth's own EFFECTIVE base, not the bare public
+      // origin -- see oauth.js's JSDoc on oauthOptions. Passing the origin
+      // alone (as an earlier version of this wiring did) left validAudiences
+      // silently missing the auth service's own base, because Better Auth's
+      // real base URL is origin + basePath, computed the same way here.
+      baseURL: `${baseURL}${AUTH_BASE_PATH}`,
+      publicOrigin: new URL(baseURL).origin,
+    }),
 
     // Closed testing. Inert unless INVITE_ONLY is on, which no self-hosted
     // instance and no local dev environment turns on.
