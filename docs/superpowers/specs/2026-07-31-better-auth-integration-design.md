@@ -154,6 +154,19 @@ needs a "you have not set one yet" branch — that is the accepted cost of
 keeping current accounts working, and it should be a single shared guard
 rather than scattered checks.
 
+> **Corrected during Phase 1.** Better Auth's own `user.email` is `NOT NULL`,
+> so "nullable email" only holds on the MyGist side. Accounts with no address
+> are seeded `<username>@mygist.invalid` — `.invalid` is reserved by RFC 2606
+> and can never resolve, so a placeholder cannot be mistaken for a deliverable
+> address or accidentally sent to. Real addresses replace them in Phase 3.
+
+> **Also found in Phase 1.** The username plugin validates with
+> `/^[a-zA-Z0-9_.]+$/` by default — no hyphens. MyGist's registration only ever
+> trimmed whitespace, so accounts containing characters outside that set
+> already exist and would have been locked out permanently. The validator is
+> widened to match what MyGist actually enforces; tightening it later means
+> migrating existing usernames.
+
 `users.password_hash` stays. Better Auth reads it through the bcrypt verifier.
 `users.token_hash` — the legacy single-token column — is untouched by this
 work and should be audited separately.
