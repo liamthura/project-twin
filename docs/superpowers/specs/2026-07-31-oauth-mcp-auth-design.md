@@ -22,6 +22,8 @@ connection experience is what other people actually touch.
 | Resource server | FastAPI's existing middleware, extended — not FastMCP's `RemoteAuthProvider` |
 | Opaque tokens | **Kept permanently**, given scopes and an `mg_` prefix. Not deprecated |
 | Scopes | `persona:write` ⊃ `persona:propose` ⊃ `persona:read`, hierarchical |
+| Minimum grant | `persona:read`, always. A connection that cannot read has nothing to authorise |
+| SPA routing | Unchanged — stays on the hash router. Two real paths added, because OAuth requires them |
 | Client registration | Open dynamic registration, rate-limited. A compatibility bridge, not the destination |
 | Access tokens | JWT, audience-bound to the MCP resource, 10-minute TTL, 30-day rotating refresh |
 | Management surface | Connected-apps list with revoke, shipping with the grant |
@@ -330,6 +332,10 @@ config files on other people's machines keep working unchanged, which is the sam
 constraint that shaped the original Better Auth migration.
 
 New tokens are minted with a scope choice in the UI and carry the `mg_` prefix.
+`persona:read` is the floor here too — a token with no scopes is not a narrower
+credential, it is a broken one — so the UI offers the same two additions the
+consent screen does.
+
 Expiry is untouched: `create_token`'s never-by-default remains right for a
 credential configured once.
 
@@ -398,25 +404,61 @@ persona, and no amount of `sub` checking catches that.
 
 ## Consent and sign-in screens
 
-The SPA has no client-side router, so `/sign-in` and `/consent` become two more
-concrete FastAPI routes serving `index.html` beside `/`, and `App.jsx` branches
-on `pathname`. Registered before the MCP mount, like everything else here.
+### Two real paths, and no more
+
+The SPA already has a router — a small hash-based one in `lib/routes.js`, with
+the auth screens already on it at `#/signin`, `#/signup`, `#/forgot`. That module
+states why it is hash-based, and the reasoning is the same one that put the
+`/auth` proxy in FastAPI rather than in platform config:
+
+> a real path like `/profile` would need every unknown URL to serve index.html,
+> which is a rule that has to live in FastAPI, in the Dockerfile's static mount,
+> and in anything anyone puts in front of it. Hash routing keeps that promise of
+> "one upstream, one port" intact.
+
+**The app is not converted to path routing.** No router library, and above all no
+catch-all: the MCP app is mounted at `/` and matches everything, so a fallback
+would need an exclusion list covering `/mcp`, `/api`, `/auth`, `/docs` and
+`/.well-known`, kept in sync by hand. That is the exact shape of the mistake that
+once made a bare `/docs` 404.
+
+OAuth forces exactly two exceptions. `/sign-in` and `/consent` must be **real
+paths**, because Better Auth redirects to them with query parameters attached,
+and parameters appended after a `#` land in the fragment rather than in
+`location.search`. Two named routes registered beside `/favicon.svg` create no
+fallback rule, so the one-upstream-one-port promise is untouched. They are OAuth
+surface, in the same category as `/.well-known/*` — not app navigation, which
+stays on the hash.
+
+Both render the **existing** `WelcomeAuth` component. One sign-in
+implementation, not two.
+
+### The consent screen
 
 **This screen carries the scope decision**, since protocol-level step-up cannot.
-It names the client, names the account, and lists each requested scope as a
-separate line in plain terms:
+It names the client, names the account, and lists each scope as a separate line
+in plain terms:
 
 | Scope | Shown as | Default |
 |---|---|---|
-| `persona:read` | Read your persona | selected |
-| `persona:propose` | Suggest changes for your approval | selected |
-| `persona:write` | Change your persona directly | **selected** |
+| `persona:read` | Read your persona | **always granted, not optional** |
+| `persona:propose` | Suggest changes for your approval | pre-selected |
+| `persona:write` | Change your persona directly | pre-selected |
 
-Write is pre-selected because it is what makes a connection useful, and
-deselectable because that is the whole point of showing it. Narrowing here is the
-supported path to a read-only or propose-only connection — there is no second
-flow to discover, and widening later means reconnecting from the connected-apps
-list, which the UI should say plainly.
+`persona:read` is the floor, shown for transparency rather than as a choice. A
+connection that cannot read has nothing to authorise — granting it would produce
+a client that can write to a persona it cannot see, which is not a narrower
+permission but an incoherent one.
+
+The other two are pre-selected because they are what make a connection useful,
+and deselectable because that is the whole point of showing them. Because the
+scopes are hierarchical, selecting *change directly* implies *suggest* — the UI
+shows the implied line as included rather than letting someone construct a grant
+that means nothing.
+
+Narrowing here is the supported path to a read-only or propose-only connection.
+There is no second flow to discover, and widening later means reconnecting from
+the connected-apps list, which the UI should say plainly.
 
 The screen carries the OAuth query parameters across sign-in so an
 unauthenticated authorize request survives the round trip. Sign-up from here goes
