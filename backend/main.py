@@ -296,8 +296,15 @@ class CreateTokenRequest(BaseModel):
     label: str = "token"
 
 
-@app.post("/api/auth/register")
+@app.post("/api/auth/register", deprecated=True)
 async def register(body: RegisterRequest):
+    """DEPRECATED. Same-origin sign-up goes through Better Auth at /auth.
+
+    Kept because it is still required, not merely tolerated: a UI pointed at
+    someone else's server cannot use a cross-site session cookie, so detached
+    mode authenticates here. Removing it would break that, and would also lock
+    out any client that scripted registration against this endpoint.
+    """
     username = body.username.strip()
     if not username:
         raise HTTPException(status_code=400, detail="username is required")
@@ -310,8 +317,15 @@ async def register(body: RegisterRequest):
     return {"user_id": user_id, "username": username, "token": token}
 
 
-@app.post("/api/auth/login")
+@app.post("/api/auth/login", deprecated=True)
 async def login(body: LoginRequest):
+    """DEPRECATED. Same-origin sign-in goes through Better Auth at /auth.
+
+    Still the only route that works for detached mode -- see register above.
+    The token it mints stays valid, and resolveCredential in the SPA prefers a
+    stored token over a session, so an account signed in this way keeps working
+    until its token expires.
+    """
     # Rate limit before checking credentials. The counter is keyed on the
     # submitted username whether or not it exists, so a 429 says nothing about
     # whether the account is real -- see db.login_retry_after.
