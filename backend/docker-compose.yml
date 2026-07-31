@@ -12,7 +12,7 @@
 #
 # There is now one way to do each job:
 #
-#   this file                → the database
+#   this file                → the database, and the auth service
 #   scripts/local-preview.sh → the full app, built from the current branch
 #
 # For day-to-day UI work you want neither: `cd frontend && npm run dev` proxies
@@ -42,6 +42,37 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  # Better Auth. Human sign-in only -- MCP clients never touch it, which is why
+  # the API keeps serving them even when this is down.
+  #
+  # Deliberately NOT published to the host: FastAPI proxies /auth/* to it over
+  # this network (backend/auth_proxy.py), so the deployment still presents one
+  # upstream and one port to the outside. Exposing it here would create a second
+  # way in that nothing is written to expect.
+  auth:
+    build:
+      context: ../auth
+    container_name: mygist-auth
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://mygist:mygist@db:5432/mygist_local
+      # The PUBLIC origin the browser uses, not this container's address:
+      # Better Auth builds its cookies and redirects from it.
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:1120}
+      # Local development only. Generate a real one for anything else:
+      #   openssl rand -base64 32
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-dev-only-secret-at-least-32-characters-xx}
+      - PORT=3001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
 
 volumes:

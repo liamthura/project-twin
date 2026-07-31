@@ -40,6 +40,11 @@ def clean_database(monkeypatch):
         cur.execute("drop table if exists persona_data;")
         cur.execute("drop table if exists login_attempts;")  # keyed by username, no FK
         cur.execute("drop table if exists users;")
+        # Better Auth's tables live in their own schema (migration 0003) and so
+        # survived the drops above -- rows leaked between tests and collided on
+        # the unique username. Dropping the schema puts it back under the same
+        # rule as everything else: migrations rebuild it for every test.
+        cur.execute("drop schema if exists better_auth cascade;")
         # Alembic's bookkeeping must go with the tables it describes. Left
         # behind, it would report the (now empty) database as already at head
         # and run_migrations() would rebuild nothing.

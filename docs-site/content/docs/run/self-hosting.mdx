@@ -7,7 +7,8 @@ description: Requirements, running the container, and every environment variable
 
 - **Postgres.** Any reachable instance. [pgvector](/run/database) is optional;
   without it, search runs full-text only.
-- **Somewhere to run one container.** Around 200 MB of image, one process.
+- **Somewhere to run two containers.** The API (~200 MB) and the auth service
+  (~120 MB). Only the API is published.
 
 That is the list. No Node runtime, no separate frontend service, no message
 broker, no Redis.
@@ -133,8 +134,10 @@ you blame the application.
 
 ## Reverse proxies
 
-Nothing special is required — one upstream, one port. Two things must survive
-the hop:
+Nothing special is required — **still one upstream, one port**, even though
+there are now two containers. `/auth/*` is proxied to the auth service by the
+API rather than by your proxy, precisely so this stays true and you do not have
+to route by path. Two things must survive the hop:
 
 **Do not strip or rewrite `/mcp`.** It is mounted at the root of the app so that
 it resolves exactly, with no redirect. A proxy that appends a trailing slash or
