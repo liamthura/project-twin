@@ -38,9 +38,6 @@
       "identifier": "name"
     }
   },
-  "capture_triggers": [
-    "example phrase"
-  ],
   "ui": {
     "sections": [
       {
