@@ -21,6 +21,7 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
+import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -139,40 +140,37 @@ export default function Consent({ client: clientProp, username: usernameProp } =
   };
 
   if (loadError) {
-    return (
-      <div className="min-h-dvh flex items-center justify-center bg-background p-4">
-        <div className="w-full max-w-sm space-y-2 text-center">
-          <h1 className="text-lg font-semibold">Could not load this request</h1>
-          <p className="text-sm text-muted-foreground">{loadError}</p>
-        </div>
-      </div>
-    );
+    return <AuthShell title="Could not load this request" description={loadError} />;
   }
 
   if (!client || !username) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
-      </div>
+      <AuthShell title="Connecting…" description="Loading the connection request.">
+        <div role="status" aria-label="Loading">
+          <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+        </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-1 text-center">
-          <h1 className="text-xl font-semibold">
-            <strong>{client.client_name}</strong> wants to connect
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Signing in as <strong className="text-foreground">{username}</strong>. Not you?{" "}
-            <a href="/sign-in" className="underline hover:text-foreground">
-              Switch account
-            </a>
-            .
-          </p>
-        </div>
-
+    <AuthShell
+      title={
+        <>
+          <strong>{client.client_name}</strong> wants to connect
+        </>
+      }
+      description={
+        <>
+          Signing in as <strong className="text-foreground">{username}</strong>. Not you?{" "}
+          <a href="/sign-in" className="underline hover:text-foreground">
+            Switch account
+          </a>
+          .
+        </>
+      }
+    >
+      <div className="space-y-6 text-left">
         <div className="space-y-4 rounded-lg border p-4">
           <ScopeRow
             id="scope-read"
@@ -223,7 +221,7 @@ export default function Consent({ client: clientProp, username: usernameProp } =
           </Button>
         </div>
       </div>
-    </div>
+    </AuthShell>
   );
 }
 

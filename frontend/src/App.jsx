@@ -133,9 +133,11 @@ export default function App() {
   const oauthScreen = window.location.pathname;
   if (oauthScreen === "/consent") return <Consent />;
   if (oauthScreen === "/sign-in") {
-    // Captured now, before WelcomeAuth's own effects get a chance to touch
-    // the address bar (it rewrites the hash on every mode change) -- this is
-    // the OAuth query that has to survive to resume the flow below.
+    // Captured now rather than read again in onSuccess below, so this does
+    // not depend on WelcomeAuth's own address-bar handling: goToRoute
+    // preserves window.location.search on every hash change, and the only
+    // param it ever strips is `invite`, which never appears here -- but this
+    // stays correct regardless of what WelcomeAuth does internally.
     const oauthQuery = window.location.search;
     return (
       <AuthShell
