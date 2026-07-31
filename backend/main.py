@@ -21,6 +21,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
+from urllib.parse import urljoin
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -38,6 +39,7 @@ import db
 import jwt_auth
 import persona_store
 import proposals_store
+import scopes
 import sections
 import settings_store
 from persona_store import VALID_FILES
@@ -50,6 +52,22 @@ write_json_file = persona_store.save
 # Import MCP server
 import server
 from server import mcp
+
+# Scope enforcement for MCP tools. Added before http_app() so it is part of the
+# app that gets mounted.
+import mcp_scopes  # noqa: E402
+
+# Guarded because `mcp` is a module-global in server.py and this module can be
+# reloaded without it -- tests/test_oauth_metadata.py does exactly that to
+# rebuild `app` under a different environment. `add_middleware` is a plain
+# list append, so an unguarded call stacks a second, third, ... copy of the
+# same middleware onto the one long-lived server: every tool listing then gets
+# filtered N times and every refused call raises N times over. Harmless by
+# luck, since both halves happen to be idempotent -- but it is accumulating
+# state in a process that is supposed to be reset, and the next middleware
+# added here may not be so forgiving.
+if not any(isinstance(m, mcp_scopes.ScopeMiddleware) for m in mcp.middleware):
+    mcp.add_middleware(mcp_scopes.ScopeMiddleware())
 
 # Create MCP HTTP app. Default path is "/mcp" - FastMCP registers this as an
 # exact route internally, so mounting the whole app at "/" below lets "/mcp"
@@ -75,6 +93,89 @@ app = FastAPI(
 # on the server's capabilities and EMBEDDING_DIM rather than on a version.
 db.ensure_vector_schema()
 
+# Endpoints that manage the account rather than the persona in it.
+_ACCOUNT_PATHS = frozenset({"/api/auth/set-password", "/api/auth/tokens"})
+
+
+def _resource_metadata_url() -> str:
+    """The absolute URL of the protected-resource metadata document.
+
+    RFC 9728 derives it by inserting the well-known path at the resource URI's
+    origin; `urljoin` with an absolute path does exactly that, discarding
+    MCP_RESOURCE's own path rather than string-concatenating a second copy of
+    the origin. `oauth_metadata.protected_resource_metadata()`'s `resource` key
+    is already absolute, so a relative value here would be inconsistent within
+    the same feature -- and MCP clients commonly do `new URL(value)` on it,
+    which throws on a relative reference.
+    """
+    return urljoin(jwt_auth.MCP_RESOURCE, "/.well-known/oauth-protected-resource/mcp")
+
+
+def _challenge(error: str = "", scope: str = "") -> str:
+    """An RFC 6750 Bearer challenge naming where to find the metadata.
+
+    Only sent on /mcp, and only once OAuth is actually configured -- see the
+    call sites' `jwt_auth.mcp_resource_configured()` guard. The SPA has always
+    received a plain JSON 401 from /api and its fetch path is written against
+    that; adding a challenge there would be a change nobody asked for.
+    """
+    parts = []
+    if error:
+        parts.append(f'error="{error}"')
+    if scope:
+        parts.append(f'scope="{scope}"')
+    parts.append(f'resource_metadata="{_resource_metadata_url()}"')
+    return "Bearer " + ", ".join(parts)
+
+
+def _unauthorized(is_mcp: bool) -> JSONResponse:
+    # A deployment without OAuth configured must behave exactly as it did
+    # before OAuth existed: oauth_metadata.register() never mounts the four
+    # discovery routes when jwt_auth.MCP_RESOURCE is unset, so a client sent a
+    # resource_metadata URL here would follow it to a 404. Gating on
+    # mcp_resource_configured() keeps the plain 401 that predates this feature.
+    send_challenge = is_mcp and jwt_auth.mcp_resource_configured()
+    headers = (
+        {"WWW-Authenticate": _challenge(scope=" ".join(scopes.ALL_SCOPES))}
+        if send_challenge
+        else None
+    )
+    return JSONResponse({"error": "Unauthorized"}, status_code=401, headers=headers)
+
+
+def _insufficient_scope(is_mcp: bool, required: str) -> JSONResponse:
+    send_challenge = is_mcp and jwt_auth.mcp_resource_configured()
+    headers = (
+        {"WWW-Authenticate": _challenge(error="insufficient_scope", scope=required)}
+        if send_challenge
+        else None
+    )
+    return JSONResponse({"error": "Forbidden"}, status_code=403, headers=headers)
+
+
+def _oauth_scopes(claims: dict) -> frozenset:
+    """The scopes an OAuth access token's `scope` claim grants.
+
+    Better Auth emits a space-delimited string, per RFC 8693 -- but this claim
+    rides in on a token an outside authorization server signed, so a value
+    that is not a string (an array, say) must not raise `AttributeError` out
+    of the middleware and surface as a 500. Anything other than a string or a
+    list of strings is treated as no scopes rather than guessed at.
+    """
+    claim = claims.get("scope", "")
+    if isinstance(claim, str):
+        parts = claim.split()
+    elif isinstance(claim, list):
+        # Element by element, not the list wholesale: `["x"]` inside the list
+        # is unhashable and would raise TypeError out of scopes.expand's set
+        # update -- a 500 from the auth middleware, on a value an outside
+        # authorization server chose.
+        parts = [item for item in claim if isinstance(item, str)]
+    else:
+        parts = []
+    return scopes.expand(parts)
+
+
 # Bearer auth middleware for /mcp and /api routes
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
@@ -97,37 +198,93 @@ async def auth_middleware(request: Request, call_next):
         # Read before anyone has a credential, because it decides which sign-in
         # screen to show. Carries no user data.
         "/api/instance",
+        # OAuth discovery. Read before the client has any credential at all --
+        # that is the entire point of them.
+        "/.well-known/oauth-protected-resource",
+        "/.well-known/oauth-protected-resource/mcp",
+        "/.well-known/oauth-authorization-server",
+        "/.well-known/oauth-authorization-server/auth",
     ):
         return await call_next(request)
 
-    # Protected routes: /mcp/* and /api/* -- resolve the bearer token to a user
-    # and scope the request to them via the current_user_id contextvar.
+    # Protected routes: /mcp/* and /api/* -- resolve the bearer credential to a
+    # user, scope the request to them, and record what the credential may do.
     if path.startswith("/mcp") or path.startswith("/api"):
+        is_mcp = path.startswith("/mcp")
         auth = request.headers.get("Authorization", "")
         if not auth.startswith("Bearer "):
-            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            return _unauthorized(is_mcp)
 
-        # Two kinds of bearer credential, told apart by shape rather than by a
-        # prefix: a JWS is three dot-separated segments, and the opaque tokens
-        # come from secrets.token_urlsafe, whose alphabet has no dot. Neither
-        # can be mistaken for the other, so neither costs a lookup for the
-        # other's failures.
-        #
-        # Humans (browser, via Better Auth) present a JWT; machines (MCP
-        # clients, scripts) present an opaque token. The opaque path below is
-        # unchanged, which is the point -- tokens already configured in clients
-        # we cannot reach keep working exactly as before.
+        # Three kinds of bearer credential, told apart by shape and then by
+        # audience. The opaque tokens come from secrets.token_urlsafe, whose
+        # alphabet has no dot, so a JWS is unmistakable; among JWSs, the
+        # audience says which surface the token was issued for. A session JWT
+        # names the auth service and an OAuth access token names /mcp, so
+        # neither can ever be presented where the other belongs.
         credential = auth[7:]
+        granted: frozenset = frozenset()
+        kind = "token"
+
         if jwt_auth.looks_like_jwt(credential):
-            claims = jwt_auth.verify(credential)
+            claims = jwt_auth.verify_access_token(credential)
+            if claims:
+                kind = "oauth"
+                granted = _oauth_scopes(claims)
+            else:
+                claims = jwt_auth.verify(credential)
+                kind = "session"
+                # A browser session is the account holder in person. Scoping it
+                # would be scoping the owner against themselves.
+                granted = scopes.expand(scopes.ALL_SCOPES)
             user = db.resolve_user_by_id(claims["sub"]) if claims else None
         else:
             user = db.resolve_token(credential)
+            granted = scopes.expand(user["scopes"]) if user else frozenset()
 
         if not user:
-            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            return _unauthorized(is_mcp)
+
+        # Each JWT is valid on exactly one surface, and both halves have to be
+        # written down. The audience claim already says so -- an access token
+        # names /mcp, a session JWT names the auth service -- but a token that
+        # fails one check simply falls through to the other verifier above, so
+        # without these two lines the *failure* is what selects the surface.
+        #
+        # An OAuth access token is valid on /mcp and nowhere else:
+        if kind == "oauth" and not is_mcp:
+            return _unauthorized(is_mcp)
+
+        # and a session JWT is valid on /api and nowhere else. Not a
+        # cross-user leak -- it is the same person either way -- but MCP
+        # requires a resource server to prove a token was issued for it
+        # specifically, and a credential minted for the browser was not.
+        # Letting it through would also route around consent entirely:
+        # anything holding a session JWT would reach /mcp with every tool
+        # visible, having agreed to nothing.
+        if kind == "session" and is_mcp:
+            return _unauthorized(is_mcp)
+
+        if not granted:
+            return _insufficient_scope(is_mcp, scopes.READ)
+
+        # Account management is not persona access. An OAuth-connected
+        # application has no business changing a password or minting bearer
+        # tokens, whatever its scope -- and a read-only token that can mint a
+        # full one is not read-only. Requiring persona:write rather than a
+        # session keeps detached mode working, where a manually configured
+        # token is the ONLY credential the SPA has.
+        if path in _ACCOUNT_PATHS or path.startswith("/api/auth/tokens"):
+            if kind == "oauth" or not scopes.has(granted, scopes.WRITE):
+                return _insufficient_scope(is_mcp, scopes.WRITE)
+        elif path.startswith("/api"):
+            required = scopes.scope_for_method(request.method)
+            if not scopes.has(granted, required):
+                return _insufficient_scope(is_mcp, required)
+
         db.current_user_id.set(user["id"])
+        scopes.current_scopes.set(granted)
         request.state.username = user["username"]
+        request.state.credential_kind = kind
 
     return await call_next(request)
 
@@ -297,6 +454,13 @@ class SetPasswordRequest(BaseModel):
 
 class CreateTokenRequest(BaseModel):
     label: str = "token"
+    # Optional scope choice for the minted token, matching the consent
+    # screen's vocabulary (persona:read/propose/write). None means every
+    # scope, preserving a token's historical default. Anything outside
+    # scopes.ALL_SCOPES is dropped rather than rejected -- a client sending
+    # an unrecognised value gets a token as narrow as what it did ask for
+    # that we understand, not a 400 over a scope we might add tomorrow.
+    scopes: Optional[list[str]] = None
 
 
 def invite_only() -> bool:
@@ -422,7 +586,12 @@ async def list_tokens():
 @app.post("/api/auth/tokens")
 async def create_token(body: CreateTokenRequest):
     label = body.label.strip() or "token"
-    token_id, token = db.create_token(db.current_user_id.get(), label)
+    token_scopes = (
+        [s for s in body.scopes if s in scopes.ALL_SCOPES] if body.scopes is not None else None
+    )
+    token_id, token = db.create_token(
+        db.current_user_id.get(), label, token_scopes=token_scopes
+    )
     return {"id": token_id, "label": label, "token": token}
 
 
@@ -821,6 +990,18 @@ def register_static_routes(app: FastAPI, static_dir: Path) -> bool:
             static_dir / "index.html", headers={"Cache-Control": "no-cache"}
         )
 
+    # OAuth redirect targets. Two named routes, deliberately not a catch-all:
+    # the MCP app is mounted at "/" and matches everything, so a fallback would
+    # need a hand-maintained exclusion list for /mcp, /api, /auth, /docs and
+    # /.well-known. These are OAuth surface, not app navigation -- the app
+    # itself stays on the hash router.
+    @app.get("/sign-in", include_in_schema=False)
+    @app.get("/consent", include_in_schema=False)
+    async def spa_oauth_screens() -> Response:
+        return FileResponse(
+            static_dir / "index.html", headers={"Cache-Control": "no-cache"}
+        )
+
     @app.get("/favicon.svg", include_in_schema=False)
     async def favicon() -> Response:
         return FileResponse(static_dir / "favicon.svg")
@@ -840,6 +1021,13 @@ STATIC_MOUNTED = register_static_routes(app, STATIC_DIR)
 # registered before it. This is the trap that made a bare /docs 404 while
 # /docs/ worked.
 AUTH_PROXIED = auth_proxy.register(app)
+
+# OAuth discovery, for MCP clients. Registered here for the same reason as the
+# static and auth routes: the MCP app is mounted at "/" below and matches
+# everything, so anything needing its own path must come first.
+import oauth_metadata  # noqa: E402
+
+OAUTH_METADATA_MOUNTED = oauth_metadata.register(app)
 
 
 # ============================================================================

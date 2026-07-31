@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -44,13 +45,25 @@ import {
   listTokens,
   createToken,
   revokeToken,
+  listConnectedApps,
+  revokeConnectedApp,
 } from "@/lib/api.js";
 import { signOut } from "@/lib/session.js";
 import { EmailSettings } from "@/components/EmailSettings";
+import ConnectedApps from "@/components/ConnectedApps";
+
+// Must match auth/src/oauth.js and Consent.jsx's wording exactly -- the
+// mint-a-token scope choice below is the same three-way decision the
+// consent screen makes for an OAuth grant, offered here for a manually
+// minted token instead.
+const READ = "persona:read";
+const PROPOSE = "persona:propose";
+const WRITE = "persona:write";
 
 const TABS = [
   { id: "connection", label: "Connection" },
   { id: "tokens", label: "API tokens" },
+  { id: "apps", label: "Connected apps" },
   { id: "data", label: "Data" },
 ];
 
@@ -95,6 +108,17 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
   const [copied, setCopied] = useState(false);
   const [confirmRevokeId, setConfirmRevokeId] = useState(null);
   const [revokingId, setRevokingId] = useState(null);
+  // The scope choice for the next minted token. write implies propose
+  // (write ⊃ propose ⊃ read), same rule and same handlers as Consent.jsx's
+  // scope-implication logic -- read has no toggle because it is the floor
+  // for every token, not a choice.
+  const [tokenPropose, setTokenPropose] = useState(true);
+  const [tokenWrite, setTokenWrite] = useState(true);
+
+  // Connected apps tab
+  const [appsList, setAppsList] = useState([]);
+  const [appsLoading, setAppsLoading] = useState(false);
+  const [appsError, setAppsError] = useState(null);
 
   // Data tab
   const [exporting, setExporting] = useState(false);
@@ -132,6 +156,11 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
     setRevealedToken(null);
     setCopied(false);
     setConfirmRevokeId(null);
+    setTokenPropose(true);
+    setTokenWrite(true);
+
+    setAppsList([]);
+    setAppsError(null);
 
     setImportMode("replace");
 
@@ -178,6 +207,63 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, activeTab, isSignedIn]);
+
+  const loadApps = async () => {
+    setAppsLoading(true);
+    setAppsError(null);
+    try {
+      const list = await listConnectedApps();
+      setAppsList(list);
+    } catch (err) {
+      setAppsError(err.message);
+    } finally {
+      setAppsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && activeTab === "apps" && isSignedIn) {
+      loadApps();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, activeTab, isSignedIn]);
+
+  const handleRevokeApp = async (id) => {
+    try {
+      await revokeConnectedApp(id);
+      toast({
+        title: "Connection revoked",
+        description:
+          "It can no longer get new access. A request already in flight may continue for up to 10 minutes.",
+        variant: "success",
+      });
+      loadApps();
+    } catch (err) {
+      toast({
+        title: "Failed to revoke connection",
+        description: err.message,
+        variant: "destructive",
+      });
+      // Rethrown so ConnectedApps.jsx knows the revoke didn't go through --
+      // it keeps the confirm row open on a rejection rather than collapsing
+      // it as if this had succeeded. See its handleRevoke for the catch.
+      throw err;
+    }
+  };
+
+  // write implies propose (write ⊃ propose ⊃ read): both start selected, and
+  // these keep that implication true no matter what gets toggled, rather
+  // than letting a click build a scope choice that means nothing -- same
+  // rule as Consent.jsx's onWriteChange/onProposeChange.
+  const onTokenWriteChange = (next) => {
+    setTokenWrite(next);
+    if (next) setTokenPropose(true);
+  };
+
+  const onTokenProposeChange = (next) => {
+    setTokenPropose(next);
+    if (!next) setTokenWrite(false);
+  };
 
   const selectCloud = () => {
     setConnectionType("cloud");
@@ -286,7 +372,8 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
   const handleGenerateToken = async () => {
     setGenerating(true);
     try {
-      const result = await createToken(newTokenLabel.trim() || "mcp");
+      const tokenScopes = [READ, ...(tokenPropose ? [PROPOSE] : []), ...(tokenWrite ? [WRITE] : [])];
+      const result = await createToken(newTokenLabel.trim() || "mcp", tokenScopes);
       setRevealedToken(result);
       setCopied(false);
     } catch (err) {
@@ -314,6 +401,8 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
   const handleDoneReveal = () => {
     setRevealedToken(null);
     setNewTokenLabel("mcp");
+    setTokenPropose(true);
+    setTokenWrite(true);
     loadTokens();
   };
 
@@ -716,26 +805,71 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
                   </div>
                 )}
 
-                <div className="space-y-2 border-t pt-4">
+                <div className="space-y-3 border-t pt-4">
                   <Label htmlFor="new-token-label">Generate token</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="new-token-label"
-                      placeholder="mcp"
-                      value={newTokenLabel}
-                      onChange={(e) => setNewTokenLabel(e.target.value)}
-                      className="flex-1"
+                  <Input
+                    id="new-token-label"
+                    placeholder="mcp"
+                    value={newTokenLabel}
+                    onChange={(e) => setNewTokenLabel(e.target.value)}
+                  />
+
+                  <div className="space-y-3 rounded-lg border p-3">
+                    <TokenScopeRow
+                      id="token-scope-read"
+                      label="Read your persona"
+                      help="Always granted -- a token needs this to do anything."
+                      checked
+                      disabled
                     />
-                    <Button onClick={handleGenerateToken} disabled={generating}>
-                      {generating ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        "Generate token"
-                      )}
-                    </Button>
+                    <TokenScopeRow
+                      id="token-scope-propose"
+                      label="Suggest changes for your approval"
+                      help={
+                        tokenWrite
+                          ? "Included -- direct changes below need this too."
+                          : "Changes wait for you to approve them before they apply."
+                      }
+                      checked={tokenPropose}
+                      onCheckedChange={onTokenProposeChange}
+                    />
+                    <TokenScopeRow
+                      id="token-scope-write"
+                      label="Change your persona directly"
+                      help="Applied immediately, without asking first."
+                      checked={tokenWrite}
+                      onCheckedChange={onTokenWriteChange}
+                    />
                   </div>
+
+                  <Button onClick={handleGenerateToken} disabled={generating} className="w-full">
+                    {generating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Generate token"
+                    )}
+                  </Button>
                 </div>
               </>
+            )}
+          </div>
+        )}
+
+        {activeTab === "apps" && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Applications you&apos;ve connected through &quot;Allow&quot; on a
+              consent screen -- Claude Desktop, an MCP client, or anything
+              else that signed in with your account.
+            </p>
+            {appsLoading ? (
+              <div className="flex items-center justify-center py-6 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : appsError ? (
+              <p className="text-sm text-destructive">{appsError}</p>
+            ) : (
+              <ConnectedApps grants={appsList} onRevoke={handleRevokeApp} />
             )}
           </div>
         )}
@@ -856,6 +990,29 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Same shape as Consent.jsx's ScopeRow -- the scope choice here is the same
+// three-way decision, just for a manually minted token instead of an OAuth
+// grant, so it reuses that presentation rather than inventing a second one.
+function TokenScopeRow({ id, label, help, checked, disabled, onCheckedChange }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="space-y-0.5 pr-2">
+        <Label htmlFor={id} className="text-sm font-medium">
+          {label}
+        </Label>
+        <p className="text-xs text-muted-foreground">{help}</p>
+      </div>
+      <Switch
+        id={id}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onCheckedChange ?? (() => {})}
+        className="mt-0.5 shrink-0"
+      />
+    </div>
   );
 }
 

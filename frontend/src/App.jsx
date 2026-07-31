@@ -51,6 +51,7 @@ import { WelcomeAuth } from "@/components/WelcomeAuth";
 import { AuthShell } from "@/components/AuthShell";
 import { ResetPassword } from "@/components/ResetPassword";
 import { AddEmailBanner } from "@/components/AddEmailBanner";
+import Consent from "@/components/Consent";
 import SectionRenderer from "@/renderers/SectionRenderer";
 
 // Debounce hook
@@ -122,6 +123,59 @@ function useEdgeFade(deps) {
 
 // Main App
 export default function App() {
+  // Two real paths, not hash routes: Better Auth appends query parameters when
+  // it redirects here, and anything after a `#` lands in the fragment rather
+  // than in location.search. Everything else in the app stays on the hash
+  // router -- see lib/routes.js for why. Checked before any hook runs: these
+  // are separate page loads (a full navigation, not a client-side route
+  // change), so a component that returns here never does so having already
+  // called a hook on a previous render.
+  const oauthScreen = window.location.pathname;
+  if (oauthScreen === "/consent") return <Consent />;
+  if (oauthScreen === "/sign-in") {
+    // Captured now rather than read again in onSuccess below, so this does
+    // not depend on WelcomeAuth's own address-bar handling: goToRoute
+    // preserves window.location.search on every hash change, and the only
+    // param it ever strips is `invite`, which never appears here -- but this
+    // stays correct regardless of what WelcomeAuth does internally.
+    const oauthQuery = window.location.search;
+    // /sign-in is a real, bookmarkable path, so it gets opened with no OAuth
+    // query behind it -- and /oauth2/authorize with an empty query is an
+    // error page, not a sign-in. client_id is the parameter that makes this a
+    // connection request; without it there is no flow to resume and the app
+    // itself is where someone signing in wanted to end up.
+    const isOAuthRequest = new URLSearchParams(oauthQuery).has("client_id");
+    return (
+      <AuthShell
+        title={isOAuthRequest ? "Sign in to connect" : "Sign in"}
+        description={
+          isOAuthRequest
+            ? "Sign in to let this application connect to your persona."
+            : "Sign in to your MyGist account."
+        }
+      >
+        <WelcomeAuth
+          // Detached mode -- a UI pointed at someone else's server -- has no
+          // meaning mid-OAuth-flow: this page IS the server the client is
+          // connecting to. The link still renders (WelcomeAuth is not
+          // forked for this), it just has nothing to do here.
+          onUseToken={() => {}}
+          onSuccess={() => {
+            if (!isOAuthRequest) {
+              window.location.assign("/");
+              return;
+            }
+            // Better Auth's /oauth2/authorize re-evaluates now that a
+            // session cookie exists, and continues the flow it interrupted
+            // -- on to /consent, or straight through for a client that has
+            // one already.
+            window.location.assign(`/auth/oauth2/authorize${oauthQuery}`);
+          }}
+        />
+      </AuthShell>
+    );
+  }
+
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);

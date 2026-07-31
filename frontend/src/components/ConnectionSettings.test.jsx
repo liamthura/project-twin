@@ -13,7 +13,7 @@
  * request uses, and never what the UI concluded from one being absent.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 
 vi.mock("@/lib/api.js", async (importOriginal) => {
   const actual = await importOriginal();
@@ -22,6 +22,7 @@ vi.mock("@/lib/api.js", async (importOriginal) => {
     whoami: vi.fn(),
     listTokens: vi.fn(async () => []),
     getConfig: vi.fn(() => ({ serverUrl: "/api" })),
+    createToken: vi.fn(async () => ({ id: "t1", label: "mcp", token: "mg_test" })),
   };
 });
 
@@ -34,7 +35,7 @@ vi.mock("@/lib/session.js", () => ({
   isPlaceholderEmail: vi.fn(() => false),
 }));
 
-import { whoami } from "@/lib/api.js";
+import { whoami, listTokens, createToken } from "@/lib/api.js";
 import { ConnectionSettings } from "@/components/ConnectionSettings";
 
 const open = () =>
@@ -91,5 +92,45 @@ describe("no credential at all", () => {
 
     await waitFor(() => expect(whoami).toHaveBeenCalled());
     expect(screen.queryByRole("button", { name: /sign out/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("minting a token with a narrowed scope", () => {
+  // The chain under test: the switches in the tokens tab build a scope
+  // array (Task 11) that has to survive unmodified through to the
+  // createToken call -- api.js forwards it, and the backend stores it. This
+  // covers only the frontend half; backend/tests/test_token_scopes.py
+  // covers the rest (POST /api/auth/tokens -> db.create_token storage).
+  //
+  // Nothing here asserts on the *implication* rule (write forces propose
+  // back on) -- that's Consent.jsx's onWriteChange/onProposeChange logic,
+  // reused verbatim as onTokenWriteChange/onTokenProposeChange, and already
+  // covered by Consent.test.jsx. This is purely "does the toggled selection
+  // reach createToken intact."
+  beforeEach(() => {
+    localStorage.setItem("mygist_config", JSON.stringify({ serverUrl: "/api" }));
+    whoami.mockResolvedValue({ user_id: "u-1", username: "Liam" });
+  });
+
+  it("passes exactly the toggled scopes to createToken, with write deselected", async () => {
+    open();
+    await waitFor(() => expect(whoami).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: /api tokens/i }));
+    await waitFor(() => expect(listTokens).toHaveBeenCalled());
+
+    // Read has no control (it's the floor, not a choice -- see the disabled
+    // switch), so only write is switched off here. Propose is left at its
+    // default (on).
+    fireEvent.click(screen.getByLabelText(/Change your persona directly/i));
+    fireEvent.click(screen.getByRole("button", { name: /generate token/i }));
+
+    await waitFor(() => expect(createToken).toHaveBeenCalled());
+
+    const [label, requestedScopes] = createToken.mock.calls[0];
+    expect(label).toBe("mcp");
+    expect(requestedScopes).toEqual(["persona:read", "persona:propose"]);
+    expect(requestedScopes).toContain("persona:read");
+    expect(requestedScopes).not.toContain("persona:write");
   });
 });

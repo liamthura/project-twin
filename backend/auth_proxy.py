@@ -142,6 +142,37 @@ def build_response(upstream: httpx.Response) -> Response:
     return response
 
 
+async def forward(upstream_path: str, request: Request) -> Response:
+    """Send a request to the auth service at `upstream_path`, verbatim.
+
+    Split out from the /auth/* route so the OAuth discovery documents can reach
+    the same service at a path the public URL does not mirror -- RFC 8414 puts
+    authorization-server metadata at the ROOT with the issuer's path appended,
+    which /auth/{path} cannot express.
+    """
+    base = SERVICE_URL.rstrip("/")
+    try:
+        upstream = await _http().request(
+            request.method,
+            f"{base}{upstream_path}",
+            params=request.query_params,
+            content=await request.body(),
+            headers=_request_headers(request),
+            # Redirects are part of the auth flow -- OAuth callbacks, and the
+            # post-sign-in bounce. Following them here would resolve them
+            # server-side and hand the browser the wrong page.
+            follow_redirects=False,
+        )
+    except httpx.RequestError as exc:
+        # The auth service is down or unreachable. Humans cannot sign in;
+        # MCP clients are unaffected, because their path never comes here.
+        logger.warning("auth service unreachable: %s", exc)
+        return JSONResponse(
+            {"error": "Authentication service unavailable"}, status_code=503
+        )
+    return build_response(upstream)
+
+
 def register(app: FastAPI) -> bool:
     """Mount the proxy if an auth service is configured. Returns whether it was.
 
@@ -152,34 +183,12 @@ def register(app: FastAPI) -> bool:
     if not SERVICE_URL:
         return False
 
-    base = SERVICE_URL.rstrip("/")
-
     @app.api_route(
         "/auth/{path:path}",
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
         include_in_schema=False,
     )
     async def auth_proxy(path: str, request: Request) -> Response:
-        try:
-            upstream = await _http().request(
-                request.method,
-                f"{base}/auth/{path}",
-                params=request.query_params,
-                content=await request.body(),
-                headers=_request_headers(request),
-                # Redirects are part of the auth flow -- OAuth callbacks, and the
-                # post-sign-in bounce. Following them here would resolve them
-                # server-side and hand the browser the wrong page.
-                follow_redirects=False,
-            )
-        except httpx.RequestError as exc:
-            # The auth service is down or unreachable. Humans cannot sign in;
-            # MCP clients are unaffected, because their path never comes here.
-            logger.warning("auth service unreachable: %s", exc)
-            return JSONResponse(
-                {"error": "Authentication service unavailable"}, status_code=503
-            )
-
-        return build_response(upstream)
+        return await forward(f"/auth/{path}", request)
 
     return True

@@ -21,6 +21,8 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
+import scopes
+
 logger = logging.getLogger(__name__)
 
 _pool: Optional[ConnectionPool] = None
@@ -270,7 +272,13 @@ def create_user(username: str, password: Optional[str] = None) -> tuple[str, str
 
 def resolve_token(token: str) -> Optional[dict]:
     """Look up the user for a bearer token, touching tokens.last_used_at and
-    users.last_seen_at in a single round-trip. None if invalid."""
+    users.last_seen_at in a single round-trip. None if invalid.
+
+    Lookup stays hash-based with no prefix requirement: bare, unprefixed
+    legacy tokens hash and resolve exactly like a new `mg_`-prefixed one, so
+    credentials already deployed on machines this project cannot reach keep
+    working forever.
+    """
     with get_pool().connection() as conn:
         user = conn.execute(
             """
@@ -278,11 +286,11 @@ def resolve_token(token: str) -> Optional[dict]:
                 update tokens set last_used_at = now()
                 where token_hash = %s
                   and (expires_at is null or expires_at > now())
-                returning user_id
+                returning user_id, scopes
             )
             update users set last_seen_at = now()
             from t where users.id = t.user_id
-            returning users.id, users.username
+            returning users.id, users.username, t.scopes
             """,
             (hash_token(token),),
         ).fetchone()
@@ -324,7 +332,10 @@ def resolve_user_by_id(user_id: str) -> Optional[dict]:
 
 
 def create_token(
-    user_id: str, label: str = "token", expires_in_days: Optional[int] = None
+    user_id: str,
+    label: str = "token",
+    expires_in_days: Optional[int] = None,
+    token_scopes: Optional[list[str]] = None,
 ) -> tuple[str, str]:
     """Issue a new named token. Returns (token_id, plaintext_token) --
     the plaintext is shown exactly once.
@@ -333,32 +344,45 @@ def create_token(
     the right default for machine credentials: an MCP client configured once
     should not stop working on a timer. Browser sessions pass a finite value --
     see SESSION_TOKEN_DAYS.
+
+    token_scopes=None means every scope, which is what a token has always had.
+    `persona:read` is forced in regardless: a credential that cannot read has
+    nothing to authorise.
+
+    The `mg_` prefix makes the credential identifiable in a log and lets secret
+    scanners match a pattern. It is hashed along with the rest of the string, so
+    older unprefixed tokens keep resolving with no special case.
     """
-    token = secrets.token_urlsafe(32)
+    granted = list(scopes.ALL_SCOPES) if token_scopes is None else list(token_scopes)
+    if scopes.READ not in granted:
+        granted.append(scopes.READ)
+
+    token = "mg_" + secrets.token_urlsafe(32)
     with get_pool().connection() as conn:
         row = conn.execute(
             """
-            insert into tokens (user_id, token_hash, label, expires_at)
+            insert into tokens (user_id, token_hash, label, expires_at, scopes)
             values (
                 %s, %s, %s,
                 -- The cast is required: a bare parameter used only in an
                 -- `is null` test leaves Postgres unable to infer its type.
                 case when %s::int is null then null
-                     else now() + make_interval(days => %s::int) end
+                     else now() + make_interval(days => %s::int) end,
+                %s
             )
             returning id
             """,
-            (user_id, hash_token(token), label, expires_in_days, expires_in_days),
+            (user_id, hash_token(token), label, expires_in_days, expires_in_days, granted),
         ).fetchone()
     return str(row["id"]), token
 
 
 def list_tokens(user_id: str) -> list[dict]:
-    """The user's tokens: id, label, created_at, last_used_at, expires_at.
+    """The user's tokens: id, label, created_at, last_used_at, expires_at, scopes.
     Never the hash. A null expires_at means the token does not expire."""
     with get_pool().connection() as conn:
         rows = conn.execute(
-            "select id, label, created_at, last_used_at, expires_at from tokens"
+            "select id, label, created_at, last_used_at, expires_at, scopes from tokens"
             " where user_id = %s order by created_at",
             (user_id,),
         ).fetchall()

@@ -16,15 +16,22 @@
 import { randomUUID } from "node:crypto";
 
 import { betterAuth } from "better-auth";
-import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthEndpoint,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import { jwt } from "better-auth/plugins";
 import { username } from "better-auth/plugins";
 import bcrypt from "bcryptjs";
 import { Pool } from "pg";
 
+import { AUTH_BASE_PATH } from "./base-path.js";
 import { poolConfig } from "./db-config.js";
 import { createMailer } from "./email.js";
 import * as invite from "./invite.js";
+import { mcpResource, oauthPlugin, revokeConnection } from "./oauth.js";
 
 const required = (name) => {
   const value = process.env[name];
@@ -45,6 +52,11 @@ const baseURL = required("BETTER_AUTH_URL");
 // Logs instead of sending when no provider is configured, so reset and
 // verification can be walked end to end before Resend exists.
 const mailer = createMailer();
+
+// The MCP endpoint this instance serves, and the switch for the whole OAuth
+// surface below. Same variable, same value as the API container's
+// AUTH_MCP_RESOURCE -- see oauth.js.
+const MCP_RESOURCE = mcpResource();
 
 // One pool, shared by Better Auth and the provisioning hook below. search_path
 // pins Better Auth's own queries to its schema; the hook reaches into `public`
@@ -104,12 +116,64 @@ function invitePlugin() {
   };
 }
 
+/**
+ * The one thing the OAuth plugin does not offer: a person ending someone
+ * else's connection to their own account.
+ *
+ * The plugin has two revocation paths and neither fits. `/oauth2/delete-consent`
+ * deletes the consent row, which the refresh grant never consults, so the
+ * connection carries on refreshing for thirty days. `/oauth2/revoke` is RFC 7009
+ * and therefore a CLIENT operation -- it wants the token plus that client's
+ * credentials, which is precisely what the account holder does not have.
+ *
+ * Same shape as invitePlugin above, and for the same reason: an endpoint that
+ * needs `pool` belongs beside the pool.
+ */
+function oauthRevokePlugin() {
+  return {
+    id: "mygist-oauth-revoke",
+
+    endpoints: {
+      revokeConnection: createAuthEndpoint(
+        "/oauth2/revoke-connection",
+        { method: "POST" },
+        async (ctx) => {
+          const session = await getSessionFromCtx(ctx);
+          if (!session) throw new APIError("UNAUTHORIZED");
+
+          const id = ctx.body?.id;
+          if (!id) {
+            throw new APIError("BAD_REQUEST", { message: "id is required" });
+          }
+
+          const result = await revokeConnection(pool, {
+            consentId: id,
+            userId: session.user.id,
+          });
+          // Null means the consent is not this user's -- or does not exist.
+          // Both answer the same way: naming the difference would turn this
+          // into an oracle for which consent ids are real.
+          if (!result) throw new APIError("NOT_FOUND", { message: "No such connection." });
+
+          return ctx.json({ revoked: true });
+        },
+      ),
+    },
+  };
+}
+
 export const auth = betterAuth({
   baseURL,
 
   // Mounted at /auth, matching what FastAPI forwards. The proxy passes the
   // path through unchanged, so both sides must agree on this prefix.
-  basePath: "/auth",
+  //
+  // Pulled from base-path.js rather than written here as a literal, because
+  // the OAuth plugin below needs this exact value too: Better Auth's own
+  // effective base (ctx.context.baseURL) is baseURL + basePath, not the bare
+  // origin, and oauthOptions' validAudiences has to contain that effective
+  // base or every token request 400s.
+  basePath: AUTH_BASE_PATH,
 
   // Minimum 32 characters, per the installation docs. BETTER_AUTH_SECRETS
   // (plural) is also read by Better Auth for rotation without invalidating
@@ -299,6 +363,43 @@ export const auth = betterAuth({
     // replacement: the browser session stays a cookie, and this is only for
     // calling the Python service.
     jwt(),
+
+    // MyGist as an OAuth 2.1 authorization server, so an MCP client connects by
+    // signing in rather than by being handed a token.
+    //
+    // Gated on AUTH_MCP_RESOURCE, and not merely for tidiness. This plugin
+    // registers /oauth2/register with allowUnauthenticatedClientRegistration,
+    // so leaving it on unconditionally would hand an anonymous, row-creating
+    // endpoint to every instance whose operator never asked for OAuth --
+    // including ones that upgraded into it without reading a release note.
+    // Fail closed: an instance that did not opt in gains no new surface, which
+    // is the same rule the API container already follows with the same
+    // variable.
+    //
+    // NOT accompanied by `disabledPaths: ["/token"]`, which both the OAuth and
+    // JWT plugin docs recommend. Verified against the published package: this
+    // plugin registers /oauth2/token and never a bare /token, so there is no
+    // collision -- and disabling /token would break the SPA, which exchanges
+    // its session cookie for a JWT there on every page load.
+    ...(MCP_RESOURCE
+      ? [
+          oauthPlugin({
+            // baseURL here is Better Auth's own EFFECTIVE base, not the bare
+            // public origin -- see oauth.js's JSDoc on oauthOptions. Passing
+            // the origin alone (as an earlier version of this wiring did) left
+            // validAudiences silently missing the auth service's own base,
+            // because Better Auth's real base URL is origin + basePath,
+            // computed the same way here.
+            baseURL: `${baseURL}${AUTH_BASE_PATH}`,
+            mcpResource: MCP_RESOURCE,
+          }),
+
+          // Revocation the plugin has no endpoint for (see the JSDoc above),
+          // and meaningless without it -- so it comes and goes with the rest
+          // of the OAuth surface rather than on its own.
+          oauthRevokePlugin(),
+        ]
+      : []),
 
     // Closed testing. Inert unless INVITE_ONLY is on, which no self-hosted
     // instance and no local dev environment turns on.

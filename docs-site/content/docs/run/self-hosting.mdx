@@ -75,6 +75,7 @@ Everything is on one origin from there:
 | `/mcp` | MCP endpoint |
 | `/docs` | This documentation |
 | `/api/docs`, `/api/redoc` | Swagger and ReDoc |
+| `/.well-known/oauth-*` | OAuth discovery documents — see [Reverse proxies](#reverse-proxies) |
 
 ## Environment variables
 
@@ -118,6 +119,39 @@ They have been removed from the example file. If you find them in an older copy,
 ignore them.
 </Callout>
 
+### Auth service
+
+These connect the API container to the auth container — the second one in
+[What you need](#what-you-need) above. All but the last live on the API side
+only; the auth service has its own settings, documented in `auth/.env.example`.
+
+| Variable | Notes |
+|---|---|
+| `AUTH_SERVICE_URL` | Internal address of the auth container, e.g. `http://auth:3001`. Unset, `/auth/*` is not registered at all — sign-in, sign-up and password reset have nowhere to go. |
+| `AUTH_JWKS_URL` | Where the API fetches the auth service's signing keys, e.g. `http://auth:3001/auth/jwks`. Unset, JWT verification is inert: a browser session can no longer call `/api` and OAuth access tokens are rejected, but the legacy opaque tokens in the `tokens` table keep working exactly as before. |
+| `AUTH_ISSUER` | The auth service's issuer — its public origin plus `/auth`, e.g. `https://your-instance/auth`. Checked against every JWT's `iss` claim. |
+| `AUTH_AUDIENCE` | What a **session** JWT's `aud` claim must be, for `/api`. Falls back to `AUTH_ISSUER` when unset, which is what Better Auth issues by default — leave it unset unless you have a reason not to. |
+| `AUTH_MCP_RESOURCE` | **Set this on both containers, or on neither.** The canonical URI of the **MCP** endpoint — `https://your-instance/mcp`, no trailing slash. An OAuth access token's `aud` claim must match this exactly to be accepted on `/mcp`, so the two containers have to agree on it character for character. Unset, OAuth is off on both sides: the API rejects OAuth access tokens outright and mounts none of the four `/.well-known` discovery routes, and the auth service registers no OAuth endpoints at all. |
+
+The first four make the browser sign-in flow work at all, and most self-hosted
+instances already have them set from the Better Auth setup. `AUTH_MCP_RESOURCE`
+is the one this feature adds, and it is additive: leave it unset and nothing
+about today's connections — the web UI, existing bearer tokens — changes.
+
+<Callout type="warn">
+`AUTH_MCP_RESOURCE` is the only variable in this table that the **auth**
+container reads too, and leaving it unset there is not cosmetic. It is what
+decides whether that service registers `/auth/oauth2/register`, which accepts
+**unauthenticated** client registrations by design — dynamic registration is
+how Claude and ChatGPT connect without a pre-issued client id.
+
+An instance that never opted into OAuth should not acquire that endpoint by
+upgrading, so the whole OAuth surface is gated on this one value. Set it on
+both containers when you want OAuth; set it on neither when you don't. Setting
+it on only the API leaves clients discovering an authorization server that
+serves nothing.
+</Callout>
+
 ## Health checks
 
 `/api/health` is public and unauthenticated. Use it for orchestrator probes.
@@ -145,6 +179,14 @@ issues a redirect will break clients that do not follow redirects on POST.
 
 **Pass `Authorization` through.** Both the REST API and the MCP endpoint
 authenticate on it. Some proxies strip unknown headers by default.
+
+**The OAuth discovery routes need nothing added, either.** The four documents
+under `/.well-known/oauth-protected-resource` and
+`/.well-known/oauth-authorization-server` (with and without a trailing `/mcp`
+or `/auth`) are served by the API container itself — two directly, two
+forwarded to the auth service the same way `/auth/*` already is. There is no
+third upstream and no extra path to route: the promise stays exactly what it
+says above.
 
 ## Local development
 

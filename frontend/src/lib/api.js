@@ -2,7 +2,7 @@
  * API Client for MyGist Server
  * Handles authentication and server connection
  */
-import { getJwt, forgetJwt } from "./session.js";
+import { getJwt, forgetJwt, authFetch } from "./session.js";
 
 // Default hosted API base (full URL including the /api prefix). The hosted
 // instance serves the UI and the API from one origin, but this stays absolute:
@@ -119,7 +119,14 @@ async function api(endpoint, options = {}, { allowRetry = true } = {}) {
         response.status === 401
           ? "Authentication failed. Check your API token."
           : "Access forbidden. Invalid API token.";
-      throw new Error(detail || fallback);
+      // The status rides along on the Error so a caller that needs to tell
+      // "this credential is bad" apart from "this credential is fine but
+      // underscoped for this endpoint" can, instead of pattern-matching the
+      // fallback string. See listTokens below for why that distinction
+      // matters here specifically.
+      const error = new Error(detail || fallback);
+      error.status = response.status;
+      throw error;
     }
 
     if (!response.ok) {
@@ -312,24 +319,138 @@ async function setPassword(newPassword, currentPassword) {
   });
 }
 
-// List the current user's API tokens (id, label, created_at, last_used_at).
+// List the current user's API tokens (id, label, created_at, last_used_at,
+// scopes). Account-management endpoints -- this one included -- require
+// persona:write, so a read-scoped credential (an OAuth grant, or a token
+// minted without the write toggle) gets a 403 here even though it works
+// everywhere else. That is not a broken request, so it must not read like
+// one: the generic 403 fallback ("Access forbidden. Invalid API token.")
+// would tell someone with a perfectly valid token that it's invalid.
 async function listTokens() {
-  const result = await api("/auth/tokens");
-  return result.tokens;
+  try {
+    const result = await api("/auth/tokens");
+    return result.tokens;
+  } catch (err) {
+    if (err.status === 403) {
+      throw new Error(
+        "This connection doesn't have permission to manage tokens -- it only has read access. Sign in on this device, or use a token with full access, to view or generate tokens.",
+      );
+    }
+    throw err;
+  }
 }
 
-// Create a new named API token. Returns { id, label, token } -- the
-// plaintext token is only ever shown once, at creation time.
-async function createToken(label) {
+// Create a new named API token, optionally scoped. `tokenScopes` omitted or
+// null grants every scope, matching a token's historical default; passing an
+// array limits it to exactly those (persona:read is always included
+// server-side regardless -- see db.create_token). Returns { id, label, token }
+// -- the plaintext token is only ever shown once, at creation time.
+async function createToken(label, tokenScopes) {
   return api("/auth/tokens", {
     method: "POST",
-    body: JSON.stringify({ label }),
+    body: JSON.stringify({
+      label,
+      ...(tokenScopes ? { scopes: tokenScopes } : {}),
+    }),
   });
 }
 
 // Revoke one of the current user's tokens.
 async function revokeToken(id) {
   return api(`/auth/tokens/${id}`, { method: "DELETE" });
+}
+
+// ---------------------------------------------------------------------------
+// Connected applications (OAuth grants)
+// ---------------------------------------------------------------------------
+//
+// These talk to the auth service directly over authFetch, the same as
+// Consent.jsx -- not through api()/getApiBase(), which point at the MyGist
+// API and send a Bearer token rather than the session cookie Better Auth's
+// /oauth2/* routes need.
+//
+// GET /oauth2/get-consents returns a bare array of consent rows -- confirmed
+// by reading auth/node_modules/@better-auth/oauth-provider/dist/index.mjs's
+// getConsentsEndpoint, which is a raw `adapter.findMany` with no join:
+//   [{ id, clientId, userId, referenceId, scopes: string[], createdAt, updatedAt }]
+// There is no client display name and no last-used time on the row itself --
+// the display name comes from /oauth2/public-client?client_id=, the same
+// public, session-gated endpoint Consent.jsx uses to name the client on the
+// way in. Fetched once per distinct clientId rather than once per grant.
+
+async function readAuthError(res, fallback) {
+  const body = await res.json().catch(() => ({}));
+  return body?.error_description || body?.message || fallback;
+}
+
+// The connected apps a user has granted access to, with each client's
+// display name resolved and merged in. Normalises to
+// { id, clientId, clientName, scopes, createdAt } -- ConnectedApps.jsx
+// consumes this shape directly.
+async function listConnectedApps() {
+  const res = await authFetch("/oauth2/get-consents");
+
+  // A 404 means the auth service registered no OAuth endpoints at all:
+  // AUTH_MCP_RESOURCE is unset, so this instance has no OAuth and therefore no
+  // connections. That is a configuration state, not a failure to report -- and
+  // it is what EVERY instance looks like until its operator opts in, so
+  // surfacing it as an error would greet most self-hosters with a red box on a
+  // settings tab that is working exactly as intended.
+  if (res.status === 404) return [];
+
+  if (!res.ok) {
+    throw new Error(await readAuthError(res, "Could not load connected applications."));
+  }
+  const consents = await res.json();
+
+  const uniqueClientIds = [...new Set(consents.map((c) => c.clientId))];
+  const names = await Promise.all(
+    uniqueClientIds.map(async (clientId) => {
+      try {
+        const r = await authFetch(`/oauth2/public-client?client_id=${encodeURIComponent(clientId)}`);
+        if (!r.ok) return [clientId, clientId];
+        const body = await r.json();
+        return [clientId, body?.client_name || clientId];
+      } catch {
+        // A client that no longer resolves (deleted, say) still had a
+        // consent granted to it -- fall back to the id rather than losing
+        // the row, since the user still needs to be able to revoke it.
+        return [clientId, clientId];
+      }
+    }),
+  );
+  const nameByClientId = Object.fromEntries(names);
+
+  return consents.map((c) => ({
+    id: c.id,
+    clientId: c.clientId,
+    clientName: nameByClientId[c.clientId] || c.clientId,
+    scopes: c.scopes || [],
+    createdAt: c.createdAt,
+  }));
+}
+
+// Revoke a connected application's access, by consent id (not client id).
+//
+// NOT /oauth2/delete-consent, which the plugin ships and which deletes only
+// the consent row. Better Auth's refresh grant never reads that row -- it
+// validates oauthRefreshToken alone -- so deleting the consent would hide the
+// connection from the settings screen while leaving it able to mint access
+// tokens for another thirty days. /oauth2/revoke-connection is MyGist's own
+// endpoint (auth/src/auth.js): it marks the refresh tokens revoked, drops any
+// stored access tokens, and then deletes the consent, in one transaction.
+//
+// It still cannot reach a JWT access token already in flight -- nothing can,
+// they are not stored; see ConnectedApps.jsx for why that's stated in the UI
+// rather than left implicit.
+async function revokeConnectedApp(consentId) {
+  const res = await authFetch("/oauth2/revoke-connection", {
+    method: "POST",
+    body: JSON.stringify({ id: consentId }),
+  });
+  if (!res.ok) {
+    throw new Error(await readAuthError(res, "Could not revoke that connection."));
+  }
 }
 
 // Pending proposals of one kind. Listing marks them seen server-side, which
@@ -390,4 +511,6 @@ export {
   listTokens,
   createToken,
   revokeToken,
+  listConnectedApps,
+  revokeConnectedApp,
 };

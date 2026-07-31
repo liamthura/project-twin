@@ -21,7 +21,11 @@ let cachedJwt = null;
 // where cookie auth cannot work at all and a manual token is used instead.
 const AUTH_BASE = "/auth";
 
-async function authFetch(path, options = {}) {
+// Exported for callers that need an /auth endpoint this module has no wrapper
+// for -- the OAuth consent screen, notably, which talks to /oauth2/consent and
+// /oauth2/public-client. Everything this module wraps itself keeps going
+// through the private call above it; this is for the rest.
+export async function authFetch(path, options = {}) {
   return fetch(`${AUTH_BASE}${path}`, {
     ...options,
     // Without this the session cookie is neither sent nor stored.
