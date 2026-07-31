@@ -94,6 +94,9 @@ async def auth_middleware(request: Request, call_next):
         "/api/docs/oauth2-redirect",
         "/api/redoc",
         "/api/openapi.json",
+        # Read before anyone has a credential, because it decides which sign-in
+        # screen to show. Carries no user data.
+        "/api/instance",
     ):
         return await call_next(request)
 
@@ -296,6 +299,28 @@ class CreateTokenRequest(BaseModel):
     label: str = "token"
 
 
+def invite_only() -> bool:
+    """Whether this instance is running as a closed test.
+
+    Read in one place so a feature-flag system later replaces this function
+    rather than every call site. The auth service reads the same variable and
+    owns the rule itself -- see auth/src/invite.js. Nothing here ever validates
+    a code, which is the point: one rule, in one language.
+    """
+    return os.getenv("INVITE_ONLY", "").lower() == "true"
+
+
+@app.get("/api/instance")
+async def instance():
+    """What the sign-in screen needs before anyone has a credential.
+
+    Deliberately says nothing about who is signed in or what exists here -- it
+    is read by strangers by definition, since it decides which screen a stranger
+    is shown.
+    """
+    return {"invite_only": invite_only()}
+
+
 @app.post("/api/auth/register", deprecated=True)
 async def register(body: RegisterRequest):
     """DEPRECATED. Same-origin sign-up goes through Better Auth at /auth.
@@ -305,6 +330,19 @@ async def register(body: RegisterRequest):
     mode authenticates here. Removing it would break that, and would also lock
     out any client that scripted registration against this endpoint.
     """
+    # The other door. Better Auth's sign-up is gated by an invite code; this is
+    # the one detached mode uses, and a gate on one door is not a gate.
+    #
+    # Locked rather than taught the rule. Duplicating "is this code valid" in a
+    # second language is precisely how two halves drift apart, and detached
+    # self-serve registration against a closed test instance is not something
+    # anyone is doing. Self-hosters run with the mode off and never see this.
+    if invite_only():
+        raise HTTPException(
+            status_code=403,
+            detail="this instance is invite-only; sign up through its web app",
+        )
+
     username = body.username.strip()
     if not username:
         raise HTTPException(status_code=400, detail="username is required")

@@ -1,12 +1,39 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Globe, Loader2, Server } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { segmentClass } from "@/components/ui/segmented-control";
-import { saveConfig, loginAccount, registerAccount, CLOUD_API_URL } from "@/lib/api.js";
-import { signIn, signUp, requestPasswordReset } from "@/lib/session.js";
+import {
+  saveConfig,
+  loginAccount,
+  registerAccount,
+  getInstance,
+  CLOUD_API_URL,
+} from "@/lib/api.js";
+import {
+  signIn,
+  signUp,
+  requestPasswordReset,
+  isCompleteInvite,
+  normaliseInvite,
+} from "@/lib/session.js";
+import { InviteGate, AcceptedInvite } from "@/components/InviteGate";
+import {
+  DEFAULT_AUTH_ROUTE,
+  goToRoute,
+  isAuthRoute,
+  readRoute,
+} from "@/lib/routes.js";
+
+/** An invite link: ?invite=7F2K-QX91. Read once at mount -- it cannot change
+ *  while the page is open, and reading it in render would re-check it on every
+ *  keystroke. */
+function inviteFromUrl() {
+  if (typeof window === "undefined") return "";
+  return normaliseInvite(new URLSearchParams(window.location.search).get("invite"));
+}
 
 // Better Auth is same-origin only: its session cookie cannot be set from, or
 // sent to, another site. A UI pointed at someone else's server therefore keeps
@@ -35,12 +62,23 @@ const ORIGIN_API_URL =
 // !getAuthToken()` branch below). On success it saves the config and hands
 // control back to the caller (which reloads app data).
 export function WelcomeAuth({ onUseToken, onSuccess }) {
-  const [mode, setMode] = useState("signin"); // "signin" | "signup" | "forgot"
+  // The mode IS the route -- #/signin, #/signup, #/forgot. Seeded from the URL
+  // so a deep link lands on the right screen, and written back to it on every
+  // change so the address bar never describes a page nobody is looking at.
+  const [mode, setMode] = useState(() =>
+    isAuthRoute(readRoute()) ? readRoute() : DEFAULT_AUTH_ROUTE,
+  );
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [resetSent, setResetSent] = useState(false);
+
+  // Whether this instance requires an invite code. Null until asked, so the
+  // sign-up form is not rendered and then replaced by a gate a moment later.
+  const [inviteOnly, setInviteOnly] = useState(null);
+  const [acceptedInvite, setAcceptedInvite] = useState("");
+  const [linkInvite] = useState(inviteFromUrl);
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState(null);
   const [showServer, setShowServer] = useState(false);
@@ -66,6 +104,86 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
 
   const serverUrl =
     connectionType === "cloud" ? CLOUD_API_URL : selfHostedUrl.trim();
+
+  // Signing IN accepts either identifier, because Better Auth has an endpoint
+  // for each and session.js routes on the shape of what was typed.
+  //
+  // Not while signing up: that still asks for a username only, and offering a
+  // choice here would promise something the next field does not deliver.
+  //
+  // Not in detached mode either: that talks to /api/auth/login, which knows
+  // only usernames. A label promising email would be a lie on that path.
+  const acceptsEmail = mode === "signin" && !isDetached(serverUrl);
+
+  // Asked once, on mount. Detached mode is excluded on purpose: /api/instance
+  // there describes SOMEBODY ELSE'S server, and its registration path is the
+  // old one, which has no notion of invite codes.
+  useEffect(() => {
+    if (isDetached(serverUrl)) {
+      setInviteOnly(false);
+      return;
+    }
+    let cancelled = false;
+    getInstance().then((info) => {
+      if (!cancelled) setInviteOnly(info?.invite_only === true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [serverUrl]);
+
+  // An invite link means someone intends to sign up, so start there rather
+  // than on the sign-in tab they would immediately have to leave.
+  useEffect(() => {
+    if (isCompleteInvite(linkInvite)) setMode("signup");
+  }, [linkInvite]);
+
+  // Once a code is in hand the query has done its job. Leaving it there means a
+  // spent code sitting in the address bar, which is the sort of thing that gets
+  // copied out of a screenshot and passed on to somebody it will not work for.
+  useEffect(() => {
+    if (!acceptedInvite) return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("invite")) return;
+
+    params.delete("invite");
+    const query = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+    );
+  }, [acceptedInvite]);
+
+  // Keep the URL describing what is on screen. Replaced rather than pushed on
+  // the first render: arriving at #/ and being corrected to #/signin is not a
+  // navigation anyone made, and a back button that walks through it is a back
+  // button that appears not to work.
+  const routeSettled = useRef(false);
+  useEffect(() => {
+    goToRoute(mode, { replace: !routeSettled.current });
+    routeSettled.current = true;
+  }, [mode]);
+
+  // Back and forward between the auth screens. Both events are listened for:
+  // hashchange covers a hash edited in the address bar, popstate covers
+  // stepping back through the entries pushed above.
+  useEffect(() => {
+    const sync = () => {
+      const route = readRoute();
+      if (isAuthRoute(route)) setMode(route);
+    };
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate", sync);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate", sync);
+    };
+  }, []);
+
+  // The gate stands between "create an account" and the account form, and only
+  // while this instance actually requires one.
+  const needsInvite = mode === "signup" && inviteOnly === true && !acceptedInvite;
 
   const switchMode = (next) => {
     setMode(next);
@@ -133,7 +251,9 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
         saveConfig({ serverUrl, token: result.token });
       } else {
         if (mode === "signup") {
-          await signUp(username.trim(), password);
+          // undefined when this instance is open; the service ignores it
+          // then, and requires it when it is not.
+          await signUp(username.trim(), password, undefined, acceptedInvite || undefined);
         } else {
           await signIn(username.trim(), password);
         }
@@ -148,6 +268,16 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
       setPending(false);
     }
   };
+
+  if (needsInvite) {
+    return (
+      <InviteGate
+        initialCode={linkInvite}
+        onAccepted={setAcceptedInvite}
+        onBack={() => switchMode("signin")}
+      />
+    );
+  }
 
   if (mode === "forgot") {
     return (
@@ -214,17 +344,22 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
 
   return (
     <div className="w-full space-y-4 text-left">
+      {/* Which code is about to be spent, and a way back to change it. */}
+      {mode === "signup" && acceptedInvite && (
+        <AcceptedInvite code={acceptedInvite} onChange={() => setAcceptedInvite("")} />
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="space-y-1.5">
           <Label htmlFor="welcome-username" className="text-xs font-medium">
-            Username
+            {acceptsEmail ? "Username or email" : "Username"}
           </Label>
           <Input
             id="welcome-username"
             autoComplete="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="yourname"
+            placeholder={acceptsEmail ? "yourname or you@example.com" : "yourname"}
           />
         </div>
         <div className="space-y-1.5">

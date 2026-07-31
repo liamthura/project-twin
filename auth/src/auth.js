@@ -16,6 +16,7 @@
 import { randomUUID } from "node:crypto";
 
 import { betterAuth } from "better-auth";
+import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
 import { jwt } from "better-auth/plugins";
 import { username } from "better-auth/plugins";
 import bcrypt from "bcryptjs";
@@ -23,6 +24,7 @@ import { Pool } from "pg";
 
 import { poolConfig } from "./db-config.js";
 import { createMailer } from "./email.js";
+import * as invite from "./invite.js";
 
 const required = (name) => {
   const value = process.env[name];
@@ -53,6 +55,54 @@ const mailer = createMailer();
 // ConnectionParameters overwrite the translation with its own. See db-config.js;
 // the reasoning is long enough to be worth reading before touching this.
 export const pool = new Pool(poolConfig(required("DATABASE_URL")));
+
+/**
+ * The invite gate, as a plugin so the check endpoint and the gate itself sit
+ * together and read the same module.
+ *
+ * Both are inert when INVITE_ONLY is off, which is the default and what every
+ * self-hosted instance runs. Off, this adds one comparison to a sign-up.
+ */
+function invitePlugin() {
+  return {
+    id: "mygist-invite",
+
+    endpoints: {
+      // Backs the first screen of sign-up. Says only valid or not: naming
+      // WHICH way a code failed tells a guesser which ones are worth pursuing
+      // and tells a genuine tester nothing they can act on.
+      checkInvite: createAuthEndpoint(
+        "/invite/check",
+        { method: "POST" },
+        async (ctx) => {
+          if (!invite.inviteOnly()) return ctx.json({ valid: true });
+          const result = await invite.check(pool, ctx.body?.code);
+          return ctx.json({ valid: result.ok });
+        },
+      ),
+    },
+
+    hooks: {
+      before: [
+        {
+          matcher: (context) => context.path === "/sign-up/email",
+          handler: createAuthMiddleware(async (ctx) => {
+            if (!invite.inviteOnly()) return;
+
+            // Read-only. Reserving here would burn a use whenever the sign-up
+            // that follows fails -- a duplicate username, most likely -- and
+            // telling someone holding a good code that it is spent is a worse
+            // failure than admitting one extra on a race.
+            const result = await invite.check(pool, ctx.body?.inviteCode);
+            if (!result.ok) {
+              throw new APIError("BAD_REQUEST", { message: result.reason });
+            }
+          }),
+        },
+      ],
+    },
+  };
+}
 
 export const auth = betterAuth({
   baseURL,
@@ -137,13 +187,20 @@ export const auth = betterAuth({
         // Runs inside the sign-up flow, so a failure here fails the
         // registration rather than leaving an account that can authenticate but
         // owns nothing.
-        after: async (user) => {
+        after: async (user, ctx) => {
           await pool.query(
             `insert into public.users (id, username, created_at)
              values ($1, $2, now())
              on conflict (id) do nothing`,
             [user.id, user.username ?? user.name],
           );
+
+          // Redeemed here, not in the gate, so that only an account which
+          // actually exists costs a use. Runs after the insert above because
+          // it writes users.invited_with, which needs the row to be there.
+          if (invite.inviteOnly()) {
+            await invite.redeem(pool, ctx?.body?.inviteCode, user.id);
+          }
         },
       },
     },
@@ -242,5 +299,9 @@ export const auth = betterAuth({
     // replacement: the browser session stays a cookie, and this is only for
     // calling the Python service.
     jwt(),
+
+    // Closed testing. Inert unless INVITE_ONLY is on, which no self-hosted
+    // instance and no local dev environment turns on.
+    invitePlugin(),
   ],
 });

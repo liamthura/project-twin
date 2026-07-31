@@ -247,13 +247,25 @@ export default function App() {
     if (!valid.has(activeTab)) setActiveTab("profile");
   }, [enabledKeys, activeTab]);
 
+  // The welcome screen owns the URL while it is up -- it writes #/signin,
+  // #/signup or #/forgot. Without this guard the tab sync ran anyway and
+  // stamped #/profile over it, so someone looking at a sign-in form had an
+  // address bar naming a page they could not reach.
+  //
+  // Above the early returns because hooks cannot be conditional; the condition
+  // is therefore inside it.
+  const showingAuth = error && !hasCredential;
   useEffect(() => {
+    // Nothing is decided yet while the first load is in flight, and writing a
+    // tab route here would put #/profile in the address bar for the moment
+    // before the welcome screen replaces it with #/signin.
+    if (isLoading || showingAuth) return;
     if (window.location.hash.replace(/^#\/?/, "") !== activeTab) {
       // replaceState, not a hash assignment: switching tabs should not stack
       // up history entries that the back button then has to walk through.
       window.history.replaceState(null, "", `#/${activeTab}`);
     }
-  }, [activeTab]);
+  }, [activeTab, showingAuth, isLoading]);
 
   // The dot on the Review tab. Counted rather than listed: listing marks rows
   // seen, which is what protects them from eviction, and this polls from every
@@ -446,7 +458,7 @@ export default function App() {
   // an HttpOnly cookie, so a signed-in account has no token here and would
   // otherwise be shown the sign-in screen the moment any request failed --
   // told to sign in while already signed in.
-  if (error && !hasCredential) {
+  if (showingAuth) {
     return (
       <AuthShell
         title="Welcome to MyGist"

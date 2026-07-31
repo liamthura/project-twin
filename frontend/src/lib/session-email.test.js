@@ -187,3 +187,99 @@ describe("reading the session", () => {
     expect(await session.getSession()).toBeNull();
   });
 });
+
+describe("choosing a sign-in endpoint from what was typed", () => {
+  it("treats an ordinary address as an email", () => {
+    expect(session.looksLikeEmail("liam@example.com")).toBe(true);
+    expect(session.looksLikeEmail("first.last+tag@sub.example.co.uk")).toBe(true);
+  });
+
+  it("treats a plain username as a username", () => {
+    expect(session.looksLikeEmail("liam")).toBe(false);
+    expect(session.looksLikeEmail("localdev-smoke")).toBe(false);
+  });
+
+  it("treats an @ without a dotted domain as a username", () => {
+    // MyGist's username rule only requires a non-empty string, so `weird@name`
+    // is a username somebody could already hold. Routing it to email sign-in
+    // would lock them out with "invalid email or password".
+    expect(session.looksLikeEmail("weird@name")).toBe(false);
+  });
+
+  it("survives an empty or missing identifier", () => {
+    expect(session.looksLikeEmail("")).toBe(false);
+    expect(session.looksLikeEmail(undefined)).toBe(false);
+  });
+
+  it("signs in by email at the email endpoint", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse({ token: "t" }));
+
+    await session.signIn("liam@example.com", "a-password");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/auth/sign-in/email");
+    expect(bodyOf(fetchMock)).toEqual({ email: "liam@example.com", password: "a-password" });
+  });
+
+  it("signs in by username at the username endpoint", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse({ token: "t" }));
+
+    await session.signIn("Liam", "a-password");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/auth/sign-in/username");
+    expect(bodyOf(fetchMock)).toEqual({ username: "Liam", password: "a-password" });
+  });
+
+  it("trims what was typed, because a trailing space is invisible", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse({ token: "t" }));
+
+    await session.signIn("  liam@example.com  ", "a-password");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/auth/sign-in/email");
+    expect(bodyOf(fetchMock).email).toBe("liam@example.com");
+  });
+
+  it("refuses a placeholder address without asking the server", async () => {
+    // Nobody is ever shown one of these, so nobody types it by accident -- but
+    // it IS a real row in the email column, and would otherwise sign someone in
+    // on an identifier we invented for them rather than one they chose.
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    await expect(session.signIn("liam@mygist.invalid", "a-password")).rejects.toThrow(
+      /invalid email or password/i,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses it in words the service itself would have used", async () => {
+    // Indistinguishable from a genuine rejection, so the refusal does not
+    // announce that placeholders are a category worth probing for.
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ message: "Invalid email or password" }, 401),
+    );
+    const real = await session
+      .signIn("nobody@example.com", "a-password")
+      .catch((e) => e.message);
+
+    const placeholder = await session
+      .signIn("liam@mygist.invalid", "a-password")
+      .catch((e) => e.message);
+
+    expect(placeholder).toBe(real);
+  });
+
+  it("still raises the service's message when credentials are wrong", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ message: "Invalid email or password" }, 401),
+    );
+
+    await expect(session.signIn("liam@example.com", "wrong")).rejects.toThrow(
+      /invalid email or password/i,
+    );
+  });
+});

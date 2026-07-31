@@ -14,6 +14,8 @@
  * someone is already looking.
  */
 
+import { activeCount, inviteOnly } from "./invite.js";
+
 // Every table migration 0003 creates. Missing any means this service is
 // pointed at a database the API has not migrated.
 const REQUIRED_TABLES = ["user", "session", "account", "verification", "jwks"];
@@ -80,5 +82,46 @@ export async function preflight(pool) {
     `[preflight] database ${context.db} as ${context.role} — ` +
       `all ${REQUIRED_TABLES.length} better_auth tables visible`,
   );
+
+  await reportInviteMode(pool);
   return true;
+}
+
+/**
+ * Say whether the gate is on, and how many codes could actually admit someone.
+ *
+ * The count is the point. Turning invite-only on with nothing mintable locks
+ * out every new account including your own, and there is no other moment where
+ * that is visible -- the service starts, /health says ok, and the first person
+ * to try discovers it. One line in the deploy log is cheaper than that.
+ *
+ * Never fatal. A missing table means the mode is off and migration 0005 has not
+ * run, which is a perfectly ordinary state for an instance that does not use
+ * this.
+ */
+async function reportInviteMode(pool) {
+  if (!inviteOnly()) {
+    console.log("[invite] invite-only OFF — anyone can create an account");
+    return;
+  }
+
+  try {
+    const active = await activeCount(pool);
+    console.log(
+      `[invite] invite-only ON — ${active} code${active === 1 ? "" : "s"} ` +
+        `can currently admit someone`,
+    );
+    if (active === 0) {
+      console.warn(
+        "[invite] WARNING: no usable codes. Nobody can create an account " +
+          "until one is minted:  python scripts/invite.py mint --label ...",
+      );
+    }
+  } catch (error) {
+    console.error(
+      `[invite] invite-only is ON but the codes cannot be read: ${error.message}\n` +
+        "  Migration 0005_invite_codes creates invite_codes. Until it has run,\n" +
+        "  every sign-up will be refused.",
+    );
+  }
 }
