@@ -200,18 +200,38 @@ this out.
 {
   "resource": "https://mygist.thuradev.qzz.io/mcp",
   "authorization_servers": ["https://mygist.thuradev.qzz.io/auth"],
-  "scopes_supported": ["persona:read", "persona:propose"],
+  "scopes_supported": ["persona:read", "persona:propose", "persona:write"],
   "bearer_methods_supported": ["header"]
 }
 ```
 
-`scopes_supported` deliberately omits `persona:write`. The spec wants this field
-to be *"the minimal set of scopes necessary for basic functionality"*, with more
-acquired through step-up authorization — so a new connection lands on
-**read-and-suggest**, and direct write is a second, explicit decision. That is
-what the proposal inbox is for, now expressed in the protocol.
+**All three scopes are advertised, including `persona:write`.** An earlier draft
+omitted it, reading the spec's *"minimal set of scopes necessary for basic
+functionality"* as an argument for landing new connections on read-and-suggest
+and acquiring write later through step-up authorization. Two things kill that.
 
-`offline_access` is omitted as well: *"MCP Servers SHOULD NOT include
+The product argument: MyGist's value is a persona that stays current, and what
+keeps it current is an assistant writing to it mid-conversation. A default
+connection that cannot write does not do the main job. That spec language is
+written for multi-tenant SaaS where a connector touches a large API; here the
+sole owner is granting access to their own assistant, and the honest minimum for
+basic functionality includes writing.
+
+The mechanical argument, which is the stronger one: **the step-up it depended on
+cannot fire.** Tool-list filtering (below) means a read-and-propose connection
+never sees `persona_modify`, so it never calls it, so no `insufficient_scope` is
+ever returned and nothing triggers a re-authorization — the connection stays
+narrow silently and forever. Even unfiltered it would not work: MCP step-up is an
+HTTP mechanism, a 403 carrying `WWW-Authenticate`, and a per-tool scope failure
+happens inside a JSON-RPC response that cannot carry that header. Supporting it
+would mean parsing the JSON-RPC body in the middleware to choose a status code —
+real complexity in the security-critical path, bought for a default nobody wants.
+
+So the choice moves to the consent screen, where a human is already looking at
+the decision. The narrower tiers are still real and still enforced: they are what
+a deliberately narrowed grant gets, and what a scoped `mg_` token gets.
+
+`offline_access` is still omitted: *"MCP Servers SHOULD NOT include
 `offline_access` in `WWW-Authenticate` scope or Protected Resource Metadata
 `scopes_supported`, as refresh tokens are not a resource requirement."* It is
 still granted — clients request it themselves.
@@ -241,8 +261,12 @@ Challenges, per the spec:
 
 | Status | When | Header |
 |---|---|---|
-| 401 | absent, invalid, or wrong audience | `Bearer resource_metadata="…", scope="persona:read persona:propose"` |
-| 403 | valid token, no `persona:*` scope | `Bearer error="insufficient_scope", scope="…", resource_metadata="…"` |
+| 401 | absent, invalid, or wrong audience | `Bearer resource_metadata="…", scope="persona:read persona:propose persona:write"` |
+| 403 | valid token, no `persona:*` scope at all | `Bearer error="insufficient_scope", scope="…", resource_metadata="…"` |
+
+The 403 covers the case HTTP can actually see: a token carrying no persona scope
+whatsoever. It is deliberately **not** a per-tool step-up — see the discovery
+section for why that mechanism cannot fire here.
 
 A new `current_scopes` contextvar carries the grant inward, mirroring
 `current_user_id`. Both credential paths populate it, so every enforcement point
@@ -378,11 +402,25 @@ The SPA has no client-side router, so `/sign-in` and `/consent` become two more
 concrete FastAPI routes serving `index.html` beside `/`, and `App.jsx` branches
 on `pathname`. Registered before the MCP mount, like everything else here.
 
-The consent screen names the client, the account, and each requested scope in
-plain terms — *read your persona*, *suggest changes for your approval*, *change
-your persona directly* — and carries the OAuth query parameters across sign-in so
-an unauthenticated authorize request survives the round trip. Sign-up from here
-goes through the existing invite gate unchanged.
+**This screen carries the scope decision**, since protocol-level step-up cannot.
+It names the client, names the account, and lists each requested scope as a
+separate line in plain terms:
+
+| Scope | Shown as | Default |
+|---|---|---|
+| `persona:read` | Read your persona | selected |
+| `persona:propose` | Suggest changes for your approval | selected |
+| `persona:write` | Change your persona directly | **selected** |
+
+Write is pre-selected because it is what makes a connection useful, and
+deselectable because that is the whole point of showing it. Narrowing here is the
+supported path to a read-only or propose-only connection — there is no second
+flow to discover, and widening later means reconnecting from the connected-apps
+list, which the UI should say plainly.
+
+The screen carries the OAuth query parameters across sign-in so an
+unauthenticated authorize request survives the round trip. Sign-up from here goes
+through the existing invite gate unchanged.
 
 ## Connected apps
 
