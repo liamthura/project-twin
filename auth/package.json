@@ -12,8 +12,9 @@
     "schema:migrate": "npx --yes @better-auth/cli@latest migrate --config src/auth.js"
   },
   "dependencies": {
-    "better-auth": "1.6.23",
+    "@better-auth/oauth-provider": "1.6.25",
     "bcryptjs": "3.0.2",
+    "better-auth": "1.6.25",
     "pg": "8.16.3"
   }
 }

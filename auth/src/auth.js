@@ -25,6 +25,7 @@ import { Pool } from "pg";
 import { poolConfig } from "./db-config.js";
 import { createMailer } from "./email.js";
 import * as invite from "./invite.js";
+import { oauthPlugin } from "./oauth.js";
 
 const required = (name) => {
   const value = process.env[name];
@@ -299,6 +300,16 @@ export const auth = betterAuth({
     // replacement: the browser session stays a cookie, and this is only for
     // calling the Python service.
     jwt(),
+
+    // MyGist as an OAuth 2.1 authorization server, so an MCP client connects by
+    // signing in rather than by being handed a token.
+    //
+    // NOT accompanied by `disabledPaths: ["/token"]`, which both the OAuth and
+    // JWT plugin docs recommend. Verified against the published package: this
+    // plugin registers /oauth2/token and never a bare /token, so there is no
+    // collision -- and disabling /token would break the SPA, which exchanges
+    // its session cookie for a JWT there on every page load.
+    oauthPlugin({ baseURL, publicOrigin: new URL(baseURL).origin }),
 
     // Closed testing. Inert unless INVITE_ONLY is on, which no self-hosted
     // instance and no local dev environment turns on.

@@ -1,0 +1,75 @@
+/**
+ * MyGist as an OAuth 2.1 authorization server.
+ *
+ * This is what lets an MCP client connect by signing in and consenting instead
+ * of being handed a token to paste into a config file. Opaque tokens are not
+ * replaced by it: OAuth is how an application connects, a token is how you
+ * script, and both are permanent.
+ *
+ * Split from auth.js because that file is already the length it wants to be,
+ * and because everything here is one decision -- the OAuth surface -- that can
+ * be read without the email flows and the invite gate around it.
+ */
+import { oauthProvider } from "@better-auth/oauth-provider";
+
+export const READ = "persona:read";
+export const PROPOSE = "persona:propose";
+export const WRITE = "persona:write";
+
+/** Offered on the consent screen, in the order shown there. */
+export const SCOPES = [READ, PROPOSE, WRITE];
+
+/**
+ * The canonical URI of the MCP endpoint, per RFC 8707 and RFC 9728.
+ *
+ * The trailing slash is stripped deliberately: the MCP specification says
+ * implementations SHOULD use the form without one, and an audience is compared
+ * by exact string, so `https://host/mcp/` and `https://host/mcp` are two
+ * different resources to every client that follows the rule.
+ */
+export const MCP_RESOURCE = (publicOrigin) =>
+  `${publicOrigin.replace(/\/+$/, "")}/mcp`;
+
+/** The plugin's options, exported separately so they can be asserted on. */
+export function oauthOptions({ baseURL, publicOrigin }) {
+  return {
+    // Real paths, not hash routes: Better Auth appends query parameters to
+    // these, and anything after a `#` lands in the fragment rather than in
+    // location.search. FastAPI serves the SPA shell at both.
+    loginPage: "/sign-in",
+    consentPage: "/consent",
+
+    scopes: [...SCOPES, "offline_access"],
+
+    // Load-bearing. This defaults to [baseURL], which is `.../auth` -- while
+    // every MCP client sends resource=`.../mcp`. Left at the default, Better
+    // Auth throws invalid_request and EVERY connection attempt fails at the
+    // token endpoint, with an error that names neither this option nor the fix.
+    validAudiences: [baseURL, MCP_RESOURCE(publicOrigin)],
+
+    // Claude and ChatGPT have no pre-issued client_id for this server; they
+    // register at connect time. The MCP specification now marks dynamic
+    // registration deprecated in favour of Client ID Metadata Documents, which
+    // Better Auth does not yet support -- so this is a compatibility bridge,
+    // not the destination. Registering grants nothing on its own: a real,
+    // invited human still has to sign in and consent.
+    allowDynamicClientRegistration: true,
+    allowUnauthenticatedClientRegistration: true,
+
+    // Short, so that revoking a connection bites in minutes rather than hours.
+    // The refresh token dies immediately on revoke; this bounds how long the
+    // access token already in flight outlives it.
+    accessTokenExpiresIn: "10m",
+    refreshTokenExpiresIn: "30d",
+
+    rateLimit: {
+      register: { window: 60, max: 5 },
+      token: { window: 60, max: 20 },
+      authorize: { window: 60, max: 30 },
+    },
+  };
+}
+
+export function oauthPlugin({ baseURL, publicOrigin }) {
+  return oauthProvider(oauthOptions({ baseURL, publicOrigin }));
+}
