@@ -18,10 +18,11 @@ vi.mock("@/lib/api.js", async (importOriginal) => {
 vi.mock("@/lib/session.js", () => ({
   signIn: vi.fn(async () => ({})),
   signUp: vi.fn(async () => ({})),
+  requestPasswordReset: vi.fn(async () => ({ status: true })),
 }));
 
 import { registerAccount, loginAccount, saveConfig, CLOUD_API_URL } from "@/lib/api.js";
-import { signIn, signUp } from "@/lib/session.js";
+import { signIn, signUp, requestPasswordReset } from "@/lib/session.js";
 import { WelcomeAuth } from "@/components/WelcomeAuth";
 
 // jsdom serves the page from http://localhost:3000 by default, which stands
@@ -104,5 +105,77 @@ describe("WelcomeAuth server default", () => {
     await user.click(screen.getByRole("button", { name: /^Server:/ }));
 
     expect(screen.getByDisplayValue(ORIGIN_API)).toBeInTheDocument();
+  });
+});
+
+describe("forgotten password", () => {
+  const openForgot = async (user) => {
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    await user.click(screen.getByRole("button", { name: /forgot your password/i }));
+  };
+
+  it("asks for the email rather than the username", async () => {
+    // Reset is addressed to an inbox. Asking for a username here would collect
+    // the one identifier that cannot receive the link.
+    const user = userEvent.setup();
+    await openForgot(user);
+
+    expect(screen.getByLabelText(/^email$/i)).toBeInTheDocument();
+  });
+
+  it("sends the request", async () => {
+    const user = userEvent.setup();
+    await openForgot(user);
+
+    await user.type(screen.getByLabelText(/^email$/i), "liam@example.com");
+    await user.click(screen.getByRole("button", { name: /send reset link/i }));
+
+    expect(requestPasswordReset).toHaveBeenCalledWith("liam@example.com");
+  });
+
+  it("does not reveal whether that address has an account", async () => {
+    // The service answers identically either way so a stranger cannot use this
+    // to enumerate users. Saying "sent!" here would give away what the service
+    // took care not to.
+    const user = userEvent.setup();
+    await openForgot(user);
+
+    await user.type(screen.getByLabelText(/^email$/i), "stranger@example.com");
+    await user.click(screen.getByRole("button", { name: /send reset link/i }));
+
+    // Conditional wording, and no claim either way. Matched on the contiguous
+    // text node: the address itself sits in a nested <strong>.
+    expect(await screen.findByText(/is on a mygist account/i)).toBeInTheDocument();
+    expect(screen.getByText("stranger@example.com")).toBeInTheDocument();
+    expect(screen.queryByText(/we sent|check your inbox|no account/i)).toBeNull();
+  });
+
+  it("does not send an empty address", async () => {
+    const user = userEvent.setup();
+    await openForgot(user);
+
+    await user.click(screen.getByRole("button", { name: /send reset link/i }));
+
+    expect(requestPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it("can go back to sign in", async () => {
+    const user = userEvent.setup();
+    await openForgot(user);
+
+    await user.click(screen.getByRole("button", { name: /back to sign in/i }));
+
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+  });
+
+  it("is not offered while signing up, where it makes no sense", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: /create an account/i }));
+
+    expect(
+      screen.queryByRole("button", { name: /forgot your password/i }),
+    ).not.toBeInTheDocument();
   });
 });

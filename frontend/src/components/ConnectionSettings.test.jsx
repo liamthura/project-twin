@@ -25,7 +25,14 @@ vi.mock("@/lib/api.js", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/session.js", () => ({ signOut: vi.fn(async () => {}) }));
+// EmailSettings renders inside the signed-in block and reaches for the session
+// on mount. Stubbed to "no session", which is the render-nothing branch, so
+// these tests stay about what they were about.
+vi.mock("@/lib/session.js", () => ({
+  signOut: vi.fn(async () => {}),
+  getSession: vi.fn(async () => null),
+  isPlaceholderEmail: vi.fn(() => false),
+}));
 
 import { whoami } from "@/lib/api.js";
 import { ConnectionSettings } from "@/components/ConnectionSettings";
