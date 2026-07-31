@@ -2,7 +2,27 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 
-afterEach(cleanup);
+// input-otp keeps its drawn caret in step with the real one using timers at 0,
+// 10 and 50ms. Unmounting does not always beat them, and one firing after
+// vitest has torn the jsdom environment down sets React state against a window
+// that no longer exists -- an unhandled error, which fails the run while every
+// test still reports as passed.
+//
+// So the pending ones are given room to fire while the environment is still
+// alive. Paid only where the control actually rendered: 60ms on every one of
+// the 590 tests would add half a minute for the benefit of about thirty.
+const OTP_TIMER_DRAIN_MS = 80;
+
+afterEach(async () => {
+  const hadOtp =
+    typeof document !== "undefined" && !!document.querySelector("[data-input-otp]");
+
+  cleanup();
+
+  if (hadOtp) {
+    await new Promise((resolve) => setTimeout(resolve, OTP_TIMER_DRAIN_MS));
+  }
+});
 
 // Two jsdom gaps that `input-otp` relies on. It draws its own caret, because
 // one real input spans all eight slots, and it needs layout to place it -- so
