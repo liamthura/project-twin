@@ -38,6 +38,7 @@ import db
 import jwt_auth
 import persona_store
 import proposals_store
+import scopes
 import sections
 import settings_store
 from persona_store import VALID_FILES
@@ -75,6 +76,44 @@ app = FastAPI(
 # on the server's capabilities and EMBEDDING_DIM rather than on a version.
 db.ensure_vector_schema()
 
+# Endpoints that manage the account rather than the persona in it.
+_ACCOUNT_PATHS = frozenset({"/api/auth/set-password", "/api/auth/tokens"})
+
+
+def _challenge(error: str = "", scope: str = "") -> str:
+    """An RFC 6750 Bearer challenge naming where to find the metadata.
+
+    Only sent on /mcp. The SPA has always received a plain JSON 401 from /api
+    and its fetch path is written against that; adding a challenge there would
+    be a change nobody asked for.
+    """
+    parts = []
+    if error:
+        parts.append(f'error="{error}"')
+    if scope:
+        parts.append(f'scope="{scope}"')
+    parts.append('resource_metadata="/.well-known/oauth-protected-resource/mcp"')
+    return "Bearer " + ", ".join(parts)
+
+
+def _unauthorized(is_mcp: bool) -> JSONResponse:
+    headers = (
+        {"WWW-Authenticate": _challenge(scope=" ".join(scopes.ALL_SCOPES))}
+        if is_mcp
+        else None
+    )
+    return JSONResponse({"error": "Unauthorized"}, status_code=401, headers=headers)
+
+
+def _insufficient_scope(is_mcp: bool, required: str) -> JSONResponse:
+    headers = (
+        {"WWW-Authenticate": _challenge(error="insufficient_scope", scope=required)}
+        if is_mcp
+        else None
+    )
+    return JSONResponse({"error": "Forbidden"}, status_code=403, headers=headers)
+
+
 # Bearer auth middleware for /mcp and /api routes
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
@@ -106,34 +145,70 @@ async def auth_middleware(request: Request, call_next):
     ):
         return await call_next(request)
 
-    # Protected routes: /mcp/* and /api/* -- resolve the bearer token to a user
-    # and scope the request to them via the current_user_id contextvar.
+    # Protected routes: /mcp/* and /api/* -- resolve the bearer credential to a
+    # user, scope the request to them, and record what the credential may do.
     if path.startswith("/mcp") or path.startswith("/api"):
+        is_mcp = path.startswith("/mcp")
         auth = request.headers.get("Authorization", "")
         if not auth.startswith("Bearer "):
-            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            return _unauthorized(is_mcp)
 
-        # Two kinds of bearer credential, told apart by shape rather than by a
-        # prefix: a JWS is three dot-separated segments, and the opaque tokens
-        # come from secrets.token_urlsafe, whose alphabet has no dot. Neither
-        # can be mistaken for the other, so neither costs a lookup for the
-        # other's failures.
-        #
-        # Humans (browser, via Better Auth) present a JWT; machines (MCP
-        # clients, scripts) present an opaque token. The opaque path below is
-        # unchanged, which is the point -- tokens already configured in clients
-        # we cannot reach keep working exactly as before.
+        # Three kinds of bearer credential, told apart by shape and then by
+        # audience. The opaque tokens come from secrets.token_urlsafe, whose
+        # alphabet has no dot, so a JWS is unmistakable; among JWSs, the
+        # audience says which surface the token was issued for. A session JWT
+        # names the auth service and an OAuth access token names /mcp, so
+        # neither can ever be presented where the other belongs.
         credential = auth[7:]
+        granted: frozenset = frozenset()
+        kind = "token"
+
         if jwt_auth.looks_like_jwt(credential):
-            claims = jwt_auth.verify(credential)
+            claims = jwt_auth.verify_access_token(credential)
+            if claims:
+                kind = "oauth"
+                granted = scopes.expand(claims.get("scope", "").split())
+            else:
+                claims = jwt_auth.verify(credential)
+                kind = "session"
+                # A browser session is the account holder in person. Scoping it
+                # would be scoping the owner against themselves.
+                granted = scopes.expand(scopes.ALL_SCOPES)
             user = db.resolve_user_by_id(claims["sub"]) if claims else None
         else:
             user = db.resolve_token(credential)
+            granted = scopes.expand(user["scopes"]) if user else frozenset()
 
         if not user:
-            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            return _unauthorized(is_mcp)
+
+        # An OAuth access token is valid on /mcp and nowhere else. The audience
+        # already says so; this makes the refusal explicit rather than relying
+        # on a claim check to have the side effect.
+        if kind == "oauth" and not is_mcp:
+            return _unauthorized(is_mcp)
+
+        if not granted:
+            return _insufficient_scope(is_mcp, scopes.READ)
+
+        # Account management is not persona access. An OAuth-connected
+        # application has no business changing a password or minting bearer
+        # tokens, whatever its scope -- and a read-only token that can mint a
+        # full one is not read-only. Requiring persona:write rather than a
+        # session keeps detached mode working, where a manually configured
+        # token is the ONLY credential the SPA has.
+        if path in _ACCOUNT_PATHS or path.startswith("/api/auth/tokens"):
+            if kind == "oauth" or not scopes.has(granted, scopes.WRITE):
+                return _insufficient_scope(is_mcp, scopes.WRITE)
+        elif path.startswith("/api"):
+            required = scopes.scope_for_method(request.method)
+            if not scopes.has(granted, required):
+                return _insufficient_scope(is_mcp, required)
+
         db.current_user_id.set(user["id"])
+        scopes.current_scopes.set(granted)
         request.state.username = user["username"]
+        request.state.credential_kind = kind
 
     return await call_next(request)
 
