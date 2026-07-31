@@ -19,9 +19,16 @@
  * listConnectedApps()/revokeConnectedApp() and wires this up to the API.
  *
  * `grants` is the already-normalised shape ConnectionSettings produces from
- * GET /oauth2/get-consents (which returns bare consent rows -- id, clientId,
- * scopes, createdAt -- with no client name or last-used time of its own):
- *   { id, clientName, scopes: string[], lastUsedAt?: string | null }
+ * GET /oauth2/get-consents:
+ *   { id, clientName, scopes: string[] }
+ *
+ * There is no "last used" here, and there was: the consent row carries only
+ * id, clientId, scopes and timestamps of its own creation, and the auth
+ * service exposes nothing else. The row rendered `grant.lastUsedAt`, which
+ * nothing ever set, so it never appeared. Showing `updatedAt` in its place
+ * would have been worse than showing nothing -- it moves when consent is
+ * re-granted, not when the connection is used, so it would have answered
+ * "is this still in use?" with a confidently wrong date.
  */
 import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
@@ -41,13 +48,6 @@ const SCOPE_LABELS = [
   [PROPOSE, "Suggest changes for your approval"],
   [WRITE, "Change your persona directly"],
 ];
-
-function formatDate(iso) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
-}
 
 export default function ConnectedApps({ grants, onRevoke }) {
   const [confirmId, setConfirmId] = useState(null);
@@ -82,7 +82,6 @@ export default function ConnectedApps({ grants, onRevoke }) {
       <div className="rounded-lg border divide-y">
         {grants.map((grant) => {
           const granted = grant.scopes || [];
-          const lastUsed = formatDate(grant.lastUsedAt);
           return (
             <div key={grant.id} className="flex items-start justify-between gap-3 p-3">
               <div className="min-w-0 space-y-1">
@@ -95,9 +94,6 @@ export default function ConnectedApps({ grants, onRevoke }) {
                     ),
                   )}
                 </ul>
-                {lastUsed && (
-                  <p className="text-xs text-muted-foreground">Last used {lastUsed}</p>
-                )}
               </div>
               {confirmId === grant.id ? (
                 <div className="flex shrink-0 flex-col items-end gap-2">

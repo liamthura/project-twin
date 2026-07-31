@@ -8,7 +8,6 @@ const GRANTS = [
     id: "consent-1",
     clientName: "Claude Desktop",
     scopes: ["persona:read", "persona:propose"],
-    lastUsedAt: "2026-07-30T10:00:00Z",
   },
 ];
 

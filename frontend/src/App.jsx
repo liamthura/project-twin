@@ -139,10 +139,20 @@ export default function App() {
     // param it ever strips is `invite`, which never appears here -- but this
     // stays correct regardless of what WelcomeAuth does internally.
     const oauthQuery = window.location.search;
+    // /sign-in is a real, bookmarkable path, so it gets opened with no OAuth
+    // query behind it -- and /oauth2/authorize with an empty query is an
+    // error page, not a sign-in. client_id is the parameter that makes this a
+    // connection request; without it there is no flow to resume and the app
+    // itself is where someone signing in wanted to end up.
+    const isOAuthRequest = new URLSearchParams(oauthQuery).has("client_id");
     return (
       <AuthShell
-        title="Sign in to connect"
-        description="Sign in to let this application connect to your persona."
+        title={isOAuthRequest ? "Sign in to connect" : "Sign in"}
+        description={
+          isOAuthRequest
+            ? "Sign in to let this application connect to your persona."
+            : "Sign in to your MyGist account."
+        }
       >
         <WelcomeAuth
           // Detached mode -- a UI pointed at someone else's server -- has no
@@ -151,6 +161,10 @@ export default function App() {
           // forked for this), it just has nothing to do here.
           onUseToken={() => {}}
           onSuccess={() => {
+            if (!isOAuthRequest) {
+              window.location.assign("/");
+              return;
+            }
             // Better Auth's /oauth2/authorize re-evaluates now that a
             // session cookie exists, and continues the flow it interrupted
             // -- on to /consent, or straight through for a client that has

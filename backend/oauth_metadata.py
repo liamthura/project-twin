@@ -51,7 +51,14 @@ def register(app: FastAPI) -> bool:
     trap that once made a bare /docs 404, and here it would make every one of
     these documents unreachable while /health kept saying ok.
     """
-    if not jwt_auth.MCP_RESOURCE:
+    # The same predicate the middleware uses to decide whether to send a
+    # WWW-Authenticate challenge, and it has to be: MCP_RESOURCE alone is not
+    # enough to verify a single token -- without AUTH_JWKS_URL there is no key
+    # to check a signature against, so verify_access_token refuses everything.
+    # Mounting these documents on a half-configured instance advertises a route
+    # that leads a client through discovery, registration and consent to a /mcp
+    # that will reject the token it just earned.
+    if not jwt_auth.mcp_resource_configured():
         return False
 
     @app.get("/.well-known/oauth-protected-resource", include_in_schema=False)
