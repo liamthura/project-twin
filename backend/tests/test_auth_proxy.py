@@ -156,3 +156,44 @@ def test_unreachable_service_gives_503_not_500(monkeypatch):
 
     response = TestClient(app, raise_server_exceptions=False).get("/auth/session")
     assert response.status_code == 503
+
+
+# --- The jar, which is where a proxy leaks other people's sessions ----------
+
+
+def test_the_client_keeps_no_cookies_of_its_own():
+    """A shipped cross-user session leak, found by driving a real browser.
+
+    httpx clients keep cookies by default, and this one is a process-wide
+    singleton shared by every visitor. The auth service set a session cookie on
+    sign-in, the jar stored it, and the proxy attached it to EVERY later
+    request -- so an unauthenticated stranger calling /auth/token was handed a
+    JWT belonging to whoever had signed in last.
+
+    Asserted on the client rather than on the class, because the defect was the
+    default and a future edit that drops the argument would restore it.
+    """
+    auth_proxy._client = None
+    client = auth_proxy._http()
+
+    request = httpx.Request("GET", "http://auth.internal/auth/token")
+    client.cookies.set("better-auth.session_token", "somebody-elses-session")
+    client.cookies.set_cookie_header(request)
+
+    assert "cookie" not in {k.lower() for k in request.headers}
+
+    auth_proxy._client = None
+
+
+def test_a_set_cookie_from_upstream_is_never_remembered():
+    """The other half: storing is what fills the jar in the first place."""
+    auth_proxy._client = None
+    client = auth_proxy._http()
+
+    client.cookies.extract_cookies(
+        upstream_response({"set-cookie": "better-auth.session_token=leaked; Path=/"})
+    )
+
+    assert len(list(client.cookies.jar)) == 0
+
+    auth_proxy._client = None

@@ -17,6 +17,7 @@ anything from forwarded headers and this stays a dumb passthrough.
 
 import logging
 import os
+from http.cookiejar import CookieJar
 from typing import Optional
 
 import httpx
@@ -56,6 +57,36 @@ _DROP_FROM_RESPONSE = _HOP_BY_HOP | {"content-encoding", "content-length"}
 # address rather than the public one.
 _DROP_FROM_REQUEST = _HOP_BY_HOP | {"host"}
 
+
+class _NoCookieJar(CookieJar):
+    """A cookie jar that never stores and never sends anything.
+
+    httpx clients keep cookies by default, and this client is a process-wide
+    singleton shared by every request from every visitor. That combination is a
+    cross-user session leak, not a performance detail: the auth service sets a
+    session cookie on sign-in, the jar stored it, and the proxy then attached it
+    to EVERY later request -- so an unauthenticated stranger calling
+    /auth/token was handed a JWT belonging to whoever signed in last.
+
+    A proxy has no session of its own. Its job is to carry the caller's own
+    Cookie header through untouched, which `_request_headers` already does, and
+    to carry Set-Cookie back, which `_response_headers` already does. Anything
+    it remembers between requests belongs to somebody, and it cannot know whom.
+
+    Written as a CookieJar rather than an httpx.Cookies subclass because that is
+    the extension point httpx actually honours: `Cookies(...)` re-wraps anything
+    it recognises and keeps only unrecognised objects as the jar itself, so a
+    Cookies subclass is silently discarded. Both hooks below are exactly the two
+    it delegates to.
+    """
+
+    def add_cookie_header(self, request):  # noqa: D102 - CookieJar hook
+        return
+
+    def extract_cookies(self, response, request):  # noqa: D102 - CookieJar hook
+        return
+
+
 # One client for the process, created on first use so that importing this
 # module opens no sockets and binds to no event loop. It is never explicitly
 # closed: the app's lifespan is FastMCP's, and hanging a second shutdown hook
@@ -68,7 +99,11 @@ _client: Optional[httpx.AsyncClient] = None
 def _http() -> httpx.AsyncClient:
     global _client
     if _client is None:
-        _client = httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=False)
+        _client = httpx.AsyncClient(
+            timeout=TIMEOUT,
+            follow_redirects=False,
+            cookies=_NoCookieJar(),
+        )
     return _client
 
 
