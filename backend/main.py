@@ -33,7 +33,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Persona data + auth now live in Postgres (see db.py / persona_store.py).
+import auth_proxy
 import db
+import jwt_auth
 import persona_store
 import sections
 import settings_store
@@ -99,7 +101,24 @@ async def auth_middleware(request: Request, call_next):
         auth = request.headers.get("Authorization", "")
         if not auth.startswith("Bearer "):
             return JSONResponse({"error": "Unauthorized"}, status_code=401)
-        user = db.resolve_token(auth[7:])
+
+        # Two kinds of bearer credential, told apart by shape rather than by a
+        # prefix: a JWS is three dot-separated segments, and the opaque tokens
+        # come from secrets.token_urlsafe, whose alphabet has no dot. Neither
+        # can be mistaken for the other, so neither costs a lookup for the
+        # other's failures.
+        #
+        # Humans (browser, via Better Auth) present a JWT; machines (MCP
+        # clients, scripts) present an opaque token. The opaque path below is
+        # unchanged, which is the point -- tokens already configured in clients
+        # we cannot reach keep working exactly as before.
+        credential = auth[7:]
+        if jwt_auth.looks_like_jwt(credential):
+            claims = jwt_auth.verify(credential)
+            user = db.resolve_user_by_id(claims["sub"]) if claims else None
+        else:
+            user = db.resolve_token(credential)
+
         if not user:
             return JSONResponse({"error": "Unauthorized"}, status_code=401)
         db.current_user_id.set(user["id"])
@@ -651,6 +670,13 @@ def register_static_routes(app: FastAPI, static_dir: Path) -> bool:
 
 
 STATIC_MOUNTED = register_static_routes(app, STATIC_DIR)
+
+# /auth/* -> the Better Auth service, when one is configured. Registered here
+# for the same reason the static routes are: the MCP app is mounted at "/"
+# below and matches everything, so anything needing its own path must be
+# registered before it. This is the trap that made a bare /docs 404 while
+# /docs/ worked.
+AUTH_PROXIED = auth_proxy.register(app)
 
 
 # ============================================================================

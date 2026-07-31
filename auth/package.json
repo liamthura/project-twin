@@ -1,0 +1,18 @@
+{
+  "name": "mygist-auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Better Auth service for MyGist. Human sign-in only; MCP clients authenticate against the Python API with opaque tokens.",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "schema:generate": "npx --yes @better-auth/cli@latest generate --config src/auth.js --output ../backend/migrations/sql/better_auth.sql",
+    "schema:migrate": "npx --yes @better-auth/cli@latest migrate --config src/auth.js"
+  },
+  "dependencies": {
+    "better-auth": "1.6.23",
+    "bcryptjs": "3.0.2",
+    "pg": "8.16.3"
+  }
+}

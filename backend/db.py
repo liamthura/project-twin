@@ -291,6 +291,38 @@ def resolve_token(token: str) -> Optional[dict]:
     return user
 
 
+def resolve_user_by_id(user_id: str) -> Optional[dict]:
+    """Look up a user by id, for a credential that has already been verified
+    cryptographically rather than by database lookup -- i.e. a Better Auth JWT,
+    whose `sub` is this id by design (see the integration design doc).
+
+    Deliberately does NOT create a missing user. A token can only be signed for
+    an account the auth service knows about, so an id with no row here means the
+    two stores have drifted, and inventing a row would paper over exactly the
+    bug worth hearing about.
+    """
+    try:
+        uuid.UUID(user_id)
+    except (ValueError, AttributeError, TypeError):
+        # `sub` is attacker-influenced only in the sense that a valid signature
+        # is required to reach here, but a non-UUID would raise inside psycopg
+        # rather than simply not matching.
+        return None
+
+    with get_pool().connection() as conn:
+        user = conn.execute(
+            """
+            update users set last_seen_at = now()
+            where id = %s
+            returning id, username
+            """,
+            (user_id,),
+        ).fetchone()
+    if user:
+        user["id"] = str(user["id"])
+    return user
+
+
 def create_token(
     user_id: str, label: str = "token", expires_in_days: Optional[int] = None
 ) -> tuple[str, str]:
