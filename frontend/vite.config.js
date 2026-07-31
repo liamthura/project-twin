@@ -53,6 +53,14 @@ export default defineConfig({
         target: "http://127.0.0.1:1120",
         changeOrigin: true,
       },
+      // Better Auth, proxied by FastAPI in production (backend/auth_proxy.py).
+      // Proxied here too so the session cookie is same-origin in development --
+      // pointing the browser straight at the auth service would make it
+      // cross-site, and the cookie would be dropped.
+      "/auth": {
+        target: "http://127.0.0.1:1120",
+        changeOrigin: true,
+      },
     },
   },
   // Build options for production

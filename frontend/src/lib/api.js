@@ -2,6 +2,7 @@
  * API Client for MyGist Server
  * Handles authentication and server connection
  */
+import { getJwt, forgetJwt } from "./session.js";
 
 // Default hosted API base (full URL including the /api prefix). The hosted
 // instance serves the UI and the API from one origin, but this stays absolute:
@@ -54,10 +55,27 @@ function getAuthToken() {
   return config?.token || import.meta.env.VITE_API_TOKEN || null;
 }
 
+/** The credential for an API call, and whether it came from the session.
+ *
+ * An explicitly configured token wins. That covers two cases that both have to
+ * keep working: an account signed in before Better Auth existed, whose
+ * thirty-day token is still in localStorage, and detached mode, where the UI
+ * points at a remote instance and cookie auth cannot apply at all.
+ *
+ * Otherwise the Better Auth session provides a short-lived JWT. Returning
+ * `fromSession` lets the caller know a 401 is worth one retry -- a stale
+ * manual token is not, but an expired JWT is.
+ */
+async function resolveCredential() {
+  const manual = getAuthToken();
+  if (manual) return { credential: manual, fromSession: false };
+  return { credential: await getJwt(), fromSession: true };
+}
+
 // API client with auth
-async function api(endpoint, options = {}) {
+async function api(endpoint, options = {}, { allowRetry = true } = {}) {
   const baseUrl = getApiBase();
-  const token = getAuthToken();
+  const { credential, fromSession } = await resolveCredential();
 
   const headers = {
     "Content-Type": "application/json",
@@ -65,8 +83,8 @@ async function api(endpoint, options = {}) {
   };
 
   // Add auth header if token exists
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  if (credential) {
+    headers["Authorization"] = `Bearer ${credential}`;
   }
 
   const url = `${baseUrl}${endpoint}`;
@@ -76,6 +94,15 @@ async function api(endpoint, options = {}) {
       ...options,
       headers,
     });
+
+    // A session JWT is short-lived by design, so the first 401 after it
+    // expires is expected rather than exceptional. Drop it, derive a fresh one
+    // from the cookie and try once more. Only once: a second 401 means the
+    // session itself is gone, and retrying would loop.
+    if (response.status === 401 && fromSession && allowRetry) {
+      forgetJwt();
+      return api(endpoint, options, { allowRetry: false });
+    }
 
     if (response.status === 401 || response.status === 403) {
       // Prefer the server's own detail (e.g. "current password is
@@ -187,7 +214,7 @@ function isConfigured() {
 // Export data as zip file download
 async function exportData() {
   const baseUrl = getApiBase();
-  const token = getAuthToken();
+  const { credential: token } = await resolveCredential();
 
   const headers = {};
   if (token) {
@@ -227,7 +254,7 @@ async function exportData() {
 // mode: "replace" (default) or "merge"
 async function importData(file, mode = "replace") {
   const baseUrl = getApiBase();
-  const token = getAuthToken();
+  const { credential: token } = await resolveCredential();
 
   const formData = new FormData();
   formData.append("file", file);

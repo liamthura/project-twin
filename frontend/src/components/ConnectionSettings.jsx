@@ -45,6 +45,7 @@ import {
   createToken,
   revokeToken,
 } from "@/lib/api.js";
+import { signOut } from "@/lib/session.js";
 
 const TABS = [
   { id: "connection", label: "Connection" },
@@ -218,7 +219,8 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
     onClose();
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
+    await signOut();
     clearConfig();
     setConnectionType("cloud");
     setServerUrl(CLOUD_API_URL);
@@ -228,7 +230,11 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
     onConnectionChange?.();
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    // Clearing localStorage alone would leave the Better Auth session cookie
+    // intact -- the UI would look signed out while a reload silently signed
+    // you back in. The cookie is HttpOnly, so only the service can revoke it.
+    await signOut();
     clearConfig();
     onConnectionChange?.();
     onClose();
