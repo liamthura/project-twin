@@ -40,6 +40,7 @@ from dotenv import load_dotenv
 
 import db
 import persona_store
+import proposals_store
 import search_index
 import sections
 import settings_store
@@ -4277,6 +4278,141 @@ def persona_batch(operations: list) -> str:
         results.append(f"{i+1}. {result}")
 
     return "\n".join(results)
+
+
+_REQUIRED_PROPOSAL_FIELDS = ("rationale", "evidence")
+
+
+def _validate_proposal(p: dict) -> tuple[dict | None, dict | None]:
+    """Return (normalised_kwargs, error). Exactly one is None."""
+    kind = p.get("kind")
+    if kind not in ("entity", "note"):
+        return None, {"result": "invalid", "reason": "kind must be 'entity' or 'note'"}
+
+    for field in _REQUIRED_PROPOSAL_FIELDS:
+        if not str(p.get(field) or "").strip():
+            return None, {
+                "result": "invalid",
+                "reason": f"'{field}' is required and must be non-empty",
+            }
+
+    common = {
+        "rationale": p["rationale"],
+        "evidence": p["evidence"],
+        "confidence": p.get("confidence"),
+    }
+
+    if kind == "note":
+        if not str(p.get("text") or "").strip():
+            return None, {"result": "invalid", "reason": "'text' is required for a note"}
+        return dict(common, note=p["text"], section_hint=p.get("section_hint")), None
+
+    entity = str(p.get("entity") or "").lower()
+    section = _section_for_entity(entity)
+    if section is None:
+        return None, {
+            "result": "invalid",
+            "reason": f"unknown entity '{entity}'",
+            "valid_entities": sorted(
+                e for spec in ENTITY_SCHEMA.values() for e in spec
+            ),
+        }
+    if p.get("action") not in ENTITY_SCHEMA[section][entity].get("actions", []):
+        return None, {
+            "result": "invalid",
+            "reason": f"action '{p.get('action')}' is not valid for '{entity}'",
+            "valid_actions": ENTITY_SCHEMA[section][entity].get("actions", []),
+        }
+
+    data = normalize_data(p.get("data") or {}, entity)
+    identifier_field = ENTITY_SCHEMA[section][entity].get("identifier")
+    return dict(
+        common, action=p["action"], entity=entity, data=data,
+        identifier=str(data.get(identifier_field, "")),
+    ), None
+
+
+@mcp.tool()
+def propose_update(proposals: list, client: str) -> str:
+    """Propose durable persona changes you inferred from the conversation.
+
+    This NEVER writes. Every proposal lands in the user's review queue, and
+    they approve, reject, or promote it themselves. To write immediately --
+    only when the user has explicitly asked you to record something -- use
+    persona_modify instead.
+
+    ARGS:
+        proposals (required): list of proposal objects, see KINDS below
+        client (required): the product you are running in, as a user would
+            name it -- "Claude Desktop", "Cursor", "Codex", "Hermes",
+            "OpenClaw". Not a model name. The user sees this on every row and
+            uses it to tell which of their tools proposed what.
+
+    KINDS:
+        entity -- typed and schema-valid; you know where it belongs.
+            {kind: "entity", action: "add"|"update"|"remove", entity: "domain",
+             data: {...}, rationale: "...", evidence: "...", confidence: 0.7}
+            Call get_schema if unsure of the entity vocabulary.
+
+        note -- durable but ambiguous; nothing in the schema holds it.
+            {kind: "note", section_hint: "preferences", text: "...",
+             rationale: "...", evidence: "...", confidence: 0.6}
+
+    REQUIRED ON EVERY PROPOSAL:
+        rationale -- why this is durable, in your words. The user reads this
+            when deciding, so make it the reason, not a restatement.
+        evidence -- the user's own words that prompted it. If you cannot quote
+            them, you have inferred too far and should not propose.
+
+    PROPOSE when the user reveals something still true next month: a skill
+    level that has actually moved, a project's real status, a person who
+    matters to them, a standing preference about how they want to be answered.
+
+    DO NOT PROPOSE session summaries, moods, one-off task instructions, things
+    the user only asked about, praise, or anything you would struggle to quote
+    them on. When in doubt, do not propose -- an unreviewed queue helps nobody.
+
+    RETURN:
+        {"results": [{n, result, ...}]} where result is one of:
+        stored | duplicate_pending | previously_rejected |
+        conflicts_with_existing | invalid
+        An invalid item never sinks the batch; the valid ones still land.
+    """
+    if not str(client or "").strip():
+        return json.dumps({
+            "error": "'client' is required: name the product you run in, "
+                     "e.g. 'Claude Desktop', 'Cursor', 'Codex'.",
+            "results": [],
+        }, ensure_ascii=False)
+    if not proposals:
+        return json.dumps({"error": "No proposals provided", "results": []},
+                          ensure_ascii=False)
+
+    results = []
+    for i, p in enumerate(proposals, start=1):
+        kwargs, error = _validate_proposal(p if isinstance(p, dict) else {})
+        if error:
+            results.append(dict(error, n=i))
+            continue
+
+        outcome = proposals_store.create(p["kind"], client=client.strip(), **kwargs)
+        entry = {"n": i, "result": outcome["result"], "id": outcome["id"]}
+
+        # A proposal that contradicts a value already on record is still
+        # stored -- the user decides -- but they should not have to go and
+        # look up what it currently says.
+        if outcome["result"] == "stored" and p["kind"] == "entity":
+            match = _find_strong_match(
+                _section_for_entity(kwargs["entity"]), kwargs["data"]
+            )
+            if match:
+                entry["result"] = "conflicts_with_existing"
+                entry["existing_entity"] = {
+                    "entity_id": match["entity_id"], "title": match["title"],
+                }
+        results.append(entry)
+
+    return json.dumps({"results": results}, ensure_ascii=False)
 
 
 @mcp.tool()
