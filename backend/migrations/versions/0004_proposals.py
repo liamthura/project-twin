@@ -1,7 +1,7 @@
 """persona_proposals
 
-Revision ID: 0003_proposals
-Revises: 0002_token_expiry
+Revision ID: 0004_proposals
+Revises: 0003_better_auth_schema
 Create Date: 2026-07-31
 
 A pending proposal is not persona data. Filing it in persona_data would drag
@@ -12,8 +12,8 @@ Every statement is idempotent, matching the baseline revision's standing rule.
 """
 from alembic import op
 
-revision = "0003_proposals"
-down_revision = "0002_token_expiry"
+revision = "0004_proposals"
+down_revision = "0003_better_auth_schema"
 branch_labels = None
 depends_on = None
 

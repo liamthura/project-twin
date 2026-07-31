@@ -25,7 +25,7 @@
 
 | File | Responsibility |
 | --- | --- |
-| `backend/migrations/versions/0003_proposals.py` | create the table and its indexes |
+| `backend/migrations/versions/0004_proposals.py` | create the table and its indexes |
 | `backend/proposals_store.py` | all proposal persistence: fingerprinting, dedupe, eviction, listing, resolution. No MCP or HTTP concerns. |
 | `backend/server.py` | `propose_update` tool only — argument validation, schema check, delegation to `proposals_store` |
 | `backend/main.py` | four REST endpoints, delegating to `proposals_store` and `server.execute_modify` |
@@ -38,7 +38,7 @@
 ### Task 1: Migration and test fixture
 
 **Files:**
-- Create: `backend/migrations/versions/0003_proposals.py`
+- Create: `backend/migrations/versions/0004_proposals.py`
 - Modify: `backend/tests/conftest.py:44-50` (the table drop list)
 - Test: `backend/tests/test_proposals_migration.py`
 
@@ -96,13 +96,13 @@ Expected: FAIL — `missing column id` (the table does not exist, so `_columns()
 
 - [ ] **Step 3: Write the migration**
 
-Create `backend/migrations/versions/0003_proposals.py`:
+Create `backend/migrations/versions/0004_proposals.py`:
 
 ```python
 """persona_proposals
 
-Revision ID: 0003_proposals
-Revises: 0002_token_expiry
+Revision ID: 0004_proposals
+Revises: 0003_better_auth_schema
 Create Date: 2026-07-31
 
 A pending proposal is not persona data. Filing it in persona_data would drag
@@ -113,8 +113,8 @@ Every statement is idempotent, matching the baseline revision's standing rule.
 """
 from alembic import op
 
-revision = "0003_proposals"
-down_revision = "0002_token_expiry"
+revision = "0004_proposals"
+down_revision = "0003_better_auth_schema"
 branch_labels = None
 depends_on = None
 
@@ -180,7 +180,7 @@ Expected: PASS (all)
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/migrations/versions/0003_proposals.py backend/tests/conftest.py backend/tests/test_proposals_migration.py
+git add backend/migrations/versions/0004_proposals.py backend/tests/conftest.py backend/tests/test_proposals_migration.py
 git commit -m "feat: a table for proposals the user has not resolved yet"
 ```
 

@@ -165,7 +165,9 @@ staging row that is about to be deleted either way, the tag would do nothing.
 
 ## Storage
 
-New alembic revision `0003_proposals`. A pending proposal is not persona data — filing it as one
+New alembic revision `0004_proposals`, chained onto `0003_better_auth_schema` — Better Auth
+landed on main first (#41), and its own revision note sets the rule that whichever lands second
+renumbers. A pending proposal is not persona data — filing it as one
 would drag it into `/api/export`, the search index, the pack registry, and the editor.
 
 ```sql
