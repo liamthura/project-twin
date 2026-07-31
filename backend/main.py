@@ -53,6 +53,12 @@ write_json_file = persona_store.save
 import server
 from server import mcp
 
+# Scope enforcement for MCP tools. Added before http_app() so it is part of the
+# app that gets mounted.
+import mcp_scopes  # noqa: E402
+
+mcp.add_middleware(mcp_scopes.ScopeMiddleware())
+
 # Create MCP HTTP app. Default path is "/mcp" - FastMCP registers this as an
 # exact route internally, so mounting the whole app at "/" below lets "/mcp"
 # resolve directly (no trailing-slash redirect, unlike mounting at "/mcp" with
