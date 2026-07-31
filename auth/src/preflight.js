@@ -34,11 +34,12 @@ export async function preflight(pool) {
         "  DATABASE_URL is set (the service would not have started otherwise),\n" +
         "  so it is reachable-looking but wrong. Common causes, in the order they\n" +
         "  usually bite:\n\n" +
-        "    - TLS. libpq reads sslmode=require as \"encrypt, do not verify\";\n" +
-        "      node-postgres verifies unless told otherwise, so a self-signed\n" +
-        "      certificate fails with UNABLE_TO_VERIFY_LEAF_SIGNATURE. Use\n" +
-        "      sslmode=require for that, or drop sslmode entirely on an\n" +
-        "      internal network.\n" +
+        "    - TLS. sslmode is honoured with libpq's meaning (see db-config.js),\n" +
+        "      so `require` encrypts without checking the certificate chain and\n" +
+        "      only `verify-ca`/`verify-full` check it. If the message above says\n" +
+        "      UNABLE_TO_VERIFY_LEAF_SIGNATURE or SELF_SIGNED_CERT, DATABASE_URL\n" +
+        "      is asking to verify a certificate that cannot be verified: use\n" +
+        "      sslmode=require, or drop sslmode on an internal network.\n" +
         "    - Host. localhost inside this container is this container.\n" +
         "    - Role or database does not exist.\n",
     );
