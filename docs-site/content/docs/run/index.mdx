@@ -10,17 +10,33 @@ If you only want to *use* MyGist, [Using MyGist](/use) is the other half.
 
 ## The whole system
 
-MyGist ships as **one container** serving four things on a single origin. There
-is no separate frontend service and no Node runtime in production — the web UI
-and this documentation are both static output built into the image.
+MyGist ships as **two containers** on a single origin: the API, and the auth
+service behind it.
+
+The API container serves four things — the web UI, the REST API, the MCP
+endpoint and this documentation. The web UI and the docs are static output
+built into the image, so there is still no frontend service and no build step
+at runtime.
+
+The second container runs [Better Auth](https://better-auth.com) and handles
+human sign-in. It is **not** published: the API proxies `/auth/*` to it
+internally, so a reverse proxy still sees one upstream and one port. It was one
+container until sign-in moved there; if you are reading older material that says
+so, this is what changed.
 
 ```text
-                    one container
+                     one origin
    ┌──────────────────────────────────────────────┐
-   │  /          web UI (static)                  │
-   │  /api       REST API                         │
-   │  /mcp       MCP endpoint                     │
-   │  /docs      this documentation (static)      │
+   │  API container                               │
+   │    /          web UI (static)                │
+   │    /api       REST API                       │
+   │    /mcp       MCP endpoint                   │
+   │    /docs      this documentation (static)    │
+   │    /auth   ───┐  proxied, not published      │
+   └───────────────┼──────────────────────────────┘
+                   ▼
+   ┌──────────────────────────────────────────────┐
+   │  auth container — Better Auth, human sign-in │
    └──────────────────────────────────────────────┘
                           │
                    ┌──────────────┐
@@ -39,7 +55,7 @@ and this documentation are both static output built into the image.
 
 ## What you need
 
-**Postgres, and somewhere to run one container.** That is the whole
+**Postgres, and somewhere to run two containers.** That is the whole
 requirement list.
 
 [pgvector](/run/database) is optional — without it, search degrades to

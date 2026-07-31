@@ -47,7 +47,8 @@ MCP tools are passive and run only when a client calls them.
 
 ## Quick start
 
-You need Postgres and one container.
+You need Postgres and two containers — the API, and the auth service it
+proxies `/auth` to.
 
 ```bash
 docker build -t mygist .

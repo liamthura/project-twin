@@ -13,6 +13,8 @@
  * pipeline to maintain, for no type surface worth checking. The types still
  * apply in an editor via JSDoc.
  */
+import { randomUUID } from "node:crypto";
+
 import { betterAuth } from "better-auth";
 import { jwt } from "better-auth/plugins";
 import { username } from "better-auth/plugins";
@@ -34,6 +36,14 @@ const required = (name) => {
 // from forwarded headers -- FastAPI proxies /auth/* to this service, and an
 // inferred base would produce internal addresses in redirects and cookies.
 const baseURL = required("BETTER_AUTH_URL");
+
+// One pool, shared by Better Auth and the provisioning hook below. search_path
+// pins Better Auth's own queries to its schema; the hook reaches into `public`
+// by qualifying the table explicitly, which works regardless of search_path.
+const pool = new Pool({
+  connectionString: required("DATABASE_URL"),
+  options: "-c search_path=better_auth",
+});
 
 export const auth = betterAuth({
   baseURL,
@@ -57,12 +67,59 @@ export const auth = betterAuth({
   // next to `public.users` is a trap for whoever reads this database next.
   // The tables themselves are created by Alembic (migration 0003), not by
   // Better Auth's CLI, so that one tool owns the schema.
-  database: new Pool({
-    connectionString: required("DATABASE_URL"),
-    options: "-c search_path=better_auth",
-  }),
+  database: pool,
 
-  trustedOrigins: [baseURL],
+  advanced: {
+    database: {
+      // Better Auth's own id generator emits a random string. MyGist's
+      // `public.users.id` is a `uuid` column, referenced by foreign keys from
+      // persona_data and persona_search, so a non-UUID id could not be stored
+      // there at all -- and the whole identity model rests on the two ids being
+      // the same value. Generating UUIDs here is what lets a NEW account keep
+      // the one-id-space property that seeding gave the existing ones.
+      generateId: () => randomUUID(),
+    },
+  },
+
+  databaseHooks: {
+    user: {
+      create: {
+        // A Better Auth account is only half an account: the persona tables key
+        // off `public.users`, and `db.resolve_user_by_id` deliberately refuses
+        // to create a missing row, so that drift between the two stores stays
+        // visible rather than being silently papered over. That strictness is
+        // only safe if registration provisions both sides, which is this hook.
+        //
+        // Runs inside the sign-up flow, so a failure here fails the
+        // registration rather than leaving an account that can authenticate but
+        // owns nothing.
+        after: async (user) => {
+          await pool.query(
+            `insert into public.users (id, username, created_at)
+             values ($1, $2, now())
+             on conflict (id) do nothing`,
+            [user.id, user.username ?? user.name],
+          );
+        },
+      },
+    },
+  },
+
+  // The public origin, plus anything BETTER_AUTH_TRUSTED_ORIGINS adds.
+  //
+  // In development the browser is on the Vite dev server (a different port
+  // from BETTER_AUTH_URL), so its Origin header is not the base URL. Measured
+  // on 1.6.23, sign-in does not currently reject an untrusted origin -- but
+  // that is a property of today's version rather than a promise, and OAuth
+  // callbacks will care. Making it configurable costs nothing and means a dev
+  // server on any port needs no code edit.
+  trustedOrigins: [
+    baseURL,
+    ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS || "")
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  ],
 
   emailAndPassword: {
     enabled: true,

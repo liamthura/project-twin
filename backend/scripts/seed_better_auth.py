@@ -20,6 +20,14 @@ accounts have no email at all. Accounts without one get `<username>@mygist
 placeholder can never be mistaken for a deliverable address or accidentally
 sent to. They are replaced when a real address is added.
 
+**Usernames are stored lowercase.** The username plugin normalises with
+`toLowerCase()` before it looks anyone up, so a row stored as "Liam" is
+unreachable: typing "Liam" normalises to "liam" and matches nothing, and the
+attempt fails as "invalid username or password" without the password ever being
+checked. `username` therefore holds the normalised form and `displayUsername`
+the original, which is exactly how the plugin writes its own rows. Getting this
+wrong locks out every account with an uppercase letter in its name.
+
 Usage:
     DATABASE_URL=... python scripts/seed_better_auth.py [--dry-run]
 """
@@ -86,7 +94,7 @@ def seed(dry_run: bool = False) -> dict:
                        set "username" = %s, "displayUsername" = %s, "updatedAt" = %s
                      where "id" = %s
                     """,
-                    (username, username, now, user_id),
+                    (username.lower(), username, now, user_id),
                 )
                 stats["updated"] += 1
             else:
@@ -101,7 +109,8 @@ def seed(dry_run: bool = False) -> dict:
                         user_id,
                         username,
                         placeholder_email(username),
-                        username,
+                        # Normalised for lookup; original preserved for display.
+                        username.lower(),
                         username,
                         row["created_at"] or now,
                         now,
