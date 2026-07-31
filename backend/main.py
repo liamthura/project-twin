@@ -426,6 +426,13 @@ class SetPasswordRequest(BaseModel):
 
 class CreateTokenRequest(BaseModel):
     label: str = "token"
+    # Optional scope choice for the minted token, matching the consent
+    # screen's vocabulary (persona:read/propose/write). None means every
+    # scope, preserving a token's historical default. Anything outside
+    # scopes.ALL_SCOPES is dropped rather than rejected -- a client sending
+    # an unrecognised value gets a token as narrow as what it did ask for
+    # that we understand, not a 400 over a scope we might add tomorrow.
+    scopes: Optional[list[str]] = None
 
 
 def invite_only() -> bool:
@@ -551,7 +558,12 @@ async def list_tokens():
 @app.post("/api/auth/tokens")
 async def create_token(body: CreateTokenRequest):
     label = body.label.strip() or "token"
-    token_id, token = db.create_token(db.current_user_id.get(), label)
+    token_scopes = (
+        [s for s in body.scopes if s in scopes.ALL_SCOPES] if body.scopes is not None else None
+    )
+    token_id, token = db.create_token(
+        db.current_user_id.get(), label, token_scopes=token_scopes
+    )
     return {"id": token_id, "label": label, "token": token}
 
 
