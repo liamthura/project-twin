@@ -143,22 +143,30 @@ No mapping table, no join, nothing to fall out of step.
   matching `public.users` row on first authenticated request, taking the id
   and username from the JWT claims.
 
-`public.users` gains one nullable column:
+**Email lives in Better Auth, not in `public.users`.**
 
-| Column | Why |
-|---|---|
-| `email text unique` | Required by verification, reset and (later) OAuth matching |
+The original plan added a nullable `email` column to `public.users`. Phase 3
+dropped that: `better_auth."user".email` already exists and is `NOT NULL`, so a
+second column would be a second copy of the same fact — exactly the drift this
+design eliminated for ids. Better Auth owns the address; FastAPI reads it from
+the session or the JWT on the rare occasion it needs one.
 
-Nullable, because existing accounts have none. Every email-dependent flow
-needs a "you have not set one yet" branch — that is the accepted cost of
-keeping current accounts working, and it should be a single shared guard
-rather than scattered checks.
+Accounts with no address hold `<username>@mygist.invalid` until they set a real
+one, so every email-dependent flow still needs a "you have not set one yet"
+branch. That should be one shared guard rather than scattered checks.
 
 > **Corrected during Phase 1.** Better Auth's own `user.email` is `NOT NULL`,
 > so "nullable email" only holds on the MyGist side. Accounts with no address
 > are seeded `<username>@mygist.invalid` — `.invalid` is reserved by RFC 2606
 > and can never resolve, so a placeholder cannot be mistaken for a deliverable
 > address or accidentally sent to. Real addresses replace them in Phase 3.
+
+> **Found in Phase 3.** Better Auth lowercases an email before looking it up,
+> just as it does a username. A placeholder seeded with the username's original
+> capitalisation was unreachable in both directions — `Liam@…` normalises to
+> `liam@…` and misses, `liam@…` does not match the stored `Liam@…` — so reset
+> returned 200 and did nothing. Placeholders are lowercased; real addresses are
+> never rewritten.
 
 > **Also found in Phase 1.** The username plugin validates with
 > `/^[a-zA-Z0-9_.]+$/` by default — no hyphens. MyGist's registration only ever
