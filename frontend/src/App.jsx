@@ -11,6 +11,7 @@ import {
   Loader2,
   Users,
   SlidersHorizontal,
+  Inbox,
   Sun,
   Moon,
   Monitor,
@@ -33,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Toaster } from "@/components/ui/toaster";
+import ProposalsPanel from "@/components/ProposalsPanel";
 import { useToast } from "@/components/ui/use-toast";
 import {
   Dialog,
@@ -523,6 +525,10 @@ export default function App() {
                 </TabsTrigger>
               );
             })}
+            <TabsTrigger value="review" className={TAB_TRIGGER_CLASS}>
+              <Inbox className="h-4 w-4" />
+              <span>Review</span>
+            </TabsTrigger>
             <TabsTrigger value="sections" className={TAB_TRIGGER_CLASS}>
               <SlidersHorizontal className="h-4 w-4" />
               <span>Sections</span>
@@ -545,6 +551,9 @@ export default function App() {
               />
             </TabsContent>
           ))}
+          <TabsContent value="review">
+            <ProposalsPanel />
+          </TabsContent>
           <TabsContent value="sections">
             <Card>
               <CardHeader className="border-b">
