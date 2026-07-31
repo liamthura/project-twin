@@ -14,10 +14,18 @@
 import { createServer } from "node:http";
 import { toNodeHandler } from "better-auth/node";
 
-import { auth } from "./auth.js";
+import { auth, pool } from "./auth.js";
+import { preflight } from "./preflight.js";
 
 const port = Number(process.env.PORT || 3001);
 const host = process.env.HOST || "0.0.0.0";
+
+// Refuse to serve against a database this service cannot use. Starting anyway
+// means /health says ok while every real request 500s, and the reason lives
+// only in a container log -- the hardest place to reach mid-deploy.
+if (!(await preflight(pool))) {
+  process.exit(1);
+}
 
 const handler = toNodeHandler(auth);
 
