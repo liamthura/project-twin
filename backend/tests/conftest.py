@@ -34,6 +34,7 @@ def clean_database(monkeypatch):
     conn = psycopg.connect(TEST_DATABASE_URL)
     conn.autocommit = True
     with conn.cursor() as cur:
+        cur.execute("drop table if exists persona_proposals;")  # references users
         cur.execute("drop table if exists persona_search;")  # references users
         cur.execute("drop table if exists tokens;")  # references users
         cur.execute("drop table if exists persona_data;")
