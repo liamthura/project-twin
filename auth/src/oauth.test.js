@@ -70,8 +70,13 @@ test("registration is rate limited", () => {
 
 test("access tokens are short lived so revocation bites quickly", () => {
   const options = oauthOptions({ baseURL: BASE, mcpResource: RESOURCE });
-  assert.equal(options.accessTokenExpiresIn, "10m");
-  assert.equal(options.refreshTokenExpiresIn, "30d");
+  // Seconds as numbers, not time-span strings: the plugin adds these onto a
+  // unix timestamp, so a string silently produces an Invalid Date and a 500
+  // from Postgres on the very last step of the handshake.
+  assert.equal(options.accessTokenExpiresIn, 600);
+  assert.equal(options.refreshTokenExpiresIn, 2592000);
+  assert.equal(typeof options.accessTokenExpiresIn, "number");
+  assert.equal(typeof options.refreshTokenExpiresIn, "number");
 });
 
 // Registration scopes. The bug these cover was found on the first real

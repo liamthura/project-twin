@@ -101,8 +101,16 @@ export function oauthOptions({ baseURL, mcpResource }) {
     // Short, so that revoking a connection bites in minutes rather than hours.
     // The refresh token dies immediately on revoke; this bounds how long the
     // access token already in flight outlives it.
-    accessTokenExpiresIn: "10m",
-    refreshTokenExpiresIn: "30d",
+    // SECONDS, as numbers. Not a time-span string: the plugin adds these
+    // straight onto a unix timestamp (`iat + opts.accessTokenExpiresIn`), so
+    // "10m" makes that a string concatenation, the resulting Date is Invalid,
+    // and Postgres rejects the insert with
+    //   invalid input syntax for type timestamp with time zone:
+    //   "0NaN-NaN-NaNTNaN:NaN:NaN.NaN+NaN:NaN"
+    // -- which reaches the user as a 500 on Allow, naming nothing that helps.
+    // The plugin's own defaults are numbers (3600, 2592000); this pins that.
+    accessTokenExpiresIn: 10 * 60,
+    refreshTokenExpiresIn: 30 * 24 * 60 * 60,
 
     rateLimit: {
       register: { window: 60, max: 5 },
