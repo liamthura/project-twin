@@ -176,12 +176,12 @@ create table persona_proposals (
   action       text,                       -- add | update | remove   (entity only)
   entity       text,                       -- domain, connection, …   (entity only)
   data         jsonb,                      --                         (entity only)
-  note_text    text,                       --                           (note only)
+  note         text,                       --                           (note only)
   section_hint text,                       --                           (note only)
   rationale    text not null,
   evidence     text,
   confidence   real,
-  proposed_by  text,                       -- MCP client name where available
+  proposed_by  text not null,              -- product name, e.g. "Claude Desktop"
   fingerprint  text not null,
   status       text not null default 'pending',   -- pending | approved | rejected | promoted | evicted
   seen_count   int  not null default 1,
@@ -196,13 +196,10 @@ create unique index on persona_proposals (user_id, fingerprint)
   where status in ('pending', 'rejected', 'promoted');
 ```
 
-`note_text` rather than `text`: the latter is a Postgres type name and, while legal as a column
-identifier, reads badly in every query that touches it.
-
 ### Fingerprint dedupe and tombstones
 
 `fingerprint` hashes the normalised claim: `kind` + `entity` + identifier value for entity
-proposals, normalised `note_text` for notes. The partial unique index gives three behaviours:
+proposals, normalised `note` for notes. The partial unique index gives three behaviours:
 
 - **Re-proposed while pending** → `seen_count` increments instead of inserting a second row.
   Three agents independently noticing the same thing surfaces as one item seen three times,
@@ -245,7 +242,25 @@ than a constant with evidence behind it.
 
 ### MCP
 
-`propose_update(proposals: list) -> str`
+`propose_update(proposals: list, client: str) -> str`
+
+`client` is **required** and user-facing. It is the product the agent is hosted in — "Claude
+Desktop", "Cursor", "Codex", "Hermes", "OpenClaw" — not a model name and not a generic label.
+Every row in both tabs shows it, so the user can see at a glance which of their tools is
+proposing what, and spot one that is over-proposing.
+
+It is enforced on two levels:
+
+- The call is rejected outright if `client` is absent or empty. This is call-level, not
+  per-item — no proposal in the batch lands.
+- MCP's `initialize` handshake carries `clientInfo.name`, reachable through
+  `session.client_params` (`mcp/server/session.py:107`). When present it is stored in
+  preference to the argument, since a value fixed at connection time is harder to vary
+  mid-conversation than a per-call parameter.
+
+Both are needed. The handshake value is the more trustworthy of the two but is optional in the
+protocol and generic in several clients, so it cannot be the only source. The argument
+guarantees a value exists; the handshake improves it when available.
 
 Returns a per-item result, mirroring `persona_batch`'s numbered output:
 
@@ -277,8 +292,9 @@ visibility.
 ### Docstring and skill
 
 The docstring is the portable contract — it is all a plain MCP client ever sees. It states what
-`propose_update` is for, that it never writes, that `rationale` and `evidence` are required and
-`evidence` must be the user's own words, the two kinds, and what **not** to propose:
+`propose_update` is for, that it never writes, that `client` must name the product the agent
+runs in, that `rationale` and `evidence` are required and `evidence` must be the user's own
+words, the two kinds, and what **not** to propose:
 
 > Do not propose session summaries, moods, one-off task instructions, things the user only
 > asked about, or anything you would struggle to quote them on.
@@ -370,7 +386,10 @@ would be visible in the queue.
 
 ## Open questions
 
-- Should `proposed_by` be surfaced in the UI, or is it audit-only? It is available from the MCP
-  client name but not reliably populated by every client.
-- Does the Observations tab need search once it can hold fifty rows, or is that over-building
-  for a list that should be kept short by design?
+None outstanding. Two were closed during review:
+
+- **`proposed_by` is user-facing**, shown on every row in both tabs, and enforced through a
+  required `client` argument backed by the handshake value. See "MCP".
+- **The Observations tab gets no search.** It is a staging area holding at most fifty rows,
+  every one of which is meant to be promoted or deleted. Search would make a temporary surface
+  comfortable to leave full, which is the opposite of what it is for.
