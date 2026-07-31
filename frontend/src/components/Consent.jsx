@@ -17,6 +17,22 @@
  * App.jsx renders `<Consent />` with neither: this component then reads
  * `client_id` and `scope` off its own URL -- the ones Better Auth's
  * /oauth2/authorize redirect put there -- and fetches the rest itself.
+ *
+ * The requested scope is not decoration on this screen, it is the input.
+ * Better Auth's `consentEndpoint` takes the `scope` posted below as the
+ * AUTHORITATIVE granted set -- it overwrites the authorization query with it --
+ * and refuses any value that was not in the original request
+ * ("Scope not originally requested"). Two rules follow, and both are load
+ * bearing rather than tidy:
+ *
+ *   1. Anything the client asked for that this screen has no row for is
+ *      carried through untouched. `offline_access` is the one that matters:
+ *      the token endpoint issues a refresh token only when the GRANTED set
+ *      contains it, so dropping it here would silently cap every connection at
+ *      one ten-minute access token and re-prompt for consent forever.
+ *   2. A scope the client did not ask for is neither offered nor sent. Posting
+ *      one back is a 400 with nothing the person at the screen can act on, so
+ *      a client that asks only for `persona:read` must see only that row.
  */
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -33,6 +49,11 @@ const READ = "persona:read";
 const PROPOSE = "persona:propose";
 const WRITE = "persona:write";
 
+// The three this screen has a row for. Anything else in the request --
+// `offline_access`, `openid` -- is the client's business, not the user's, and
+// is passed through rather than decided on.
+const PERSONA_SCOPES = [READ, PROPOSE, WRITE];
+
 async function readError(res, fallback) {
   const body = await res.json().catch(() => ({}));
   return body?.error_description || body?.message || fallback;
@@ -43,11 +64,15 @@ export default function Consent({ client: clientProp, username: usernameProp } =
   const [username, setUsername] = useState(usernameProp ?? null);
   const [loadError, setLoadError] = useState(null);
 
-  // write implies propose (write ⊃ propose ⊃ read): both start selected, and
-  // the handlers below keep that implication true no matter what gets
-  // clicked, rather than letting a click build a grant that means nothing.
-  const [propose, setPropose] = useState(true);
-  const [write, setWrite] = useState(true);
+  // write implies propose (write ⊃ propose ⊃ read): each starts selected IF
+  // the client asked for it, and the handlers below keep that implication true
+  // no matter what gets clicked, rather than letting a click build a grant that
+  // means nothing. Starting from the request rather than from `true` is what
+  // stops a least-privilege client from being handed a form it cannot submit.
+  const [propose, setPropose] = useState(() =>
+    (clientProp?.scopes ?? []).includes(PROPOSE),
+  );
+  const [write, setWrite] = useState(() => (clientProp?.scopes ?? []).includes(WRITE));
 
   const [pending, setPending] = useState(null); // "approve" | "deny" | null
   const [actionError, setActionError] = useState(null);
@@ -80,6 +105,10 @@ export default function Consent({ client: clientProp, username: usernameProp } =
         }
         const body = await clientRes.json();
         setClient({ client_name: body.client_name, scopes: requestedScopes });
+        // Seeded from the request, for the same reason the initial state above
+        // is: a toggle for a scope the client never asked for cannot be sent.
+        setPropose(requestedScopes.includes(PROPOSE));
+        setWrite(requestedScopes.includes(WRITE));
         setUsername(session.user?.username || session.user?.name || session.user?.email || "");
       } catch (err) {
         if (!cancelled) setLoadError(err.message);
@@ -92,6 +121,14 @@ export default function Consent({ client: clientProp, username: usernameProp } =
     // effect's job is the opposite case, and it needs to run exactly once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // What the client actually asked for. Everything below is decided against
+  // this rather than against the three scopes MyGist happens to define.
+  const requested = client?.scopes ?? [];
+  const askedRead = requested.includes(READ);
+  const askedPropose = requested.includes(PROPOSE);
+  const askedWrite = requested.includes(WRITE);
+  const carried = requested.filter((scope) => !PERSONA_SCOPES.includes(scope));
 
   const onWriteChange = (next) => {
     setWrite(next);
@@ -113,7 +150,16 @@ export default function Consent({ client: clientProp, username: usernameProp } =
     setPending(accept ? "approve" : "deny");
     setActionError(null);
     try {
-      const scope = [READ, ...(propose ? [PROPOSE] : []), ...(write ? [WRITE] : [])].join(" ");
+      // Read is granted whenever it was asked for and never added when it was
+      // not -- see the module comment: a scope outside the original request is
+      // a 400, not a generosity. `carried` is what keeps offline_access (and so
+      // the refresh token) alive.
+      const scope = [
+        ...(askedRead ? [READ] : []),
+        ...(askedPropose && propose ? [PROPOSE] : []),
+        ...(askedWrite && write ? [WRITE] : []),
+        ...carried,
+      ].join(" ");
       const res = await authFetch("/oauth2/consent", {
         method: "POST",
         body: JSON.stringify({
@@ -153,6 +199,27 @@ export default function Consent({ client: clientProp, username: usernameProp } =
     );
   }
 
+  // A request naming none of the three is refused rather than rendered. The
+  // alternative -- an empty form whose Allow button grants nothing -- would
+  // produce a connection that authenticates and then sees no tools at all,
+  // which looks like a MyGist fault and is not one. Read is not silently added
+  // back to rescue it: adding a scope the client did not request is exactly
+  // what Better Auth rejects, so the honest answer is to say so here.
+  if (!askedRead && !askedPropose && !askedWrite) {
+    return (
+      <AuthShell
+        title="Nothing to approve"
+        description={
+          <>
+            <strong>{client.client_name}</strong> asked to connect without
+            requesting any access to your persona, so there is nothing to grant.
+            Start the connection again from the application.
+          </>
+        }
+      />
+    );
+  }
+
   return (
     <AuthShell
       title={
@@ -171,32 +238,40 @@ export default function Consent({ client: clientProp, username: usernameProp } =
       }
     >
       <div className="space-y-6 text-left">
+        {/* One row per scope the client actually asked for. A row for
+            anything else would offer a permission that cannot be granted. */}
         <div className="space-y-4 rounded-lg border p-4">
-          <ScopeRow
-            id="scope-read"
-            label="Read your persona"
-            help="Always granted -- a connection needs this to do anything."
-            checked
-            disabled
-          />
-          <ScopeRow
-            id="scope-propose"
-            label="Suggest changes for your approval"
-            help={
-              write
-                ? "Included -- you're allowing direct changes below, which needs this too."
-                : "Changes wait for you to approve them before they apply."
-            }
-            checked={propose}
-            onCheckedChange={onProposeChange}
-          />
-          <ScopeRow
-            id="scope-write"
-            label="Change your persona directly"
-            help="Applied immediately, without asking first."
-            checked={write}
-            onCheckedChange={onWriteChange}
-          />
+          {askedRead && (
+            <ScopeRow
+              id="scope-read"
+              label="Read your persona"
+              help="Always granted -- a connection needs this to do anything."
+              checked
+              disabled
+            />
+          )}
+          {askedPropose && (
+            <ScopeRow
+              id="scope-propose"
+              label="Suggest changes for your approval"
+              help={
+                write
+                  ? "Included -- you're allowing direct changes below, which needs this too."
+                  : "Changes wait for you to approve them before they apply."
+              }
+              checked={propose}
+              onCheckedChange={onProposeChange}
+            />
+          )}
+          {askedWrite && (
+            <ScopeRow
+              id="scope-write"
+              label="Change your persona directly"
+              help="Applied immediately, without asking first."
+              checked={write}
+              onCheckedChange={onWriteChange}
+            />
+          )}
         </div>
 
         {actionError && <p className="text-xs text-destructive">{actionError}</p>}
