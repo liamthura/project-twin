@@ -22,6 +22,7 @@ import bcrypt from "bcryptjs";
 import { Pool } from "pg";
 
 import { poolConfig } from "./db-config.js";
+import { createMailer } from "./email.js";
 
 const required = (name) => {
   const value = process.env[name];
@@ -38,6 +39,10 @@ const required = (name) => {
 // from forwarded headers -- FastAPI proxies /auth/* to this service, and an
 // inferred base would produce internal addresses in redirects and cookies.
 const baseURL = required("BETTER_AUTH_URL");
+
+// Logs instead of sending when no provider is configured, so reset and
+// verification can be walked end to end before Resend exists.
+const mailer = createMailer();
 
 // One pool, shared by Better Auth and the provisioning hook below. search_path
 // pins Better Auth's own queries to its schema; the hook reaches into `public`
@@ -125,8 +130,37 @@ export const auth = betterAuth({
       .filter(Boolean),
   ],
 
+  emailVerification: {
+    // Verification is what turns a placeholder into a usable address. Until it
+    // completes, the account still has <username>@mygist.invalid and cannot be
+    // recovered.
+    sendVerificationEmail: async ({ user, url }) => {
+      await mailer.send({
+        to: user.email,
+        subject: "Confirm your MyGist email",
+        text:
+          `Confirm this address so you can reset your MyGist password if you ` +
+          `ever lose it.\n\n${url}\n\n` +
+          `If you did not add this address to a MyGist account, ignore this ` +
+          `email — nothing changes until the link is opened.`,
+      });
+    },
+  },
+
   emailAndPassword: {
     enabled: true,
+
+    sendResetPassword: async ({ user, url }) => {
+      await mailer.send({
+        to: user.email,
+        subject: "Reset your MyGist password",
+        text:
+          `Open this link to choose a new password:\n\n${url}\n\n` +
+          `The link expires shortly, and can be used once.\n\n` +
+          `If you did not ask for this, ignore it — your current password ` +
+          `still works and nothing has changed.`,
+      });
+    },
 
     // The whole migration rests on this. Better Auth hashes with scrypt by
     // default; MyGist's existing passwords are bcrypt, written by

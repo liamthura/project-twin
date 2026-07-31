@@ -50,7 +50,19 @@ CREDENTIAL_PROVIDER = "credential"
 
 
 def placeholder_email(username: str) -> str:
-    return f"{username}@{PLACEHOLDER_DOMAIN}"
+    """Lowercase, because Better Auth lowercases an email before looking it up.
+
+    Stored with capitals, the address is unreachable in exactly the way a
+    capitalised username was: a reset request for "Liam@..." normalises to
+    "liam@..." and matches nothing, and one for "liam@..." does not match the
+    stored "Liam@..." either. Both fail as "user not found", and the account
+    cannot be recovered at all.
+    """
+    return f"{username.lower()}@{PLACEHOLDER_DOMAIN}"
+
+
+def is_placeholder(email: str) -> bool:
+    return bool(email) and email.lower().endswith(f"@{PLACEHOLDER_DOMAIN}")
 
 
 def seed(dry_run: bool = False) -> dict:
@@ -87,14 +99,23 @@ def seed(dry_run: bool = False) -> dict:
                 continue
 
             if existing:
-                # Do not overwrite an email someone has since set for real.
+                # Placeholders are normalised in place: they were seeded with
+                # the original capitalisation before this was understood, and a
+                # capitalised placeholder is unreachable. A REAL address is
+                # never touched -- that is the point of the is_placeholder
+                # guard, not an optimisation.
+                email = existing["email"]
+                if is_placeholder(email):
+                    email = placeholder_email(username)
+
                 conn.execute(
                     """
                     update better_auth."user"
-                       set "username" = %s, "displayUsername" = %s, "updatedAt" = %s
+                       set "username" = %s, "displayUsername" = %s,
+                           "email" = %s, "updatedAt" = %s
                      where "id" = %s
                     """,
-                    (username.lower(), username, now, user_id),
+                    (username.lower(), username, email, now, user_id),
                 )
                 stats["updated"] += 1
             else:
