@@ -23,7 +23,21 @@ const host = process.env.HOST || "0.0.0.0";
 // Refuse to serve against a database this service cannot use. Starting anyway
 // means /health says ok while every real request 500s, and the reason lives
 // only in a container log -- the hardest place to reach mid-deploy.
-if (!(await preflight(pool))) {
+try {
+  if (!(await preflight(pool))) {
+    process.exit(1);
+  }
+} catch (error) {
+  // The preflight exists so a bad configuration is legible in a deployment
+  // log. It undermines itself if it can fail with a bare stack trace, so
+  // anything unexpected in it still names what to look at.
+  console.error(
+    "\n[preflight] Failed before it could check the database.\n" +
+      `  ${error?.message ?? error}\n\n` +
+      "  This is the check itself failing, not a verdict on your database.\n" +
+      "  Look first at DATABASE_URL: it is read at startup, and a value the\n" +
+      "  driver cannot parse fails here.\n",
+  );
   process.exit(1);
 }
 
