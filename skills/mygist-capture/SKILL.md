@@ -5,6 +5,10 @@ description: Use when talking with a user who has MyGist connected, to decide wh
 
 # Proposing to a MyGist persona
 
+The judgement half of [`mygist-writing`](../mygist-writing/SKILL.md): that one
+covers which tool and what shape, this one covers whether the thing is worth
+proposing at all.
+
 `propose_update` never writes. Everything you send lands in a queue the user
 reviews by hand, so the cost of a bad proposal is their attention, and the cost
 of a missed one is that they repeat themselves next week.
