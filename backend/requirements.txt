@@ -31,6 +31,15 @@ psycopg-pool==3.3.1
 # Password hashing (tokens stay sha256; passwords need a slow hash)
 bcrypt==5.0.0
 
+# Verifying Better Auth's JWTs against its JWKS endpoint (jwt_auth.py). Both
+# arrived transitively via fastmcp before this; declared explicitly because an
+# unrelated fastmcp bump dropping either would break authentication, and the
+# failure would look like "everyone is logged out" rather than an import error.
+# cryptography is not optional here -- PyJWT cannot verify Ed25519 without it,
+# and Ed25519 is what Better Auth signs with by default.
+PyJWT==2.10.1
+cryptography==46.0.3
+
 # Embedding providers
 httpx==0.28.1
 
