@@ -422,13 +422,20 @@ async function listConnectedApps() {
 }
 
 // Revoke a connected application's access, by consent id (not client id).
-// Deletes the underlying oauthConsent row, which is what a refresh token's
-// validity is checked against -- so this is what makes the refresh token
-// stop working immediately. It does not, and cannot, reach into an access
-// token already issued; see ConnectedApps.jsx for why that's stated in the
-// UI rather than left implicit.
+//
+// NOT /oauth2/delete-consent, which the plugin ships and which deletes only
+// the consent row. Better Auth's refresh grant never reads that row -- it
+// validates oauthRefreshToken alone -- so deleting the consent would hide the
+// connection from the settings screen while leaving it able to mint access
+// tokens for another thirty days. /oauth2/revoke-connection is MyGist's own
+// endpoint (auth/src/auth.js): it marks the refresh tokens revoked, drops any
+// stored access tokens, and then deletes the consent, in one transaction.
+//
+// It still cannot reach a JWT access token already in flight -- nothing can,
+// they are not stored; see ConnectedApps.jsx for why that's stated in the UI
+// rather than left implicit.
 async function revokeConnectedApp(consentId) {
-  const res = await authFetch("/oauth2/delete-consent", {
+  const res = await authFetch("/oauth2/revoke-connection", {
     method: "POST",
     body: JSON.stringify({ id: consentId }),
   });

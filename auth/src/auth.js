@@ -16,7 +16,12 @@
 import { randomUUID } from "node:crypto";
 
 import { betterAuth } from "better-auth";
-import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthEndpoint,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import { jwt } from "better-auth/plugins";
 import { username } from "better-auth/plugins";
 import bcrypt from "bcryptjs";
@@ -26,7 +31,7 @@ import { AUTH_BASE_PATH } from "./base-path.js";
 import { poolConfig } from "./db-config.js";
 import { createMailer } from "./email.js";
 import * as invite from "./invite.js";
-import { oauthPlugin } from "./oauth.js";
+import { oauthPlugin, revokeConnection } from "./oauth.js";
 
 const required = (name) => {
   const value = process.env[name];
@@ -102,6 +107,52 @@ function invitePlugin() {
           }),
         },
       ],
+    },
+  };
+}
+
+/**
+ * The one thing the OAuth plugin does not offer: a person ending someone
+ * else's connection to their own account.
+ *
+ * The plugin has two revocation paths and neither fits. `/oauth2/delete-consent`
+ * deletes the consent row, which the refresh grant never consults, so the
+ * connection carries on refreshing for thirty days. `/oauth2/revoke` is RFC 7009
+ * and therefore a CLIENT operation -- it wants the token plus that client's
+ * credentials, which is precisely what the account holder does not have.
+ *
+ * Same shape as invitePlugin above, and for the same reason: an endpoint that
+ * needs `pool` belongs beside the pool.
+ */
+function oauthRevokePlugin() {
+  return {
+    id: "mygist-oauth-revoke",
+
+    endpoints: {
+      revokeConnection: createAuthEndpoint(
+        "/oauth2/revoke-connection",
+        { method: "POST" },
+        async (ctx) => {
+          const session = await getSessionFromCtx(ctx);
+          if (!session) throw new APIError("UNAUTHORIZED");
+
+          const id = ctx.body?.id;
+          if (!id) {
+            throw new APIError("BAD_REQUEST", { message: "id is required" });
+          }
+
+          const result = await revokeConnection(pool, {
+            consentId: id,
+            userId: session.user.id,
+          });
+          // Null means the consent is not this user's -- or does not exist.
+          // Both answer the same way: naming the difference would turn this
+          // into an oracle for which consent ids are real.
+          if (!result) throw new APIError("NOT_FOUND", { message: "No such connection." });
+
+          return ctx.json({ revoked: true });
+        },
+      ),
     },
   };
 }
@@ -325,6 +376,9 @@ export const auth = betterAuth({
       baseURL: `${baseURL}${AUTH_BASE_PATH}`,
       publicOrigin: new URL(baseURL).origin,
     }),
+
+    // Revocation the plugin has no endpoint for. See the JSDoc above.
+    oauthRevokePlugin(),
 
     // Closed testing. Inert unless INVITE_ONLY is on, which no self-hosted
     // instance and no local dev environment turns on.

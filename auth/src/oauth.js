@@ -96,3 +96,84 @@ export function oauthOptions({ baseURL, publicOrigin }) {
 export function oauthPlugin({ baseURL, publicOrigin }) {
   return oauthProvider(oauthOptions({ baseURL, publicOrigin }));
 }
+
+/**
+ * End one user's connection to one client: refresh tokens first, consent last.
+ *
+ * The plugin's own `/oauth2/delete-consent` removes the consent row and nothing
+ * else, and its `refresh_token` grant never reads that row -- it validates
+ * `oauthRefreshToken` alone (verified in the shipped source: the grant checks
+ * the row's `clientId`, `expiresAt` and `revoked`, and no query touches
+ * `oauthConsent`). A connection revoked through the consent row therefore keeps
+ * minting access tokens for the refresh token's full 30 days, which is the
+ * opposite of what the button says.
+ *
+ * `/oauth2/revoke` is not the answer either. RFC 7009 revocation is a CLIENT
+ * operation: the endpoint requires the token itself plus that client's
+ * credentials, and validates them before doing anything. A person in their own
+ * account settings has neither -- they are revoking someone else's token, which
+ * is exactly the case RFC 7009 does not cover. Hence this.
+ *
+ * `revoked` is set rather than the row deleted, because that is the column the
+ * grant checks -- and a revoked row also makes the plugin invalidate the whole
+ * refresh family if the old token is ever replayed, which a deleted row would
+ * not.
+ *
+ * One transaction: a half-done revoke that dropped the consent row but left the
+ * tokens alive would hide a live connection from the very screen meant to end
+ * it.
+ *
+ * @returns the clientId and what was killed, or null if no such consent belongs
+ *   to this user. The caller distinguishes "not yours" from "done".
+ */
+export async function revokeConnection(pool, { consentId, userId }) {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+
+    // userId is in the WHERE clause, not checked afterwards: one query that
+    // cannot match another person's consent is safer than two that could drift.
+    const { rows } = await client.query(
+      `select "clientId" from better_auth."oauthConsent"
+        where "id" = $1 and "userId" = $2`,
+      [consentId, userId],
+    );
+    if (rows.length === 0) {
+      await client.query("rollback");
+      return null;
+    }
+    const clientId = rows[0].clientId;
+
+    const refresh = await client.query(
+      `update better_auth."oauthRefreshToken"
+          set "revoked" = now()
+        where "clientId" = $1 and "userId" = $2 and "revoked" is null`,
+      [clientId, userId],
+    );
+
+    // Opaque access tokens are stored and so can be destroyed outright. JWT
+    // access tokens are not stored at all and cannot be -- which is why the UI
+    // says a request already in flight can survive up to ten minutes.
+    const access = await client.query(
+      `delete from better_auth."oauthAccessToken"
+        where "clientId" = $1 and "userId" = $2`,
+      [clientId, userId],
+    );
+
+    await client.query(`delete from better_auth."oauthConsent" where "id" = $1`, [
+      consentId,
+    ]);
+
+    await client.query("commit");
+    return {
+      clientId,
+      refreshTokensRevoked: refresh.rowCount,
+      accessTokensDeleted: access.rowCount,
+    };
+  } catch (error) {
+    await client.query("rollback").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
