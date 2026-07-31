@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Globe, Loader2, Server } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,12 @@ import {
   normaliseInvite,
 } from "@/lib/session.js";
 import { InviteGate, AcceptedInvite } from "@/components/InviteGate";
+import {
+  DEFAULT_AUTH_ROUTE,
+  goToRoute,
+  isAuthRoute,
+  readRoute,
+} from "@/lib/routes.js";
 
 /** An invite link: ?invite=7F2K-QX91. Read once at mount -- it cannot change
  *  while the page is open, and reading it in render would re-check it on every
@@ -56,7 +62,12 @@ const ORIGIN_API_URL =
 // !getAuthToken()` branch below). On success it saves the config and hands
 // control back to the caller (which reloads app data).
 export function WelcomeAuth({ onUseToken, onSuccess }) {
-  const [mode, setMode] = useState("signin"); // "signin" | "signup" | "forgot"
+  // The mode IS the route -- #/signin, #/signup, #/forgot. Seeded from the URL
+  // so a deep link lands on the right screen, and written back to it on every
+  // change so the address bar never describes a page nobody is looking at.
+  const [mode, setMode] = useState(() =>
+    isAuthRoute(readRoute()) ? readRoute() : DEFAULT_AUTH_ROUTE,
+  );
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -126,6 +137,49 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
   useEffect(() => {
     if (isCompleteInvite(linkInvite)) setMode("signup");
   }, [linkInvite]);
+
+  // Once a code is in hand the query has done its job. Leaving it there means a
+  // spent code sitting in the address bar, which is the sort of thing that gets
+  // copied out of a screenshot and passed on to somebody it will not work for.
+  useEffect(() => {
+    if (!acceptedInvite) return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("invite")) return;
+
+    params.delete("invite");
+    const query = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+    );
+  }, [acceptedInvite]);
+
+  // Keep the URL describing what is on screen. Replaced rather than pushed on
+  // the first render: arriving at #/ and being corrected to #/signin is not a
+  // navigation anyone made, and a back button that walks through it is a back
+  // button that appears not to work.
+  const routeSettled = useRef(false);
+  useEffect(() => {
+    goToRoute(mode, { replace: !routeSettled.current });
+    routeSettled.current = true;
+  }, [mode]);
+
+  // Back and forward between the auth screens. Both events are listened for:
+  // hashchange covers a hash edited in the address bar, popstate covers
+  // stepping back through the entries pushed above.
+  useEffect(() => {
+    const sync = () => {
+      const route = readRoute();
+      if (isAuthRoute(route)) setMode(route);
+    };
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate", sync);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate", sync);
+    };
+  }, []);
 
   // The gate stands between "create an account" and the account form, and only
   // while this instance actually requires one.

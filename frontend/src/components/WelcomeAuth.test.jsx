@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // Only the calls that touch the network are replaced. The invite helpers --
@@ -40,7 +40,14 @@ import { WelcomeAuth } from "@/components/WelcomeAuth";
 // in for any self-hosted origin -- the case that was broken.
 const ORIGIN_API = `${window.location.origin}/api`;
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  // The screen reads its mode from the hash and writes back to it, and jsdom
+  // keeps one location for the whole file -- so without this, a test that ends
+  // on #/forgot starts the next one there. A real page load never inherits the
+  // previous page's URL.
+  window.history.replaceState(null, "", window.location.pathname);
+});
 
 describe("WelcomeAuth server default", () => {
   it("signs in against the origin that served the page, not the cloud preset", async () => {
@@ -311,5 +318,100 @@ describe("an open instance", () => {
 
     expect(await screen.findByLabelText("Confirm password")).toBeInTheDocument();
     expect(screen.queryByLabelText(/invite code/i)).toBeNull();
+  });
+});
+
+describe("the auth screens have their own routes", () => {
+  const routeNow = () => window.location.hash;
+
+  it("names itself #/signin instead of leaving a stale app route up", async () => {
+    // The bug: the tab sync wrote #/profile while the sign-in form was on
+    // screen, so the address bar named a page you could not reach without
+    // signing in first.
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await waitFor(() => expect(routeNow()).toBe("#/signin"));
+  });
+
+  it("moves to #/signup when an account is being created", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: "Create an account" }));
+
+    await waitFor(() => expect(routeNow()).toBe("#/signup"));
+  });
+
+  it("moves to #/forgot for a password reset", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: /forgot your password/i }));
+
+    await waitFor(() => expect(routeNow()).toBe("#/forgot"));
+  });
+
+  it("opens straight onto the form a deep link names", async () => {
+    window.history.replaceState(null, "", "#/signup");
+
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    expect(await screen.findByLabelText("Confirm password")).toBeInTheDocument();
+  });
+
+  it("falls back to sign-in for a route that means nothing here", async () => {
+    // #/profile is a real route -- just not one this screen can show. Landing
+    // on a blank page would be the alternative.
+    window.history.replaceState(null, "", "#/profile");
+
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    expect(await screen.findByLabelText("Username or email")).toBeInTheDocument();
+    await waitFor(() => expect(routeNow()).toBe("#/signin"));
+  });
+
+  it("follows the back button between screens", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    await user.click(screen.getByRole("button", { name: "Create an account" }));
+    await waitFor(() => expect(routeNow()).toBe("#/signup"));
+
+    // Deliberate moves push, so this lands back on sign-in rather than skipping
+    // past it to wherever the tab was open before.
+    window.history.back();
+
+    expect(await screen.findByLabelText("Username or email")).toBeInTheDocument();
+  });
+
+  it("keeps an invite link's query when the route changes", async () => {
+    // ?invite= is what brought someone here. Rewriting the hash must not drop
+    // it, or the code is lost the moment the screen names itself.
+    window.history.replaceState(null, "", "/?invite=7F2K-QX91");
+
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await waitFor(() => expect(window.location.search).toBe("?invite=7F2K-QX91"));
+  });
+
+  it("starts an invite link on sign-up, not sign-in", async () => {
+    window.history.replaceState(null, "", "/?invite=7F2K-QX91");
+
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await waitFor(() => expect(routeNow()).toBe("#/signup"));
+  });
+  it("drops a spent invite code from the address bar", async () => {
+    // It has done its job by then, and a code left in the URL is one that gets
+    // copied out of a screenshot and passed to somebody it will not work for.
+    getInstance.mockResolvedValue({ invite_only: true });
+    checkInvite.mockResolvedValue(true);
+    window.history.replaceState(null, "", "/?invite=7F2K-QX91");
+
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await screen.findByLabelText("Confirm password");
+    await waitFor(() => expect(window.location.search).toBe(""));
+    // The route it navigated to is untouched by the cleanup.
+    expect(window.location.hash).toBe("#/signup");
   });
 });
