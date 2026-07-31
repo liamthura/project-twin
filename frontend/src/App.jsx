@@ -148,6 +148,7 @@ export default function App() {
 
   const [disabledSections, setDisabledSections] = useState([]);
   const [packs, setPacks] = useState([]);
+  const [activeTab, setActiveTab] = useState("profile");
   // Tab count changes when sections are toggled, so re-measure the strip then.
   const [tabStripRef, tabStripEdges] = useEdgeFade([disabledSections, packs]);
   // Data for enabled sections WITHOUT a bespoke editor, keyed by section key.
@@ -185,6 +186,18 @@ export default function App() {
     loadAllData();
     loadSettings();
   }, []);
+
+  // Controlling the tab strip means nothing re-picks a valid tab for us. Turn
+  // off the section you are looking at and `activeTab` would name a tab that
+  // no longer exists, which renders as an empty page with no way back.
+  // Must sit above the loading/error early returns -- hooks cannot be
+  // conditional.
+  const enabledKeys = packs.filter((p) => p.enabled).map((p) => p.key).join(",");
+  useEffect(() => {
+    if (!enabledKeys) return;
+    const valid = new Set([...enabledKeys.split(","), "review", "sections"]);
+    if (!valid.has(activeTab)) setActiveTab("profile");
+  }, [enabledKeys, activeTab]);
 
   const loadAllData = async () => {
     setIsLoading(true);
@@ -407,6 +420,9 @@ export default function App() {
   }
 
   const dynamicPacks = packs.filter((p) => p.enabled);
+  // The Review tab's toasts link to whatever section just changed, so the tab
+  // strip has to be steerable from outside itself.
+  const sectionTitles = Object.fromEntries(packs.map((p) => [p.key, p.title]));
 
   return (
     <div className="min-h-dvh bg-background">
@@ -505,7 +521,8 @@ export default function App() {
 
       <div className="mx-auto max-w-6xl px-4 py-8">
         <Tabs
-          defaultValue="profile"
+          value={activeTab}
+          onValueChange={setActiveTab}
           orientation="vertical"
           className="flex flex-col gap-6 md:flex-row"
         >
@@ -552,7 +569,10 @@ export default function App() {
             </TabsContent>
           ))}
           <TabsContent value="review">
-            <ProposalsPanel />
+            <ProposalsPanel
+              onViewSection={setActiveTab}
+              sectionTitles={sectionTitles}
+            />
           </TabsContent>
           <TabsContent value="sections">
             <Card>

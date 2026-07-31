@@ -646,7 +646,14 @@ async def approve_proposal(proposal_id: str, body: Optional[ResolveRequest] = No
         raise HTTPException(status_code=400, detail=result)
 
     proposals_store.resolve(proposal_id, "approved")
-    return {"status": "approved", "result": result}
+    return {
+        "status": "approved",
+        "result": result,
+        # Which section moved, so the UI can link the user straight to it.
+        # Derived here rather than in the frontend: the entity -> section map
+        # is manifest-owned and should have exactly one reader.
+        "section": server._section_for_entity(proposal["entity"]),
+    }
 
 
 @app.post("/api/proposals/{proposal_id}/reject")
@@ -654,7 +661,8 @@ async def reject_proposal(proposal_id: str):
     """Reject it. The row becomes a tombstone so no agent raises it again."""
     _load_pending(proposal_id)
     proposals_store.resolve(proposal_id, "rejected")
-    return {"status": "rejected"}
+    # Nothing changed, so there is nothing for the UI to link to.
+    return {"status": "rejected", "section": None}
 
 
 @app.post("/api/proposals/{proposal_id}/promote")
@@ -687,7 +695,7 @@ async def promote_proposal(proposal_id: str, body: ResolveRequest):
         raise HTTPException(status_code=400, detail=result)
 
     proposals_store.resolve(proposal_id, "promoted", promoted_to=entity)
-    return {"status": "promoted", "result": result}
+    return {"status": "promoted", "result": result, "section": section}
 
 
 # ============================================================================

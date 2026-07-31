@@ -5,10 +5,13 @@ import ProposalsPanel from "./ProposalsPanel";
 
 vi.mock("@/lib/api", () => ({
   listProposals: vi.fn(),
-  approveProposal: vi.fn(() => Promise.resolve({ status: "approved" })),
-  rejectProposal: vi.fn(() => Promise.resolve({ status: "rejected" })),
-  promoteProposal: vi.fn(() => Promise.resolve({ status: "promoted" })),
+  approveProposal: vi.fn(() => Promise.resolve({ status: "approved", section: "knowledge" })),
+  rejectProposal: vi.fn(() => Promise.resolve({ status: "rejected", section: null })),
+  promoteProposal: vi.fn(() => Promise.resolve({ status: "promoted", section: "lifestyle" })),
 }));
+
+const toast = vi.fn();
+vi.mock("@/components/ui/use-toast", () => ({ useToast: () => ({ toast }) }));
 
 import * as api from "@/lib/api";
 
@@ -29,6 +32,7 @@ const NOTE = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  toast.mockClear();
   api.listProposals.mockImplementation((kind) =>
     Promise.resolve(kind === "entity" ? [ENTITY] : [NOTE]),
   );
@@ -99,6 +103,60 @@ describe("ProposalsPanel", () => {
     expect(await screen.findByRole("button", { name: /^promote$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^approve$/i })).not.toBeInTheDocument();
+  });
+
+  it("confirms every action with a toast", async () => {
+    const user = userEvent.setup();
+    render(<ProposalsPanel />);
+    await user.click(await screen.findByRole("button", { name: /^approve$/i }));
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    expect(toast.mock.calls[0][0]).toMatchObject({ variant: "success" });
+  });
+
+  it("offers a way to see what changed, on the actions that change something", async () => {
+    const user = userEvent.setup();
+    const onViewSection = vi.fn();
+    render(<ProposalsPanel onViewSection={onViewSection} sectionTitles={{ knowledge: "Knowledge" }} />);
+    await user.click(await screen.findByRole("button", { name: /^approve$/i }));
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    const { action } = toast.mock.calls[0][0];
+    expect(action).toBeTruthy();
+    // A link nobody has time to click is not a link. The default is 5s.
+    expect(toast.mock.calls[0][0].duration).toBeGreaterThan(5000);
+    render(action);
+    await user.click(screen.getByRole("button", { name: /view in knowledge/i }));
+    expect(onViewSection).toHaveBeenCalledWith("knowledge");
+  });
+
+  it("promoting links to the section the note became part of", async () => {
+    const user = userEvent.setup();
+    const onViewSection = vi.fn();
+    render(<ProposalsPanel onViewSection={onViewSection} sectionTitles={{ lifestyle: "Lifestyle" }} />);
+    await user.click(screen.getByRole("button", { name: /observations/i }));
+    await user.click(await screen.findByRole("button", { name: /^promote$/i }));
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    const { action } = toast.mock.calls[0][0];
+    render(action);
+    await user.click(screen.getByRole("button", { name: /view in lifestyle/i }));
+    expect(onViewSection).toHaveBeenCalledWith("lifestyle");
+  });
+
+  it("gives rejecting a toast but no link, because nothing changed", async () => {
+    const user = userEvent.setup();
+    render(<ProposalsPanel onViewSection={vi.fn()} sectionTitles={{}} />);
+    await user.click(await screen.findByRole("button", { name: /^reject$/i }));
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    expect(toast.mock.calls[0][0].action).toBeUndefined();
+  });
+
+  it("says so when an action fails, and keeps the row", async () => {
+    const user = userEvent.setup();
+    api.approveProposal.mockRejectedValueOnce(new Error("boom"));
+    render(<ProposalsPanel />);
+    await user.click(await screen.findByRole("button", { name: /^approve$/i }));
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    expect(toast.mock.calls[0][0]).toMatchObject({ variant: "destructive" });
+    expect(screen.getByText(/Runs the on-call dashboards/)).toBeInTheDocument();
   });
 
   it("says the queue is empty rather than showing nothing", async () => {

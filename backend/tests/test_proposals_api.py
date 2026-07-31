@@ -75,6 +75,32 @@ def test_approving_with_edits_writes_the_edited_data(clean_database):
     assert domain["level"] == "intermediate"
 
 
+def test_approving_reports_which_section_changed(clean_database):
+    # The UI links the user straight to what moved. Deriving the section
+    # frontend-side would mean a second copy of the entity->section map.
+    client, auth = _client_and_auth()
+    _as_that_user(client, auth)
+    pid = _seed_entity()
+    assert client.post(f"/api/proposals/{pid}/approve", headers=auth).json()["section"] == "knowledge"
+
+
+def test_promoting_reports_which_section_changed(clean_database):
+    client, auth = _client_and_auth()
+    _as_that_user(client, auth)
+    pid = _seed_note()
+    r = client.post(f"/api/proposals/{pid}/promote", headers=auth, json={
+        "entity": "hobby", "data": {"name": "Bouldering"}})
+    assert r.json()["section"] == "lifestyle"
+
+
+def test_rejecting_reports_no_section(clean_database):
+    # Nothing changed, so there is nothing to link to.
+    client, auth = _client_and_auth()
+    _as_that_user(client, auth)
+    pid = _seed_entity()
+    assert client.post(f"/api/proposals/{pid}/reject", headers=auth).json()["section"] is None
+
+
 def test_approving_removes_it_from_the_queue(clean_database):
     client, auth = _client_and_auth()
     _as_that_user(client, auth)

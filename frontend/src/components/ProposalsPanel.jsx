@@ -3,6 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ToastAction } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/use-toast";
 import {
   listProposals, approveProposal, rejectProposal, promoteProposal,
 } from "@/lib/api";
@@ -49,11 +51,12 @@ function renderValue(value) {
  * decision about where something belongs. A queue that mixes fast and slow
  * items gets abandoned at the slow ones.
  */
-export default function ProposalsPanel() {
+export default function ProposalsPanel({ onViewSection, sectionTitles = {} }) {
   const [kind, setKind] = useState("entity");
   const [rows, setRows] = useState([]);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
+  const { toast } = useToast();
 
   const refresh = useCallback(async (which) => {
     try {
@@ -67,14 +70,48 @@ export default function ProposalsPanel() {
 
   useEffect(() => { refresh(kind); }, [kind, refresh]);
 
-  async function act(id, fn) {
+  /**
+   * Run one resolution, then say what happened.
+   *
+   * `title` is past tense because the row vanishes as it fires -- the toast is
+   * the only remaining evidence the click did anything. Where a section
+   * actually changed, the toast carries the way to go and look at it: approving
+   * something and being shown nothing is the moment a review queue starts to
+   * feel like a void you throw decisions into.
+   */
+  async function act(id, title, fn) {
     setBusy(id);
     try {
-      await fn();
+      const res = await fn();
       setRows((current) => current.filter((r) => r.id !== id));
       setError(null);
+      const section = res?.section;
+      toast({
+        title,
+        variant: "success",
+        ...(section && onViewSection
+          ? {
+              // The default 5s is enough to read a confirmation but not to
+              // read one AND decide to follow a link.
+              duration: 10000,
+              action: (
+                <ToastAction
+                  altText={`View in ${sectionTitles[section] || section}`}
+                  onClick={() => onViewSection(section)}
+                >
+                  View in {sectionTitles[section] || section}
+                </ToastAction>
+              ),
+            }
+          : {}),
+      });
     } catch {
       setError("That did not go through. The item is still in the queue.");
+      toast({
+        title: "That did not go through",
+        description: "The item is still in the queue.",
+        variant: "destructive",
+      });
     } finally {
       setBusy(null);
     }
@@ -155,7 +192,10 @@ export default function ProposalsPanel() {
                   <Button
                     size="sm"
                     disabled={busy === row.id}
-                    onClick={() => act(row.id, () => approveProposal(row.id, undefined))}
+                    onClick={() =>
+                      act(row.id, "Added to your persona", () =>
+                        approveProposal(row.id, undefined))
+                    }
                   >
                     Approve
                   </Button>
@@ -163,7 +203,10 @@ export default function ProposalsPanel() {
                     size="sm"
                     variant="outline"
                     disabled={busy === row.id}
-                    onClick={() => act(row.id, () => rejectProposal(row.id))}
+                    onClick={() =>
+                      act(row.id, "Rejected — it will not be proposed again", () =>
+                        rejectProposal(row.id))
+                    }
                   >
                     Reject
                   </Button>
@@ -173,7 +216,7 @@ export default function ProposalsPanel() {
                   <Button
                     size="sm"
                     disabled={busy === row.id}
-                    onClick={() => act(row.id, () => promote(row))}
+                    onClick={() => act(row.id, "Promoted to your persona", () => promote(row))}
                   >
                     Promote
                   </Button>
@@ -181,7 +224,10 @@ export default function ProposalsPanel() {
                     size="sm"
                     variant="outline"
                     disabled={busy === row.id}
-                    onClick={() => act(row.id, () => rejectProposal(row.id))}
+                    onClick={() =>
+                      act(row.id, "Deleted — it will not be proposed again", () =>
+                        rejectProposal(row.id))
+                    }
                   >
                     Delete
                   </Button>
