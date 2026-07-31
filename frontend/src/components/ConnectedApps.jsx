@@ -5,13 +5,17 @@
  * ships in the same feature rather than "later": access you can see but
  * cannot withdraw is the part that ages badly.
  *
- * Revoking here deletes the underlying OAuth consent, which kills the
- * refresh token immediately -- the client cannot mint a new access token
- * after this. But an access token already issued and in flight is a signed
- * artifact the auth service does not track, so it keeps working until it
- * expires on its own (up to ten minutes). That has to be said plainly, not
- * implied away: "revoked" reading as an instant cutoff when it isn't is
- * exactly the kind of gap that erodes trust in the control.
+ * Revoking here marks the connection's refresh tokens revoked and then
+ * deletes the consent -- in that order, and both, because Better Auth's
+ * refresh grant validates the token row and never reads the consent one.
+ * Deleting the consent alone would hide the connection from this screen while
+ * leaving it able to mint access tokens for another thirty days.
+ *
+ * What that still cannot reach is an access token already issued and in
+ * flight: it is a signed artifact the auth service does not track, so it keeps
+ * working until it expires on its own (up to ten minutes). That has to be said
+ * plainly, not implied away: "revoked" reading as an instant cutoff when it
+ * isn't is exactly the kind of gap that erodes trust in the control.
  *
  * Presentational only: `grants` and `onRevoke` are handed in as props so
  * this can be rendered and asserted on without a network (see
