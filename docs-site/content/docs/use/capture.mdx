@@ -1,6 +1,6 @@
 ---
 title: Capture
-description: Why nothing is saved unless you ask, and how to turn suggestions on.
+description: Why nothing is saved unless you approve it, and how the review queue works.
 ---
 
 This is the page that surprises people, so it comes with the blunt version
@@ -18,75 +18,86 @@ So, by default:
 
 - The assistant **reads** your persona when you ask about yourself.
 - The assistant **writes** to it when you explicitly ask it to.
-- Saying *"I've started learning Rust"* halfway through a chat about something
-  else changes **nothing**.
+- Anything it merely *infers* goes to a queue you review — never straight into
+  your persona.
 
 That is deliberate. A tool that silently recorded everything you typed would be
 a different product, and a harder one to trust with this kind of data.
 
-## Turning suggestions on
+## Two ways things get in
 
-If you want a conversation where things do get noticed, say so at the start:
-
-> For this conversation, call `suggest_persona_update` on my messages and tell
-> me when something is worth saving.
-
-From then on the client passes what you say to `suggest_persona_update`, which
-returns candidate updates. You still approve them. The tool proposes; it does
-not write.
-
-<Screenshot
-  caption="A capture suggestion offered mid-conversation"
-  hint="The assistant noticing a fact in passing and asking whether to save it, with the suggest_persona_update call visible."
-/>
-
-<Callout>
-Worth putting in your client's system prompt or project instructions if you want
-it always on. That is the closest thing to automatic capture that exists — and
-it is still the client doing the work, not the server.
-</Callout>
-
-## How suggestions are judged
-
-`suggest_persona_update` weighs what kind of statement it is looking at, because
-not everything said is meant.
-
-| Kind | Example | Treatment |
+| You say | Tool | Effect |
 |---|---|---|
-| Declarative | "I am a developer" | High confidence |
-| Insight or reflection | "This helped me understand pricing" | High confidence, goes to the learning log |
-| Hypothetical | "Maybe I should try Rust" | Low confidence |
-| Venting | "TypeScript is killing me" | Usually ignored, unless there is an insight in it |
-| Question | "Should I learn Rust?" | Ignored, unless it also states something |
+| "Add Datadog to my skills" | `persona_modify` | Written immediately |
+| *(mentions in passing that they now run the on-call dashboards)* | `propose_update` | Lands in your review queue |
 
-Long messages are analysed sentence by sentence, so a paragraph of solid
-statements ending in a question still yields the statements.
+The rule is one line: **explicit instruction writes, inference proposes.** No
+confidence score decides on your behalf, and `propose_update` cannot write to
+your persona at all.
 
-Confidence then decides what happens:
+## Turning proposals on
 
-| Confidence | Result |
-|---|---|
-| 0.8 and above | Applied, and mentioned to you |
-| 0.5 to 0.8 | You are asked first |
-| Below 0.5 | Dropped silently |
+If you want a conversation where things get noticed, say so at the start:
 
-### Insights go to the learning log
+> For this conversation, call `propose_update` when you notice something
+> durable about me.
 
-Conceptual and soft-skill learning counts, not just technical facts. "I realised
-titles don't guarantee commitment" is a valid learning-log entry.
+Worth putting in your client's system prompt or project instructions if you
+want it always on. That is the closest thing to automatic capture that exists —
+and it is still the client doing the work, not the server.
 
-Those entries get a topic extracted from the surrounding conversation, a summary
-of what led to the insight, and automatic tags — so the context of *why* you
-learned something survives alongside the fact.
+## What a proposal carries
 
-### Duplicates are checked first
+Every proposal must include two things, or the server rejects it:
 
-Every suggestion is compared against what you already have, through the search
-index. If it matches something, the suggestion is rewritten from an `add` into
-an update targeting that entry.
+- **`rationale`** — why the agent thinks this is durable, in its own words.
+  This is what you read when deciding.
+- **`evidence`** — your own words that prompted it. An agent that cannot quote
+  you has inferred too far, and the requirement is what stops the queue filling
+  with plausible guesses.
 
-Mentioning the same thing across five conversations does not leave you with five
-copies of it.
+Each row also names the tool that proposed it — "Claude Desktop", "Cursor",
+"Codex" — so you can tell which of your clients is over-eager.
+
+## The two surfaces
+
+Proposals come in two kinds, and they get their own tabs because they need
+different amounts of thought.
+
+### Inbox — things with a known home
+
+Typed, schema-valid changes: a skill level that moved, a project that finished,
+a person worth remembering. **Approve**, **edit then approve**, or **reject**.
+
+Approving writes through exactly the same path `persona_modify` uses, so every
+duplicate check and validation applies. Editing first is expected — agents get
+details slightly wrong often enough that correcting before approving is normal.
+
+### Observations — things with no home yet
+
+Durable but ambiguous, where nothing in the schema fits. "Wants the
+recommendation first, then the reasoning" is real, and there is no field for it.
+
+Two actions: **promote** it into a typed entry wherever you think it belongs, or
+**delete** it. Observations are a staging area, not storage — they feed no
+scope, so no agent reads them until you have promoted them into real data.
+
+If the same kind of observation keeps appearing and nothing fits, that is a
+signal to add a section for it. See
+[section packs](/run/section-packs).
+
+## Two things that stop the queue rotting
+
+**Rejected claims never come back.** Reject a proposal and it becomes a
+tombstone: no agent, in any client, can raise the same thing again. Without
+this, every tool re-suggests what you already declined, forever.
+
+**The same claim from three tools is one row.** Repeat proposals increment a
+counter instead of stacking up, so you see "seen 3×" — which is useful signal
+rather than clutter.
+
+Observations are also bounded: the newest 50 are kept, and rows you have never
+looked at are protected from being trimmed.
 
 ## The honest limitation
 
@@ -97,16 +108,15 @@ Capture depends on the client actually calling the tool, and clients vary:
 - None do it unprompted.
 
 If accuracy matters more than convenience, write the entry yourself — see
-[Writing](/use/writing) — or use [the editor](/use/editor). Treat capture as a
-way to catch things you would otherwise lose, not as a reliable record.
+[Writing](/use/writing) — or use [the editor](/use/editor). Treat proposals as
+a way to catch things you would otherwise lose, not as a reliable record.
 
 ## What to do at the end of a good conversation
 
 The practical middle ground: when a conversation has produced something worth
 keeping, ask for it directly.
 
-> Anything from this conversation worth saving to my persona?
+> Anything from this conversation worth proposing to my persona?
 
-The client reviews the thread, proposes entries, and you approve them in one
-pass. That gets you most of what automatic capture would, with none of the
-guessing.
+The client reviews the thread, sends proposals, and you clear them in one pass
+from the Review tab.

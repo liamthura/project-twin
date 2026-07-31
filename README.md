@@ -28,6 +28,9 @@ MCP tools are passive and run only when a client calls them.
   `get_entity` fetches only the ones that matter.
 - **Structured writes.** A published entity vocabulary (`get_schema`) covering
   ten persona sections, with duplicate advisories on add.
+- **Proposals, not guesses.** Agents propose durable changes with their
+  reasoning and a quote from you (`propose_update`); nothing reaches your
+  persona until you approve it, and anything you reject is never raised again.
 - **Hybrid search.** Postgres full-text plus optional pgvector embeddings,
   degrading to FTS-only rather than breaking.
 - **A web editor** generated from the same section packs the server writes
