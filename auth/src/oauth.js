@@ -116,6 +116,66 @@ export function oauthPlugin({ baseURL, mcpResource }) {
   return oauthProvider(oauthOptions({ baseURL, mcpResource }));
 }
 
+/** The scope that decides whether a grant may hold a refresh token. */
+export const REFRESH_SCOPE = "offline_access";
+
+/**
+ * The scope string a registration should be stored with, or undefined to leave
+ * it alone.
+ *
+ * An empty request is left alone deliberately: the plugin already defaults a
+ * scope-less registration to the full `scopes` option, which contains
+ * offline_access, so there is nothing to correct.
+ */
+export function registrationScopes(scope) {
+  const requested = (scope || "").split(" ").filter(Boolean);
+  if (!requested.length) return undefined;
+  if (requested.includes(REFRESH_SCOPE)) return undefined;
+  return [...requested, REFRESH_SCOPE].join(" ");
+}
+
+/**
+ * Make a dynamically registered client capable of holding a refresh token.
+ *
+ * Two decisions collide here, each correct on its own. Our protected-resource
+ * metadata omits offline_access, because the MCP specification says a resource
+ * server SHOULD NOT advertise it -- refresh tokens are the client's concern,
+ * not the resource's. And `/oauth2/authorize` validates a request against the
+ * REGISTERED client's scopes rather than the server's:
+ *
+ *     const validScopes = new Set(client.scopes ?? opts.scopes);
+ *
+ * A client that registers using the scope list it read from our resource
+ * metadata is therefore stored without offline_access -- and then fails with
+ * `invalid_scope` the moment it asks for the refresh token it is entitled to.
+ * Observed against Claude Code on the first real connection; the metadata is
+ * right, the plugin is right, and the client is right.
+ *
+ * Adding it at registration keeps the metadata spec-compliant and fixes the
+ * thing that is actually broken: a client that could never refresh. It grants
+ * nothing on its own -- the consent screen still decides what is handed over,
+ * and offline_access only ever means "may hold a refresh token", never "may
+ * read or write a persona".
+ */
+export function oauthRegistrationScopePlugin(createAuthMiddleware) {
+  return {
+    id: "mygist-oauth-registration-scope",
+
+    hooks: {
+      before: [
+        {
+          matcher: (context) => context.path === "/oauth2/register",
+          handler: createAuthMiddleware(async (ctx) => {
+            const scope = registrationScopes(ctx.body?.scope);
+            if (!scope) return;
+            return { context: { body: { ...ctx.body, scope } } };
+          }),
+        },
+      ],
+    },
+  };
+}
+
 /**
  * End one user's connection to one client: refresh tokens first, consent last.
  *

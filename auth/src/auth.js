@@ -31,7 +31,12 @@ import { AUTH_BASE_PATH } from "./base-path.js";
 import { poolConfig } from "./db-config.js";
 import { createMailer } from "./email.js";
 import * as invite from "./invite.js";
-import { mcpResource, oauthPlugin, revokeConnection } from "./oauth.js";
+import {
+  mcpResource,
+  oauthPlugin,
+  oauthRegistrationScopePlugin,
+  revokeConnection,
+} from "./oauth.js";
 
 const required = (name) => {
   const value = process.env[name];
@@ -393,6 +398,11 @@ export const auth = betterAuth({
             baseURL: `${baseURL}${AUTH_BASE_PATH}`,
             mcpResource: MCP_RESOURCE,
           }),
+
+          // Without this, a client that registers from our resource metadata is
+          // stored without offline_access and then fails with `invalid_scope`
+          // the moment it asks for a refresh token. See oauth.js.
+          oauthRegistrationScopePlugin(createAuthMiddleware),
 
           // Revocation the plugin has no endpoint for (see the JSDoc above),
           // and meaningless without it -- so it comes and goes with the rest
