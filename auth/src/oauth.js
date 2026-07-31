@@ -20,15 +20,32 @@ export const WRITE = "persona:write";
 export const SCOPES = [READ, PROPOSE, WRITE];
 
 /**
- * The canonical URI of the MCP endpoint, per RFC 8707 and RFC 9728.
+ * The canonical form of a resource URI, per RFC 8707 and RFC 9728.
  *
  * The trailing slash is stripped deliberately: the MCP specification says
  * implementations SHOULD use the form without one, and an audience is compared
  * by exact string, so `https://host/mcp/` and `https://host/mcp` are two
- * different resources to every client that follows the rule.
+ * different resources to every client that follows the rule. This runs over
+ * whatever the operator typed, which is where that mistake actually gets made.
  */
-export const MCP_RESOURCE = (publicOrigin) =>
-  `${publicOrigin.replace(/\/+$/, "")}/mcp`;
+export const canonicalResource = (value) => (value || "").trim().replace(/\/+$/, "");
+
+/**
+ * The MCP endpoint this instance serves, or "" if it serves none.
+ *
+ * The SAME variable the API container reads, with the same meaning and the
+ * same expected value (`https://your-instance/mcp`) -- an audience is an exact
+ * string match across the two services, so two names for it would be two
+ * chances to disagree.
+ *
+ * Empty is what gates the whole OAuth surface off. An authorization server is
+ * not something an instance should acquire by upgrading: unset, this container
+ * would otherwise expose `/auth/oauth2/register`, which anonymous callers may
+ * post to, on every deployment whose operator never opted in.
+ */
+export function mcpResource(env = process.env) {
+  return canonicalResource(env.AUTH_MCP_RESOURCE);
+}
 
 /**
  * The plugin's options, exported separately so they can be asserted on.
@@ -39,10 +56,12 @@ export const MCP_RESOURCE = (publicOrigin) =>
  *   token endpoint lives at that effective base, and if this is passed the
  *   origin instead, `validAudiences` silently omits it. See auth.js, which
  *   derives this from the same `AUTH_BASE_PATH` its `basePath` option uses.
- * @param {string} publicOrigin The bare public origin, no path -- used only
- *   to build the MCP resource URI.
+ * @param {string} mcpResource The canonical MCP resource URI, from
+ *   AUTH_MCP_RESOURCE. Never derived from the origin here: the API container
+ *   checks an access token's `aud` against its own copy of this value by exact
+ *   string, and two independent derivations are two things to drift.
  */
-export function oauthOptions({ baseURL, publicOrigin }) {
+export function oauthOptions({ baseURL, mcpResource }) {
   return {
     // Real paths, not hash routes: Better Auth appends query parameters to
     // these, and anything after a `#` lands in the fragment rather than in
@@ -56,7 +75,7 @@ export function oauthOptions({ baseURL, publicOrigin }) {
     // every MCP client sends resource=`.../mcp`. Left at the default, Better
     // Auth throws invalid_request and EVERY connection attempt fails at the
     // token endpoint, with an error that names neither this option nor the fix.
-    validAudiences: [baseURL, MCP_RESOURCE(publicOrigin)],
+    validAudiences: [baseURL, mcpResource],
 
     // Explicit, because the plugin's own default is
     // ["authorization_code", "client_credentials", "refresh_token"] -- and an
@@ -93,8 +112,8 @@ export function oauthOptions({ baseURL, publicOrigin }) {
   };
 }
 
-export function oauthPlugin({ baseURL, publicOrigin }) {
-  return oauthProvider(oauthOptions({ baseURL, publicOrigin }));
+export function oauthPlugin({ baseURL, mcpResource }) {
+  return oauthProvider(oauthOptions({ baseURL, mcpResource }));
 }
 
 /**

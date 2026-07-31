@@ -31,7 +31,7 @@ import { AUTH_BASE_PATH } from "./base-path.js";
 import { poolConfig } from "./db-config.js";
 import { createMailer } from "./email.js";
 import * as invite from "./invite.js";
-import { oauthPlugin, revokeConnection } from "./oauth.js";
+import { mcpResource, oauthPlugin, revokeConnection } from "./oauth.js";
 
 const required = (name) => {
   const value = process.env[name];
@@ -52,6 +52,11 @@ const baseURL = required("BETTER_AUTH_URL");
 // Logs instead of sending when no provider is configured, so reset and
 // verification can be walked end to end before Resend exists.
 const mailer = createMailer();
+
+// The MCP endpoint this instance serves, and the switch for the whole OAuth
+// surface below. Same variable, same value as the API container's
+// AUTH_MCP_RESOURCE -- see oauth.js.
+const MCP_RESOURCE = mcpResource();
 
 // One pool, shared by Better Auth and the provisioning hook below. search_path
 // pins Better Auth's own queries to its schema; the hook reaches into `public`
@@ -362,23 +367,39 @@ export const auth = betterAuth({
     // MyGist as an OAuth 2.1 authorization server, so an MCP client connects by
     // signing in rather than by being handed a token.
     //
+    // Gated on AUTH_MCP_RESOURCE, and not merely for tidiness. This plugin
+    // registers /oauth2/register with allowUnauthenticatedClientRegistration,
+    // so leaving it on unconditionally would hand an anonymous, row-creating
+    // endpoint to every instance whose operator never asked for OAuth --
+    // including ones that upgraded into it without reading a release note.
+    // Fail closed: an instance that did not opt in gains no new surface, which
+    // is the same rule the API container already follows with the same
+    // variable.
+    //
     // NOT accompanied by `disabledPaths: ["/token"]`, which both the OAuth and
     // JWT plugin docs recommend. Verified against the published package: this
     // plugin registers /oauth2/token and never a bare /token, so there is no
     // collision -- and disabling /token would break the SPA, which exchanges
     // its session cookie for a JWT there on every page load.
-    oauthPlugin({
-      // baseURL here is Better Auth's own EFFECTIVE base, not the bare public
-      // origin -- see oauth.js's JSDoc on oauthOptions. Passing the origin
-      // alone (as an earlier version of this wiring did) left validAudiences
-      // silently missing the auth service's own base, because Better Auth's
-      // real base URL is origin + basePath, computed the same way here.
-      baseURL: `${baseURL}${AUTH_BASE_PATH}`,
-      publicOrigin: new URL(baseURL).origin,
-    }),
+    ...(MCP_RESOURCE
+      ? [
+          oauthPlugin({
+            // baseURL here is Better Auth's own EFFECTIVE base, not the bare
+            // public origin -- see oauth.js's JSDoc on oauthOptions. Passing
+            // the origin alone (as an earlier version of this wiring did) left
+            // validAudiences silently missing the auth service's own base,
+            // because Better Auth's real base URL is origin + basePath,
+            // computed the same way here.
+            baseURL: `${baseURL}${AUTH_BASE_PATH}`,
+            mcpResource: MCP_RESOURCE,
+          }),
 
-    // Revocation the plugin has no endpoint for. See the JSDoc above.
-    oauthRevokePlugin(),
+          // Revocation the plugin has no endpoint for (see the JSDoc above),
+          // and meaningless without it -- so it comes and goes with the rest
+          // of the OAuth surface rather than on its own.
+          oauthRevokePlugin(),
+        ]
+      : []),
 
     // Closed testing. Inert unless INVITE_ONLY is on, which no self-hosted
     // instance and no local dev environment turns on.
