@@ -35,7 +35,14 @@ logger = logging.getLogger(__name__)
 # disables JWT auth entirely.
 JWKS_URL = os.getenv("AUTH_JWKS_URL", "")
 ISSUER = os.getenv("AUTH_ISSUER", "")
-AUDIENCE = os.getenv("AUTH_AUDIENCE", "")
+
+# Falls back to the issuer, because Better Auth sets both to its base URL by
+# default. Without this, leaving AUTH_AUDIENCE unset rejects EVERY token:
+# Better Auth always emits an `aud` claim, and PyJWT raises InvalidAudienceError
+# for a token carrying one when no audience is configured. The symptom is a bare
+# 401 on every request with nothing naming the cause, which is a poor thing to
+# hand someone in the middle of a deploy.
+AUDIENCE = os.getenv("AUTH_AUDIENCE", "") or ISSUER
 
 # Better Auth signs with EdDSA (Ed25519) by default. Pinning the accepted
 # algorithms is not optional: a verifier that accepts whatever the token's

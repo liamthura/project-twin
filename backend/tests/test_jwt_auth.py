@@ -174,3 +174,30 @@ def test_dotted_credential_is_rejected_when_disabled(monkeypatch):
     credential = "eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJ4In0.bm90LWEtc2lnbmF0dXJl"
     assert jwt_auth.looks_like_jwt(credential) is True
     assert jwt_auth.verify(credential) is None
+
+
+def test_audience_defaults_to_the_issuer(monkeypatch, keypair):
+    """AUTH_AUDIENCE unset must not reject every token.
+
+    Better Auth always emits an `aud` claim, and PyJWT raises
+    InvalidAudienceError for a token carrying one when no audience is
+    configured -- so a deployment that sets AUTH_ISSUER but forgets
+    AUTH_AUDIENCE would 401 on every request, with nothing naming the cause.
+    Both default to the service's base URL, so the issuer is the right
+    fallback.
+    """
+    private, public = keypair
+    monkeypatch.setattr(jwt_auth, "JWKS_URL", "https://auth.invalid/jwks")
+    monkeypatch.setattr(jwt_auth, "ISSUER", ISSUER)
+    monkeypatch.setattr(jwt_auth, "AUDIENCE", ISSUER)  # what the fallback yields
+
+    class _Key:
+        key = public
+
+    class _Client:
+        def get_signing_key_from_jwt(self, token):
+            return _Key()
+
+    monkeypatch.setattr(jwt_auth, "_jwk_client", lambda: _Client())
+
+    assert jwt_auth.verify(make_token(private)) is not None
