@@ -289,6 +289,13 @@ async function listProposals(kind) {
   return data.proposals || [];
 }
 
+// How many proposals are waiting. Unlike listProposals this does not mark
+// rows seen, which matters because the sidebar dot polls it from every tab.
+async function proposalCount() {
+  const data = await api("/proposals/count");
+  return data?.total ?? 0;
+}
+
 // `data` overrides the proposal's own payload, for edit-then-approve.
 async function approveProposal(id, data) {
   return api(`/proposals/${id}/approve`, {
@@ -312,6 +319,7 @@ export {
   CLOUD_API_URL,
   api,
   listProposals,
+  proposalCount,
   approveProposal,
   rejectProposal,
   promoteProposal,

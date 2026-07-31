@@ -75,6 +75,42 @@ def test_approving_with_edits_writes_the_edited_data(clean_database):
     assert domain["level"] == "intermediate"
 
 
+def test_the_count_endpoint_reports_both_queues(clean_database):
+    client, auth = _client_and_auth()
+    _as_that_user(client, auth)
+    _seed_entity()
+    _seed_note()
+    body = client.get("/api/proposals/count", headers=auth).json()
+    assert body == {"entity": 1, "note": 1, "total": 2}
+
+
+def test_counting_does_not_mark_rows_as_seen(clean_database):
+    """The sidebar dot polls this from every tab. If counting marked rows
+    seen, sitting on Profile would quietly strip the eviction protection off
+    observations the user has never once looked at."""
+    client, auth = _client_and_auth()
+    _as_that_user(client, auth)
+    _seed_note()
+    client.get("/api/proposals/count", headers=auth)
+    assert ps.list_pending("note", mark_seen=False)[0]["seen_at"] is None
+
+
+def test_the_count_is_zero_when_the_queue_is_empty(clean_database):
+    client, auth = _client_and_auth()
+    _as_that_user(client, auth)
+    assert client.get("/api/proposals/count", headers=auth).json()["total"] == 0
+
+
+def test_the_count_is_scoped_to_the_user(clean_database):
+    client, auth = _client_and_auth()
+    _as_that_user(client, auth)
+    _seed_entity()
+    other = TestClient(main.app)
+    r = other.post("/api/auth/register", json={"username": "someone-else"})
+    other_auth = {"Authorization": f"Bearer {r.json()['token']}"}
+    assert other.get("/api/proposals/count", headers=other_auth).json()["total"] == 0
+
+
 def test_approving_reports_which_section_changed(clean_database):
     # The UI links the user straight to what moved. Deriving the section
     # frontend-side would mean a second copy of the entity->section map.

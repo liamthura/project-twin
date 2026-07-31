@@ -148,6 +148,7 @@ export default function App() {
 
   const [disabledSections, setDisabledSections] = useState([]);
   const [packs, setPacks] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
   // The tab lives in the URL so a refresh keeps your place. Without it, any
   // reload drops you back on Profile, which is worst exactly when you have
   // just been sent somewhere by a "View in ..." link.
@@ -211,6 +212,37 @@ export default function App() {
       window.history.replaceState(null, "", `#/${activeTab}`);
     }
   }, [activeTab]);
+
+  // The dot on the Review tab. Counted rather than listed: listing marks rows
+  // seen, which is what protects them from eviction, and this polls from every
+  // tab -- so sitting on Profile would quietly strip that protection off
+  // observations you have never opened.
+  const refreshPendingCount = useCallback(async () => {
+    try {
+      const data = await api("/proposals/count");
+      setPendingCount(data?.total ?? 0);
+    } catch (_) {
+      // Non-fatal: a missing dot is better than a broken page.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    refreshPendingCount();
+    const tick = () => {
+      // The panel refreshes itself while it is open, and a hidden tab has
+      // nobody to tell.
+      if (document.visibilityState === "visible" && activeTab !== "review") {
+        refreshPendingCount();
+      }
+    };
+    const timer = setInterval(tick, 30000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [isConnected, activeTab, refreshPendingCount]);
 
   // Approving or promoting writes server-side, so the section it landed in is
   // stale in this page until we go and get it. We know which one changed, so
@@ -572,6 +604,18 @@ export default function App() {
             <TabsTrigger value="review" className={TAB_TRIGGER_CLASS}>
               <Inbox className="h-4 w-4" />
               <span>Review</span>
+              {pendingCount > 0 && (
+                <>
+                  <span
+                    data-pending-dot
+                    aria-hidden="true"
+                    className="ml-auto h-2 w-2 shrink-0 rounded-full bg-primary"
+                  />
+                  {/* The dot is decoration; this is the part a screen reader
+                      can actually convey. */}
+                  <span className="sr-only">{pendingCount} waiting</span>
+                </>
+              )}
             </TabsTrigger>
             <TabsTrigger value="sections" className={TAB_TRIGGER_CLASS}>
               <SlidersHorizontal className="h-4 w-4" />
@@ -599,6 +643,7 @@ export default function App() {
             <ProposalsPanel
               onViewSection={setActiveTab}
               onSectionChanged={refreshSection}
+              onResolved={refreshPendingCount}
               sectionTitles={sectionTitles}
               packs={packs}
             />

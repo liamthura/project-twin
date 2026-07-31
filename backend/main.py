@@ -622,6 +622,13 @@ async def list_proposals(kind: str = "entity"):
     return {"proposals": proposals_store.list_pending(kind)}
 
 
+@app.get("/api/proposals/count")
+async def count_proposals():
+    """How many proposals are waiting. Drives the sidebar dot, so it is polled
+    from every tab -- and unlike listing, it does not mark anything seen."""
+    return proposals_store.pending_counts()
+
+
 def _load_pending(proposal_id: str) -> dict:
     try:
         proposal = proposals_store.get(proposal_id)

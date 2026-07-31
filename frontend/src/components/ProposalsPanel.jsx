@@ -75,7 +75,7 @@ function renderValue(value) {
 const QUEUE_POLL_MS = 15000;
 
 export default function ProposalsPanel({
-  onViewSection, onSectionChanged, sectionTitles = {}, packs = [],
+  onViewSection, onSectionChanged, onResolved, sectionTitles = {}, packs = [],
 }) {
   const [kind, setKind] = useState("entity");
   const [rows, setRows] = useState([]);
@@ -125,6 +125,9 @@ export default function ProposalsPanel({
       setRows((current) => current.filter((r) => r.id !== id));
       setError(null);
       const section = res?.section;
+      // The sidebar dot is owned by the app, and it stops polling while this
+      // panel is open -- so resolving something has to tell it directly.
+      onResolved?.();
       // Refetch the section that changed straight away, rather than waiting
       // for the user to click through and find stale data. We know exactly
       // what moved, so there is nothing here worth polling for.

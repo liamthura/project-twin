@@ -145,6 +145,26 @@ def list_pending(kind: str, mark_seen: bool = True) -> list[dict]:
     return [dict(r, id=str(r["id"])) for r in rows]
 
 
+def pending_counts() -> dict:
+    """How many proposals are waiting, per kind.
+
+    Deliberately not list_pending(mark_seen=False) + len(): the sidebar dot
+    polls this from every tab, and there is no reason to ship whole rows across
+    the wire to render a dot.
+    """
+    with db.get_pool().connection() as conn:
+        rows = conn.execute(
+            "select kind, count(*) as n from persona_proposals"
+            " where user_id = %s and status = 'pending' group by kind",
+            (db.current_user_id.get(),),
+        ).fetchall()
+    counts = {"entity": 0, "note": 0}
+    for r in rows:
+        counts[r["kind"]] = r["n"]
+    counts["total"] = counts["entity"] + counts["note"]
+    return counts
+
+
 def get(proposal_id: str) -> dict | None:
     with db.get_pool().connection() as conn:
         row = conn.execute(
