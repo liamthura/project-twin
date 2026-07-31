@@ -19,7 +19,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import db  # noqa: E402
-from scripts.seed_better_auth import PLACEHOLDER_DOMAIN, seed  # noqa: E402
+from scripts.seed_better_auth import (  # noqa: E402
+    PLACEHOLDER_DOMAIN,
+    placeholder_email,
+    seed,
+)
 
 
 def better_auth_user(username_lookup):
@@ -127,3 +131,34 @@ def test_seeding_twice_changes_nothing(seeded):
     assert first["created"] >= 1
     assert second["created"] == 0
     assert second["updated"] >= 1
+
+
+def test_placeholder_email_is_lowercase(seeded):
+    """Better Auth lowercases an email before looking it up, so a capitalised
+    placeholder is unreachable in both directions: a request for "Liam@..."
+    normalises to "liam@..." and misses, and "liam@..." does not match the
+    stored "Liam@..." either. Both fail as "user not found", leaving the
+    account unrecoverable. Same trap as the username, one layer down."""
+    db.create_user("MixedCase", "a-password-long-enough")
+    seeded()
+
+    assert better_auth_user("mixedcase")["email"] == f"mixedcase@{PLACEHOLDER_DOMAIN}"
+    assert placeholder_email("MixedCase") == placeholder_email("mixedcase")
+
+
+def test_a_real_email_is_never_overwritten(seeded):
+    """The seed runs before every deploy. Normalising placeholders must not
+    touch an address someone has actually set, or re-seeding would silently
+    undo it -- and with it, their ability to recover the account."""
+    db.create_user("hasreal", "a-password-long-enough")
+    seeded()
+
+    with db.get_pool().connection() as conn:
+        conn.execute(
+            'update better_auth."user" set "email" = %s where "username" = %s',
+            ("real.person@example.com", "hasreal"),
+        )
+
+    seeded()
+
+    assert better_auth_user("hasreal")["email"] == "real.person@example.com"
