@@ -1,0 +1,150 @@
+"""Pass /auth/* through to the Better Auth service.
+
+Why FastAPI proxies this rather than the platform doing path-based routing:
+`run/self-hosting` promises reverse proxies "one upstream, one port". Routing
+/auth at the platform breaks that promise for everyone who self-hosts, who would
+need two upstreams in the right order or watch sign-in silently reach the wrong
+service. Proxying here keeps the public contract identical and changes only what
+happens behind it. It also puts the rule in code, where it is reviewed, tested
+and deployed atomically, rather than in a dashboard -- this project has already
+lost time to a container port and a DNS record that lived only in dashboards.
+
+Cost is one loopback hop, on auth calls only. /api and /mcp never touch this.
+
+The service's own baseURL is set to the public origin, so it never infers
+anything from forwarded headers and this stays a dumb passthrough.
+"""
+
+import logging
+import os
+from typing import Optional
+
+import httpx
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, Response
+
+logger = logging.getLogger(__name__)
+
+# Internal address of the Better Auth container, e.g. http://auth:3001. Unset
+# means the service is not deployed and /auth is not registered at all.
+SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "")
+
+# A hung auth service must not hold a worker open indefinitely. Sign-in is
+# interactive: a user gives up long before ten seconds.
+TIMEOUT = httpx.Timeout(10.0, connect=2.0)
+
+# RFC 7230 hop-by-hop headers, which describe a single connection and must not
+# be forwarded across one.
+_HOP_BY_HOP = {
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailers",
+    "transfer-encoding",
+    "upgrade",
+}
+
+# Dropped from the RESPONSE on top of the hop-by-hop set. httpx has already
+# decompressed the body, so upstream's content-encoding now describes something
+# that is no longer true, and its content-length is the compressed size. Passing
+# either on produces a response the client cannot parse.
+_DROP_FROM_RESPONSE = _HOP_BY_HOP | {"content-encoding", "content-length"}
+
+# Dropped from the REQUEST. Host is left to httpx so it matches the upstream
+# address rather than the public one.
+_DROP_FROM_REQUEST = _HOP_BY_HOP | {"host"}
+
+# One client for the process, created on first use so that importing this
+# module opens no sockets and binds to no event loop. It is never explicitly
+# closed: the app's lifespan is FastMCP's, and hanging a second shutdown hook
+# off it would mean `on_event`, which FastAPI has deprecated. A connection pool
+# living exactly as long as the process is the normal shape for a proxy, and
+# the sockets go when the process does.
+_client: Optional[httpx.AsyncClient] = None
+
+
+def _http() -> httpx.AsyncClient:
+    global _client
+    if _client is None:
+        _client = httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=False)
+    return _client
+
+
+def _request_headers(request: Request) -> dict:
+    return {
+        k: v
+        for k, v in request.headers.items()
+        if k.lower() not in _DROP_FROM_REQUEST
+    }
+
+
+def build_response(upstream: httpx.Response) -> Response:
+    """Turn an upstream response into ours, preserving every Set-Cookie.
+
+    A sign-in response carries several Set-Cookie headers. Anything that treats
+    headers as a mapping keeps one and silently drops the rest, which presents
+    later as a session that half-works -- so this walks the multi-valued list
+    and appends each header individually.
+    """
+    response = Response(content=upstream.content, status_code=upstream.status_code)
+
+    # Response() has already set content-length for the body we are actually
+    # sending. Everything else comes from upstream, unmerged.
+    already_set = {key.decode("latin-1").lower() for key, _ in response.raw_headers}
+
+    for key, value in upstream.headers.multi_items():
+        lowered = key.lower()
+        if lowered in _DROP_FROM_RESPONSE:
+            continue
+        if lowered != "set-cookie" and lowered in already_set:
+            continue
+        response.raw_headers.append(
+            (key.encode("latin-1"), value.encode("latin-1"))
+        )
+
+    return response
+
+
+def register(app: FastAPI) -> bool:
+    """Mount the proxy if an auth service is configured. Returns whether it was.
+
+    Mirrors register_static_routes: conditional, so a deployment without the
+    auth service behaves exactly as it did before this existed, and /auth simply
+    does not resolve.
+    """
+    if not SERVICE_URL:
+        return False
+
+    base = SERVICE_URL.rstrip("/")
+
+    @app.api_route(
+        "/auth/{path:path}",
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+        include_in_schema=False,
+    )
+    async def auth_proxy(path: str, request: Request) -> Response:
+        try:
+            upstream = await _http().request(
+                request.method,
+                f"{base}/auth/{path}",
+                params=request.query_params,
+                content=await request.body(),
+                headers=_request_headers(request),
+                # Redirects are part of the auth flow -- OAuth callbacks, and the
+                # post-sign-in bounce. Following them here would resolve them
+                # server-side and hand the browser the wrong page.
+                follow_redirects=False,
+            )
+        except httpx.RequestError as exc:
+            # The auth service is down or unreachable. Humans cannot sign in;
+            # MCP clients are unaffected, because their path never comes here.
+            logger.warning("auth service unreachable: %s", exc)
+            return JSONResponse(
+                {"error": "Authentication service unavailable"}, status_code=503
+            )
+
+        return build_response(upstream)
+
+    return True

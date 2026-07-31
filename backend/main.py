@@ -33,6 +33,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Persona data + auth now live in Postgres (see db.py / persona_store.py).
+import auth_proxy
 import db
 import jwt_auth
 import persona_store
@@ -669,6 +670,13 @@ def register_static_routes(app: FastAPI, static_dir: Path) -> bool:
 
 
 STATIC_MOUNTED = register_static_routes(app, STATIC_DIR)
+
+# /auth/* -> the Better Auth service, when one is configured. Registered here
+# for the same reason the static routes are: the MCP app is mounted at "/"
+# below and matches everything, so anything needing its own path must be
+# registered before it. This is the trap that made a bare /docs 404 while
+# /docs/ worked.
+AUTH_PROXIED = auth_proxy.register(app)
 
 
 # ============================================================================
