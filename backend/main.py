@@ -950,6 +950,18 @@ def register_static_routes(app: FastAPI, static_dir: Path) -> bool:
             static_dir / "index.html", headers={"Cache-Control": "no-cache"}
         )
 
+    # OAuth redirect targets. Two named routes, deliberately not a catch-all:
+    # the MCP app is mounted at "/" and matches everything, so a fallback would
+    # need a hand-maintained exclusion list for /mcp, /api, /auth, /docs and
+    # /.well-known. These are OAuth surface, not app navigation -- the app
+    # itself stays on the hash router.
+    @app.get("/sign-in", include_in_schema=False)
+    @app.get("/consent", include_in_schema=False)
+    async def spa_oauth_screens() -> Response:
+        return FileResponse(
+            static_dir / "index.html", headers={"Cache-Control": "no-cache"}
+        )
+
     @app.get("/favicon.svg", include_in_schema=False)
     async def favicon() -> Response:
         return FileResponse(static_dir / "favicon.svg")

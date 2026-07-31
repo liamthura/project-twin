@@ -51,6 +51,7 @@ import { WelcomeAuth } from "@/components/WelcomeAuth";
 import { AuthShell } from "@/components/AuthShell";
 import { ResetPassword } from "@/components/ResetPassword";
 import { AddEmailBanner } from "@/components/AddEmailBanner";
+import Consent from "@/components/Consent";
 import SectionRenderer from "@/renderers/SectionRenderer";
 
 // Debounce hook
@@ -122,6 +123,43 @@ function useEdgeFade(deps) {
 
 // Main App
 export default function App() {
+  // Two real paths, not hash routes: Better Auth appends query parameters when
+  // it redirects here, and anything after a `#` lands in the fragment rather
+  // than in location.search. Everything else in the app stays on the hash
+  // router -- see lib/routes.js for why. Checked before any hook runs: these
+  // are separate page loads (a full navigation, not a client-side route
+  // change), so a component that returns here never does so having already
+  // called a hook on a previous render.
+  const oauthScreen = window.location.pathname;
+  if (oauthScreen === "/consent") return <Consent />;
+  if (oauthScreen === "/sign-in") {
+    // Captured now, before WelcomeAuth's own effects get a chance to touch
+    // the address bar (it rewrites the hash on every mode change) -- this is
+    // the OAuth query that has to survive to resume the flow below.
+    const oauthQuery = window.location.search;
+    return (
+      <AuthShell
+        title="Sign in to connect"
+        description="Sign in to let this application connect to your persona."
+      >
+        <WelcomeAuth
+          // Detached mode -- a UI pointed at someone else's server -- has no
+          // meaning mid-OAuth-flow: this page IS the server the client is
+          // connecting to. The link still renders (WelcomeAuth is not
+          // forked for this), it just has nothing to do here.
+          onUseToken={() => {}}
+          onSuccess={() => {
+            // Better Auth's /oauth2/authorize re-evaluates now that a
+            // session cookie exists, and continues the flow it interrupted
+            // -- on to /consent, or straight through for a client that has
+            // one already.
+            window.location.assign(`/auth/oauth2/authorize${oauthQuery}`);
+          }}
+        />
+      </AuthShell>
+    );
+  }
+
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
