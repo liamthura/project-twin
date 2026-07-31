@@ -105,7 +105,21 @@ export const auth = betterAuth({
     },
   },
 
-  trustedOrigins: [baseURL],
+  // The public origin, plus anything BETTER_AUTH_TRUSTED_ORIGINS adds.
+  //
+  // In development the browser is on the Vite dev server (a different port
+  // from BETTER_AUTH_URL), so its Origin header is not the base URL. Measured
+  // on 1.6.23, sign-in does not currently reject an untrusted origin -- but
+  // that is a property of today's version rather than a promise, and OAuth
+  // callbacks will care. Making it configurable costs nothing and means a dev
+  // server on any port needs no code edit.
+  trustedOrigins: [
+    baseURL,
+    ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS || "")
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  ],
 
   emailAndPassword: {
     enabled: true,
