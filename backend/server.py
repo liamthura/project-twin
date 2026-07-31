@@ -2608,10 +2608,19 @@ def _section_for_entity(entity: str):
 
 # Usage instructions embedded in every get_schema digest so the LLM sees them up front.
 _SCHEMA_USAGE = {
+    "choosing_a_write_tool": (
+        "Which write tool is correct depends on whether the user asked. For a "
+        "change they explicitly asked for, persona_modify / persona_batch "
+        "write it immediately. For anything you inferred from the "
+        "conversation, propose_update(proposals, client) puts it in their "
+        "review queue instead. Same entity vocabulary either way."
+    ),
     "workflow": (
-        "Use persona_modify(action, entity, data) for one change, "
-        "persona_batch([...]) for many. Call get_schema(entity='<name>') for one "
-        "entity's full fields, enum values, and copy-paste examples."
+        "Use persona_modify(action, entity, data) for one change the user "
+        "asked for, persona_batch([...]) for many, and propose_update("
+        "proposals, client) for anything you inferred rather than were asked "
+        "-- see choosing_a_write_tool. Call get_schema(entity='<name>') for "
+        "one entity's full fields, enum values, and copy-paste examples."
     ),
     "identifying": (
         "For update/remove, include the entity's `identifier` field (shown per "
@@ -2751,6 +2760,12 @@ def get_entity_schema(entity: str = None, file: str = None) -> dict:
                 if spec.get("description"):
                     detail["purpose"] = spec["description"]
                 detail["examples"] = _build_examples(entity_lower, spec)
+                # The examples above are persona_modify-shaped, and this is the
+                # call an agent makes immediately before writing -- so it is
+                # exactly where the other door has to be pointed out. The
+                # digest paths carry the full usage block; a single entity gets
+                # the one line that decides which tool is correct.
+                detail["writing"] = _SCHEMA_USAGE["choosing_a_write_tool"]
                 return detail
         valid = sorted(e for ents in ENTITY_SCHEMA.values() for e in ents)
         return {"error": f"Unknown entity: {entity}. Use get_schema() to see valid entities.",
@@ -3332,6 +3347,13 @@ def persona_modify(
     unlinks any two existing entries.
     If unsure, use get_schema to discover valid entity types, required fields, and enum values.
 
+    WRITES IMMEDIATELY. Use this only when the user has explicitly asked for
+    something to be recorded -- "add Datadog to my skills", "mark that project
+    finished". If you INFERRED it from what they said rather than being asked,
+    call propose_update instead: it puts the change in their review queue
+    where they decide, and writing behind their back is what that queue exists
+    to prevent.
+
     Args:
         action: "add" | "update" | "remove" | "link" | "unlink"
         entity: Entity type (use get_schema to discover valid types). Ignored
@@ -3377,7 +3399,10 @@ def persona_modify(
 def persona_batch(operations: list) -> str:
     """Perform multiple persona modifications in one call.
     If unsure, use get_schema to discover valid entity types and fields.
-    
+
+    WRITES IMMEDIATELY, same as persona_modify -- only for changes the user
+    explicitly asked for. For anything you inferred, use propose_update.
+
     WHEN TO USE:
         - Adding multiple items at once (e.g., several highlights)
         - Updating related items together
