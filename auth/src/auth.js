@@ -54,8 +54,27 @@ const databaseUrl = required("DATABASE_URL");
  * Honouring libpq's meaning is what makes one DATABASE_URL work for both
  * services, which is the only sane arrangement when they share a database.
  */
+function sslModeOf(connectionString) {
+  // libpq accepts two forms and node-postgres accepts both: a URI, and
+  // keyword/value ("host=... sslmode=require"). `new URL` throws on the second,
+  // and this runs at module load -- so an unparseable string would crash the
+  // process before the preflight could print anything useful, which is the
+  // opposite of what that check is for.
+  try {
+    const fromUrl = new URL(connectionString).searchParams.get("sslmode");
+    if (fromUrl) return fromUrl;
+  } catch {
+    // Not a URI. Fall through to the scan below.
+  }
+
+  // Also covers a URI whose password contains an unencoded "#", where the URL
+  // parser silently treats the rest as a fragment and loses the query.
+  const match = /[?&\s]sslmode=([a-z-]+)/i.exec(connectionString);
+  return match ? match[1].toLowerCase() : "prefer";
+}
+
 function sslFromConnectionString(url) {
-  const mode = new URL(url).searchParams.get("sslmode") ?? "prefer";
+  const mode = sslModeOf(url);
 
   // verify-ca and verify-full ask for the chain to be checked.
   if (mode.startsWith("verify")) return { rejectUnauthorized: true };
