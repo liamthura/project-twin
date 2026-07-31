@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { oauthProvider } from "@better-auth/oauth-provider";
 
 import { AUTH_BASE_PATH } from "./base-path.js";
-import { SCOPES, canonicalResource, mcpResource, oauthOptions } from "./oauth.js";
+import { SCOPES, canonicalResource, mcpResource, oauthOptions, registrationScopes } from "./oauth.js";
 
 const ORIGIN = "https://mygist.example";
 
@@ -72,4 +72,37 @@ test("access tokens are short lived so revocation bites quickly", () => {
   const options = oauthOptions({ baseURL: BASE, mcpResource: RESOURCE });
   assert.equal(options.accessTokenExpiresIn, "10m");
   assert.equal(options.refreshTokenExpiresIn, "30d");
+});
+
+// Registration scopes. The bug these cover was found on the first real
+// connection from Claude Code, not by any test: our resource metadata omits
+// offline_access (the MCP spec says a resource server SHOULD NOT advertise it),
+// the client registered with the list it read there, and /oauth2/authorize
+// validates against the REGISTERED client's scopes -- so asking for a refresh
+// token came back `invalid_scope`.
+
+test("a registration that omits offline_access has it added", () => {
+  assert.equal(
+    registrationScopes("persona:read persona:propose persona:write"),
+    "persona:read persona:propose persona:write offline_access",
+  );
+});
+
+test("a registration that already asked for it is left alone", () => {
+  assert.equal(registrationScopes("persona:read offline_access"), undefined);
+});
+
+test("a scope-less registration is left to the plugin's own default", () => {
+  // The plugin defaults an absent scope to the full `scopes` option, which
+  // already contains offline_access. Rewriting it here would replace a list
+  // that adapts to the server's config with a frozen copy.
+  assert.equal(registrationScopes(undefined), undefined);
+  assert.equal(registrationScopes(""), undefined);
+});
+
+test("the requested scopes survive, and are not replaced", () => {
+  assert.equal(
+    registrationScopes("persona:read"),
+    "persona:read offline_access",
+  );
 });
