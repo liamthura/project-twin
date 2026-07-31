@@ -21,6 +21,8 @@ import { username } from "better-auth/plugins";
 import bcrypt from "bcryptjs";
 import { Pool } from "pg";
 
+import { poolConfig } from "./db-config.js";
+
 const required = (name) => {
   const value = process.env[name];
   if (!value) {
@@ -40,10 +42,12 @@ const baseURL = required("BETTER_AUTH_URL");
 // One pool, shared by Better Auth and the provisioning hook below. search_path
 // pins Better Auth's own queries to its schema; the hook reaches into `public`
 // by qualifying the table explicitly, which works regardless of search_path.
-const pool = new Pool({
-  connectionString: required("DATABASE_URL"),
-  options: "-c search_path=better_auth",
-});
+//
+// poolConfig translates libpq's sslmode into what node-postgres actually needs
+// -- and removes sslmode from the string, because leaving it in lets
+// ConnectionParameters overwrite the translation with its own. See db-config.js;
+// the reasoning is long enough to be worth reading before touching this.
+export const pool = new Pool(poolConfig(required("DATABASE_URL")));
 
 export const auth = betterAuth({
   baseURL,
