@@ -293,17 +293,29 @@ Two carve-outs, both of which already exist in some form:
   id and username, not persona data, and a client that cannot call it cannot
   tell the user which account it is connected to.
 
-### Account endpoints require a session JWT
+### Account endpoints require `persona:write`, and never an OAuth token
 
-`/api/auth/set-password` and all three `/api/auth/tokens` methods become
-reachable only by a human with a browser session.
+`/api/auth/set-password` and all three `/api/auth/tokens` methods accept a
+session JWT or an opaque token carrying `persona:write`. They reject OAuth access
+tokens outright, whatever their scope.
 
 This closes a privilege-escalation hole that scoping would otherwise open: today
 an opaque token can call `POST /api/auth/tokens`, so a `persona:read` token could
 mint itself a full-scope one. A read-only token that can do that is not a
-read-only token. The SPA already uses a session JWT for these endpoints, so
-nothing user-facing changes — but a script managing tokens *with* a token stops
-working, and that is a deliberate break.
+read-only token.
+
+> **Corrected while planning.** An earlier draft made these endpoints
+> session-JWT-only. That breaks **detached mode** — `api.js:69` resolves a
+> manually configured token ahead of the session, precisely because the UI can
+> point at a remote instance where cookie auth cannot apply at all, and because
+> pre-Better-Auth accounts still hold a thirty-day token in localStorage. Both
+> are supported today. Requiring `persona:write` rather than a session closes the
+> same hole without taking either away: legacy tokens are grandfathered to all
+> scopes and keep working, while a newly minted read-only token cannot mint its
+> way up.
+
+An OAuth-connected application has no business changing your password or minting
+bearer tokens, so that rejection is by credential kind, not by scope.
 
 ### On `/mcp`, the tool is the scope
 
