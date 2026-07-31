@@ -15,6 +15,11 @@ MCP_RESOURCE = "https://mygist.example/mcp"
 def configured(monkeypatch):
     monkeypatch.setattr(jwt_auth, "JWKS_URL", "https://mygist.example/auth/jwks")
     monkeypatch.setattr(jwt_auth, "ISSUER", ISSUER)
+    # What a session JWT's aud must be, set the way production sets it (it
+    # defaults to the issuer). Only `verify` reads it -- but without it that
+    # function would reject everything for want of configuration, and a test
+    # asserting it rejects an MCP-audience token would prove nothing.
+    monkeypatch.setattr(jwt_auth, "AUDIENCE", ISSUER)
     monkeypatch.setattr(jwt_auth, "MCP_RESOURCE", MCP_RESOURCE)
     monkeypatch.setattr(jwt_auth, "ALGORITHMS", ["HS256"])
 
@@ -54,6 +59,19 @@ def test_accepts_an_audience_array():
 def test_rejects_a_session_jwt():
     """aud is the auth base, not the MCP resource. Must not drive MCP."""
     assert jwt_auth.verify_access_token(_token(aud=ISSUER)) is None
+
+
+def test_verify_rejects_a_token_minted_for_the_mcp_resource():
+    """The mirror of test_rejects_a_session_jwt, and the half that was missing.
+
+    Both directions have to hold or the audience is not separating anything:
+    the session verifier must refuse an OAuth access token just as firmly as
+    the access-token verifier refuses a session JWT. The second assertion is
+    what makes the first mean something -- without it, a fixture that had left
+    `verify` unconfigured would pass by rejecting every token alike.
+    """
+    assert jwt_auth.verify(_token(aud=MCP_RESOURCE)) is None
+    assert jwt_auth.verify(_token(aud=ISSUER)) is not None
 
 
 def test_rejects_a_token_with_no_sub():

@@ -156,7 +156,11 @@ def _oauth_scopes(claims: dict) -> frozenset:
     if isinstance(claim, str):
         parts = claim.split()
     elif isinstance(claim, list):
-        parts = claim
+        # Element by element, not the list wholesale: `["x"]` inside the list
+        # is unhashable and would raise TypeError out of scopes.expand's set
+        # update -- a 500 from the auth middleware, on a value an outside
+        # authorization server chose.
+        parts = [item for item in claim if isinstance(item, str)]
     else:
         parts = []
     return scopes.expand(parts)
@@ -230,10 +234,24 @@ async def auth_middleware(request: Request, call_next):
         if not user:
             return _unauthorized(is_mcp)
 
-        # An OAuth access token is valid on /mcp and nowhere else. The audience
-        # already says so; this makes the refusal explicit rather than relying
-        # on a claim check to have the side effect.
+        # Each JWT is valid on exactly one surface, and both halves have to be
+        # written down. The audience claim already says so -- an access token
+        # names /mcp, a session JWT names the auth service -- but a token that
+        # fails one check simply falls through to the other verifier above, so
+        # without these two lines the *failure* is what selects the surface.
+        #
+        # An OAuth access token is valid on /mcp and nowhere else:
         if kind == "oauth" and not is_mcp:
+            return _unauthorized(is_mcp)
+
+        # and a session JWT is valid on /api and nowhere else. Not a
+        # cross-user leak -- it is the same person either way -- but MCP
+        # requires a resource server to prove a token was issued for it
+        # specifically, and a credential minted for the browser was not.
+        # Letting it through would also route around consent entirely:
+        # anything holding a session JWT would reach /mcp with every tool
+        # visible, having agreed to nothing.
+        if kind == "session" and is_mcp:
             return _unauthorized(is_mcp)
 
         if not granted:

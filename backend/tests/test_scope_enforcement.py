@@ -175,6 +175,30 @@ def test_oauth_access_token_is_refused_on_account_endpoints_regardless_of_scope(
     assert res.status_code == 401
 
 
+def test_session_jwt_is_refused_on_mcp(as_user, jwt_configured):
+    """The mirror of the /api refusal above, and the one that was missing.
+
+    A session JWT fails verify_access_token on its audience and then falls
+    through to verify(), which accepts it -- so without an explicit check the
+    credential arrives at /mcp classified as a full-scope session, and `is_mcp`
+    means no scope test fires afterwards. Same user, so nothing leaks between
+    accounts; but MCP requires a resource server to prove a token was issued
+    for it specifically, and a browser credential reaching /mcp with every tool
+    visible is the consent model bypassed rather than enforced.
+    """
+    token = _session_token(db.current_user_id.get())
+    res = _client().post("/mcp", headers={"Authorization": f"Bearer {token}"}, json={})
+    assert res.status_code == 401
+
+
+def test_session_jwt_is_still_accepted_on_api(as_user, jwt_configured):
+    """The other half: refusing it on /mcp must not disturb the SPA, whose
+    every request to /api carries exactly this credential."""
+    token = _session_token(db.current_user_id.get())
+    res = _client().get("/api/files", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+
+
 def test_session_jwt_is_treated_as_full_scope(as_user, jwt_configured):
     """The account holder in person, scoped against nobody -- including at an
     account-management endpoint that an opaque token would need persona:write
@@ -200,6 +224,16 @@ def test_oauth_scopes_accepts_a_list_valued_scope_claim():
 
 def test_oauth_scopes_treats_a_non_string_non_list_claim_as_no_scopes():
     assert main._oauth_scopes({"scope": 12345}) == frozenset()
+
+
+def test_oauth_scopes_ignores_non_string_elements_inside_a_list_claim():
+    """A nested list is unhashable, so passing the elements through untouched
+    raised TypeError inside scopes.expand and surfaced as a 500 from the auth
+    middleware -- on a value an outside authorization server chose."""
+    assert main._oauth_scopes({"scope": [["x"]]}) == frozenset()
+    assert main._oauth_scopes({"scope": ["persona:read", None, 7]}) == scopes.expand(
+        ["persona:read"]
+    )
 
 
 def test_oauth_access_token_with_a_list_scope_claim_does_not_500(
