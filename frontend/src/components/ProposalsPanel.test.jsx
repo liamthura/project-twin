@@ -141,6 +141,36 @@ describe("ProposalsPanel", () => {
     expect(onViewSection).toHaveBeenCalledWith("lifestyle");
   });
 
+  it("tells the app which section to refetch, so the link does not land on stale data", async () => {
+    const user = userEvent.setup();
+    const onSectionChanged = vi.fn();
+    render(<ProposalsPanel onSectionChanged={onSectionChanged} />);
+    await user.click(await screen.findByRole("button", { name: /^approve$/i }));
+    await waitFor(() => expect(onSectionChanged).toHaveBeenCalledWith("knowledge"));
+  });
+
+  it("does not ask for a refetch when nothing changed", async () => {
+    const user = userEvent.setup();
+    const onSectionChanged = vi.fn();
+    render(<ProposalsPanel onSectionChanged={onSectionChanged} />);
+    await user.click(await screen.findByRole("button", { name: /^reject$/i }));
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    expect(onSectionChanged).not.toHaveBeenCalled();
+  });
+
+  it("picks up proposals that arrive while the tab is open", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<ProposalsPanel />);
+      await waitFor(() => expect(api.listProposals).toHaveBeenCalled());
+      const before = api.listProposals.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(20000);
+      expect(api.listProposals.mock.calls.length).toBeGreaterThan(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("gives rejecting a toast but no link, because nothing changed", async () => {
     const user = userEvent.setup();
     render(<ProposalsPanel onViewSection={vi.fn()} sectionTitles={{}} />);

@@ -51,7 +51,13 @@ function renderValue(value) {
  * decision about where something belongs. A queue that mixes fast and slow
  * items gets abandoned at the slow ones.
  */
-export default function ProposalsPanel({ onViewSection, sectionTitles = {} }) {
+// Agents propose while you have this open, and nothing else tells the page.
+// This is the only surface in the app that changes without the user doing
+// anything, so it is the only one that polls -- and only while it is mounted,
+// which Radix already scopes to the tab being open.
+const QUEUE_POLL_MS = 15000;
+
+export default function ProposalsPanel({ onViewSection, onSectionChanged, sectionTitles = {} }) {
   const [kind, setKind] = useState("entity");
   const [rows, setRows] = useState([]);
   const [busy, setBusy] = useState(null);
@@ -70,6 +76,19 @@ export default function ProposalsPanel({ onViewSection, sectionTitles = {} }) {
 
   useEffect(() => { refresh(kind); }, [kind, refresh]);
 
+  useEffect(() => {
+    const tick = () => {
+      // A backgrounded tab polling every 15s is just battery and rate limit.
+      if (document.visibilityState === "visible") refresh(kind);
+    };
+    const timer = setInterval(tick, QUEUE_POLL_MS);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [kind, refresh]);
+
   /**
    * Run one resolution, then say what happened.
    *
@@ -86,6 +105,10 @@ export default function ProposalsPanel({ onViewSection, sectionTitles = {} }) {
       setRows((current) => current.filter((r) => r.id !== id));
       setError(null);
       const section = res?.section;
+      // Refetch the section that changed straight away, rather than waiting
+      // for the user to click through and find stale data. We know exactly
+      // what moved, so there is nothing here worth polling for.
+      if (section) onSectionChanged?.(section);
       toast({
         title,
         variant: "success",

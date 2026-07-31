@@ -148,7 +148,12 @@ export default function App() {
 
   const [disabledSections, setDisabledSections] = useState([]);
   const [packs, setPacks] = useState([]);
-  const [activeTab, setActiveTab] = useState("profile");
+  // The tab lives in the URL so a refresh keeps your place. Without it, any
+  // reload drops you back on Profile, which is worst exactly when you have
+  // just been sent somewhere by a "View in ..." link.
+  const [activeTab, setActiveTab] = useState(
+    () => window.location.hash.replace(/^#\/?/, "") || "profile",
+  );
   // Tab count changes when sections are toggled, so re-measure the strip then.
   const [tabStripRef, tabStripEdges] = useEdgeFade([disabledSections, packs]);
   // Data for enabled sections WITHOUT a bespoke editor, keyed by section key.
@@ -198,6 +203,28 @@ export default function App() {
     const valid = new Set([...enabledKeys.split(","), "review", "sections"]);
     if (!valid.has(activeTab)) setActiveTab("profile");
   }, [enabledKeys, activeTab]);
+
+  useEffect(() => {
+    if (window.location.hash.replace(/^#\/?/, "") !== activeTab) {
+      // replaceState, not a hash assignment: switching tabs should not stack
+      // up history entries that the back button then has to walk through.
+      window.history.replaceState(null, "", `#/${activeTab}`);
+    }
+  }, [activeTab]);
+
+  // Approving or promoting writes server-side, so the section it landed in is
+  // stale in this page until we go and get it. We know which one changed, so
+  // refetch exactly that -- no polling, and no window where the "View in ..."
+  // link shows the old data.
+  const refreshSection = useCallback(async (key) => {
+    try {
+      const response = await api(`/files/${key}`);
+      setPackData((prev) => ({ ...prev, [key]: response.data ?? {} }));
+    } catch (_) {
+      // Non-fatal: the toast already said the change went through, and the
+      // next load will pick it up.
+    }
+  }, []);
 
   const loadAllData = async () => {
     setIsLoading(true);
@@ -571,6 +598,7 @@ export default function App() {
           <TabsContent value="review">
             <ProposalsPanel
               onViewSection={setActiveTab}
+              onSectionChanged={refreshSection}
               sectionTitles={sectionTitles}
             />
           </TabsContent>

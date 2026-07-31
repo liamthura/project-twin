@@ -3471,8 +3471,18 @@ def _validate_proposal(p: dict) -> tuple[dict | None, dict | None]:
             "valid_actions": ENTITY_SCHEMA[section][entity].get("actions", []),
         }
 
-    data = normalize_data(p.get("data") or {}, entity)
-    identifier_field = ENTITY_SCHEMA[section][entity].get("identifier")
+    spec = ENTITY_SCHEMA[section][entity]
+    identifier_field = spec.get("identifier")
+    # normalize_data adds alias keys so the write path can find a field under
+    # any spelling an agent might use. Keeping them would make the review card
+    # show one value twice under two names, on the one surface whose whole job
+    # is being read by a person -- so store exactly the published input
+    # vocabulary, which is what get_schema tells clients to send.
+    declared = set(spec.get("required", [])) | set(spec.get("optional", []))
+    if identifier_field:
+        declared.add(identifier_field)
+    normalised = normalize_data(p.get("data") or {}, entity)
+    data = {k: v for k, v in normalised.items() if k in declared} or normalised
     return dict(
         common, action=p["action"], entity=entity, data=data,
         identifier=str(data.get(identifier_field, "")),

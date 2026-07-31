@@ -88,6 +88,43 @@ def test_a_conflicting_value_is_stored_with_the_current_one_attached(clean_datab
     assert r["existing_entity"]["title"] == "Datadog"
 
 
+def test_stored_data_carries_no_alias_duplicates(clean_database, as_user):
+    """normalize_data adds alias keys so the write path can find a field under
+    any spelling. Storing that verbatim makes the review card show the same
+    value twice under two names -- `trait` and `name` -- which is noise on the
+    one surface whose whole job is being read by a person."""
+    import proposals_store
+    _call([{
+        "kind": "entity", "action": "add", "entity": "personality_trait",
+        "data": {"trait": "Impatient with ceremony"},
+        "rationale": "r", "evidence": "e",
+    }])
+    [row] = proposals_store.list_pending("entity")
+    assert row["data"] == {"trait": "Impatient with ceremony"}
+
+
+def test_an_alias_only_payload_is_kept_rather_than_stripped_to_nothing(clean_database, as_user):
+    """Alias resolution happens inside execute_modify, not in normalize_data --
+    an agent that sends only `name` for an entity whose field is `item` still
+    writes correctly on approve. Filtering to declared fields must therefore
+    never empty a payload out, or the proposal would become unexecutable."""
+    import proposals_store
+    _call([{
+        "kind": "entity", "action": "add", "entity": "top_of_mind",
+        "data": {"name": "Pick a licence"},
+        "rationale": "r", "evidence": "e",
+    }])
+    [row] = proposals_store.list_pending("entity")
+    assert row["data"] == {"name": "Pick a licence"}
+    # ...and that payload is still executable, which is the point. Asserted on
+    # the value, not the key: top_of_mind's declared identifier is `item` but
+    # it stores under `idea`, one of the gaps the entity-field-schema spec
+    # records. This test is about the proposal surviving, not about that.
+    assert "✅" in server.execute_modify(row["action"], row["entity"], row["data"])
+    [stored] = server.load_json("projects.json")["top_of_mind"]
+    assert "Pick a licence" in stored.values()
+
+
 def test_the_queue_is_not_readable_over_mcp(clean_database, as_user):
     names = {t.lower() for t in dir(server)}
     for forbidden in ("list_proposals", "get_proposals", "resolve_proposal"):
