@@ -93,7 +93,7 @@ export async function signIn(identifier, password) {
  *  given. RFC 2606 guarantees it can never resolve, so it cannot be mistaken
  *  for a deliverable address or accidentally sent to. A real address replaces
  *  it when email flows arrive. */
-export async function signUp(username, password, email) {
+export async function signUp(username, password, email, inviteCode) {
   const res = await authFetch("/sign-up/email", {
     method: "POST",
     body: JSON.stringify({
@@ -101,11 +101,70 @@ export async function signUp(username, password, email) {
       name: username,
       email: email || `${username}@mygist.invalid`,
       password,
+      // Ignored by the service unless it is running invite-only. Sent
+      // unconditionally when we have one rather than branching here: the
+      // service is the authority on whether it is required, and a client that
+      // decides for itself is a client that can be wrong about it.
+      ...(inviteCode ? { inviteCode } : {}),
     }),
   });
   if (!res.ok) throw new Error(await readError(res, "Registration failed"));
   cachedJwt = null;
   return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Invite codes
+// ---------------------------------------------------------------------------
+
+/** XXXX-XXXX from Crockford base32 minus I, L, O and U -- the characters people
+ *  mistype for one another. Must match ALPHABET in auth/src/invite.js. */
+export const INVITE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+export const INVITE_LENGTH = 8;
+
+/** Uppercase, separator removed, anything outside the alphabet dropped.
+ *
+ *  The slots hold the bare eight characters; the separator is presentation. A
+ *  code arrives written `7F2K-QX91`, typed `7f2kqx91`, or pasted with spaces,
+ *  and all three have to be the same code. */
+export function normaliseInvite(input) {
+  return String(input ?? "")
+    .toUpperCase()
+    .split("")
+    .filter((c) => INVITE_ALPHABET.includes(c))
+    .join("")
+    .slice(0, INVITE_LENGTH);
+}
+
+/** Whether a code is complete enough to be worth asking the server about. */
+export function isCompleteInvite(input) {
+  return normaliseInvite(input).length === INVITE_LENGTH;
+}
+
+/** The form the server stores and expects: XXXX-XXXX. */
+export function formatInvite(input) {
+  const bare = normaliseInvite(input);
+  return bare.length === INVITE_LENGTH ? `${bare.slice(0, 4)}-${bare.slice(4)}` : bare;
+}
+
+/**
+ * Ask whether a code would admit someone.
+ *
+ * Answers only yes or no. Which way a code failed -- unknown, expired, spent,
+ * revoked -- is deliberately not exposed: it would tell a guesser which codes
+ * are worth pursuing, and tells a genuine tester nothing they can act on.
+ *
+ * This is an affordance, not the gate. The code it accepts can be spent in the
+ * seconds before a password is chosen, so the service checks again at sign-up.
+ */
+export async function checkInvite(code) {
+  const res = await authFetch("/invite/check", {
+    method: "POST",
+    body: JSON.stringify({ code: formatInvite(code) }),
+  });
+  if (!res.ok) throw new Error(await readError(res, "Could not check that code"));
+  const body = await res.json().catch(() => ({}));
+  return body?.valid === true;
 }
 
 export async function signOut() {

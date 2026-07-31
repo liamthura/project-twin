@@ -211,6 +211,29 @@ function isConfigured() {
   return !!(config?.serverUrl || import.meta.env.DEV);
 }
 
+/**
+ * What this instance is, before anyone has a credential.
+ *
+ * Read by the sign-up screen to learn whether an invite code is required. No
+ * credential is sent or needed -- it decides what a stranger is shown, so a
+ * stranger has to be able to read it.
+ *
+ * Falls back to "not invite-only" when unreachable. That is the right way to
+ * be wrong: an instance that IS invite-only still refuses the sign-up itself,
+ * so the worst case is a form that asks for no code and is then told it needed
+ * one. Guessing the other way would put an invite gate in front of every
+ * self-hosted instance the moment this call failed.
+ */
+async function getInstance() {
+  try {
+    const response = await fetch(`${getApiBase()}/instance`);
+    if (!response.ok) return { invite_only: false };
+    return await response.json();
+  } catch {
+    return { invite_only: false };
+  }
+}
+
 // Export data as zip file download
 async function exportData() {
   const baseUrl = getApiBase();
@@ -360,6 +383,7 @@ export {
   loginAccount,
   whoami,
   isConfigured,
+  getInstance,
   exportData,
   importData,
   setPassword,

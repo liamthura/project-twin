@@ -1,12 +1,33 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Globe, Loader2, Server } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { segmentClass } from "@/components/ui/segmented-control";
-import { saveConfig, loginAccount, registerAccount, CLOUD_API_URL } from "@/lib/api.js";
-import { signIn, signUp, requestPasswordReset } from "@/lib/session.js";
+import {
+  saveConfig,
+  loginAccount,
+  registerAccount,
+  getInstance,
+  CLOUD_API_URL,
+} from "@/lib/api.js";
+import {
+  signIn,
+  signUp,
+  requestPasswordReset,
+  isCompleteInvite,
+  normaliseInvite,
+} from "@/lib/session.js";
+import { InviteGate, AcceptedInvite } from "@/components/InviteGate";
+
+/** An invite link: ?invite=7F2K-QX91. Read once at mount -- it cannot change
+ *  while the page is open, and reading it in render would re-check it on every
+ *  keystroke. */
+function inviteFromUrl() {
+  if (typeof window === "undefined") return "";
+  return normaliseInvite(new URLSearchParams(window.location.search).get("invite"));
+}
 
 // Better Auth is same-origin only: its session cookie cannot be set from, or
 // sent to, another site. A UI pointed at someone else's server therefore keeps
@@ -41,6 +62,12 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [resetSent, setResetSent] = useState(false);
+
+  // Whether this instance requires an invite code. Null until asked, so the
+  // sign-up form is not rendered and then replaced by a gate a moment later.
+  const [inviteOnly, setInviteOnly] = useState(null);
+  const [acceptedInvite, setAcceptedInvite] = useState("");
+  const [linkInvite] = useState(inviteFromUrl);
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState(null);
   const [showServer, setShowServer] = useState(false);
@@ -76,6 +103,33 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
   // Not in detached mode either: that talks to /api/auth/login, which knows
   // only usernames. A label promising email would be a lie on that path.
   const acceptsEmail = mode === "signin" && !isDetached(serverUrl);
+
+  // Asked once, on mount. Detached mode is excluded on purpose: /api/instance
+  // there describes SOMEBODY ELSE'S server, and its registration path is the
+  // old one, which has no notion of invite codes.
+  useEffect(() => {
+    if (isDetached(serverUrl)) {
+      setInviteOnly(false);
+      return;
+    }
+    let cancelled = false;
+    getInstance().then((info) => {
+      if (!cancelled) setInviteOnly(info?.invite_only === true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [serverUrl]);
+
+  // An invite link means someone intends to sign up, so start there rather
+  // than on the sign-in tab they would immediately have to leave.
+  useEffect(() => {
+    if (isCompleteInvite(linkInvite)) setMode("signup");
+  }, [linkInvite]);
+
+  // The gate stands between "create an account" and the account form, and only
+  // while this instance actually requires one.
+  const needsInvite = mode === "signup" && inviteOnly === true && !acceptedInvite;
 
   const switchMode = (next) => {
     setMode(next);
@@ -143,7 +197,9 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
         saveConfig({ serverUrl, token: result.token });
       } else {
         if (mode === "signup") {
-          await signUp(username.trim(), password);
+          // undefined when this instance is open; the service ignores it
+          // then, and requires it when it is not.
+          await signUp(username.trim(), password, undefined, acceptedInvite || undefined);
         } else {
           await signIn(username.trim(), password);
         }
@@ -158,6 +214,16 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
       setPending(false);
     }
   };
+
+  if (needsInvite) {
+    return (
+      <InviteGate
+        initialCode={linkInvite}
+        onAccepted={setAcceptedInvite}
+        onBack={() => switchMode("signin")}
+      />
+    );
+  }
 
   if (mode === "forgot") {
     return (
@@ -224,6 +290,11 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
 
   return (
     <div className="w-full space-y-4 text-left">
+      {/* Which code is about to be spent, and a way back to change it. */}
+      {mode === "signup" && acceptedInvite && (
+        <AcceptedInvite code={acceptedInvite} onChange={() => setAcceptedInvite("")} />
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="space-y-1.5">
           <Label htmlFor="welcome-username" className="text-xs font-medium">

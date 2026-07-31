@@ -2,9 +2,24 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+// Only the calls that touch the network are replaced. The invite helpers --
+// normalisation, the alphabet, what counts as complete -- stay real, because
+// they are rules the screen depends on and a stubbed rule would only ever agree
+// with whatever the test assumed.
+vi.mock("@/lib/session.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    signIn: vi.fn(async () => ({})),
+    signUp: vi.fn(async () => ({})),
+    requestPasswordReset: vi.fn(async () => ({ status: true })),
+    checkInvite: vi.fn(async () => true),
+  };
+});
+
 // registerAccount/loginAccount take the server URL as their first argument,
-// which is the whole point of these tests: which server a fresh sign-up is
-// sent to. Everything else in the module is kept real.
+// which is the whole point of several of these tests: which server a fresh
+// sign-up is sent to. Everything else in the module is kept real.
 vi.mock("@/lib/api.js", async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -12,17 +27,13 @@ vi.mock("@/lib/api.js", async (importOriginal) => {
     saveConfig: vi.fn(),
     registerAccount: vi.fn(async () => ({ token: "t" })),
     loginAccount: vi.fn(async () => ({ token: "t" })),
+    // Every test that predates invite-only expects an open instance.
+    getInstance: vi.fn(async () => ({ invite_only: false })),
   };
 });
 
-vi.mock("@/lib/session.js", () => ({
-  signIn: vi.fn(async () => ({})),
-  signUp: vi.fn(async () => ({})),
-  requestPasswordReset: vi.fn(async () => ({ status: true })),
-}));
-
-import { registerAccount, loginAccount, saveConfig, CLOUD_API_URL } from "@/lib/api.js";
-import { signIn, signUp, requestPasswordReset } from "@/lib/session.js";
+import { registerAccount, loginAccount, saveConfig, getInstance, CLOUD_API_URL } from "@/lib/api.js";
+import { signIn, signUp, requestPasswordReset, checkInvite } from "@/lib/session.js";
 import { WelcomeAuth } from "@/components/WelcomeAuth";
 
 // jsdom serves the page from http://localhost:3000 by default, which stands
@@ -76,7 +87,9 @@ describe("WelcomeAuth server default", () => {
     await user.type(screen.getByLabelText("Confirm password"), "CorrectHorse9!");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
-    expect(signUp).toHaveBeenCalledWith("someone", "CorrectHorse9!");
+    // Trailing undefined: no email is collected at sign-up, and this instance
+    // is open so there is no invite code either.
+    expect(signUp).toHaveBeenCalledWith("someone", "CorrectHorse9!", undefined, undefined);
     expect(registerAccount).not.toHaveBeenCalled();
   });
 
@@ -220,5 +233,83 @@ describe("signing in with an email", () => {
 
     expect(screen.getByLabelText("Username")).toBeInTheDocument();
     expect(screen.queryByLabelText("Username or email")).toBeNull();
+  });
+});
+
+describe("an invite-only instance", () => {
+  beforeEach(() => {
+    getInstance.mockResolvedValue({ invite_only: true });
+    checkInvite.mockResolvedValue(true);
+  });
+
+  it("asks for a code before the account form", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: "Create an account" }));
+
+    expect(await screen.findByLabelText(/invite code/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Confirm password")).toBeNull();
+  });
+
+  it("does not gate signing in", async () => {
+    // Only account creation passes through the gate. Someone who already has an
+    // account has already been invited.
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    expect(await screen.findByLabelText("Username or email")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/invite code/i)).toBeNull();
+  });
+
+  it("shows the account form once a code is accepted, and which code it was", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: "Create an account" }));
+    await user.type(await screen.findByLabelText(/invite code/i), "7F2KQX91");
+
+    expect(await screen.findByLabelText("Confirm password")).toBeInTheDocument();
+    expect(screen.getByText("7F2K-QX91")).toBeInTheDocument();
+  });
+
+  it("sends the code with the registration", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: "Create an account" }));
+    await user.type(await screen.findByLabelText(/invite code/i), "7F2KQX91");
+
+    await user.type(await screen.findByLabelText("Username"), "sarah");
+    await user.type(screen.getByLabelText("Password"), "CorrectHorse9!");
+    await user.type(screen.getByLabelText("Confirm password"), "CorrectHorse9!");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(signUp).toHaveBeenCalledWith("sarah", "CorrectHorse9!", undefined, "7F2K-QX91");
+  });
+
+  it("lets a wrong code be changed without losing the form", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: "Create an account" }));
+    await user.type(await screen.findByLabelText(/invite code/i), "7F2KQX91");
+    await screen.findByLabelText("Confirm password");
+
+    await user.click(screen.getByRole("button", { name: /change/i }));
+
+    expect(await screen.findByLabelText(/invite code/i)).toBeInTheDocument();
+  });
+});
+
+describe("an open instance", () => {
+  it("never mentions invite codes", async () => {
+    getInstance.mockResolvedValue({ invite_only: false });
+    const user = userEvent.setup();
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: "Create an account" }));
+
+    expect(await screen.findByLabelText("Confirm password")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/invite code/i)).toBeNull();
   });
 });

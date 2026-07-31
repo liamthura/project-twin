@@ -69,10 +69,19 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        // The caret in the invite-code slots. input-otp hides the real one and
+        // asks us to draw it, since the input itself spans all eight boxes.
+        // shadcn's config ships this; MyGist's is hand-written, so it is added
+        // here rather than by adopting theirs wholesale.
+        "caret-blink": {
+          "0%,70%,100%": { opacity: "1" },
+          "20%,50%": { opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "caret-blink": "caret-blink 1.25s ease-out infinite",
       },
     },
   },
