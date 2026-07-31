@@ -600,6 +600,7 @@ export default function App() {
               onViewSection={setActiveTab}
               onSectionChanged={refreshSection}
               sectionTitles={sectionTitles}
+              packs={packs}
             />
           </TabsContent>
           <TabsContent value="sections">

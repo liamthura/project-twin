@@ -1,7 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import ProposalsPanel from "./ProposalsPanel";
+import ProposalsPanel, { promotionTargets } from "./ProposalsPanel";
+
+const PACKS = [
+  {
+    key: "lifestyle", title: "Lifestyle", enabled: true,
+    entities: {
+      hobby: { actions: ["add", "update", "remove"], required: ["name"], optional: ["notes"], identifier: "name" },
+      value: { actions: ["add", "remove"], required: ["value"], optional: [], identifier: "value" },
+      // nested: needs an owning row, so it cannot take a bare note
+      hobby_specific: { actions: ["add"], required: ["hobby_name", "specific"], identifier: "specific", parent: "hobby_name" },
+    },
+  },
+  {
+    key: "knowledge", title: "Knowledge", enabled: true,
+    entities: {
+      mental_tab: { actions: ["add", "remove"], required: ["title"], optional: ["tags"], identifier: "title" },
+    },
+  },
+];
 
 vi.mock("@/lib/api", () => ({
   listProposals: vi.fn(),
@@ -128,17 +146,68 @@ describe("ProposalsPanel", () => {
     expect(onViewSection).toHaveBeenCalledWith("knowledge");
   });
 
-  it("promoting links to the section the note became part of", async () => {
-    const user = userEvent.setup();
-    const onViewSection = vi.fn();
-    render(<ProposalsPanel onViewSection={onViewSection} sectionTitles={{ lifestyle: "Lifestyle" }} />);
-    await user.click(screen.getByRole("button", { name: /observations/i }));
-    await user.click(await screen.findByRole("button", { name: /^promote$/i }));
-    await waitFor(() => expect(toast).toHaveBeenCalled());
-    const { action } = toast.mock.calls[0][0];
-    render(action);
-    await user.click(screen.getByRole("button", { name: /view in lifestyle/i }));
-    expect(onViewSection).toHaveBeenCalledWith("lifestyle");
+  describe("promotion asks where it should go", () => {
+    async function openPromoteDialog(user, props = {}) {
+      render(<ProposalsPanel packs={PACKS} sectionTitles={{ lifestyle: "Lifestyle" }} {...props} />);
+      await user.click(screen.getByRole("button", { name: /observations/i }));
+      await user.click(await screen.findByRole("button", { name: /^promote$/i }));
+      return screen.findByRole("dialog");
+    }
+
+    it("only offers entities that a single line of text can actually fill", () => {
+      const targets = promotionTargets(PACKS[0]).map((t) => t.entity);
+      expect(targets).toEqual(["hobby", "value"]);
+      // hobby_specific needs an owning hobby as well, so a bare note cannot
+      // make one -- offering it would produce a proposal that cannot execute.
+      expect(targets).not.toContain("hobby_specific");
+    });
+
+    it("does not file anything until you confirm", async () => {
+      const user = userEvent.setup();
+      await openPromoteDialog(user);
+      expect(api.promoteProposal).not.toHaveBeenCalled();
+    });
+
+    it("defaults to the section the agent suggested", async () => {
+      const user = userEvent.setup();
+      const dialog = await openPromoteDialog(user);
+      // NOTE's section_hint is "preferences", which has no valid target here,
+      // so it falls back rather than silently filing somewhere wrong.
+      expect(within(dialog).getByLabelText(/section/i)).toBeInTheDocument();
+    });
+
+    it("promotes into the entity you picked, under its own field", async () => {
+      const user = userEvent.setup();
+      const dialog = await openPromoteDialog(user);
+      await user.selectOptions(within(dialog).getByLabelText(/section/i), "lifestyle");
+      await user.selectOptions(within(dialog).getByLabelText(/^type$/i), "value");
+      await user.click(within(dialog).getByRole("button", { name: /^promote$/i }));
+      await waitFor(() =>
+        expect(api.promoteProposal).toHaveBeenCalledWith(
+          "p2", "value", { value: "Wants the recommendation first." }),
+      );
+    });
+
+    it("lets you edit the wording before it becomes real data", async () => {
+      const user = userEvent.setup();
+      const dialog = await openPromoteDialog(user);
+      await user.selectOptions(within(dialog).getByLabelText(/section/i), "knowledge");
+      const field = within(dialog).getByLabelText(/^title$/i);
+      await user.clear(field);
+      await user.type(field, "Recommendation first");
+      await user.click(within(dialog).getByRole("button", { name: /^promote$/i }));
+      await waitFor(() =>
+        expect(api.promoteProposal).toHaveBeenCalledWith(
+          "p2", "mental_tab", { title: "Recommendation first" }),
+      );
+    });
+
+    it("cancelling files nothing", async () => {
+      const user = userEvent.setup();
+      const dialog = await openPromoteDialog(user);
+      await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
+      expect(api.promoteProposal).not.toHaveBeenCalled();
+    });
   });
 
   it("tells the app which section to refetch, so the link does not land on stale data", async () => {

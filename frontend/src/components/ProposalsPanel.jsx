@@ -5,6 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import {
   listProposals, approveProposal, rejectProposal, promoteProposal,
 } from "@/lib/api";
@@ -14,15 +19,27 @@ const KINDS = [
   { key: "note", label: "Observations" },
 ];
 
-// A note carries only a section_hint, so promotion needs a destination entity.
-// These are the entities that both accept a single free-text identifier and
-// declare a `tags` field, so the agent-observation tag survives the promotion.
-const PROMOTION_TARGET = {
-  knowledge: { entity: "mental_tab", field: "title" },
-  projects: { entity: "project", field: "name" },
-  media: { entity: "media_item", field: "title" },
-};
-const DEFAULT_TARGET = { entity: "mental_tab", field: "title" };
+/**
+ * Which entities in a pack a single line of text can actually become.
+ *
+ * A note is one sentence, so the only entities it can fill are the ones whose
+ * sole required field is their own identifier. Anything needing a second value
+ * -- `hobby_specific` needs an owning hobby, `project_reference` needs a
+ * project -- would produce a proposal that cannot execute, so it is not
+ * offered rather than offered and then failing on confirm.
+ */
+export function promotionTargets(pack) {
+  return Object.entries(pack?.entities || {})
+    .filter(([, spec]) => {
+      const required = spec.required || [];
+      return (spec.actions || []).includes("add")
+        && spec.identifier
+        && !spec.parent
+        && required.length === 1
+        && required[0] === spec.identifier;
+    })
+    .map(([entity, spec]) => ({ entity, field: spec.identifier }));
+}
 
 const ACTION_VERB = { add: "Add", update: "Update", remove: "Remove" };
 
@@ -57,11 +74,14 @@ function renderValue(value) {
 // which Radix already scopes to the tab being open.
 const QUEUE_POLL_MS = 15000;
 
-export default function ProposalsPanel({ onViewSection, onSectionChanged, sectionTitles = {} }) {
+export default function ProposalsPanel({
+  onViewSection, onSectionChanged, sectionTitles = {}, packs = [],
+}) {
   const [kind, setKind] = useState("entity");
   const [rows, setRows] = useState([]);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
+  const [promoting, setPromoting] = useState(null);
   const { toast } = useToast();
 
   const refresh = useCallback(async (which) => {
@@ -140,13 +160,126 @@ export default function ProposalsPanel({ onViewSection, onSectionChanged, sectio
     }
   }
 
-  function promote(row) {
-    const target = PROMOTION_TARGET[row.section_hint] || DEFAULT_TARGET;
-    return promoteProposal(row.id, target.entity, { [target.field]: row.note });
+  // Sections that can actually receive a note, in tab order.
+  const promotable = packs
+    .filter((p) => p.enabled !== false && promotionTargets(p).length)
+    .map((p) => ({ key: p.key, title: p.title || p.key, targets: promotionTargets(p) }));
+
+  function openPromote(row) {
+    // Default to what the agent suggested, but only if that section can
+    // actually hold a note -- otherwise fall back visibly rather than filing
+    // somewhere the card never mentioned.
+    const hinted = promotable.find((s) => s.key === row.section_hint);
+    const section = hinted || promotable[0];
+    setPromoting({
+      row,
+      section: section?.key ?? "",
+      entity: section?.targets[0]?.entity ?? "",
+      text: row.note || "",
+    });
   }
+
+  function confirmPromote() {
+    const { row, section, entity, text } = promoting;
+    const field = promotable
+      .find((s) => s.key === section)?.targets
+      .find((t) => t.entity === entity)?.field;
+    setPromoting(null);
+    if (!field || !text.trim()) return;
+    return act(row.id, "Promoted to your persona", () =>
+      promoteProposal(row.id, entity, { [field]: text.trim() }));
+  }
+
+  const promotingSection = promotable.find((s) => s.key === promoting?.section);
+  const promotingField = promotingSection?.targets
+    .find((t) => t.entity === promoting?.entity)?.field;
+
+  const selectClass =
+    "h-9 w-full rounded-md border border-input bg-background px-3 text-sm " +
+    "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2";
 
   return (
     <div className="space-y-4">
+      <Dialog open={Boolean(promoting)} onOpenChange={(o) => !o && setPromoting(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Promote to your persona</DialogTitle>
+            <DialogDescription>
+              An observation has no home of its own. Choose where this belongs
+              and it becomes real, editable data.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="promote-section">Section</Label>
+              <select
+                id="promote-section"
+                className={selectClass}
+                value={promoting?.section || ""}
+                onChange={(e) => {
+                  const next = promotable.find((s) => s.key === e.target.value);
+                  setPromoting((p) => ({
+                    ...p,
+                    section: e.target.value,
+                    entity: next?.targets[0]?.entity ?? "",
+                  }));
+                }}
+              >
+                {promotable.map((s) => (
+                  <option key={s.key} value={s.key}>{s.title}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="promote-entity">Type</Label>
+              <select
+                id="promote-entity"
+                className={selectClass}
+                value={promoting?.entity || ""}
+                onChange={(e) =>
+                  setPromoting((p) => ({ ...p, entity: e.target.value }))
+                }
+              >
+                {(promotingSection?.targets || []).map((t) => (
+                  <option key={t.entity} value={t.entity}>
+                    {humanise(t.entity)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {promotingField && (
+              <div className="space-y-1.5">
+                {/* The agent's wording is a starting point, not the record.
+                    Editing here is the last chance before it becomes data. */}
+                <Label htmlFor="promote-text">{humanise(promotingField)}</Label>
+                <Input
+                  id="promote-text"
+                  value={promoting?.text || ""}
+                  onChange={(e) =>
+                    setPromoting((p) => ({ ...p, text: e.target.value }))
+                  }
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPromoting(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmPromote}
+              disabled={!promotingField || !promoting?.text?.trim()}
+            >
+              Promote
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex gap-2">
         {KINDS.map((k) => (
           <Button
@@ -177,8 +310,11 @@ export default function ProposalsPanel({ onViewSection, onSectionChanged, sectio
                 </span>
               )}
               {row.section_hint && (
+                // "suggested", not an arrow: this is where the agent thinks it
+                // belongs, and you choose the real destination on promote. An
+                // arrow read as a promise the promote dialog then broke.
                 <span className="text-xs text-muted-foreground">
-                  → {row.section_hint}
+                  suggested: {humanise(row.section_hint)}
                 </span>
               )}
             </div>
@@ -238,8 +374,8 @@ export default function ProposalsPanel({ onViewSection, onSectionChanged, sectio
                 <>
                   <Button
                     size="sm"
-                    disabled={busy === row.id}
-                    onClick={() => act(row.id, "Promoted to your persona", () => promote(row))}
+                    disabled={busy === row.id || !promotable.length}
+                    onClick={() => openPromote(row)}
                   >
                     Promote
                   </Button>
