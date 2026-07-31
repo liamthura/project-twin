@@ -31,6 +31,9 @@ def tools_for_scopes(
     unclassified tool is one somebody forgot to add, and hiding it would make a
     newly added tool silently vanish for every client, which is far harder to
     notice than the reverse.
+
+    Visible, and -- unlike every other tool here -- not callable. See
+    ScopeMiddleware.on_call_tool for why the two halves differ.
     """
     candidates = set(names) if names is not None else set(scopes.TOOL_SCOPES)
     return {
@@ -57,20 +60,47 @@ class ScopeMiddleware(Middleware):
         return [tool for tool in tools if tool.name in allowed]
 
     async def on_call_tool(self, context: MiddlewareContext, call_next):
-        required = scopes.TOOL_SCOPES.get(context.message.name)
-        if required is not None:
-            try:
-                granted = scopes.current_scopes.get()
-            except LookupError:
-                granted = frozenset()
-            if not scopes.has(granted, required):
-                # ToolError's message survives even if mask_error_details is
-                # ever turned on -- a bare exception would be swallowed into a
-                # generic "error calling tool" message in that mode, and this
-                # refusal is exactly the detail a client needs to see.
-                raise ToolError(
-                    f"This connection is not authorised to use "
-                    f"{context.message.name}. It needs the {required} scope; "
-                    f"reconnect from MyGist's settings to grant it."
-                )
+        """Refuse a call the grant does not cover -- and refuse an unclassified
+        tool outright.
+
+        The two halves of "unclassified" are decided differently on purpose.
+        Listing it is a loudness choice: a tool that vanishes from every
+        client's tool list is a bug nobody reports for weeks, whereas one that
+        appears and then refuses names itself the moment anyone tries it.
+        Running it is a different question, and answering it "anyone may" was
+        a fail-open nobody argued for: it let a persona:read grant invoke a
+        tool that might write, purely because a line was missing from a dict.
+
+        test_mcp_scopes.py now asserts TOOL_SCOPES covers every tool the server
+        registers, so this branch should be unreachable in any build that ran
+        the suite. It exists for the build that did not, and the message says
+        what is actually wrong rather than blaming the caller's scopes.
+        """
+        name = context.message.name
+        try:
+            granted = scopes.current_scopes.get()
+        except LookupError:
+            # No grant on this request at all. The HTTP middleware refuses
+            # before we get here, so this is a path that never authenticated
+            # -- an empty grant satisfies nothing, which is the fail-closed
+            # answer and matches on_list_tools returning nothing.
+            granted = frozenset()
+
+        # ToolError's message survives even if mask_error_details is ever
+        # turned on -- a bare exception would be swallowed into a generic
+        # "error calling tool" in that mode, and these refusals are exactly the
+        # detail a client (or whoever forgot the dict entry) needs to see.
+        required = scopes.TOOL_SCOPES.get(name)
+        if required is None:
+            raise ToolError(
+                f"{name} has no scope classification on this server, so MyGist "
+                f"cannot tell what authorising it would permit. This is a "
+                f"server-side omission, not a problem with your connection."
+            )
+        if not scopes.has(granted, required):
+            raise ToolError(
+                f"This connection is not authorised to use {name}. It needs "
+                f"the {required} scope; reconnect from MyGist's settings to "
+                f"grant it."
+            )
         return await call_next(context)
