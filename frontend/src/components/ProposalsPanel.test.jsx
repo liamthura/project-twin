@@ -41,6 +41,29 @@ describe("ProposalsPanel", () => {
     expect(screen.getByText(/I rebuilt the whole alerting setup myself/)).toBeInTheDocument();
   });
 
+  it("renders the change as fields, never as raw JSON", async () => {
+    render(<ProposalsPanel />);
+    // The whole point of this surface is that a person reads it and decides.
+    expect(await screen.findByText("Update")).toBeInTheDocument();
+    expect(screen.getByText("domain")).toBeInTheDocument();
+    expect(screen.getByText("name")).toBeInTheDocument();
+    expect(screen.getByText("Datadog")).toBeInTheDocument();
+    expect(screen.getByText("level")).toBeInTheDocument();
+    expect(screen.getByText("advanced")).toBeInTheDocument();
+    expect(screen.queryByText(/[{}"]/)).not.toBeInTheDocument();
+  });
+
+  it("reads snake_case keys as words", async () => {
+    api.listProposals.mockImplementation((kind) =>
+      Promise.resolve(kind === "entity"
+        ? [{ ...ENTITY, entity: "work_experience", data: { company: "Acme", start_date: "2026-01" } }]
+        : []),
+    );
+    render(<ProposalsPanel />);
+    expect(await screen.findByText("work experience")).toBeInTheDocument();
+    expect(screen.getByText("start date")).toBeInTheDocument();
+  });
+
   it("names the tool that proposed it", async () => {
     render(<ProposalsPanel />);
     expect(await screen.findByText("Cursor")).toBeInTheDocument();

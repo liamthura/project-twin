@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,25 @@ const PROMOTION_TARGET = {
   media: { entity: "media_item", field: "title" },
 };
 const DEFAULT_TARGET = { entity: "mental_tab", field: "title" };
+
+const ACTION_VERB = { add: "Add", update: "Update", remove: "Remove" };
+
+// Entity names and field keys are snake_case in the schema. This is a review
+// surface a person reads, so they get read as words.
+function humanise(key) {
+  return String(key || "").replace(/_/g, " ");
+}
+
+function renderValue(value) {
+  if (Array.isArray(value)) return value.map(humanise).join(", ");
+  if (value && typeof value === "object") {
+    return Object.entries(value)
+      .map(([k, v]) => `${humanise(k)}: ${v}`)
+      .join(" · ");
+  }
+  if (typeof value === "boolean") return value ? "yes" : "no";
+  return humanise(value);
+}
 
 /**
  * Two review surfaces over one queue.
@@ -104,11 +123,24 @@ export default function ProposalsPanel() {
               )}
             </div>
 
-            <p className="text-sm font-medium">
-              {row.kind === "entity"
-                ? `${row.action} ${row.entity}: ${JSON.stringify(row.data)}`
-                : row.note}
-            </p>
+            {row.kind === "entity" ? (
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  <span>{ACTION_VERB[row.action] || row.action}</span>{" "}
+                  <span className="text-muted-foreground">{humanise(row.entity)}</span>
+                </p>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
+                  {Object.entries(row.data || {}).map(([field, value]) => (
+                    <Fragment key={field}>
+                      <dt className="text-muted-foreground">{humanise(field)}</dt>
+                      <dd className="min-w-0 break-words">{renderValue(value)}</dd>
+                    </Fragment>
+                  ))}
+                </dl>
+              </div>
+            ) : (
+              <p className="text-sm font-medium">{row.note}</p>
+            )}
 
             <p className="text-sm text-muted-foreground">{row.rationale}</p>
             {row.evidence && (
