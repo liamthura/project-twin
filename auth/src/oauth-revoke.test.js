@@ -12,6 +12,16 @@
  * statements do nothing at all wherever the migration has run, which is every
  * environment the Python suite has touched, so what is exercised there is the
  * real schema. They list only the columns this test needs, not the full table.
+ *
+ * One thing to know if this file ever fails with `duplicate key value violates
+ * unique constraint "pg_type_typname_nsp_index"`, or with a table that plainly
+ * exists reported as missing: nothing here is wrong. TEST_DATABASE_URL defaults
+ * to the same mygist_test that backend/tests/conftest.py uses, and that suite
+ * drops and rebuilds the whole schema -- `drop schema better_auth cascade`
+ * included -- before EVERY test. Run the two suites at once and they fight over
+ * the same catalog. CI is unaffected: the auth job gets its own Postgres
+ * service container. Locally, run them one after the other, or point
+ * TEST_DATABASE_URL at a database of this suite's own.
  */
 import { after, before, beforeEach, test } from "node:test";
 import assert from "node:assert/strict";

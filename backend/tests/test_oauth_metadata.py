@@ -23,13 +23,44 @@ def _reloaded_app():
 
 
 @pytest.fixture
-def client(monkeypatch):
+def reload_modules(monkeypatch):
+    """Hand back `_reloaded_app`, and put the modules back afterwards.
+
+    These tests can only be written with a reload: jwt_auth freezes
+    AUTH_MCP_RESOURCE and friends into module globals at import, and
+    oauth_metadata.register() decides once, while main is executing, whether
+    the discovery routes exist at all. Setting the environment later changes
+    nothing.
+
+    The catch is that a reload does not unwind. monkeypatch restores
+    os.environ; it knows nothing about the module state a reload built from it.
+    Left alone, jwt_auth.MCP_RESOURCE stays set and main.app stays a different
+    object for the remainder of the session -- so
+    test_scope_enforcement.py's
+    test_unauthenticated_mcp_without_oauth_configured_gets_a_plain_401, which
+    asserts this deployment has no OAuth configured, fails for every run in
+    which it happens to come after this file. It passed alone and failed in the
+    full suite, which is the worst way for this to show up.
+
+    So the environment is undone first and the modules are then rebuilt from
+    it, in that order -- reloading before the undo would just refreeze the
+    patched values. Requesting `monkeypatch` here rather than in each consumer
+    is what puts this teardown last: fixtures unwind in reverse setup order,
+    and everything below depends on this one.
+    """
+    yield _reloaded_app
+    monkeypatch.undo()  # the environment first...
+    _reloaded_app()  # ...then the modules that were frozen from it
+
+
+@pytest.fixture
+def client(monkeypatch, reload_modules):
     monkeypatch.setenv("AUTH_MCP_RESOURCE", "https://mygist.example/mcp")
     monkeypatch.setenv("AUTH_ISSUER", "https://mygist.example/auth")
     # Both halves, because both are needed to verify a token -- see
     # jwt_auth.mcp_resource_configured(), which is what gates these routes.
     monkeypatch.setenv("AUTH_JWKS_URL", "https://mygist.example/auth/jwks")
-    return TestClient(_reloaded_app())
+    return TestClient(reload_modules())
 
 
 def test_protected_resource_metadata_names_the_resource_and_its_server(client):
@@ -66,24 +97,35 @@ def test_metadata_needs_no_credential(client):
     assert client.get("/.well-known/oauth-protected-resource/mcp").status_code == 200
 
 
-def test_half_configured_mounts_nothing(monkeypatch):
+def test_half_configured_mounts_nothing(monkeypatch, reload_modules):
     """AUTH_MCP_RESOURCE set, AUTH_JWKS_URL not: no key, so no token this
     instance can ever verify.
 
     Advertising discovery here would walk a client all the way through
     registration and consent to a /mcp that rejects the token it just earned --
-    a longer, more confusing failure than the 404 it gets instead. Restored to
-    the fully-configured state afterwards, since these modules are reloaded
-    into the shared process."""
+    a longer, more confusing failure than the 404 it gets instead."""
     monkeypatch.setenv("AUTH_MCP_RESOURCE", "https://mygist.example/mcp")
     monkeypatch.setenv("AUTH_ISSUER", "https://mygist.example/auth")
     monkeypatch.delenv("AUTH_JWKS_URL", raising=False)
 
-    res = TestClient(_reloaded_app()).get("/.well-known/oauth-protected-resource/mcp")
+    res = TestClient(reload_modules()).get("/.well-known/oauth-protected-resource/mcp")
     assert res.status_code == 404
 
-    # Put the modules back. monkeypatch restores the environment but not the
-    # module state a reload froze from it, and leaving jwt_auth de-configured
-    # would silently change what every later test in this process sees.
-    monkeypatch.setenv("AUTH_JWKS_URL", "https://mygist.example/auth/jwks")
-    _reloaded_app()
+
+def test_reloading_main_does_not_stack_scope_middleware(reload_modules):
+    """`mcp` lives in server.py and is NOT reloaded when main is, so main's
+    module body runs `add_middleware` again over the same long-lived server.
+
+    That is a plain list append. Every reload this file performs was leaving
+    another ScopeMiddleware behind, and they never went away -- by the end of a
+    full-suite run the one server was filtering each tool listing half a dozen
+    times. Counted by class name rather than isinstance because a reload of
+    mcp_scopes would make the old instances fail an identity check while still
+    being just as stacked."""
+    from server import mcp
+
+    reload_modules()
+    reload_modules()
+
+    stacked = [type(m).__name__ for m in mcp.middleware]
+    assert stacked.count("ScopeMiddleware") == 1, stacked

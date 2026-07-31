@@ -57,7 +57,17 @@ from server import mcp
 # app that gets mounted.
 import mcp_scopes  # noqa: E402
 
-mcp.add_middleware(mcp_scopes.ScopeMiddleware())
+# Guarded because `mcp` is a module-global in server.py and this module can be
+# reloaded without it -- tests/test_oauth_metadata.py does exactly that to
+# rebuild `app` under a different environment. `add_middleware` is a plain
+# list append, so an unguarded call stacks a second, third, ... copy of the
+# same middleware onto the one long-lived server: every tool listing then gets
+# filtered N times and every refused call raises N times over. Harmless by
+# luck, since both halves happen to be idempotent -- but it is accumulating
+# state in a process that is supposed to be reset, and the next middleware
+# added here may not be so forgiving.
+if not any(isinstance(m, mcp_scopes.ScopeMiddleware) for m in mcp.middleware):
+    mcp.add_middleware(mcp_scopes.ScopeMiddleware())
 
 # Create MCP HTTP app. Default path is "/mcp" - FastMCP registers this as an
 # exact route internally, so mounting the whole app at "/" below lets "/mcp"
