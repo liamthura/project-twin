@@ -60,28 +60,32 @@ This matters because it decides where the rule lives. A hook here is fifteen
 lines against a supported API; the alternative was the FastAPI proxy parsing
 request bodies and making authorisation decisions.
 
-### Two things NOT yet verified
+### Two load-bearing assumptions — both now confirmed
 
-Both are load-bearing, and both are cheap to settle before anything is built.
-Neither has been confirmed against a running service, and this spec should not
-pretend otherwise.
+These were open when this spec was written, and a wrong answer to either would
+have moved enforcement to the FastAPI front door. Settled by a spike against a
+running service on a clean database, before the migration existed.
 
 1. **Does `ctx.body` still carry an unrecognised field?** The code travels as
-   `inviteCode` in the sign-up body. Better Auth validates request bodies with
-   zod, and if unknown keys are stripped *before* `hooks.before` runs, the hook
-   never sees it. Fallback if so: declare it through the sign-up schema, or read
-   it from a header the client sets instead.
+   `inviteCode` in the sign-up body, and zod could have stripped unknown keys
+   before `hooks.before` ran. **It does not.** Measured:
+
+   ```
+   q1_bodyKeys           ["username","name","email","password","inviteCode"]
+   q1_inviteCodeVisible  "7F2K-QX91"
+   ```
 
 2. **Does `databaseHooks.user.create.after` receive the request context?** The
-   existing hook takes `(user)`; redemption needs `(user, ctx)` to know which
-   code was used. Fallback if not: have `hooks.before` stash the validated code
-   on the context, or move redemption into an `after` hook on the sign-up
-   endpoint, which does see the response.
+   existing hook takes `(user)`; redemption needs to know which code was used.
+   **It receives `(user, ctx)`, and `ctx.body` is intact:**
 
-**First implementation task is a spike answering both**, before the migration.
-If both fall through, enforcement moves to the FastAPI front door and the
-trade-offs in the rejected option apply — worth knowing that early rather than
-after the table exists.
+   ```
+   q2_ctxDefined          true
+   q2_inviteCodeFromCtx   "7F2K-QX91"
+   ```
+
+The spike was deleted rather than kept. What it proved belongs in tests that
+run every time, not in a file nobody executes again.
 
 **`input-otp` carries no styling.** Version 1.4.2, zero runtime dependencies,
 React 18 in its peer range. It is headless — it owns keyboard handling, paste,
@@ -301,15 +305,15 @@ $ python scripts/invite.py mint --label "sarah (course)"
   7F2K-QX91   1 use   no expiry
 
 $ python scripts/invite.py mint --label "reddit thread" --uses 10 --expires 30d
-  3B8M-LP44   10 uses   expires 2026-08-30
+  3B8M-KP44   10 uses   expires 2026-08-30
 
 $ python scripts/invite.py list
   CODE       LABEL            USED   EXPIRES      STATUS
   7F2K-QX91  sarah (course)   1/1    —            spent
-  3B8M-LP44  reddit thread    4/10   2026-08-30   active
+  3B8M-KP44  reddit thread    4/10   2026-08-30   active
 
-$ python scripts/invite.py revoke 3B8M-LP44
-  3B8M-LP44 revoked. 4 accounts already created with it are unaffected.
+$ python scripts/invite.py revoke 3B8M-KP44
+  3B8M-KP44 revoked. 4 accounts already created with it are unaffected.
 ```
 
 Revoking closes a code to new sign-ups and does nothing to accounts already
@@ -412,11 +416,7 @@ None blocking. Two worth revisiting after testing starts:
 
 ## First step
 
-**A spike, not the migration.** Answer the two unverified questions above
-against a running auth service: can `hooks.before` see `inviteCode` in the body,
-and can the redemption hook learn which code was used. Both are load-bearing,
-and a wrong answer moves enforcement to the other side of the proxy.
-
-Then migration `0005_invite_codes` and `auth/src/invite.js` with its tests. The
-rule and the table are what everything else depends on, and both can be proven
-before a single line of UI exists.
+The spike is done and both answers came back the way this design needed, so the
+next step is migration `0005_invite_codes` and `auth/src/invite.js` with its
+tests. The rule and the table are what everything else depends on, and both can
+be proven before a single line of UI exists.

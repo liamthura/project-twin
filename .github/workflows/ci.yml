@@ -132,6 +132,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    services:
+      # The invite rule IS a WHERE clause -- "revoked, or expired, or spent" is
+      # four conditions that have to combine correctly, and a stubbed pool would
+      # only prove the string is the string. Plain postgres, not pgvector: this
+      # suite touches two tables and no extensions.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mygist
+          POSTGRES_PASSWORD: mygist
+          POSTGRES_DB: mygist_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -148,12 +167,13 @@ jobs:
         working-directory: auth
         run: npm ci
 
-      # The service's only real logic is turning one DATABASE_URL into a
-      # working connection, and it took three attempts to get right -- twice
-      # shipping to production and failing there. These run in a second and
-      # need no database.
+      # Two things: turning one DATABASE_URL into a working connection, which
+      # took three attempts to get right and shipped broken to production
+      # twice; and the invite rule, which decides who may create an account.
       - name: Test
         working-directory: auth
+        env:
+          TEST_DATABASE_URL: postgresql://mygist:mygist@localhost:5432/mygist_test
         run: npm test
 
   docs:
