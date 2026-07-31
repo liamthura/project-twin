@@ -31,6 +31,10 @@ MCP tools are passive and run only when a client calls them.
 - **Proposals, not guesses.** Agents propose durable changes with their
   reasoning and a quote from you (`propose_update`); nothing reaches your
   persona until you approve it, and anything you reject is never raised again.
+- **Skills that make agents consistent.** Four Markdown skills in
+  [`skills/`](skills/) covering how to read a persona, which write tool is
+  correct, and what is worth proposing — so behaviour does not depend on which
+  client you happen to be in.
 - **Hybrid search.** Postgres full-text plus optional pgvector embeddings,
   degrading to FTS-only rather than breaking.
 - **A web editor** generated from the same section packs the server writes
@@ -68,6 +72,7 @@ it.
 │   ├── pack_loader.py  # manifest validation
 │   └── scripts/        # migrations and search-index backfill
 ├── frontend/         # React SPA — the persona editor
+├── skills/           # agent skills — see skills/README.md
 ├── docs-site/        # this project's documentation (Fumadocs, static export)
 ├── docs/             # internal specs, plans, and CONTRIBUTING-PACKS.md
 └── mygist_data/      # legacy JSON personas — migration source only
