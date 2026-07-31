@@ -40,8 +40,39 @@ const baseURL = required("BETTER_AUTH_URL");
 // One pool, shared by Better Auth and the provisioning hook below. search_path
 // pins Better Auth's own queries to its schema; the hook reaches into `public`
 // by qualifying the table explicitly, which works regardless of search_path.
-const pool = new Pool({
-  connectionString: required("DATABASE_URL"),
+const databaseUrl = required("DATABASE_URL");
+
+/**
+ * TLS settings matching libpq's `sslmode`, which node-postgres does not follow.
+ *
+ * libpq -- and so psycopg, and so the Python half of MyGist -- reads
+ * `sslmode=require` as "encrypt, do not verify"; only verify-ca and verify-full
+ * check the chain. node-postgres instead verifies whenever ssl is on, so the
+ * SAME connection string that works for the API fails here against a
+ * self-signed certificate with UNABLE_TO_VERIFY_LEAF_SIGNATURE.
+ *
+ * Honouring libpq's meaning is what makes one DATABASE_URL work for both
+ * services, which is the only sane arrangement when they share a database.
+ */
+function sslFromConnectionString(url) {
+  const mode = new URL(url).searchParams.get("sslmode") ?? "prefer";
+
+  // verify-ca and verify-full ask for the chain to be checked.
+  if (mode.startsWith("verify")) return { rejectUnauthorized: true };
+  // require asks for encryption without verification -- the case that fails
+  // against a self-signed certificate if you let node-postgres decide.
+  if (mode === "require") return { rejectUnauthorized: false };
+  // disable, allow, prefer (libpq's default). prefer means "try TLS, fall back
+  // to plaintext", and node-postgres cannot negotiate that fallback: asking for
+  // ssl against a server without it fails outright with "The server does not
+  // support SSL connections". Plaintext is the behaviour that actually works
+  // for both, and these connections do not leave the internal network.
+  return false;
+}
+
+export const pool = new Pool({
+  connectionString: databaseUrl,
+  ssl: sslFromConnectionString(databaseUrl),
   options: "-c search_path=better_auth",
 });
 
