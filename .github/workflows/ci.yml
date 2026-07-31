@@ -127,6 +127,35 @@ jobs:
           fi
           echo "no placeholder URLs in dist/"
 
+  auth:
+    name: auth
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches auth/Dockerfile.
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: auth/package-lock.json
+
+      # Dev dependencies would be nothing extra: the tests use node:test, which
+      # ships with Node. The runtime dependencies are what they exercise.
+      - name: Install dependencies
+        working-directory: auth
+        run: npm ci
+
+      # The service's only real logic is turning one DATABASE_URL into a
+      # working connection, and it took three attempts to get right -- twice
+      # shipping to production and failing there. These run in a second and
+      # need no database.
+      - name: Test
+        working-directory: auth
+        run: npm test
+
   docs:
     name: docs
     runs-on: ubuntu-latest
