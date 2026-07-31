@@ -6,6 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { segmentClass } from "@/components/ui/segmented-control";
 import { saveConfig, loginAccount, registerAccount, CLOUD_API_URL } from "@/lib/api.js";
+import { signIn, signUp } from "@/lib/session.js";
+
+// Better Auth is same-origin only: its session cookie cannot be set from, or
+// sent to, another site. A UI pointed at someone else's server therefore keeps
+// the original username/password endpoints and a stored bearer token, which is
+// the one place the old flow is not merely deprecated but still required.
+function isDetached(serverUrl) {
+  if (!serverUrl) return false;
+  try {
+    return new URL(serverUrl, window.location.origin).origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+}
 
 // The API served by whatever origin handed us this page. Computed once at
 // module scope rather than per render: it cannot change while the page is
@@ -83,11 +97,27 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
 
     setPending(true);
     try {
-      const result =
-        mode === "signup"
-          ? await registerAccount(serverUrl, username.trim(), password)
-          : await loginAccount(serverUrl, username.trim(), password);
-      saveConfig({ serverUrl, token: result.token });
+      // Same-origin instances authenticate through Better Auth, which sets an
+      // HttpOnly session cookie -- so nothing is stored here, and the config
+      // deliberately carries no token. Detached mode (a UI pointed at someone
+      // else's server) cannot use a cross-site cookie, so it keeps the old
+      // endpoints and the localStorage token.
+      if (isDetached(serverUrl)) {
+        const result =
+          mode === "signup"
+            ? await registerAccount(serverUrl, username.trim(), password)
+            : await loginAccount(serverUrl, username.trim(), password);
+        saveConfig({ serverUrl, token: result.token });
+      } else {
+        if (mode === "signup") {
+          await signUp(username.trim(), password);
+        } else {
+          await signIn(username.trim(), password);
+        }
+        // No token: the session is the cookie. Any token left from a previous
+        // sign-in would otherwise take precedence over it in resolveCredential.
+        saveConfig({ serverUrl });
+      }
       onSuccess();
     } catch (err) {
       setFormError(err.message);
