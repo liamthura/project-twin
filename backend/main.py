@@ -97,6 +97,12 @@ async def auth_middleware(request: Request, call_next):
         # Read before anyone has a credential, because it decides which sign-in
         # screen to show. Carries no user data.
         "/api/instance",
+        # OAuth discovery. Read before the client has any credential at all --
+        # that is the entire point of them.
+        "/.well-known/oauth-protected-resource",
+        "/.well-known/oauth-protected-resource/mcp",
+        "/.well-known/oauth-authorization-server",
+        "/.well-known/oauth-authorization-server/auth",
     ):
         return await call_next(request)
 
@@ -840,6 +846,13 @@ STATIC_MOUNTED = register_static_routes(app, STATIC_DIR)
 # registered before it. This is the trap that made a bare /docs 404 while
 # /docs/ worked.
 AUTH_PROXIED = auth_proxy.register(app)
+
+# OAuth discovery, for MCP clients. Registered here for the same reason as the
+# static and auth routes: the MCP app is mounted at "/" below and matches
+# everything, so anything needing its own path must come first.
+import oauth_metadata  # noqa: E402
+
+OAUTH_METADATA_MOUNTED = oauth_metadata.register(app)
 
 
 # ============================================================================
