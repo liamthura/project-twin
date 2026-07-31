@@ -36,7 +36,7 @@ describe("WelcomeAuth server default", () => {
     const user = userEvent.setup();
     render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
 
-    await user.type(screen.getByLabelText("Username"), "someone");
+    await user.type(screen.getByLabelText("Username or email"), "someone");
     await user.type(screen.getByLabelText("Password"), "CorrectHorse9!");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
@@ -57,7 +57,7 @@ describe("WelcomeAuth server default", () => {
     const user = userEvent.setup();
     render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
 
-    await user.type(screen.getByLabelText("Username"), "someone");
+    await user.type(screen.getByLabelText("Username or email"), "someone");
     await user.type(screen.getByLabelText("Password"), "CorrectHorse9!");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
@@ -177,5 +177,48 @@ describe("forgotten password", () => {
     expect(
       screen.queryByRole("button", { name: /forgot your password/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("signing in with an email", () => {
+  it("says the field takes either identifier", () => {
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    expect(screen.getByLabelText("Username or email")).toBeInTheDocument();
+  });
+
+  it("passes an email through to the session module, which routes it", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await user.type(screen.getByLabelText("Username or email"), "liam@example.com");
+    await user.type(screen.getByLabelText("Password"), "CorrectHorse9!");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(signIn).toHaveBeenCalledWith("liam@example.com", "CorrectHorse9!");
+  });
+
+  it("still asks only for a username when creating an account", async () => {
+    // Sign-up is unchanged. Offering a choice here would promise something the
+    // next step does not deliver.
+    const user = userEvent.setup();
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: "Create an account" }));
+
+    expect(screen.getByLabelText("Username")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Username or email")).toBeNull();
+  });
+
+  it("asks only for a username in detached mode", async () => {
+    // Detached mode talks to /api/auth/login, which knows only usernames. A
+    // label promising email would be a lie on that path.
+    const user = userEvent.setup();
+    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: /^Server:/ }));
+    await user.click(screen.getByRole("button", { name: "Cloud" }));
+
+    expect(screen.getByLabelText("Username")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Username or email")).toBeNull();
   });
 });

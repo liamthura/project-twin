@@ -35,12 +35,51 @@ async function readError(res, fallback) {
   return body?.message || body?.error?.message || fallback;
 }
 
-/** Sign in with username and password. Existing accounts work unchanged: the
- *  service verifies their original bcrypt hash. */
-export async function signIn(username, password) {
-  const res = await authFetch("/sign-in/username", {
+/**
+ * Whether an identifier should be treated as an email address.
+ *
+ * Stricter than "contains an @" on purpose. MyGist's username rule only
+ * requires a non-empty string, so `weird@name` is a username someone could
+ * already hold; requiring a dotted domain routes that to username sign-in where
+ * it belongs, and costs nothing for real addresses.
+ *
+ * The residual case -- a username that is itself a well-formed email address --
+ * would be indistinguishable from an email by any rule, and is not worth a
+ * second round trip that would also double what a mistyped password costs
+ * against the rate limiter.
+ */
+export function looksLikeEmail(identifier) {
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(identifier ?? "").trim());
+}
+
+// Word for word what the service returns for a bad email sign-in, so a
+// rejection made here is indistinguishable from one made there.
+const INVALID_EMAIL_OR_PASSWORD = "Invalid email or password";
+
+/**
+ * Sign in with a username OR an email address, and a password.
+ *
+ * Which endpoint is used follows from the identifier's shape: Better Auth has
+ * two, and neither accepts the other's identifier. Existing accounts work
+ * unchanged either way -- the service verifies their original bcrypt hash.
+ */
+export async function signIn(identifier, password) {
+  const trimmed = String(identifier ?? "").trim();
+  const byEmail = looksLikeEmail(trimmed);
+
+  // A placeholder is not an address anyone was ever given -- the UI goes out of
+  // its way never to show one -- so nobody types it by accident. It is a real
+  // row in the email column though, and would otherwise sign someone in on an
+  // identifier we invented for them rather than one they chose.
+  if (byEmail && isPlaceholderEmail(trimmed)) {
+    throw new Error(INVALID_EMAIL_OR_PASSWORD);
+  }
+
+  const res = await authFetch(byEmail ? "/sign-in/email" : "/sign-in/username", {
     method: "POST",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify(
+      byEmail ? { email: trimmed, password } : { username: trimmed, password },
+    ),
   });
   if (!res.ok) throw new Error(await readError(res, "Sign in failed"));
   cachedJwt = null;

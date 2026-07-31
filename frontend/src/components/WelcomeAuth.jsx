@@ -67,6 +67,16 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
   const serverUrl =
     connectionType === "cloud" ? CLOUD_API_URL : selfHostedUrl.trim();
 
+  // Signing IN accepts either identifier, because Better Auth has an endpoint
+  // for each and session.js routes on the shape of what was typed.
+  //
+  // Not while signing up: that still asks for a username only, and offering a
+  // choice here would promise something the next field does not deliver.
+  //
+  // Not in detached mode either: that talks to /api/auth/login, which knows
+  // only usernames. A label promising email would be a lie on that path.
+  const acceptsEmail = mode === "signin" && !isDetached(serverUrl);
+
   const switchMode = (next) => {
     setMode(next);
     setFormError(null);
@@ -217,14 +227,14 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="space-y-1.5">
           <Label htmlFor="welcome-username" className="text-xs font-medium">
-            Username
+            {acceptsEmail ? "Username or email" : "Username"}
           </Label>
           <Input
             id="welcome-username"
             autoComplete="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="yourname"
+            placeholder={acceptsEmail ? "yourname or you@example.com" : "yourname"}
           />
         </div>
         <div className="space-y-1.5">
