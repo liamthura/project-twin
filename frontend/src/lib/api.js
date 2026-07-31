@@ -389,6 +389,15 @@ async function readAuthError(res, fallback) {
 // consumes this shape directly.
 async function listConnectedApps() {
   const res = await authFetch("/oauth2/get-consents");
+
+  // A 404 means the auth service registered no OAuth endpoints at all:
+  // AUTH_MCP_RESOURCE is unset, so this instance has no OAuth and therefore no
+  // connections. That is a configuration state, not a failure to report -- and
+  // it is what EVERY instance looks like until its operator opts in, so
+  // surfacing it as an error would greet most self-hosters with a red box on a
+  // settings tab that is working exactly as intended.
+  if (res.status === 404) return [];
+
   if (!res.ok) {
     throw new Error(await readAuthError(res, "Could not load connected applications."));
   }
