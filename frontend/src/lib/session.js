@@ -103,3 +103,117 @@ export function forgetJwt() {
 export async function hasSession() {
   return (await getJwt()) !== null;
 }
+
+// ---------------------------------------------------------------------------
+// Email
+// ---------------------------------------------------------------------------
+
+/** Reserved by RFC 2606, so it can never resolve and can never be posted to.
+ *  Seeding and registration both use it for accounts with no real address. */
+export const PLACEHOLDER_DOMAIN = "mygist.invalid";
+
+/** Whether an address is a stand-in rather than somewhere a person reads mail.
+ *
+ *  The UI must never show one of these as if it were the user's email, and
+ *  must never offer to send to it. Checking the domain rather than the whole
+ *  address matters: the local part is the username, which changes case and
+ *  spelling between accounts. */
+export function isPlaceholderEmail(email) {
+  return typeof email === "string" && email.toLowerCase().endsWith(`@${PLACEHOLDER_DOMAIN}`);
+}
+
+/** The signed-in user, or null.
+ *
+ *  Separate from `getJwt` because the JWT answers "may I call the API" while
+ *  this answers "who is this and can we reach them" -- the second needs
+ *  `email` and `emailVerified`, which the token does not carry. */
+export async function getSession() {
+  const res = await authFetch("/get-session");
+  if (!res.ok) return null;
+
+  const body = await res.json().catch(() => null);
+  return body?.user ? body : null;
+}
+
+/** Set the account's email address.
+ *
+ *  For every existing account this is how an email is ADDED, not changed: they
+ *  were seeded with a placeholder, so there is always an address in the column
+ *  and never a real one. The service permits this without confirming from the
+ *  old address precisely because a placeholder is unverified -- see
+ *  `updateEmailWithoutVerification` in auth/src/auth.js.
+ *
+ *  Verification is then sent to the new address automatically. */
+export async function changeEmail(newEmail) {
+  const res = await authFetch("/change-email", {
+    method: "POST",
+    body: JSON.stringify({
+      newEmail,
+      callbackURL: verifiedCallbackUrl(),
+    }),
+  });
+  if (!res.ok) throw new Error(await readError(res, "Could not save that email"));
+  return res.json();
+}
+
+/** Send (or re-send) the verification email for an address already on file. */
+export async function sendVerificationEmail(email) {
+  const res = await authFetch("/send-verification-email", {
+    method: "POST",
+    body: JSON.stringify({ email, callbackURL: verifiedCallbackUrl() }),
+  });
+  if (!res.ok) throw new Error(await readError(res, "Could not send that email"));
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Password reset
+// ---------------------------------------------------------------------------
+
+/** Where the verification link lands once the address is confirmed. */
+function verifiedCallbackUrl() {
+  return `${window.location.origin}/?verified=1`;
+}
+
+/** Where the reset link lands. `reset=1` is ours; Better Auth appends `token`.
+ *
+ *  Marking it explicitly rather than keying on `token` alone keeps a bare
+ *  `?token=` in the URL from being mistaken for a reset -- that name is far too
+ *  generic to claim. */
+export function resetCallbackUrl() {
+  return `${window.location.origin}/?reset=1`;
+}
+
+/** Ask for a reset email.
+ *
+ *  `redirectTo` is not optional in practice. Better Auth builds the emailed
+ *  link as /reset-password/<token>?callbackURL=<this>, and its handler rejects
+ *  the request outright when callbackURL is empty -- so omitting this produces
+ *  a link that fails when opened, long after anyone would connect the two.
+ *
+ *  The service answers the same way whether or not the address exists, so a
+ *  stranger cannot use this to learn who has an account. The UI must not
+ *  improve on that by saying more than the response does. */
+export async function requestPasswordReset(email) {
+  const res = await authFetch("/request-password-reset", {
+    method: "POST",
+    body: JSON.stringify({ email, redirectTo: resetCallbackUrl() }),
+  });
+  if (!res.ok) throw new Error(await readError(res, "Could not send that email"));
+  return res.json();
+}
+
+/** Set a new password using the token from a reset link.
+ *
+ *  Every other session is revoked by the service as this completes, so a reset
+ *  prompted by "someone else may have my password" actually ends their access.
+ *  This one is not signed in either -- the caller sends the user to sign in. */
+export async function resetPassword(newPassword, token) {
+  const res = await authFetch("/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ newPassword, token }),
+  });
+  if (!res.ok) throw new Error(await readError(res, "Could not reset your password"));
+  cachedJwt = null;
+  return res.json();
+}

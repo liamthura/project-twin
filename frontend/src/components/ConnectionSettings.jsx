@@ -46,6 +46,7 @@ import {
   revokeToken,
 } from "@/lib/api.js";
 import { signOut } from "@/lib/session.js";
+import { EmailSettings } from "@/components/EmailSettings";
 
 const TABS = [
   { id: "connection", label: "Connection" },
@@ -430,6 +431,11 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
                 </Button>
               </div>
             )}
+
+            {/* Renders nothing without a Better Auth session, which is exactly
+                the detached-mode case: a token there carries no email and the
+                reset flow it feeds does not exist. */}
+            {isSignedIn && <EmailSettings />}
 
             {/* Connection type */}
             <div className="space-y-2">

@@ -90,6 +90,41 @@ export const auth = betterAuth({
     },
   },
 
+  user: {
+    changeEmail: {
+      // "Add an email" IS a change-email for every existing account: seeding
+      // gave them <username>@mygist.invalid, so there is always an address
+      // there and never a real one.
+      enabled: true,
+
+      // Load-bearing. Better Auth's default is to confirm a change by mailing
+      // the CURRENT address first -- which for a placeholder means sending to
+      // an .invalid domain that RFC 2606 guarantees can never resolve. Every
+      // existing account would be unable to add an email at all, and the
+      // failure would look like a mail problem rather than a design one.
+      //
+      // A placeholder is unverified by construction, so this permits exactly
+      // the case that must work and nothing else: a real, verified address
+      // still cannot be changed without confirming from the old one.
+      updateEmailWithoutVerification: true,
+
+      // The other branch: someone who has already verified an address and now
+      // wants a different one. Approval goes to the address we know reaches
+      // them, so losing an inbox does not mean losing the account.
+      sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
+        await mailer.send({
+          to: user.email,
+          subject: "Approve your MyGist email change",
+          text:
+            `Someone asked to change this MyGist account's email to ` +
+            `${newEmail}. Approve it here:\n\n${url}\n\n` +
+            `If that was not you, ignore this email — the address stays as ` +
+            `it is and nothing changes.`,
+        });
+      },
+    },
+  },
+
   databaseHooks: {
     user: {
       create: {
@@ -149,6 +184,11 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
+
+    // A reset is what someone does when they think the password is no longer
+    // only theirs. Leaving old sessions alive through it would answer that
+    // worry with "not really".
+    revokeSessionsOnPasswordReset: true,
 
     sendResetPassword: async ({ user, url }) => {
       await mailer.send({

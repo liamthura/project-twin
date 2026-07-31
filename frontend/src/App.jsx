@@ -48,6 +48,9 @@ import { ConnectionSettings } from "@/components/ConnectionSettings";
 import { api, getAuthToken } from "@/lib/api.js";
 import { hasSession } from "@/lib/session.js";
 import { WelcomeAuth } from "@/components/WelcomeAuth";
+import { AuthShell } from "@/components/AuthShell";
+import { ResetPassword } from "@/components/ResetPassword";
+import { AddEmailBanner } from "@/components/AddEmailBanner";
 import SectionRenderer from "@/renderers/SectionRenderer";
 
 // Debounce hook
@@ -193,6 +196,28 @@ export default function App() {
   // Seeded from the token synchronously so the first render is right when one
   // is present, then corrected once the session check resolves.
   const [hasCredential, setHasCredential] = useState(() => !!getAuthToken());
+
+  // Landed here from a password-reset email. Better Auth checks the token and
+  // then redirects to the callback we gave it, appending `token`; `reset=1` is
+  // ours, and is required because `token` alone is far too generic a parameter
+  // name to treat as a claim about what this page is.
+  const [resetToken, setResetToken] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    return params.get("reset") === "1" ? params.get("token") : null;
+  });
+
+  // Landed here from a verification email. Better Auth has already confirmed
+  // the address by this point -- without a word to the person who clicked,
+  // unless we say one.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("verified") !== "1") return;
+
+    toast({ title: "Email verified", variant: "success" });
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [toast]);
 
   useEffect(() => {
     if (getAuthToken()) return;
@@ -385,6 +410,25 @@ export default function App() {
     }
   };
 
+  // A reset link outranks everything else on screen, including the loading
+  // state: whoever followed it cannot sign in, so waiting for data that needs a
+  // credential would leave them watching a spinner instead of the one form that
+  // helps them.
+  if (resetToken) {
+    return (
+      <ResetPassword
+        token={resetToken}
+        onDone={() => {
+          // Strip the token from the address bar before anything else. It is
+          // single-use and already spent, but a live-looking credential left in
+          // history and in the next referrer is worth removing.
+          window.history.replaceState({}, "", window.location.pathname);
+          setResetToken(null);
+        }}
+      />
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-dvh flex items-center justify-center">
@@ -404,42 +448,11 @@ export default function App() {
   // told to sign in while already signed in.
   if (error && !hasCredential) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-background p-4">
-        <div className="w-full max-w-sm space-y-6 text-center">
-          <div className="flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
-              <svg
-                width="40"
-                height="40"
-                viewBox="0 0 96 96"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-hidden="true"
-              >
-                <circle
-                  cx="45"
-                  cy="40"
-                  r="15"
-                  fill="none"
-                  stroke="hsl(var(--primary-foreground))"
-                  strokeWidth="9"
-                />
-                <path
-                  d="M60 40 v22 a14 14 0 0 1 -14 14 h-9"
-                  fill="none"
-                  stroke="hsl(var(--primary-foreground))"
-                  strokeWidth="9"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold">Welcome to MyGist</h1>
-            <p className="text-sm text-muted-foreground">
-              Your portable personal context for AI. Sign in or create an
-              account to get started.
-            </p>
-          </div>
+      <AuthShell
+        title="Welcome to MyGist"
+        description="Your portable personal context for AI. Sign in or create an account to get started."
+      >
+        <>
           <WelcomeAuth
             onUseToken={() => setShowConnectionSettings(true)}
             onSuccess={() => {
@@ -447,16 +460,18 @@ export default function App() {
               loadSettings();
             }}
           />
-        </div>
-        <ConnectionSettings
-          isOpen={showConnectionSettings}
-          onClose={() => setShowConnectionSettings(false)}
-          onConnectionChange={() => {
-            loadAllData();
-            loadSettings();
-          }}
-        />
-      </div>
+          {/* Renders through a portal, so its place in this tree is only
+              about which state it reads. */}
+          <ConnectionSettings
+            isOpen={showConnectionSettings}
+            onClose={() => setShowConnectionSettings(false)}
+            onConnectionChange={() => {
+              loadAllData();
+              loadSettings();
+            }}
+          />
+        </>
+      </AuthShell>
     );
   }
 
@@ -601,6 +616,11 @@ export default function App() {
       </header>
 
       <div className="mx-auto max-w-6xl px-4 py-8">
+        {/* Above the tabs rather than in a corner: an account that cannot be
+            recovered is worth one line of the page until it can be. */}
+        <div className="mb-4 empty:mb-0">
+          <AddEmailBanner onAddEmail={() => setShowConnectionSettings(true)} />
+        </div>
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}

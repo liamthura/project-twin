@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { segmentClass } from "@/components/ui/segmented-control";
 import { saveConfig, loginAccount, registerAccount, CLOUD_API_URL } from "@/lib/api.js";
-import { signIn, signUp } from "@/lib/session.js";
+import { signIn, signUp, requestPasswordReset } from "@/lib/session.js";
 
 // Better Auth is same-origin only: its session cookie cannot be set from, or
 // sent to, another site. A UI pointed at someone else's server therefore keeps
@@ -35,10 +35,12 @@ const ORIGIN_API_URL =
 // !getAuthToken()` branch below). On success it saves the config and hands
 // control back to the caller (which reloads app data).
 export function WelcomeAuth({ onUseToken, onSuccess }) {
-  const [mode, setMode] = useState("signin"); // "signin" | "signup"
+  const [mode, setMode] = useState("signin"); // "signin" | "signup" | "forgot"
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState(null);
   const [showServer, setShowServer] = useState(false);
@@ -70,6 +72,27 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
     setFormError(null);
     setPassword("");
     setConfirmPassword("");
+    setResetSent(false);
+  };
+
+  const handleResetSubmit = async (e) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!resetEmail.trim()) {
+      setFormError("Enter the email on your account.");
+      return;
+    }
+
+    setPending(true);
+    try {
+      await requestPasswordReset(resetEmail.trim());
+      setResetSent(true);
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setPending(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -125,6 +148,69 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
       setPending(false);
     }
   };
+
+  if (mode === "forgot") {
+    return (
+      <div className="w-full space-y-4 text-left">
+        {resetSent ? (
+          // Deliberately says nothing about whether that address has an
+          // account. The service answers identically either way so a stranger
+          // cannot use this to find out who has signed up, and it would be a
+          // waste of that care to give it away in the copy.
+          <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+            <p className="text-sm">
+              If <strong>{resetEmail.trim()}</strong> is on a MyGist account, a reset
+              link is on its way.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              The link works once and expires within the hour. Nothing has changed
+              until you open it.
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleResetSubmit} className="space-y-4" noValidate>
+            <div className="space-y-1.5">
+              <Label htmlFor="reset-email" className="text-xs font-medium">
+                Email
+              </Label>
+              <Input
+                id="reset-email"
+                type="email"
+                autoComplete="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                The address on your account. If you never added one, a reset cannot
+                reach you — sign in and add one first.
+              </p>
+            </div>
+
+            {formError && <p className="text-xs text-destructive">{formError}</p>}
+
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Send reset link"
+              )}
+            </Button>
+          </form>
+        )}
+
+        <p className="text-center text-xs text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => switchMode("signin")}
+            className="underline hover:text-foreground"
+          >
+            Back to sign in
+          </button>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full space-y-4 text-left">
@@ -236,6 +322,21 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
             >
               Create an account
             </button>
+            {/* Reset runs through Better Auth, which is same-origin only.
+                Detached mode talks to the old endpoints, which have no reset
+                at all -- offering it there would be a dead end. */}
+            {!isDetached(serverUrl) && (
+              <>
+                <br />
+                <button
+                  type="button"
+                  onClick={() => switchMode("forgot")}
+                  className="underline hover:text-foreground"
+                >
+                  Forgot your password?
+                </button>
+              </>
+            )}
           </>
         )}
       </p>
