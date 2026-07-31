@@ -49,6 +49,13 @@ AUDIENCE = os.getenv("AUTH_AUDIENCE", "") or ISSUER
 # header claims will accept "none", or an HMAC signed with the public key.
 ALGORITHMS = ["EdDSA", "RS256", "ES256"]
 
+# The canonical URI of the MCP endpoint, e.g. https://mygist.example/mcp. An
+# OAuth access token must name it in `aud` -- the MCP specification requires a
+# resource server to prove a token was issued for it specifically, and this is
+# the claim that proves it. Unset, OAuth access tokens are rejected outright and
+# only the existing credential paths work.
+MCP_RESOURCE = os.getenv("AUTH_MCP_RESOURCE", "")
+
 # PyJWKClient caches keys and refetches on an unknown `kid`, which is what makes
 # key rotation work without a restart. One client for the process lifetime; it
 # is created lazily so that importing this module never touches the network.
@@ -74,6 +81,13 @@ def reset_cache() -> None:
     _client = None
 
 
+def _signing_key_for(token: str):
+    """Look up the key that signed `token`, shared by `verify` and
+    `verify_access_token` so both go through the same JWKS client -- and so
+    tests have exactly one place to patch."""
+    return _jwk_client().get_signing_key_from_jwt(token)
+
+
 def verify(token: str) -> Optional[dict]:
     """Return the token's claims, or None if it is not a valid JWT for us.
 
@@ -86,7 +100,7 @@ def verify(token: str) -> Optional[dict]:
         return None
 
     try:
-        signing_key = _jwk_client().get_signing_key_from_jwt(token)
+        signing_key = _signing_key_for(token)
         return jwt.decode(
             token,
             signing_key.key,
@@ -108,6 +122,41 @@ def verify(token: str) -> Optional[dict]:
         # the auth service is unreachable, and every human sign-in is failing
         # while MCP clients carry on working.
         logger.warning("JWT verification unavailable: %s", exc)
+        return None
+
+
+def mcp_resource_configured() -> bool:
+    """Whether OAuth access tokens can be verified at all."""
+    return bool(JWKS_URL and MCP_RESOURCE)
+
+
+def verify_access_token(token: str) -> Optional[dict]:
+    """Return an OAuth access token's claims, or None.
+
+    Separate from `verify` because the two credentials differ in exactly one
+    way that matters: the audience. A session JWT names the auth service, an
+    access token names the MCP endpoint. Verifying each against its own audience
+    means neither can ever be presented where the other belongs, and that
+    property costs nothing beyond passing the right string here.
+
+    `sub` is required. A client_credentials grant mints tokens without one, and
+    every persona query in MyGist keys off a user id -- so a token with no
+    subject has nothing to scope to. That grant is not enabled, and this is the
+    belt to its braces.
+    """
+    if not mcp_resource_configured():
+        return None
+    try:
+        return jwt.decode(
+            token,
+            _signing_key_for(token).key,
+            algorithms=ALGORITHMS,
+            audience=MCP_RESOURCE,
+            issuer=ISSUER,
+            options={"require": ["sub", "exp", "aud", "iss"]},
+        )
+    except Exception as exc:  # noqa: BLE001 - see module docstring: never raise
+        logger.debug("access token rejected: %s", exc)
         return None
 
 
