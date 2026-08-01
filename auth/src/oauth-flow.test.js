@@ -405,3 +405,41 @@ test("revoking a connection stops it refreshing", async () => {
     "a revoked connection refreshed successfully",
   );
 });
+
+test("session JWTs and access tokens agree on the issuer", async () => {
+  // The API has ONE issuer setting and verifies both token types against it.
+  // Better Auth does not agree with itself by default: the JWT plugin signs
+  // `iss` as the bare origin (`options?.jwt?.issuer ?? baseURLOrigin`) while
+  // the OAuth provider signs it as `ctx.context.baseURL`, origin plus
+  // basePath. That mismatch cost a production outage in each direction --
+  // AUTH_ISSUER set to the origin refused every MCP connection, set to
+  // origin+/auth it refused every web request -- and both arrived as a bare
+  // 401 naming no claim. auth.js pins the plugin so one setting is correct
+  // for both; this is what stops that drifting apart again.
+  const { cookie } = await signUp();
+  const res = await api("/token", { headers: { cookie } });
+  const exchanged = await res.json().catch(() => null);
+  assert.equal(
+    res.status,
+    200,
+    `token exchange failed: ${JSON.stringify(exchanged)}`,
+  );
+  const { token } = exchanged;
+
+  const session = JSON.parse(
+    Buffer.from(token.split(".")[1], "base64url").toString(),
+  );
+  const expected = `${ORIGIN}/auth`;
+  assert.equal(session.iss, expected, "session JWT issuer drifted");
+  assert.equal(session.aud, expected, "session JWT audience drifted");
+
+  const { token: oauth } = await handshake();
+  const access = JSON.parse(
+    Buffer.from(oauth.access_token.split(".")[1], "base64url").toString(),
+  );
+  assert.equal(
+    access.iss,
+    session.iss,
+    "the two token types disagree on the issuer, so no single AUTH_ISSUER can verify both",
+  );
+});

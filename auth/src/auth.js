@@ -367,7 +367,29 @@ export const auth = betterAuth({
     // JWKS endpoint FastAPI verifies against. Explicitly NOT a session
     // replacement: the browser session stays a cookie, and this is only for
     // calling the Python service.
-    jwt(),
+    //
+    // issuer and audience are set explicitly because the two token types this
+    // service mints disagree by default, and the API has one setting for both.
+    // This plugin defaults to the bare ORIGIN --
+    //
+    //     const defaultIss = options?.jwt?.issuer ?? baseURLOrigin;
+    //
+    // -- while the OAuth provider signs `iss` as `ctx.context.baseURL`, which
+    // is the origin PLUS basePath. So a session JWT claimed
+    // `https://host` while an access token claimed `https://host/auth`, and
+    // AUTH_ISSUER could satisfy exactly one of them: set to the origin, MCP
+    // connections were refused; set to the origin plus /auth, the web app was.
+    // Both failures arrive as a bare 401 that names neither claim.
+    //
+    // Pinning both to the effective base makes one AUTH_ISSUER correct for
+    // everything. Safe to change: these tokens live fifteen minutes and are
+    // re-derived from the session cookie on demand, so nobody is signed out.
+    jwt({
+      jwt: {
+        issuer: `${baseURL}${AUTH_BASE_PATH}`,
+        audience: `${baseURL}${AUTH_BASE_PATH}`,
+      },
+    }),
 
     // MyGist as an OAuth 2.1 authorization server, so an MCP client connects by
     // signing in rather than by being handed a token.
