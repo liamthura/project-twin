@@ -9,9 +9,9 @@
 // bare by App.jsx, which has to parse its own URL, ask `getSession()` who is
 // signed in, and fetch the client's name over `authFetch` -- none of which
 // the first group exercises.
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Only the network calls are replaced. Everything else Consent imports from
 // session.js (there is nothing else it imports) goes through this mock too,
@@ -217,5 +217,77 @@ describe("Consent, the scope set it posts back", () => {
     await allow();
 
     expect(postedScopes()).toEqual(new Set(["persona:read", "offline_access"]));
+  });
+});
+
+describe("Consent — returning to the client", () => {
+  // The consent endpoint answers {redirect: true, url}. An earlier version read
+  // `redirect_uri`, so neither Allow nor Deny navigated and neither threw: the
+  // spinner ran forever with no way out but closing the tab. Observed in
+  // production on the first real connection.
+  const assign = vi.fn();
+  const realLocation = window.location;
+
+  beforeEach(() => {
+    assign.mockClear();
+    // jsdom's location is non-configurable, so spyOn cannot reach `assign`.
+    // Replacing the whole object is the usual way round it; the original is
+    // put back afterwards so nothing else in the suite inherits a stub.
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      writable: true,
+      value: { ...realLocation, search: "?client_id=abc", assign },
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      writable: true,
+      value: realLocation,
+    });
+  });
+
+  it("follows the url the server returns when access is allowed", async () => {
+    vi.mocked(authFetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ redirect: true, url: "http://localhost:9876/cb?code=abc" }),
+    });
+
+    render(<Consent client={CLIENT} username="liamthura" />);
+    await userEvent.click(screen.getByRole("button", { name: /allow/i }));
+
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith("http://localhost:9876/cb?code=abc"),
+    );
+  });
+
+  it("follows it on denial too, which is also a redirect", async () => {
+    vi.mocked(authFetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        redirect: true,
+        url: "http://localhost:9876/cb?error=access_denied",
+      }),
+    });
+
+    render(<Consent client={CLIENT} username="liamthura" />);
+    await userEvent.click(screen.getByRole("button", { name: /deny/i }));
+
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith(
+        "http://localhost:9876/cb?error=access_denied",
+      ),
+    );
+  });
+
+  it("surfaces an error rather than spinning forever when no target comes back", async () => {
+    vi.mocked(authFetch).mockResolvedValue({ ok: true, json: async () => ({}) });
+
+    render(<Consent client={CLIENT} username="liamthura" />);
+    await userEvent.click(screen.getByRole("button", { name: /allow/i }));
+
+    expect(await screen.findByText(/did not say where to send you back/i)).toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
   });
 });

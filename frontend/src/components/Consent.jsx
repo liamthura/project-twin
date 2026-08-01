@@ -176,9 +176,22 @@ export default function Consent({ client: clientProp, username: usernameProp } =
         throw new Error(await readError(res, "Could not complete that request."));
       }
       const body = await res.json();
-      if (body?.redirect_uri) {
-        window.location.assign(body.redirect_uri);
+
+      // `url`, not `redirect_uri`. The consent endpoint answers a non-browser
+      // caller with {redirect: true, url} -- for Deny as much as for Allow,
+      // since a denial is still a redirect back to the client carrying
+      // access_denied. Reading the wrong key meant neither button navigated
+      // and neither threw, so the spinner ran forever and the only way out was
+      // to close the tab. redirect_uri is accepted too, defensively, because
+      // being wrong about this shape once was enough.
+      const target = body?.url ?? body?.redirect_uri;
+      if (!target) {
+        throw new Error(
+          "The authorization server did not say where to send you back to. " +
+            "Close this tab and start again from the application.",
+        );
       }
+      window.location.assign(target);
     } catch (err) {
       setActionError(err.message);
       setPending(null);
