@@ -8,6 +8,7 @@ Single entry point serving:
 """
 
 import base64
+import contextlib
 import copy
 import hashlib
 import json
@@ -34,6 +35,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Persona data + auth now live in Postgres (see db.py / persona_store.py).
+import auth_preflight
 import auth_proxy
 import db
 import jwt_auth
@@ -75,13 +77,31 @@ if not any(isinstance(m, mcp_scopes.ScopeMiddleware) for m in mcp.middleware):
 # an internal path of "/", which required a "/mcp/" -> would 307 on "/mcp").
 mcp_app = mcp.http_app()
 
+
+@contextlib.asynccontextmanager
+async def lifespan(fastapi_app: FastAPI):
+    """FastMCP's lifespan, plus the auth issuer check.
+
+    Wrapped rather than replaced: `mcp_app.lifespan` is what starts the MCP
+    session manager, and an app mounted without it accepts connections and then
+    fails on the first tool call. The check hangs off the inside so it only
+    runs once the rest of startup has succeeded.
+    """
+    async with mcp_app.lifespan(fastapi_app):
+        auth_preflight.start()
+        try:
+            yield
+        finally:
+            auth_preflight.stop()
+
+
 # Initialize FastAPI
 # The interactive API docs move under /api: "/docs" now serves the public
 # documentation site from the static mounts near the bottom of this file.
 app = FastAPI(
     title="MyGist API",
     version="1.0.0",
-    lifespan=mcp_app.lifespan,
+    lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
