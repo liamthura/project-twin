@@ -17,7 +17,14 @@ For working on MyGist itself rather than just running it.
 │   ├── pack_loader.py    manifest validation
 │   ├── section_packs/    one manifest per persona section
 │   ├── scripts/          backfills and one-off tools
+│   ├── migrations/       Alembic — the schema of record, auth tables included
 │   └── tests/            pytest, against a real Postgres
+├── auth/               Better Auth (Node) — sign-in, and the OAuth server
+│   └── src/
+│       ├── auth.js       plugins, issuer, session JWTs
+│       ├── oauth.js      scopes, registration, consent, revocation
+│       ├── invite.js     the INVITE_ONLY rule
+│       └── __fixtures__/ the schema this service expects
 ├── frontend/           React SPA — the persona editor
 │   ├── src/renderers/    the shared renderer kit packs drive
 │   └── src/__fixtures__/ pack fixtures, generated from the manifests
@@ -101,6 +108,45 @@ npx playwright install --with-deps chromium
 Timezone is pinned to `America/New_York` in the test config, so date-formatting
 assertions do not depend on the machine.
 
+## Auth service
+
+Plain ESM on Node 22, with no build step — `src/` is what runs.
+
+```bash
+cd auth
+npm install
+npm run dev                      # node --watch src/server.js
+```
+
+```bash
+npm test                         # node:test, no test framework to install
+```
+
+The suite needs a real Postgres for the same reason the backend's does: the
+invite rule *is* a `WHERE` clause, and a stubbed pool would only prove the
+string is the string. It reads `TEST_DATABASE_URL`, and plain `postgres:16` is
+enough — nothing here touches pgvector.
+
+<Callout type="warn">
+**Alembic owns the schema, including Better Auth's tables.** The Better Auth
+CLI can emit and even apply its own DDL, and doing so puts the database into a
+state no migration describes.
+
+```bash
+npm run schema:generate          # writes DDL, for reading
+```
+
+That command exists to be read once while writing the matching Alembic
+migration, and its output is gitignored — it reappears on every run and is a
+record of nothing. `npm run schema:migrate` applies DDL directly; do not run it
+against anything you care about.
+
+The committed record is `backend/migrations/versions/`, and
+`auth/src/__fixtures__/better-auth-schema.sql` is the copy the auth suite tests
+against. `backend/tests/test_better_auth_schema_fixture.py` pins the fixture to
+the migrated schema, so the two cannot drift apart silently.
+</Callout>
+
 ## Documentation
 
 ```bash
@@ -145,19 +191,24 @@ On every push and pull request:
 | **backend (py3.11)** | Full pytest suite against a `pgvector/pgvector:pg16` service container |
 | **backend (py3.13)** | The same suite on the version the dev venv uses |
 | **frontend** | Fixture freshness, the full test suite, then a production build |
+| **auth** | `node:test` against a plain `postgres:16` service container |
+| **docs** | Type check, a production build, then an internal link and anchor check |
 
 Two versions of Python are tested because the production image runs 3.11 and
 local development tends to run 3.13. Testing both stops them drifting apart
 unnoticed.
 
-The frontend build runs in CI because the single-container merge means a broken
-frontend build blocks the whole image — and therefore any backend fix. Catching
-it in CI is much cheaper than catching it at deploy time.
+The frontend and docs builds run in CI because the single-container merge means
+either one breaking blocks the whole image — and therefore any backend fix.
+Catching that in CI is much cheaper than catching it at deploy time, which is
+after review and after merge.
 
-<Callout type="warn">
-**CI does not build `docs-site`.** A change that breaks the docs build will pass
-CI and fail at image build time instead. Worth adding if the docs get edited
-often.
+<Callout>
+The link check exists because `basePath` prefixes `/docs` automatically, so an
+author writing `/docs/use/...` by hand emits `/docs/docs/use/...`. Every
+internal link on the site was wrong that way once and nothing failed — the
+pages built, the links 404'd. Anchors rot the same way when a heading is
+reworded, so both are checked.
 </Callout>
 
 ## Conventions worth knowing
