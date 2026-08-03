@@ -116,3 +116,8 @@ skills-lock.json
 
 # Local database dumps taken before container surgery
 .docker-backup/
+
+# `npm run schema:generate` (auth/package.json) dumps Better Auth's DDL here so
+# a migration can be written from it. Regenerable, never read at runtime, and
+# it reappears on every run -- the migrations in versions/ are the real record.
+backend/migrations/sql/
