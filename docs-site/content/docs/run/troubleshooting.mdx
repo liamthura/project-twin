@@ -75,6 +75,95 @@ a trailing slash. The endpoint is mounted at the root of the app so it resolves
 exactly, and a redirect breaks clients that do not follow redirects on POST.
 </Callout>
 
+## Sign-in and OAuth
+
+Nearly every failure here arrives as a bare `401` or an OAuth error code that
+names neither the setting nor the fix, so match on the symptom rather than on
+the message.
+
+<Accordions>
+
+<Accordion title="Sign-in works, then every page 401s on /api">
+
+`AUTH_ISSUER` on the API does not match the `iss` claim the auth service signs.
+It is the public origin **plus `/auth`** — `https://your-instance/auth`, not
+`https://your-instance`.
+
+See [The `/auth` suffix](/run/self-hosting#the-auth-suffix). Recreate the
+container after changing it; a restart reuses the old environment.
+
+</Accordion>
+
+<Accordion title="A client finishes consent, then reports its credentials were rejected">
+
+The same defect, seen from the other end: the access token reached `/mcp` and
+failed verification there. Check `AUTH_ISSUER` first, then `AUTH_MCP_RESOURCE`.
+
+An access token's `aud` claim must equal `AUTH_MCP_RESOURCE` exactly, and both
+containers have to carry the identical string — no trailing slash on one and
+not the other.
+
+<Callout type="warn">
+If correcting `AUTH_ISSUER` for one of these two symptoms produces the other,
+you are on a build from before the two token types were reconciled. No value
+satisfies both on those builds. Upgrade.
+</Callout>
+
+</Accordion>
+
+<Accordion title="The client never offers to sign in, or discovery 404s">
+
+```bash
+curl -s https://your-instance/.well-known/oauth-protected-resource
+```
+
+A 404 means `AUTH_MCP_RESOURCE` is unset, which gates the entire OAuth surface
+— no discovery documents on the API, no OAuth endpoints on the auth service.
+That is the intended state for an instance that has not opted in; clients use
+[bearer tokens](/use/clients#using-a-token-instead) instead.
+
+Set on the API only, clients discover an authorization server that serves
+nothing. Set it on both containers or on neither.
+
+</Accordion>
+
+<Accordion title="invalid_scope: offline_access while connecting">
+
+Fixed. A client registered itself from the advertised scope list, which omits
+`offline_access` deliberately, and was then refused the refresh token it needs.
+If you see it, you are on an older build.
+
+</Accordion>
+
+<Accordion title="The consent screen never leaves the consent screen">
+
+Fixed, on both **Allow** and **Deny**. The screen read the wrong key off the
+server's response and so never learned where to send the browser back to. If
+you see it, you are on an older build.
+
+A 500 naming `invalid input syntax for type timestamp with time zone` at the
+same point in the flow is a second fixed bug with the same cause of confusion —
+token lifetimes are counts of seconds, and a time-span string produced a
+`NaN` expiry.
+
+</Accordion>
+
+<Accordion title="Sign-up is open when it should be closed, or closed when it should be open">
+
+`INVITE_ONLY` is read by **both** containers, and only the literal string
+`true` turns it on. `1`, `yes` and `on` are read as off — the gate fails open,
+quietly.
+
+Set on only one container it is a gate on one of two doors: the auth service
+owns Better Auth's sign-up, and the API owns the deprecated
+`/api/auth/register` that detached mode still uses.
+
+`/api/instance` reports which mode the API believes it is in.
+
+</Accordion>
+
+</Accordions>
+
 ## Search behaves oddly
 
 <Accordions>
