@@ -4,9 +4,14 @@
 
 Your portable personal context for AI — stop repeating yourself.
 
-**📖 [Documentation](https://mygist.thuradev.qzz.io/docs)** — everything below in
-depth, split into [Using MyGist](https://mygist.thuradev.qzz.io/docs/use) and
-[Running MyGist](https://mygist.thuradev.qzz.io/docs/run).
+**📖 [Documentation](https://mygist.thuradev.qzz.io/docs)** —
+[Using MyGist](https://mygist.thuradev.qzz.io/docs/use) to connect a client and
+edit your persona, [Running MyGist](https://mygist.thuradev.qzz.io/docs/run) to
+host your own.
+
+The docs site is the single source of truth. This file is deliberately an
+overview and duplicates nothing from it, so it cannot fall out of date the way a
+copied table or file tree does.
 
 ## Why this exists
 
@@ -23,95 +28,49 @@ MCP tools are passive and run only when a client calls them.
 ## What it does
 
 - **Scoped reads.** A client asks for `minimal` or `professional` rather than
-  pulling everything — plus topic filtering and a titles-only mode.
+  pulling everything, with topic filters and a titles-only mode.
 - **Lean retrieval.** `search_context` returns ranked snippets with ids;
-  `get_entity` fetches only the ones that matter.
-- **Structured writes.** A published entity vocabulary (`get_schema`) covering
-  ten persona sections, with duplicate advisories on add.
+  `get_entity` fetches only the ones that matter. Postgres full-text plus
+  optional pgvector, degrading to FTS-only rather than breaking.
+- **Structured writes.** A published entity vocabulary (`get_schema`) across ten
+  persona sections, with duplicate advisories on add.
 - **Proposals, not guesses.** Agents propose durable changes with their
-  reasoning and a quote from you (`propose_update`); nothing reaches your
-  persona until you approve it, and anything you reject is never raised again.
+  reasoning and a quote from you; nothing reaches your persona until you approve
+  it, and anything you reject is never raised again.
+- **OAuth or a token.** A client that speaks OAuth connects with nothing but the
+  URL, through a consent screen where you choose what it may do. Anything
+  without a browser uses a scoped bearer token instead.
+- **Extensible sections.** A new persona section is one declarative manifest —
+  no backend or frontend code. See
+  [docs/CONTRIBUTING-PACKS.md](docs/CONTRIBUTING-PACKS.md).
 - **Skills that make agents consistent.** Four Markdown skills in
   [`skills/`](skills/) covering how to read a persona, which write tool is
   correct, and what is worth proposing — so behaviour does not depend on which
   client you happen to be in.
-- **Hybrid search.** Postgres full-text plus optional pgvector embeddings,
-  degrading to FTS-only rather than breaking.
-- **A web editor** generated from the same section packs the server writes
-  through, so the UI and the tool vocabulary cannot drift apart.
-- **Extensible sections.** A new persona section is one declarative manifest —
-  no backend or frontend code. See
-  [docs/CONTRIBUTING-PACKS.md](docs/CONTRIBUTING-PACKS.md), which points at the
-  [walkthrough](https://mygist.thuradev.qzz.io/docs/run/section-packs) and the
-  [manifest reference](https://mygist.thuradev.qzz.io/docs/run/pack-reference).
 
 ## Quick start
-
-You need Postgres and two containers — the API, and the auth service it
-proxies `/auth` to.
 
 ```bash
 docker build -t mygist .
 docker run -p 1120:1120 -e DATABASE_URL="postgresql://…" mygist
 ```
 
-That single image serves the web UI at `/`, the REST API at `/api`, the MCP
-endpoint at `/mcp`, and the documentation at `/docs`.
+One image serves the web UI at `/`, the REST API at `/api`, the MCP endpoint at
+`/mcp`, and the documentation at `/docs`. Sign-in runs in a second container.
 
-Then register an account, create a token, and point your client at
-`http://127.0.0.1:1120/mcp` with an `Authorization: Bearer` header — the
-[quick start](https://mygist.thuradev.qzz.io/docs/use/quick-start) walks through
-it.
+Then register an account and point your client at `http://127.0.0.1:1120/mcp`.
+[Quick start](https://mygist.thuradev.qzz.io/docs/use/quick-start) walks through
+it; [Self-hosting](https://mygist.thuradev.qzz.io/docs/run/self-hosting) covers
+the second container and every environment variable that does something.
 
-## Repository layout
+## Working on it
 
-```
-├── backend/          # FastAPI: REST API, MCP server, persona logic
-│   ├── main.py         # entry point — /api, /mcp, static routes
-│   ├── server.py       # MCP tools and persona writes
-│   ├── section_packs/  # one manifest per persona section
-│   ├── pack_loader.py  # manifest validation
-│   └── scripts/        # migrations and search-index backfill
-├── frontend/         # React SPA — the persona editor
-├── skills/           # agent skills — see skills/README.md
-├── docs-site/        # this project's documentation (Fumadocs, static export)
-├── docs/             # internal specs, plans, and CONTRIBUTING-PACKS.md
-└── mygist_data/      # legacy JSON personas — migration source only
-```
-
-## Development
+[Development](https://mygist.thuradev.qzz.io/docs/run/development) has the
+repository layout, the commands for each part, and what CI checks. The short
+version:
 
 ```bash
-cd backend && python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-docker compose up -d
-DATABASE_URL="postgresql://mygist:mygist@localhost:5433/mygist_test" uvicorn main:app --reload --port 1120
-```
-
-```bash
-cd frontend && npm install && npm run dev
-```
-
-Tests: `python -m pytest -q` in `backend/`, `npm test` in `frontend/`.
-
-Static routes are conditional on built output existing, so a source checkout
-serves the API and MCP normally with no UI and no docs.
-
-## Documentation
-
-The docs site is the single source of truth. This file is deliberately an
-overview: it duplicates nothing, so it cannot fall out of date the way a copied
-entity table does.
-
-| | |
-|---|---|
-| [Using MyGist](https://mygist.thuradev.qzz.io/docs/use) | Connect a client, read and write your persona, capture |
-| [Running MyGist](https://mygist.thuradev.qzz.io/docs/run) | Self-hosting, database, search index, section packs |
-
-Building the docs locally:
-
-```bash
-cd docs-site && npm install && npm run dev
+cd backend && docker compose up -d && python -m pytest -q
 ```
 
 ## Roadmap
