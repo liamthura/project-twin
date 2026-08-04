@@ -273,7 +273,14 @@ drawn from the running MyGist UI rather than invented for the page.
 10. Product mockup — `safari` frame, chrome recoloured, holding the editor with Maya's persona open. The hero anchor
 11. Persona card — the editor's own card, extracted for use outside the frame. Concentric radii, 24px outer and 16px inner rows
 12. Client chip — pill. Contents pending the client-list answer below
-13. Scope selector — echoes the real `segmented-control.jsx`; minimal / professional / personal / learning / full
+13. Scope payload — the editor's **Preferences** section as captured, carrying Maya's tone rules and dislikes, with a Geist Mono label naming the scope that returned it
+
+    Not a selector. There is no scope-selector UI in MyGist: read scopes
+    (`minimal` / `professional` / `personal` / `learning` / `full`) are
+    `get_context` parameters defined in `backend/pack_loader.py`, and the app's
+    own "scopes" are OAuth permissions, a different concept. An earlier draft of
+    this spec invented a segmented control. Showing what a scope *returns* is
+    both true and the more persuasive half of the story anyway.
 14. Proposal card — reasoning, quote from Maya, Approve and Reject. **Two buttons, not three** — verified against the running app, which has no Edit action
 15. Export view — readable JSON with a Download button
 
@@ -413,7 +420,7 @@ so Codex is named instead.
 >
 > ## Everything your assistants can ask for.
 
-**Scoped reads** — 2col, scope selector in the background slot
+**Scoped reads** — 2col, the Preferences section in the background slot with a mono scope label
 
 > Every client sees only the slice you allow. A work assistant asks for
 > `professional` and gets your tone rules and what you're working on; ask for

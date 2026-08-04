@@ -731,11 +731,11 @@ LEARNS        Examples first, theory later
 
 Radius `radius/pill`, fill `color/card`, 1px `color/border`, logo plus name. Six instances: `Claude`, `Codex`, `Raycast`, `Notion AI`, `Hermes`, and a text-only `anything with MCP connectors`. Do not add clients beyond this list.
 
-- [ ] **Step 4: Build Scope selector**
+- [ ] **Step 4: Build Scope payload**
 
-Mirrors the app's real `segmented-control.jsx`. Five segments: `minimal`, `professional`, `personal`, `learning`, `full`. `professional` selected, showing Maya's tone rules and current projects beneath.
+**Not a selector.** Task 6 established that no scope-selector UI exists — read scopes are `get_context` parameters in `backend/pack_loader.py`, and the app's "scopes" are OAuth permissions. Do not draw a segmented control.
 
-If Task 6 Step 4 established that no such UI exists, skip this step and note the skip in the commit message rather than inventing the component.
+Build from `design/screens/editor-preferences.png`: the Preferences section showing Maya's tone rules and dislikes, with a Geist Mono label above it reading `SCOPE: professional`. This shows what a scope returns rather than a control that does not exist.
 
 - [ ] **Step 5: Build Proposal card**
 
@@ -817,7 +817,7 @@ row 2   [ Your sections 1col ] [ Proposals  2col, media=ui ]
 row 3   [ Consent 1col ] [ Skills 1col ] [ Run it yourself 1col ]
 ```
 
-`Scope selector` drops into the Scoped reads media slot; `Proposal card` into the Proposals media slot. Tile caps: Scoped reads and Proposals get `verdigris`, the four smaller tiles get `clay`, `indigo`, `clay`, `indigo` in reading order — Clay appearing more often than Verdigris, per the warmth rule.
+`Scope payload` drops into the Scoped reads media slot; `Proposal card` into the Proposals media slot. Tile caps: Scoped reads and Proposals get `verdigris`, the four smaller tiles get `clay`, `indigo`, `clay`, `indigo` in reading order — Clay appearing more often than Verdigris, per the warmth rule.
 
 Tile copy is transcribed from the spec's seven tile blocks, verbatim.
 
