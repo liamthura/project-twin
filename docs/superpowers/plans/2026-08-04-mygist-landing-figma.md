@@ -16,9 +16,30 @@ Every task's requirements implicitly include this section. Values are copied ver
 
 **`get_metadata` with no `nodeId` is not a usable verification tool.** Its "list top-level pages" path returned only `01 Foundations` for the whole of Task 1, persistently, while `02 Components` and `03 Landing` demonstrably existed — confirmed by `get_metadata` with explicit node IDs `1:2` and `1:3`, and by a `use_figma` read of `figma.root.children`. Two separate reviewers reached the wrong conclusion from it and a false Critical finding went into a fix round.
 
-Verify page structure with `use_figma` reading `figma.root.children`, or with `get_metadata` against an explicit `nodeId`. Verify variables with `get_variable_defs`, and appearance with `get_screenshot`. If a read disagrees with a write, get a second read by a different method before concluding anything.
+Verify page structure with `use_figma` reading `figma.root.children`, or with `get_metadata` against an explicit `nodeId`. Verify appearance with `get_screenshot`.
+
+**Verify variables with the Plugin API, not `get_variable_defs`.** That tool resolves variables for a *selection*, so on a page with no layers it fails with "nothing selected" — which is every page at the point Tasks 2 and 3 run. Read them directly instead:
+
+```js
+const cols = await figma.variables.getLocalVariableCollectionsAsync()
+const vars = await figma.variables.getLocalVariablesAsync()
+return vars.map(v => ({ name: v.name, type: v.resolvedType, values: v.valuesByMode }))
+```
+
+`get_variable_defs` becomes useful only once components exist and can be selected, which is Task 7 onwards.
+
+If a read disagrees with a write, get a third read by a different method before concluding anything.
 
 **Mandatory skill loading.** Before *every* `use_figma` call, invoke the `figma:figma-use` skill. Before `create_new_file`, invoke `figma:figma-create-new-file`. When building variables or components, load `figma:figma-generate-library` alongside `figma-use`. When assembling the page, load `figma:figma-generate-design`. Skipping these causes hard-to-debug failures.
+
+**HSL is authoritative; every hex in this plan is derived from it.** The HSL values below come from the app's real tokens and the approved palette artifact. Hex values appear only as conveniences for tools that demand them, and three of the five in Task 5's first draft were wrong — they were typed rather than computed, which would have produced off-brand gradient art that Task 5's own palette check could not have caught, because it compared against the same wrong list. If a hex and an HSL value ever disagree, the HSL wins. Compute, do not transcribe:
+
+```js
+const hsl = (h, s, l) => { s/=100; l/=100
+  const k = n => (n + h/30) % 12, a = s * Math.min(l, 1-l)
+  const f = n => l - a * Math.max(-1, Math.min(k(n)-3, Math.min(9-k(n), 1)))
+  return "#" + [f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,"0")).join("").toUpperCase() }
+```
 
 **Colour — light mode.**
 ```
@@ -250,11 +271,11 @@ return made
 
 - [ ] **Step 3: Verify by reading back, not by trusting the write**
 
-Run `get_variable_defs` against the file. Expected: 15 variables under the `color/` prefix, each resolving to a different value in Light and Dark. Spot-check three by hand:
+Read the variables back with the Plugin API snippet in Global Constraints — not `get_variable_defs`, which needs a selection and will fail on this empty page. Expected: 15 variables under the `color/` prefix, each resolving to a different value in Light and Dark. Spot-check three by hand:
 
 - `color/paper` Light must be `#FAFAF9` (±1 per channel from rounding)
-- `color/verdigris` Light must be `#39838D` (±1)
-- `color/clay-tint` Dark must be `#3B2A20` (±1)
+- `color/verdigris` Light must be `#39757F` (±1)
+- `color/clay-tint` Dark must be `#3C2820` (±1)
 
 If any of the three is wrong, the `hsl` helper was altered — restore it verbatim and re-run Step 2.
 
@@ -304,7 +325,7 @@ return [
 
 - [ ] **Step 2: Verify**
 
-Run `get_variable_defs`. Expected: 8 radius, 11 space, 9 type = 28 new variables, on top of the 15 colours from Task 2.
+Read the variables back with the Plugin API snippet in Global Constraints. Expected: 8 radius, 11 space, 9 type = 28 new variables, on top of the 15 colours from Task 2.
 
 If the count is short, a value collided with an existing name — list the collection contents and reconcile before continuing.
 
@@ -427,8 +448,8 @@ In the tool's colour controls, replace every stop with brand colours only. Nothi
 
 ```
 paper      #FAFAF9      ink        #1C1917
-indigo     #3B5BDB      clay       #E8845A
-verdigris  #39838D
+indigo     #3D5DDB      clay       #E47B4E
+verdigris  #39757F
 ```
 
 Starting parameters, from the tool's own defaults: grain `0.52`, seam `0.05`, depth3d `0.55`. Treatment `Contour` with fill `Filled bands` is what produces the strip effect.
@@ -454,7 +475,7 @@ For each asset, append a block to `design/gradients/README.md` under `## Assets`
 
 ```markdown
 ### edge-strip-light.png
-2880x24 @2x · stops: indigo #3B5BDB, clay #E8845A, verdigris #39838D
+2880x24 @2x · stops: indigo #3D5DDB, clay #E47B4E, verdigris #39757F
 grain 0.52 · seam 0.05 · depth3d 0.55 · treatment: contour / filled bands
 frequency <value> · weight <value> · angle <value> · layers <value>
 ```
@@ -959,7 +980,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ## Notes for the implementer
 
-**This plan builds a Figma file, not code.** There is no test suite. Verification is done by reading state back out of Figma — `get_variable_defs`, `get_metadata`, `get_screenshot` — rather than by trusting that a write succeeded. Several tasks fail silently if you skip the read-back: fonts fall back without erroring, and a gradient with a stray colour looks fine until it is next to the brand palette.
+**This plan builds a Figma file, not code.** There is no test suite. Verification is done by reading state back out of Figma — the Plugin API for variables, `get_metadata` with an explicit nodeId, `get_screenshot` for appearance — rather than by trusting that a write succeeded. Read the Global Constraints note on which read tools actually work before choosing one; two of the obvious choices do not. Several tasks fail silently if you skip the read-back: fonts fall back without erroring, and a gradient with a stray colour looks fine until it is next to the brand palette.
 
 **Three tasks stop and ask.** Tasks 4 and 5 are decision gates on things only a person can judge by eye. Task 6 Step 4 stops if the app turns out not to have a UI the spec assumed. Do not guess past any of them.
 
