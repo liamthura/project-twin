@@ -4,7 +4,7 @@
 
 **Goal:** Build the MyGist design system and landing page prototype in Figma, from the approved spec at `docs/superpowers/specs/2026-08-04-mygist-landing-design.md`.
 
-**Architecture:** One Figma design file with three pages — Foundations (variables and specimens), Components (the library), and Landing (page assembly at two breakpoints). Variables are the single source of truth and are named so they could be exported as CSS custom properties without renaming. Gradient artwork is generated outside Figma from a local copy of GRADIENTOOL, palette-locked to the brand colours, and imported as stills. Every product object is populated with one demo persona, built from screenshots of the running application rather than from imagination.
+**Architecture:** One Figma design file with three pages — Foundations (variables and specimens), Components (the library), and Landing (page assembly at two breakpoints). Variables are the single source of truth and are named so they could be exported as CSS custom properties without renaming. Gradient artwork is generated outside Figma from a local copy of GRADIENTOOL, following the owner's reference ramp, and imported as stills. Every product object is populated with one demo persona, built from screenshots of the running application rather than from imagination.
 
 **Tech Stack:** Figma (via `use_figma` MCP), GRADIENTOOL (local HTML, canvas 2D), Magic UI registry (`bento-grid`, `safari`, `blur-fade`, `noise-texture`) as design reference, the running MyGist app (Docker) as the source for mockup content.
 
@@ -200,8 +200,9 @@ Write `design/gradients/README.md` with this content:
 Generated from GRADIENTOOL (gradientool.com), a canvas 2D generator using
 layered linear and radial gradients with grain.
 
-Every asset here is palette-locked to the MyGist brand colours: paper, ink,
-indigo, clay, verdigris. Nothing else. See the spec at
+Every asset here follows the owner's reference ramp (ink -> blue -> pink ->
+cream), not the brand palette. Brand-locking the artwork was tried first and
+produced mud. See the spec at
 docs/superpowers/specs/2026-08-04-mygist-landing-design.md.
 
 Regenerating: open the tool, set the parameters recorded beside each asset
@@ -463,15 +464,15 @@ It is a saved single-file copy of gradientool.com — canvas 2D, no network need
 
 - [ ] **Step 2: Lock the palette**
 
-In the tool's colour controls, replace every stop with brand colours only. Nothing else may appear in any asset:
+Set the state to the reference ramp given in Global Constraints. Do not substitute brand colours — the brand-locked version was tried and produced mud.
 
 ```
-paper      #FAFAF9      ink        #1C1917
-indigo     #3D5DDB      clay       #E47B4E
-verdigris  #39757F
+0.00  #1C1917      0.44  #2345E0      0.72  #FF9DC5      1.00  #FBF0EE
+grain 0.52 · seam 0.05 · depth3d 0.55 · shadow 1
+one peak · peakPos 0.5 · direction up · gradMap bar · count 9 · depth 0.45
 ```
 
-Starting parameters, from the tool's own defaults: grain `0.52`, seam `0.05`, depth3d `0.55`. Treatment `Contour` with fill `Filled bands` is what produces the strip effect.
+`window.GR_DEBUG.state` is the tool's own exposed state object; set the stops there and call `GR_DEBUG.render()` rather than driving sliders. Read the state back afterwards to confirm it held.
 
 - [ ] **Step 3a: Generate two assets and stop for judgement**
 
@@ -523,7 +524,7 @@ Run `get_screenshot` on the `Gradient assets` frame. Inspect every asset. If any
 
 Present the screenshot and ask:
 
-> Ten gradient assets, palette-locked. The edge strip is the signature element and appears on every section, so it matters most. Too loud, too quiet, or right?
+> Ten gradient assets on the reference ramp. The edge strip is the signature element and appears on every section, so it matters most. Too loud, too quiet, or right?
 
 Wait for the answer and regenerate if asked.
 
@@ -531,7 +532,7 @@ Wait for the answer and regenerate if asked.
 
 ```bash
 git add design/gradients/
-git commit -m "design: palette-locked gradient assets with their generation parameters
+git commit -m "design: gradient assets on the reference ramp, with their generation parameters
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
