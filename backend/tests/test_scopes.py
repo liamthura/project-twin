@@ -2,6 +2,11 @@ import pytest
 
 import scopes
 
+# Pure logic -- nothing here reads or writes a persona, so the per-test row
+# wipe in conftest is dead weight. The marker only skips cleanup; it can
+# never make a test wrong, only slower to forget.
+pytestmark = pytest.mark.nodb
+
 
 def test_write_implies_propose_and_read():
     granted = scopes.expand([scopes.WRITE])

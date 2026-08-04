@@ -75,10 +75,15 @@ def test_baseline_replays_safely_over_existing_data(rerun_migrations):
 # --- the runtime/migration boundary ------------------------------------------
 
 
-def test_persona_search_comes_from_migrations_without_the_embedding_column():
+def test_persona_search_comes_from_migrations_without_the_embedding_column(fresh_schema):
     """Tables, columns and indexes that do not vary by deployment belong to
     migrations; the embedding column does not, because its width comes from
-    EMBEDDING_DIM and pgvector may be absent."""
+    EMBEDDING_DIM and pgvector may be absent.
+
+    Takes `fresh_schema` because it deliberately leaves persona_search without
+    its embedding column: row-level cleanup cannot put a dropped column back,
+    so the next test needs a rebuilt schema rather than a wiped one.
+    """
     with db.get_pool().connection() as conn:
         conn.execute("drop table if exists persona_search;")
         conn.execute("delete from alembic_version;")

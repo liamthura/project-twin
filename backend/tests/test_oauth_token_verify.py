@@ -6,6 +6,11 @@ import pytest
 
 import jwt_auth
 
+# Pure logic -- nothing here reads or writes a persona, so the per-test row
+# wipe in conftest is dead weight. The marker only skips cleanup; it can
+# never make a test wrong, only slower to forget.
+pytestmark = pytest.mark.nodb
+
 SECRET = "test-secret-not-used-in-production"
 ISSUER = "https://mygist.example/auth"
 MCP_RESOURCE = "https://mygist.example/mcp"
