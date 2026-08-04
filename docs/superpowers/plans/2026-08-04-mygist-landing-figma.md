@@ -47,6 +47,7 @@ paper           60 9% 98%      ink             24 10% 10%
 card             0 0% 100%     muted           60 5% 96%
 muted-fg        25 5% 45%      border          20 6% 90%
 indigo         228 69% 55%     indigo-tint    223 100% 96%
+on-primary       0 0% 100%     (white in BOTH modes)
 clay            18 74% 60%     clay-tint       18 74% 94%
 verdigris      188 38% 36%     verdigris-tint 188 26% 93%
 success        142 71% 35%     warning         43 96% 40%
@@ -59,6 +60,7 @@ paper           60 3% 7%       ink             60 5% 96%
 card            60 2% 10%      muted           60 1% 14%
 muted-fg        24 5% 64%      border          60 2% 16%
 indigo         228 94% 67%     indigo-tint    227 22% 20%
+on-primary       0 0% 100%     (white in BOTH modes)
 clay            18 66% 62%     clay-tint       18 30% 18%
 verdigris      188 40% 50%     verdigris-tint 188 26% 15%
 success        142 60% 50%     warning         43 90% 55%
@@ -266,6 +268,7 @@ const TOKENS = {
   'muted-fg':       [[25,5,45],    [24,5,64]],
   'border':         [[20,6,90],    [60,2,16]],
   'indigo':         [[228,69,55],  [228,94,67]],
+  'on-primary':     [[0,0,100],    [0,0,100]],   // white in BOTH modes
   'indigo-tint':    [[223,100,96], [227,22,20]],
   'clay':           [[18,74,60],   [18,66,62]],
   'clay-tint':      [[18,74,94],   [18,30,18]],
@@ -291,7 +294,7 @@ return made
 
 - [ ] **Step 3: Verify by reading back, not by trusting the write**
 
-Read the variables back with the Plugin API snippet in Global Constraints — not `get_variable_defs`, which needs a selection and will fail on this empty page. Expected: 15 variables under the `color/` prefix, each resolving to a different value in Light and Dark. Spot-check three by hand:
+Read the variables back with the Plugin API snippet in Global Constraints — not `get_variable_defs`, which needs a selection and will fail on this empty page. Expected: 16 variables under the `color/` prefix, each resolving to a different value in Light and Dark. Spot-check three by hand:
 
 - `color/paper` Light must be `#FAFAF9` (±1 per channel from rounding)
 - `color/verdigris` Light must be `#39757F` (±1)
@@ -345,7 +348,7 @@ return [
 
 - [ ] **Step 2: Verify**
 
-Read the variables back with the Plugin API snippet in Global Constraints. Expected: 8 radius, 11 space, 9 type = 28 new variables, on top of the 15 colours from Task 2.
+Read the variables back with the Plugin API snippet in Global Constraints. Expected: 8 radius, 11 space, 9 type = 28 new variables, on top of the 16 colours from Task 2.
 
 If the count is short, a value collided with an existing name — list the collection contents and reconcile before continuing.
 

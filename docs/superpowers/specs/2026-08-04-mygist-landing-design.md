@@ -64,6 +64,7 @@ with the stone neutrals and far enough from indigo not to compete with a CTA.
 | Paper | `60 9% 98%` | `60 3% 7%` | Page ground (existing `--background`) |
 | Ink | `24 10% 10%` | `60 5% 96%` | Text (existing `--foreground`) |
 | Indigo | `228 69% 55%` | `228 94% 67%` | Primary, CTAs, the mark (existing, untouched) |
+| On-primary | `0 0% 100%` | `0 0% 100%` | Text on Indigo. White in **both** modes (existing `--primary-foreground`) |
 | Clay | `18 74% 60%` | `18 66% 62%` | New. Section tint, illustration |
 | Verdigris | `188 38% 36%` | `188 40% 50%` | New. Section tint, illustration |
 
