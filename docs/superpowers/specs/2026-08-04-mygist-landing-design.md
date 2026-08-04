@@ -274,7 +274,7 @@ drawn from the running MyGist UI rather than invented for the page.
 11. Persona card — the editor's own card, extracted for use outside the frame. Concentric radii, 24px outer and 16px inner rows
 12. Client chip — pill. Contents pending the client-list answer below
 13. Scope selector — echoes the real `segmented-control.jsx`; minimal / professional / personal / learning / full
-14. Proposal card — reasoning, quote from Maya, approve and reject
+14. Proposal card — reasoning, quote from Maya, Approve and Reject. **Two buttons, not three** — verified against the running app, which has no Edit action
 15. Export view — readable JSON with a Download button
 
 ## Page structure
