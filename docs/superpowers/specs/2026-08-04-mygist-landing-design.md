@@ -119,7 +119,16 @@ radius   4 · 6 · 8 (app default) · 12 · 16 · 24 · 32 · 9999 (pill)
 space    4 · 8 · 12 · 16 · 24 · 32 · 48 · 64 · 80 · 120 · 160
 ```
 
-Nested radii are concentric: a 24px container holds 16px children.
+Nested radii are concentric: a 12px container holds 8px children.
+
+**Cards are 12px, not 24px.** Set by the owner against the running app: the app's
+`--radius` is 8px, and a 24px marketing card read as a different product. 12px is
+close enough to be the same family without being identical.
+
+This overrides the Playful Editorial note's "container radii 16-32px, never 4px".
+The owner made the call with both surfaces on screen, which beats the note written
+in the abstract. Recorded rather than silently reconciled. The 32px page frame and
+the 9999px pills are unaffected.
 
 ### Elevation
 
@@ -171,8 +180,9 @@ Three rules keep it a system element rather than decoration:
 1. **Follows the reference ramp.** Ink `#1C1917` → blue `#2345E0` → pink `#FF9DC5` → cream `#FBF0EE`, at positions 0, 0.44, 0.72, 1. Supplied by the owner as a GRADIENTOOL state. Pink and cream are new to the system and live only in gradient artwork.
 
    An earlier version of this rule locked the artwork to the five brand colours. It produced mud: Clay and Verdigris are near-complementary, so interpolating between them passes through grey-brown. The reference avoids this because lightness rises monotonically and each hue step is adjacent to the last.
-2. **Two fixed roles.** A 12px full-bleed **edge strip** along the top of the
-   page frame, recoloured per section and acting as the signature element; a
+2. **Two fixed roles.** A 12px **edge strip** across the very top of the page,
+   full-bleed to the viewport edges and above everything including the nav pill,
+   acting as the signature element seen once; a
    large soft **field** behind the hero mockup.
 
    A third role, a gradient **tile cap** on each bento tile, was cut once the

@@ -73,7 +73,9 @@ The 40px floor is a **role boundary, not a legibility limit**. Task 4's specimen
 
 **Hero headline is decided: "Explain yourself once."** Chosen from the specimen. Do not re-open it, and do not set the other candidate anywhere.
 
-**Radius.** `4 · 6 · 8 · 12 · 16 · 24 · 32 · 9999`. Nested radii are concentric: a 24px container holds 16px children.
+**Radius.** `4 · 6 · 8 · 12 · 16 · 24 · 32 · 9999`.
+
+**Cards use `radius/12`, and their inner rows `radius/8`.** Not 24/16. Set by the owner against the running app, whose own radius is 8px — a 24px marketing card read as a different product. This overrides the Playful Editorial note's 16px floor; the owner made the call with both surfaces on screen. The 32px page frame and 9999px pills are unaffected.
 
 **Space.** `4 · 8 · 12 · 16 · 24 · 32 · 48 · 64 · 80 · 120 · 160`.
 
@@ -628,7 +630,11 @@ The success state is the last thing a converted visitor sees, so it gets the sam
 
 - [ ] **Step 3: Build the shell components**
 
-`Page frame` — a 32px-radius container the whole page sits inside, with the `edge-strip` gradient as a 12px band along its top edge.
+`Page frame` — a 32px-radius container the whole page sits inside. **It does not contain the edge strip.**
+
+`Edge strip` — its own component, 12px tall, full viewport width, **square corners**, with a `theme` property (`light`/`dark`) carrying `edge-strip-light.png` and `edge-strip-dark.png`. It sits at the very top of the page, above everything including the nav pill, and bleeds to both viewport edges.
+
+The strip cannot live inside `Page frame`: a 32px-radius container would clip it away from the viewport edge, and full-bleed is the point.
 
 `Nav pill` — floating, detached 16px from the top, radius `radius/pill`, fill `color/card` at 80% opacity with a background blur (frosted glass, permitted here and nowhere else), shadow `pop`. Contents: the MyGist mark at left, and `Sign in` at right.
 
