@@ -151,6 +151,16 @@ Figma work has no unit tests. The analogue, and it is mandatory for every task:
 
 ---
 
+## Recorded values
+
+Produced by Task 1. Every later task reads these values from here — the literal token `FILE_KEY` elsewhere in this document is not replaced; substitute the value below wherever it appears.
+
+- **`FILE_KEY`**: `Ti7FlZLYOvX3goyvfypJBk`
+- **`FONT_DECISION`**: `{ sans: 'Geist', mono: 'Geist Mono', regularStyle: 'Regular', semiboldStyle: 'SemiBold' }` — both `Geist` and `Geist Mono` are available (`listAvailableFontsAsync` rule 1 applied), so no Inter/Roboto Mono substitution is needed. Style strings are verbatim from `listAvailableFontsAsync()`: Geist and Geist Mono both expose `Black, Bold, ExtraBold, ExtraLight, Light, Medium, Regular, SemiBold, Thin` — note **no space** in `SemiBold`/`ExtraBold` (unlike Inter, which uses `Semi Bold`/`Extra Bold` with a space).
+- **`RESHAPED_LIB_KEY`**: `null` — the duplicated Reshaped v3.9 library did not appear in `libraries_available_to_add` for this file's team (`Khant Thura's team`; `libraries_available_to_add_next_offset` was `null`, so pagination is exhausted). Per the brief this is treated as genuine absence and does not block later tasks — it is a geometry reference only.
+
+---
+
 ## Task 1: Create the file, pages, library subscription, and font gate
 
 **Files:**
@@ -160,11 +170,11 @@ Figma work has no unit tests. The analogue, and it is mandatory for every task:
 **Interfaces:**
 - Produces: `FILE_KEY` — the file key, consumed by every later task. Nine named pages. `FONT_DECISION` — the exact `{family, style}` pairs every later text operation must use. `RESHAPED_LIB_KEY` — the Reshaped library key, or `null` if unavailable.
 
-- [ ] **Step 1: Create the file**
+- [x] **Step 1: Create the file**
 
 Invoke `figma:figma-create-new-file`. Create a `design` editor-type file named `MyGist — App Redesign`. Record the returned file key as `FILE_KEY` in this document, replacing every literal `FILE_KEY` below.
 
-- [ ] **Step 2: Create the nine pages**
+- [x] **Step 2: Create the nine pages**
 
 Invoke `figma:figma-use`. One `use_figma` call:
 
@@ -183,11 +193,11 @@ return { renamed: figma.root.children[0].id, createdNodeIds: created,
          pages: figma.root.children.map(p => ({ id: p.id, name: p.name })) };
 ```
 
-- [ ] **Step 3: Verify page structure**
+- [x] **Step 3: Verify page structure**
 
 Run `get_metadata` on `FILE_KEY`. Expected: exactly nine pages, names matching Step 2's list in order, no page named "Page 1".
 
-- [ ] **Step 4: Gate the fonts — this blocks every later task**
+- [x] **Step 4: Gate the fonts — this blocks every later task**
 
 Invoke `figma:figma-use`. One `use_figma` call:
 
@@ -203,7 +213,7 @@ for (const family of want) {
 return { found, geistPresent: !!found['Geist'], geistMonoPresent: !!found['Geist Mono'] };
 ```
 
-- [ ] **Step 5: Record the font decision**
+- [x] **Step 5: Record the font decision**
 
 Apply this rule exactly. Do not improvise a third option.
 
@@ -212,7 +222,7 @@ Apply this rule exactly. Do not improvise a third option.
 
 Write `FONT_DECISION` into this document. Every later task reads it from here.
 
-- [ ] **Step 6: Subscribe the Reshaped library**
+- [x] **Step 6: Subscribe the Reshaped library**
 
 ```
 get_libraries with fileKey = FILE_KEY
@@ -222,7 +232,7 @@ Find the duplicated Reshaped v3.9 library in `libraries_available_to_add`. Recor
 
 If it is genuinely absent, record `RESHAPED_LIB_KEY = null` and continue — the library is a geometry reference, not a dependency. Every component in Tasks 5–7 is specified completely enough to build without it. **Do not block on this.**
 
-- [ ] **Step 7: Commit the recorded values**
+- [x] **Step 7: Commit the recorded values**
 
 ```bash
 git add docs/superpowers/plans/2026-08-04-mygist-app-reshaped-figma.md
