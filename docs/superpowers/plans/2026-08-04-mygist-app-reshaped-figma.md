@@ -391,10 +391,10 @@ for (const [name, value] of [['duration-fast',120],['duration-medium',200],
   v.setValueForMode(mode, value);
   ids[name] = v.id;
 }
-for (const [name, value] of [['easing-decelerate','cubic-bezier(0, 0, .2, 1)'],
-                             ['easing-accelerate','cubic-bezier(.4, 0, 1, 1)'],
-                             ['easing-standard','cubic-bezier(.4, 0, .2, 1)'],
-                             ['easing-emphasized','cubic-bezier(.2, 0, 0, 1)']]) {
+for (const [name, value] of [['easing-decelerate','cubic-bezier(0,0,.2,1)'],
+                             ['easing-accelerate','cubic-bezier(.4,0,1,1)'],
+                             ['easing-standard','cubic-bezier(.4,0,.2,1)'],
+                             ['easing-emphasized','cubic-bezier(.2,0,0,1)']]) {
   const v = figma.variables.createVariable(name, c, 'STRING');
   v.scopes = ['ALL_SCOPES'];
   v.setValueForMode(mode, value);
