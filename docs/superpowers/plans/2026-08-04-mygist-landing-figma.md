@@ -690,7 +690,12 @@ Set `clipsContent = true` on the tile. Inside, a frame named exactly `media slot
 
 Give the slot a soft fade where it leaves the tile: a gradient mask from opaque at the top-left to transparent toward the bottom-right edge, so the UI dissolves rather than being guillotined.
 
-Leave the slot empty but named. Task 9's product objects drop in.
+The slot is **not** empty, and cannot be: a Figma fade needs a mask, and a mask is a child node. It holds two children:
+
+- `fade mask` — `isMask = true`, the gradient that dissolves the bleed. **Structural. Task 9 must not delete or reorder it.** Note `isMask` masks *later* siblings, so it comes first.
+- `media placeholder (demo only)` — a flat `color/muted` rectangle so the component reads before real content exists. **This is what Task 9 replaces.**
+
+An earlier draft of this step asked for a fade and an empty slot in the same breath, which is not possible.
 
 - [ ] **Step 3: Record the hover spec, do not wire it**
 
@@ -835,7 +840,9 @@ row 2   [ Your sections 1col ] [ Proposals  2col, media=ui ]
 row 3   [ Consent 1col ] [ Skills 1col ] [ Run it yourself 1col ]
 ```
 
-`Scope payload` drops into the Scoped reads media slot; `Proposal card` into the Proposals media slot. Tile caps: Scoped reads and Proposals get `verdigris`, the four smaller tiles get `clay`, `indigo`, `clay`, `indigo` in reading order — Clay appearing more often than Verdigris, per the warmth rule.
+`Scope payload` drops into the Scoped reads media slot; `Proposal card` into the Proposals media slot.
+
+In both cases, **replace the `media placeholder (demo only)` node and leave `fade mask` alone** — it is what makes the bleed dissolve, `isMask` masks later siblings so it must stay first, and deleting it leaves the media guillotined at the tile edge. Tile caps: Scoped reads and Proposals get `verdigris`, the four smaller tiles get `clay`, `indigo`, `clay`, `indigo` in reading order — Clay appearing more often than Verdigris, per the warmth rule.
 
 Tile copy is transcribed from the spec's seven tile blocks, verbatim.
 
