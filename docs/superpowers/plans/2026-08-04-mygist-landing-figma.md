@@ -458,7 +458,17 @@ verdigris  #39757F
 
 Starting parameters, from the tool's own defaults: grain `0.52`, seam `0.05`, depth3d `0.55`. Treatment `Contour` with fill `Filled bands` is what produces the strip effect.
 
-- [ ] **Step 3: Generate the ten assets**
+- [ ] **Step 3a: Generate two assets and stop for judgement**
+
+Produce `edge-strip-light` and `hero-field-light` only, to the specifications in the table below, then stop and present them. These two carry the look: the edge strip is the signature element repeated on every section, and the hero field is the largest area of gradient on the page. If the direction is wrong, it is wrong for all ten, and eight more files is wasted work.
+
+The tool is a GUI. Drive it with Playwright (see the `webapp-testing` skill) rather than by hand: its sliders carry stable ids such as `i-grainIntensity`, `i-seam` and `i-depth3d`, so parameters can be set programmatically and recorded exactly. Read the result straight off the `<canvas>` with `toDataURL` rather than using the export button — fewer moving parts, and it gives the exact pixels the canvas holds.
+
+**If the colour stops cannot be set programmatically, stop and report.** Do not generate assets in the tool's default palette and plan to recolour later. A stray non-brand hue is the single most likely failure in this task, and it stays invisible until the asset is sitting next to the real palette.
+
+- [ ] **Step 3b: Generate the remaining eight**
+
+Only after the direction is approved.
 
 | Asset | Size | Colours | Notes |
 |---|---|---|---|
