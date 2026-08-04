@@ -67,6 +67,10 @@ destructive      0 74% 54%
 
 **Type.** Stack Sans Notch (display, 40px and above only, weights 500–600), Geist (UI and body), Geist Mono (eyebrows, labels, code). Ramp: `13 · 14 · 16 · 18 · 20 · 28 · 40 · 56 · 72`.
 
+The 40px floor is a **role boundary, not a legibility limit**. Task 4's specimen showed the notches still reading fine at 28px, so do not justify the floor by claiming the character disappears — it does not. The floor exists so display and body stay visibly separate roles and the display face stays an event rather than a default. Enforce it regardless.
+
+**Hero headline is decided: "Explain yourself once."** Chosen from the specimen. Do not re-open it, and do not set the other candidate anywhere.
+
 **Radius.** `4 · 6 · 8 · 12 · 16 · 24 · 32 · 9999`. Nested radii are concentric: a 24px container holds 16px children.
 
 **Space.** `4 · 8 · 12 · 16 · 24 · 32 · 48 · 64 · 80 · 120 · 160`.
@@ -767,7 +771,7 @@ Section padding `space/120` top and bottom, `space/80` horizontal.
 
 - [ ] **Step 2: Assemble the hero**
 
-Eyebrow `PORTABLE CONTEXT FOR AI`. Headline at `type/72` in Stack Sans Notch — the string chosen in Task 4. Sub at `type/18`. Then the `Waitlist field` in `idle`, then the small link `Already have a code? Sign in.` in `type/14`.
+Eyebrow `PORTABLE CONTEXT FOR AI`. Headline at `type/72` in Stack Sans Notch, reading exactly `Explain yourself once.` Sub at `type/18`. Then the `Waitlist field` in `idle`, then the small link `Already have a code? Sign in.` in `type/14`.
 
 `Product mockup` sits below, centred on the hero gradient field. `Client chip` row beneath it, with no line drawn between them.
 

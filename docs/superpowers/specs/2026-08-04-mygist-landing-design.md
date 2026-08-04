@@ -94,9 +94,15 @@ Three families, split by role rather than by taste.
 - **Geist** — UI and body. Already loaded.
 - **Geist Mono** — eyebrows, labels, code. Already loaded.
 
-The 40px floor is a hard rule. The notched cuts are the entire character of the
-face, and below roughly 40px they stop reading, leaving a geometric sans too
-close to Geist to hold hierarchy.
+The 40px floor is a hard rule, though not for the reason first given here. The
+original justification was that the notches stop reading below 40px. A specimen
+setting the same string at 28px in both faces disproved that: the notches still
+read clearly and the two faces still look nothing like each other.
+
+The floor stands as a role boundary rather than a legibility limit. Display and
+body stay visibly separate, and the display face remains an event rather than a
+default. Anything below 40px is Geist, however well Stack Sans Notch would in
+fact survive there.
 
 At 72px the notches carry the headline on their own, so display weight stays at
 500–600 rather than 700.
@@ -345,7 +351,7 @@ concise, no cheese.
 
 > `PORTABLE CONTEXT FOR AI`
 >
-> # Write yourself down once.
+> # Explain yourself once.
 >
 > Every new AI conversation starts from nothing. Your role, your stack, how you
 > like answers written. MyGist stores that once and hands it to any assistant you
@@ -361,9 +367,11 @@ concise, no cheese.
 >
 > Already have a code? Sign in.
 
-Alternative headline to mock alongside at 72px: **"Explain yourself once."** It
-hits the repetition pain harder but flirts with the being-told-off reading. Pick
-by eye.
+Chosen from the Figma specimen with both set at 72px. "Write yourself down once."
+was the other candidate; it fills the measure more evenly and ties to the product
+name, but the shorter line carries more force and the white space around it at
+72px reads more confident. The being-told-off reading is present and faint enough
+to accept.
 
 ### 2 · Works with
 
@@ -490,7 +498,6 @@ is drawn, for the same reason.
 
 ## Open questions
 
-- Hero headline: "Write yourself down once." or "Explain yourself once." Decide from the Figma specimen.
 - **The docs client list is narrower than the page's.** `clients.mdx` documents Claude Desktop and Claude Code with their own setup sections; the landing page names Claude, Codex, Raycast, Notion AI and Hermes on the owner's confirmation. The page is not wrong, but the docs are now behind it, and a visitor who follows a chip through to the docs finds no setup section for four of the five. Not a blocker for the design. Worth a docs pass before launch.
 - Stack Sans Notch carries Koto's notch signature from the Stack Overflow identity. Free and legal to use, and not yet widely deployed, but a reader who knows the rebrand may make the association. Accepted knowingly.
 - Whether the gradient strips eventually ship as static exports or a live canvas. Deferred with the code target.
