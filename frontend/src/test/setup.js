@@ -1,25 +1,47 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, beforeEach } from "vitest";
+import {
+  OTP_SELECTOR,
+  OTP_TIMER_DRAIN_MS,
+  recordsContainOtp,
+} from "./otp-drain.js";
 
-// input-otp keeps its drawn caret in step with the real one using timers at 0,
-// 10 and 50ms. Unmounting does not always beat them, and one firing after
-// vitest has torn the jsdom environment down sets React state against a window
-// that no longer exists -- an unhandled error, which fails the run while every
-// test still reports as passed.
-//
-// So the pending ones are given room to fire while the environment is still
-// alive. Paid only where the control actually rendered: 60ms on every one of
-// the 590 tests would add half a minute for the benefit of about thirty.
-const OTP_TIMER_DRAIN_MS = 80;
+// `input-otp` schedules caret timers it never cancels, and one firing after the
+// environment is torn down fails the whole run while every test still reports as
+// passed. They are given room to finish while jsdom is still alive. See
+// ./otp-drain.js for why this is watched rather than queried at teardown.
+let sawOtpControl = false;
+let watcher = null;
+
+function watchForOtpControl() {
+  if (watcher || typeof MutationObserver === "undefined") return;
+  // One observer per file rather than per test: the jsdom document outlives
+  // every test in a file, and 600 observers would be 600 more things to unwind.
+  watcher = new MutationObserver((records) => {
+    sawOtpControl = sawOtpControl || recordsContainOtp(records);
+  });
+  watcher.observe(document.documentElement, { childList: true, subtree: true });
+}
+
+beforeEach(() => {
+  sawOtpControl = false;
+  watchForOtpControl();
+});
 
 afterEach(async () => {
-  const hadOtp =
-    typeof document !== "undefined" && !!document.querySelector("[data-input-otp]");
+  // takeRecords first: the callback runs a microtask behind the mutation, and
+  // this must not depend on having been given that tick.
+  if (watcher) sawOtpControl = sawOtpControl || recordsContainOtp(watcher.takeRecords());
+
+  // Kept as a floor under the observer. If anything ever renders the control
+  // without a mutation this can see, the drain still happens.
+  const present =
+    typeof document !== "undefined" && !!document.querySelector(OTP_SELECTOR);
 
   cleanup();
 
-  if (hadOtp) {
+  if (sawOtpControl || present) {
     await new Promise((resolve) => setTimeout(resolve, OTP_TIMER_DRAIN_MS));
   }
 });
