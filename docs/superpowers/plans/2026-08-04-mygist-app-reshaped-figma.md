@@ -502,11 +502,11 @@ git commit -m "docs: record scale, motion and text style ids"
 - Consumes: all variable and style IDs from Tasks 2–3
 - Produces: page `01 Foundations` holding frames `Colour`, `Type`, `Scale`, `Elevation`, `Motion`. No later task depends on these — they exist so a human can check the token layer at a glance.
 
-- [ ] **Step 1: State the expected structure**
+- [x] **Step 1: State the expected structure**
 
 Five top-level auto-layout frames on `01 Foundations`, laid out left to right starting at x=0, y=0, each 24px apart. `Colour` holds 15 swatch rows, each a 48×48 chip with the token name in `caption-2` and the hex in `caption-1`. Every chip fill is **bound to its variable**, not a literal — that is the whole point of the page.
 
-- [ ] **Step 2: Build the Colour specimen**
+- [x] **Step 2: Build the Colour specimen**
 
 Invoke `figma:figma-use`. Switch to the page first — page context resets every call.
 
@@ -550,7 +550,7 @@ return { createdNodeIds: created, wrapId: wrap.id };
 
 Fifteen rows is over the ten-operation guidance. If the call errors or times out, split it into two calls of eight and seven names — the script is idempotent per name only if you delete the partial wrap first, so on retry remove `wrapId` before rerunning.
 
-- [ ] **Step 3: Verify the Colour specimen in both modes**
+- [x] **Step 3: Verify the Colour specimen in both modes**
 
 ```js
 const page = figma.root.children.find(p => p.name === '01 Foundations');
@@ -564,7 +564,7 @@ return { rows: wrap.children.length, unboundChips: unbound.map(r => r.parent.nam
 
 Expected: `rows: 15`, `unboundChips: []`. Then set the page's Colour collection mode to `Dark` and screenshot again — every chip must change and no label may become illegible.
 
-- [ ] **Step 4: Build the Type specimen**
+- [x] **Step 4: Build the Type specimen**
 
 One frame, nine rows, each row the style name in `caption-2` above a pangram in that style. Use "Maya writes British English and never says delve" as the specimen string rather than lorem, so the ramp is checked against real copy.
 
@@ -596,17 +596,17 @@ for (const s of styles) {
 return { createdNodeIds: created, count: created.length };
 ```
 
-- [ ] **Step 5: Build the Scale, Elevation and Motion specimens**
+- [x] **Step 5: Build the Scale, Elevation and Motion specimens**
 
 - `Scale` at x=1000: four squares at radius 4/6/8/12 with `caption-2` labels, then six horizontal bars at width 4/8/12/16/24/32.
 - `Elevation` at x=1400: two 200×120 cards, one with `shadow-raised`, one with `shadow-overlay`, both `card` fill on `paper` ground.
 - `Motion` at x=1700: a text table of the four durations and four easings, values read from the `Motion` collection rather than retyped, so a drift between the collection and the specimen is impossible.
 
-- [ ] **Step 6: Verify the whole page**
+- [x] **Step 6: Verify the whole page**
 
 `get_metadata` on the page. Expected: five top-level frames named `Colour`, `Type`, `Scale`, `Elevation`, `Motion`, none overlapping, none at (0,0) except `Colour`. Screenshot the full page in light and dark. Check for clipped text in the Type specimen — the 28px row is where clipping shows first.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git commit --allow-empty -m "chore: foundations specimens built in Figma Ti7FlZLYOvX3goyvfypJBk"
