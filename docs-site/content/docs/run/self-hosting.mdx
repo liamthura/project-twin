@@ -170,12 +170,27 @@ Better Auth's JWT plugin defaults `iss` to the bare origin while its OAuth
 provider uses the origin plus base path, and the auth service now pins the
 plugin so the two agree.
 
-<Callout type="warn">
-Getting this wrong produces a bare `401` that names no claim. If sign-in works
-but every page 401s on `/api`, or a client completes consent and is then told
-its credentials were rejected, check this value before anything else — both
-symptoms are the same defect, and neither error says so.
+Getting this wrong produces a bare `401` that names no claim, so the API checks
+it for you. Where OAuth is configured, it fetches the auth service's metadata at
+startup and compares:
 
+```text
+INFO   auth issuer agreed with the auth service: https://your-instance/auth
+```
+
+```text
+ERROR  auth issuer mismatch: OAuth cannot work.
+           AUTH_ISSUER = https://your-instance
+           advertised  = https://your-instance/auth
+```
+
+The check only ever logs. A mismatch has already broken every JWT by the time it
+runs, but bearer tokens and the parts of `/api` that need no session still work
+— refusing to start would take those down too, and widen the fault rather than
+report it. An auth service that is not up yet is retried for around twenty
+seconds and then reported as *unchecked*, never as a mismatch.
+
+<Callout type="warn">
 Older builds cannot be fixed by configuration alone: before the two token types
 were reconciled, one setting could satisfy the web app or MCP but never both.
 Upgrade rather than hunting for a value that works.

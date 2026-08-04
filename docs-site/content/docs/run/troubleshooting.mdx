@@ -81,6 +81,16 @@ Nearly every failure here arrives as a bare `401` or an OAuth error code that
 names neither the setting nor the fix, so match on the symptom rather than on
 the message.
 
+**Read the API's startup log first.** Where OAuth is configured, the API checks
+its own `AUTH_ISSUER` against what the auth service advertises and says so:
+
+```text
+INFO   auth issuer agreed with the auth service: https://your-instance/auth
+```
+
+Anything other than that line is the answer to most of what follows, without
+reproducing anything.
+
 <Accordions>
 
 <Accordion title="Sign-in works, then every page 401s on /api">
@@ -89,8 +99,32 @@ the message.
 It is the public origin **plus `/auth`** — `https://your-instance/auth`, not
 `https://your-instance`.
 
+The startup log says so directly, with both values:
+
+```text
+ERROR  auth issuer mismatch: OAuth cannot work.
+           AUTH_ISSUER = https://your-instance
+           advertised  = https://your-instance/auth
+```
+
 See [The `/auth` suffix](/run/self-hosting#the-auth-suffix). Recreate the
 container after changing it; a restart reuses the old environment.
+
+</Accordion>
+
+<Accordion title="Clients discover an authorization server that then registers nothing">
+
+`AUTH_MCP_RESOURCE` is set on the API and not on the auth service, so discovery
+resolves and `/auth/oauth2/register` does not exist. Connecting fails after the
+browser has already opened, which is the most confusing point at which it can.
+
+The startup log names this one too:
+
+```text
+ERROR  the auth service has no OAuth endpoints, but this API expects them
+```
+
+Set the same value on both containers and recreate them.
 
 </Accordion>
 
