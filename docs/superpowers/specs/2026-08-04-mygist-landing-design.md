@@ -171,10 +171,15 @@ Three rules keep it a system element rather than decoration:
 1. **Follows the reference ramp.** Ink `#1C1917` → blue `#2345E0` → pink `#FF9DC5` → cream `#FBF0EE`, at positions 0, 0.44, 0.72, 1. Supplied by the owner as a GRADIENTOOL state. Pink and cream are new to the system and live only in gradient artwork.
 
    An earlier version of this rule locked the artwork to the five brand colours. It produced mud: Clay and Verdigris are near-complementary, so interpolating between them passes through grey-brown. The reference avoids this because lightness rises monotonically and each hue step is adjacent to the last.
-2. **Three fixed roles.** A 12px full-bleed **edge strip** along the top of the
+2. **Two fixed roles.** A 12px full-bleed **edge strip** along the top of the
    page frame, recoloured per section and acting as the signature element; a
-   large soft **field** behind the hero persona card; and a **tile cap** across
-   the top of feature tiles, coloured to its section.
+   large soft **field** behind the hero mockup.
+
+   A third role, a gradient **tile cap** on each bento tile, was cut once the
+   bento's visual direction was set from reference: the tiles are plain cards
+   whose colour comes from an Indigo title and the bleeding product UI, and an
+   8px saturated band fought that. The three `tile-cap-*` asset pairs remain in
+   `design/gradients/` and are currently unused.
 3. **Never under text.** Strips are decorative. Any type over gradient sits on a
    solid or scrimmed surface.
 
@@ -264,7 +269,7 @@ mirrors its variant names, so Code Connect is close to free later.
 **Content**
 
 6. Section header — mono eyebrow, display, body sub
-7. Bento tile — adapted from `bento-grid`, 24px radius, tinted fill, gradient tile cap. Variants: 1-col and 2-col
+7. Bento tile — adapted from `bento-grid`, 24px radius, `card` fill, hairline border. **No tile cap and no icon.** Title in Indigo, description in `muted-fg`. Product UI sits oversized at the foot, clipped by the tile so it bleeds off the bottom and right with a soft fade. Variants: 1-col and 2-col × media none/ui
 8. Step card — numbered
 9. Pull-quote
 

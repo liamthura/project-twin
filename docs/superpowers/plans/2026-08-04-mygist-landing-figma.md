@@ -671,15 +671,26 @@ Adapted from Magic UI's `bento-grid`. That component ships `rounded-xl` (12px), 
 
 - [ ] **Step 1: Build the tile**
 
-Radius `radius/24` — not the registry's 12px. Fill `color/card`. Shadow `sm` at rest, `lift` on hover. Text: title in Geist SemiBold `type/20` bound to `color/ink`; body in Geist `type/16` bound to `color/muted-fg`. Icons from `lucide-react`'s set, to match the app, not Radix.
+Radius `radius/24` — not the registry's 12px. Fill `color/card`, 1px `color/border` stroke. Shadow `sm` at rest. **Title in Geist SemiBold `type/20` bound to `color/indigo`** — not ink. Body in Geist `type/16` bound to `color/muted-fg`.
 
-A `tile-cap` gradient runs across the top edge, 8px tall, coloured to the tile's section.
+**No icon and no tile cap.** Both were built and then cut once the visual direction was set from reference images: the tiles are plain cards whose colour arrives from the Indigo title and the product UI, and an 8px gradient band fought that. The gradient signature lives on the page frame's edge strip instead.
 
 Widths: `1col` = 400, `2col` = 824. Row height 352 (the registry's `22rem`). Gap between tiles `space/16`.
 
-- [ ] **Step 2: Build the `media = ui` variant**
+- [ ] **Step 2: Build the `media = ui` variant — the media bleeds**
 
-The `2col` tiles carry live-looking product UI in place of the registry's `background` slot. Leave a 760×200 region at the tile's foot, named `media slot`, which Task 9's product objects drop into.
+This is the point of the whole component, so get it right. The product UI is **larger than the tile and clipped by it**, running off the bottom and right edges rather than sitting in a bounded box. A contained thumbnail is the look the reference deliberately moves away from.
+
+Set `clipsContent = true` on the tile. Inside, a frame named exactly `media slot`, positioned to overflow:
+
+| Variant | Tile | `media slot` | Position |
+|---|---|---|---|
+| `1col` | 400×352 | 520×280 | x `space/32`, top at y 168 — overflows ~152px right, ~96px bottom |
+| `2col` | 824×352 | 1000×300 | x `space/48`, top at y 152 — overflows ~224px right, ~100px bottom |
+
+Give the slot a soft fade where it leaves the tile: a gradient mask from opaque at the top-left to transparent toward the bottom-right edge, so the UI dissolves rather than being guillotined.
+
+Leave the slot empty but named. Task 9's product objects drop in.
 
 - [ ] **Step 3: Record the hover spec, do not wire it**
 
