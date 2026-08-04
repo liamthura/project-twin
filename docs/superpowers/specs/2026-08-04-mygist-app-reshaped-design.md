@@ -42,7 +42,7 @@ a library's default.
 | Deliverable | Spec plus Figma prototype; code migration planned separately |
 | Section navigation | Two-level rail with live scroll-spy, one card per subsection |
 | Review | Weighted by effort — dense rows for Inbox, full cards for Observations |
-| Onboarding | Non-blocking checklist; basics filled in-app, seeding delegated to the client |
+| Onboarding | Non-blocking. A routing spine plus a basics panel built from the editor's own patterns; seeding delegated to the client as a peer option |
 | Breakpoints | 1440 and 390 |
 | Motion | A full motion layer. Purposeful, triggered, never idle |
 
@@ -90,7 +90,7 @@ forbids both on body text, and a form-dense app has almost no tinted ground to
 spend them on. Rather than drop them and lose the family resemblance:
 
 - **clay** (`18 74% 60%` / `18 66% 62%`, tint `18 74% 94%` / `18 30% 18%`) tints
-  the onboarding card and empty-state surfaces.
+  the onboarding spine, the delegate-to-client offer, and empty-state surfaces.
 - **verdigris** (`188 38% 36%` / `188 40% 50%`, tint `188 26% 93%` /
   `188 26% 15%`) means one thing only: **a client connection that is live**. The
   connected dot, the "connected" state in onboarding step 1, the live badge in
@@ -101,14 +101,15 @@ custom tokens `clay` / `clayFaded` / `verdigris` / `verdigrisFaded`.
 
 ### Typography
 
-Stack Sans Notch is display-only at 40px and above. The only 40px text anywhere
-in the app is one onboarding headline, so **the app is effectively Geist-only**.
-That is correct for a tool built out of forms, and it means the display face is
-a landing asset rather than a shared one.
+Stack Sans Notch is display-only at 40px and above. Making onboarding a
+section-shaped destination rather than a hero screen removed the last 40px text
+in the product, so **the app uses no display face at all** — it is Geist and
+Geist Mono, end to end. That is correct for a tool built out of forms, and it
+means Stack Sans Notch is a landing asset, not a shared one. It is not loaded by
+the app, which is one less webfont on a surface people open every day.
 
 | Reshaped token | Size / line height | Face and weight | Used for |
 |---|---|---|---|
-| `featured-1` | 40 / 1.1 | Stack Sans Notch 500 | onboarding hero, once |
 | `featured-2` | 28 / 1.2 | Geist 600 | full-page empty state headline |
 | `featured-3` | 20 / 1.3 | Geist 600 | section page title |
 | `headline-1` | 18 / 1.4 | Geist 600 | modal title |
@@ -121,9 +122,10 @@ a landing asset rather than a shared one.
 
 Every size above is a **MyGist override**, not a Reshaped v4 default — the token
 names are v4's, the values are ours. Tokens not listed (`display-1`, `display-2`,
-`featured-4` through `featured-6`) keep Reshaped's defaults and are unused by the
-app; they are left in place rather than deleted so the theme stays a complete
-`ThemeDefinition`.
+`featured-1`, `featured-4` through `featured-6`) keep Reshaped's defaults and are
+unused by the app; they are left in place rather than deleted so the theme stays
+a complete `ThemeDefinition`. `featured-1` is where Stack Sans Notch would be
+bound if the app ever needs a display line, and the landing file binds it there.
 
 ### Radius, space, elevation
 
@@ -410,24 +412,22 @@ the connected client lacks the `propose` scope, a line saying so — see below.
 
 ## Onboarding
 
-Not a wizard. A dismissible `Getting started` card pinned above the section
-title, shown until complete or dismissed.
+Not a wizard, and not a card with inputs crammed into it. Two pieces: a
+**progress spine** that lives above the section title, and a **rail destination**
+where the basics are actually filled in.
+
+### The spine
+
+A dismissible `Getting started` card above the section title, showing three
+steps and nothing more. It routes; it does not collect.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ Getting started                                 1 of 3   ✕   │
 │                                                              │
 │ ✓ 1  Connect a client            ● connected · Claude        │
-│                                                              │
-│   2  Fill in the basics                                      │
-│      What should we call you?     Your role                  │
-│      [ Maya                  ]    [ Marketing assistant   ]  │
-│      Tone                         Detail level               │
-│      [ direct             ▾ ]     [ concise             ▾ ]  │
-│                                          [ Skip for now ]    │
-│                                                              │
-│   3  Ask your client to fill in the rest          optional   │
-│      [ Copy prompt ]                                         │
+│   2  Fill in the basics                    [ Start ]         │
+│   3  Ask your client to fill in the rest   optional          │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -435,23 +435,75 @@ title, shown until complete or dismissed.
 call…` and flips to a **verdigris** connected state, naming the client, when the
 first MCP call actually lands.
 
-**Step 2 — fill in the basics.** The primary path, filled in the app, writing
-directly to the persona because the reader is typing it themselves. Four real
-fields across two sections:
+### Step 2 — the basics, as a rail destination
 
-| Question | Path |
-|---|---|
-| What should we call you? | `profile.preferred_name` |
-| Your role | `profile.current_role` |
-| Tone | `preferences.communication.default.tone` |
-| Detail level | `preferences.communication.default.detail_level` |
+`Getting started` becomes an entry in the rail below the divider, with its own
+subsection anchors, behaving exactly like a persona section. **It is built from
+the section editor's own patterns** — eyebrow bands, subsection cards, fill
+summaries, scroll-spy — rather than from a bespoke wizard layout. Two reasons,
+and the second is the important one: it teaches the interface by being the
+interface, and it cannot drift from the editor design because it *is* the editor
+design applied to a curated cross-section of fields.
 
-Four answers and every scope a client can request returns something useful.
-`Skip for now` is always available.
+```
+ ▸ Profile           │  Getting started                            2 of 3
+ ▸ Preferences       │  Four groups, about five minutes. Skip any of it.
+ ▸ Lifestyle         │
+ ──────────          │  ┌────────────────────────────────────────────────┐
+ ▸ Review         3  │  │ Would you rather your client did this?          │
+ ▸ Sections          │  │ Paste one prompt and it proposes the lot for    │
+ ▾ Getting started   │  │ you to approve.            [ Copy prompt ]      │
+     About you     ● │  └────────────────────────────────────────────────┘
+     How you like…   │
+     Working on      │  ABOUT YOU ─────────────────────────
+     Languages       │  ┌────────────────────────────────────────────────┐
+                     │  │ Your name and role                   2 of 5    │
+                     │  │  What we call you       Full name               │
+                     │  │  [ Maya             ]   [ Maya Ellis        ]   │
+                     │  │  Role                   Organisation           │
+                     │  │  [ Marketing assis. ]   [                  ]   │
+                     │  │  Location                                      │
+                     │  │  [ Manchester       ]                          │
+                     │  └────────────────────────────────────────────────┘
+                     │  ┌────────────────────────────────────────────────┐
+                     │  │ In a sentence                        empty     │
+                     │  │  Anything a new assistant should know first    │
+                     │  │  [                                         ]   │
+                     │  └────────────────────────────────────────────────┘
+```
 
-**Step 3 — ask your client to fill in the rest.** The secondary path, and
-explicitly optional. A copy-paste prompt, run by the client rather than by the
-app:
+Four bands, every field an existing manifest path. Nothing here is a new
+concept the app has to learn:
+
+| Band | Fields | Writes to |
+|---|---|---|
+| **About you** | `preferred_name`, `name`, `current_role`, `organisation`, `location`, `bio` | `profile` |
+| **How you like answers** | `communication.default.{tone, detail_level, locale}`, `response_format`, `learning_style.preferred`, `learning_style.avoid` | `preferences` |
+| **What you're working on** | `top_of_mind`, one `goal.title` | `projects`, `goals` |
+| **Languages** | `language` rows (`name` + `fluency`) | `profile.languages_spoken` |
+
+Three properties this shape buys:
+
+- **The client option is a peer, not a footnote.** It sits at the top of the
+  panel, above the first band, so delegating is a choice offered before any
+  typing rather than a consolation found after it.
+- **Non-blocking throughout.** The rail never disappears, so leaving mid-way is
+  a click. Every answer is already saved by autosave, so leaving costs nothing
+  and there is no "finish" to abandon.
+- **Progress counts bands touched, not fields filled.** Skipping a band is a
+  legitimate way through, and the counter should not turn that into a failure
+  state. A band counts as touched once any field in it is set or it is
+  explicitly skipped.
+
+Writes go through the same `/files/{key}` endpoint the editors use, one request
+per affected section, debounced identically. There is no onboarding-specific
+write path.
+
+### Step 3 — ask your client to fill in the rest
+
+The secondary path, explicitly optional, and reachable both from the spine and
+from the top of the basics panel. A copy-paste prompt, run by the client rather
+than by the app:
 
 > Use `get_schema` to learn my MyGist vocabulary, then propose what you know
 > about me with `propose_update`. One call per fact, each with your reasoning
@@ -470,12 +522,16 @@ dozen rows in Review, which teaches the review mechanic on day one.
 **Scope caveat, and it matters.** `propose_update` requires the `propose` scope,
 and `mcp_scopes.py` *hides* out-of-scope tools rather than failing them. A
 read-only connection means the pasted prompt does nothing at all, with no error
-anywhere. So the onboarding card shows the connected client's granted scopes,
-and when `propose` is absent it says so and offers reconnection. Without this,
-the feature's failure mode is complete silence.
+anywhere. So the spine's step 1 shows the connected client's granted scopes, and
+when `propose` is absent both step 3 and the panel's delegate offer say so and
+point at reconnection instead of a copy button. Without this, the feature's
+failure mode is complete silence.
 
-**Dismissal is not destructive.** The card returns from the account menu, because
-someone who enables Media in three weeks is a first-run user again.
+**Dismissal is not destructive.** Dismissing the spine also removes the
+`Getting started` rail entry; both return from the account menu, because someone
+who enables Media in three weeks is a first-run user again. The basics panel
+itself is never deleted — it is a view over fields that already exist, so
+"finishing" onboarding only hides the route to it.
 
 ## Auth, settings, consent
 
@@ -507,7 +563,7 @@ file's so the two merge into one library later.
 03 Shell & Navigation   header, rail, mobile sheet
 04 Section editor       Profile (dense), Preferences (mixed), Goals (light)
 05 Review               inbox, expanded row, observation, promote, empty
-06 Onboarding           checklist states, prompt copy, teaching empty states
+06 Onboarding           spine states, basics panel (4 bands), prompt, empty states
 07 Auth & Settings      auth states, settings tabs, consent
 08 Motion               annotated motion specs
 ```
@@ -530,11 +586,11 @@ case. No second persona is needed.
 5. Auth & Settings
 6. Motion annotations
 
-**Reshaped Figma library.** We check whether Reshaped appears as an addable
-community library on the new file. If it does not, the community file must be
-duplicated into the team once by hand — a single click unavailable through the
-API. Either way, components are built to **v4 token naming**, not the v3.9
-file's.
+**Reshaped Figma library.** The v3.9 community file has been duplicated into the
+team, so it is discoverable through `get_libraries` on the new file and can be
+subscribed to and searched with `search_design_system`. Components are still
+built to **v4 token naming**, not the v3.9 file's — the duplicate is a source of
+geometry and states, not of token names.
 
 ## Out of scope
 
