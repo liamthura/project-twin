@@ -153,11 +153,12 @@ Figma work has no unit tests. The analogue, and it is mandatory for every task:
 
 ## Recorded values
 
-Produced by Task 1. Every later task reads these values from here — the literal token `FILE_KEY` elsewhere in this document is not replaced; substitute the value below wherever it appears.
+Produced by Task 1. `FILE_KEY` is already resolved inline everywhere it appears in this document — no manual substitution remains for it. The placeholders that remain unresolved (`COLLECTION_ID`, `PAGE_ID`, `ROOT_ID`, `VARIANT_ID_*`, `FONT_DECISION.sans`/`.mono`, `REGULAR_STYLE_STRING`, `SEMIBOLD_STYLE_STRING`, etc.) are filled in by later tasks at their own runtime, once each value is known.
 
 - **`FILE_KEY`**: `Ti7FlZLYOvX3goyvfypJBk`
 - **`FONT_DECISION`**: `{ sans: 'Geist', mono: 'Geist Mono', regularStyle: 'Regular', semiboldStyle: 'SemiBold' }` — both `Geist` and `Geist Mono` are available (`listAvailableFontsAsync` rule 1 applied), so no Inter/Roboto Mono substitution is needed. Style strings are verbatim from `listAvailableFontsAsync()`: Geist and Geist Mono both expose `Black, Bold, ExtraBold, ExtraLight, Light, Medium, Regular, SemiBold, Thin` — note **no space** in `SemiBold`/`ExtraBold` (unlike Inter, which uses `Semi Bold`/`Extra Bold` with a space).
-- **`RESHAPED_LIB_KEY`**: `null` — the duplicated Reshaped v3.9 library did not appear in `libraries_available_to_add` for this file's team (`Khant Thura's team`; `libraries_available_to_add_next_offset` was `null`, so pagination is exhausted). Per the brief this is treated as genuine absence and does not block later tasks — it is a geometry reference only.
+- **`RESHAPED_LIB_KEY`**: `null` — the duplicated Reshaped v3.9 library did not appear in `libraries_available_to_add` for this file's team (`Khant Thura's team`; `libraries_available_to_add_next_offset` was `null`, so pagination is exhausted). This is now the correct, final value, not a failure — see `RESHAPED_REF_FILE_KEY` below for how later tasks get geometry reference instead.
+- **`RESHAPED_REF_FILE_KEY`**: `oR8g1o9qiluZAqHzMfieg0` — URL: `https://www.figma.com/design/oR8g1o9qiluZAqHzMfieg0/Reshaped-Design-System-v3.9--Community-`. The user provided this Reshaped v3.9 reference file directly. It is read as a **geometry reference only**, via `get_metadata` and `get_screenshot` — it is deliberately **not** a subscribed library, so nothing is ever instanced or imported from it. Tasks 5–7 copy proportions (heights, padding, focus-ring treatment, etc.) from it by eye/measurement and build every component locally in the app file.
 
 ---
 
