@@ -287,7 +287,12 @@ mirrors its variant names, so Code Connect is close to free later.
 drawn from the running MyGist UI rather than invented for the page.
 
 10. Product mockup — `safari` frame, chrome recoloured, holding the editor with Maya's persona open. The hero anchor
-11. Persona card — the editor's own card, extracted for use outside the frame. Concentric radii, 24px outer and 16px inner rows
+11. Persona card — the editor's **Profile** section as captured: labelled fields for Name, Preferred name, Current role, Organisation, Location and Nationality, plus the Bio paragraph. Concentric radii, 12px outer and 8px inner rows
+
+    An earlier draft of this spec invented a `WRITES / USES / GOAL / LEARNS`
+    summary layout. No such view exists — the Profile section is a form. Maya's
+    tone rules and goals are real data, but they live in the Preferences and Goals
+    sections, not on one card.
 12. Client chip — pill. Contents pending the client-list answer below
 13. Scope payload — the editor's **Preferences** section as captured, carrying Maya's tone rules and dislikes, with a Geist Mono label naming the scope that returned it
 
@@ -298,7 +303,11 @@ drawn from the running MyGist UI rather than invented for the page.
     this spec invented a segmented control. Showing what a scope *returns* is
     both true and the more persuasive half of the story anyway.
 14. Proposal card — reasoning, quote from Maya, Approve and Reject. **Two buttons, not three** — verified against the running app, which has no Edit action
-15. Export view — readable JSON with a Download button
+15. Export view — the **Account & Connection** dialog on its **Data** tab, as captured: `Export backup / Download everything as a zip / [Export]`, with Import beneath it
+
+    Not a JSON viewer. An earlier draft of this spec described "readable JSON with
+    a Download button"; the real surface is a settings dialog and the export is a
+    **zip**, not a JSON view. Verified against `design/screens/editor-export.png`.
 
 ## Page structure
 

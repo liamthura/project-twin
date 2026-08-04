@@ -744,17 +744,24 @@ A browser frame based on Magic UI's `safari`, with its macOS grey chrome recolou
 
 - [ ] **Step 2: Build Persona card**
 
-The editor's own card, extracted for use outside the frame. Radius `radius/24` outer with `radius/16` inner rows — concentric, per the shape rule. Content, verbatim:
+The editor's **Profile** section, transcribed from `design/screens/editor-persona.png`. Radius `radius/12` outer, `radius/8` inner rows — concentric, one step down from the original 24/16.
+
+Labelled fields with their captured values:
 
 ```
-Maya Ellis
-Marketing assistant · Manchester
-
-WRITES        British English, no exclamation marks, never "delve"
-USES          Three assistants a day, for drafts, research and meeting notes
-GOAL          Move into brand strategy within two years
-LEARNS        Examples first, theory later
+Name             Maya Ellis
+Preferred name   Maya
+Current role     Marketing Assistant
+Organisation     Northgate Studio
+Location         Manchester, UK
+Nationality      British
+Bio              Marketing assistant, six months out of an English and Media
+                 degree. I write most of the words that go out: newsletter,
+                 socials, the odd case study. I run three assistants a day and
+                 got tired of explaining my tone rules to each one.
 ```
+
+**Do not build a `WRITES / USES / GOAL / LEARNS` summary.** An earlier draft of this plan specified one and no such view exists; the Profile section is a form. Maya's tone rules and goals are real, but they live in the Preferences and Goals sections.
 
 - [ ] **Step 3: Build Client chip**
 
@@ -782,7 +789,25 @@ Evidence    "I've got the newsletter now, so that's on me from June."
 
 - [ ] **Step 6: Build Export view**
 
-Readable JSON in Geist Mono `type/13` on `color/muted`, showing a fragment of Maya's persona, with a `Download` secondary Button.
+The **Account & Connection** dialog on its **Data** tab, transcribed from `design/screens/editor-export.png`. Radius `radius/12`, fill `color/card`, shadow `lift` (it is a modal).
+
+```
+Account & Connection
+Manage your connection, tokens, and data.
+[ Connection ]  [ API tokens ]  [ Data ]        <- Data selected
+
+Export backup                                   [ Export ]
+Download everything as a zip.
+
+Import backup                                   [ Choose file ]
+Restore from a backup zip. A safety backup is made first.
+
+Import mode
+[ Replace ]  [ Merge ]
+Replace overwrites your existing data with the backup's contents.
+```
+
+**Not a JSON viewer.** An earlier draft specified "readable JSON in Geist Mono with a Download button". The real export is a **zip**, from a settings dialog. The first capture of this screen caught the Connection tab by mistake; the Data tab is the right one.
 
 - [ ] **Step 7: Verify against reality, not against this plan**
 
