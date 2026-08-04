@@ -12,7 +12,11 @@
 
 Every task's requirements implicitly include this section. Values are copied verbatim from the spec.
 
-**A write's return value is not evidence the write landed.** This bit the first execution of Task 1: the page-creation script returned all three page names while only one page actually existed. Every task that writes to Figma verifies with a *separate* read call afterwards — `get_metadata`, `get_variable_defs` or `get_screenshot` — never by inspecting what its own write returned. A task that reports success on the strength of its own return value has not verified anything.
+**Verify with a separate read, and use a read that tells the truth.** Every task that writes to Figma confirms the result with a separate read call rather than by inspecting what its own write returned.
+
+**`get_metadata` with no `nodeId` is not a usable verification tool.** Its "list top-level pages" path returned only `01 Foundations` for the whole of Task 1, persistently, while `02 Components` and `03 Landing` demonstrably existed — confirmed by `get_metadata` with explicit node IDs `1:2` and `1:3`, and by a `use_figma` read of `figma.root.children`. Two separate reviewers reached the wrong conclusion from it and a false Critical finding went into a fix round.
+
+Verify page structure with `use_figma` reading `figma.root.children`, or with `get_metadata` against an explicit `nodeId`. Verify variables with `get_variable_defs`, and appearance with `get_screenshot`. If a read disagrees with a write, get a second read by a different method before concluding anything.
 
 **Mandatory skill loading.** Before *every* `use_figma` call, invoke the `figma:figma-use` skill. Before `create_new_file`, invoke `figma:figma-create-new-file`. When building variables or components, load `figma:figma-generate-library` alongside `figma-use`. When assembling the page, load `figma:figma-generate-design`. Skipping these causes hard-to-debug failures.
 
@@ -132,9 +136,14 @@ return figma.root.children.map(p => p.name)
 
 Expected return: `["01 Foundations", "02 Components", "03 Landing"]`.
 
-**Do not trust that return value.** In the first execution of this plan it reported all three pages while only `01 Foundations` actually existed. Verify with a separate `get_metadata` call passing `fileKey` and no `nodeId`, which lists the document's top-level pages. If that call shows fewer than three pages, the write did not persist regardless of what the script returned.
+Verify with a separate read, using either of these — **not** `get_metadata` without a `nodeId`, which reports only `01 Foundations` for this file no matter what actually exists:
 
-This is the general rule the whole plan rests on: a write's own return value is not evidence the write landed.
+```js
+// Authoritative page list.
+return figma.root.children.map(p => ({ id: p.id, name: p.name }))
+```
+
+Or `get_metadata` against each page's explicit node ID. In the first execution the pages landed at `0:1`, `1:2` and `1:3`.
 
 - [ ] **Step 5: Create the repo scaffolding**
 
