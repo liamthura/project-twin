@@ -498,7 +498,7 @@ is drawn, for the same reason.
 
 ## Open questions
 
-- **Which clients can be named.** The docs document Claude Desktop and Claude Code only. The hero promises context in "any assistant you open" and the audience is people juggling several, so a two-name row undersells the promise or oversells the docs, depending on which is out of date. Needs the owner's answer on what has actually been tested before section 2 and the hero beam are designed. Affects the client chip and the "Works with" row.
+- **Which clients can be named.** The docs document Claude Desktop and Claude Code only. The hero promises context in "any assistant you open" and the audience is people juggling several, so a two-name row undersells the promise or oversells the docs, depending on which is out of date. Needs the owner's answer on what has actually been tested before section 2 and the hero chip row are designed. Affects the client chip and the "Works with" row.
 - Hero headline: "Write yourself down once." or "Explain yourself once." Decide from the Figma specimen.
 - Stack Sans Notch carries Koto's notch signature from the Stack Overflow identity. Free and legal to use, and not yet widely deployed, but a reader who knows the rebrand may make the association. Accepted knowingly.
 - Whether the gradient strips eventually ship as static exports or a live canvas. Deferred with the code target.
