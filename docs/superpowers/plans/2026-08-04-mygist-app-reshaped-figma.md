@@ -167,6 +167,7 @@ Produced by Task 1. `FILE_KEY` is already resolved inline everywhere it appears 
 - **`MOTION_COLLECTION_ID`**: `VariableCollectionId:7:13` — Produced by Task 3. Mode `Mode 1` = `7:1`. Task 3 `variableIds`: `duration-fast` = `VariableID:7:14`, `duration-medium` = `VariableID:7:15`, `duration-slow` = `VariableID:7:16`, `duration-scroll` = `VariableID:7:17`, `easing-decelerate` = `VariableID:7:18`, `easing-accelerate` = `VariableID:7:19`, `easing-standard` = `VariableID:7:20`, `easing-emphasized` = `VariableID:7:21`.
 - **Task 3 `textStyleIds`**: `featured-2` = `S:8c53a2ec48cec65ae8dd09c82e5d2b1b92790edb,`, `featured-3` = `S:b64dd4d1f10e8f04d2ad75cd3ac3b4917138646f,`, `headline-1` = `S:2f151c5f267a1c937475bb62dca4fe1e782109be,`, `headline-2` = `S:8c19b10f1c13933916a09df777520734da81ebb0,`, `headline-3` = `S:868ef535b81546a8d4a15b32ef35a4bc2834d2ad,`, `body-1` = `S:4c0a7dfefeb26bf04e7d6d0767e14266acee373f,`, `body-2` = `S:7b2a17ce6a4397672b40e1ec6acaa2fc96987584,`, `caption-1` = `S:3fbb4e54fb967eef3923cb14852c06427f3c71e0,`, `caption-2` = `S:67d9c575f4707ce385fa563a0635917dc30f9e2d,`.
 - **Task 3 `effectStyleIds`**: `shadow-raised` = `S:a3d8d8cb802153b071804af1f587b398c0f2e244,`, `shadow-overlay` = `S:1c90f6baec2795d0eb0aea3a9cbb3001363b7988,`.
+- **Task 5 component sets** (all on page `02 Components`, `Ti7FlZLYOvX3goyvfypJBk`): `TextField` id `28:34` key `03456a0c6313dac68a36242f1b58d1aff3633f76` (6 variants); `Select` id `29:44` key `e0b8d0a3347f781580ec00daa7ef33a1a41e6003` (6 variants); `TextArea` id `30:38` key `68a397cd1d297404282a3860fd1fd15fe2618e66` (6 variants); `Switch` id `32:14` key `7a59f5e2f7fa475c526483a0ef2e9e26e5eba921` (4 variants); `Checkbox` id `37:12` key `3f6dbbcddfde74738d17ad7d7caa5b75ce5bcaca` (4 variants); `PinField` id `38:49` key `4e9b0daad2c4977f04aa1c2d86f8663db7e9d394` (4 variants). Reshaped reference file exposed no usable geometry (Community cover page only) so all proportions come from the brief's explicit values. Tasks 8–13 consume these sets via local `component.createInstance()`, not `importComponentByKeyAsync` — same file, no publish step exists.
 
 ---
 
@@ -625,7 +626,7 @@ Figma work lives in Figma, so the commit records progress against the plan rathe
 - Consumes: variables and text styles from Tasks 2–3; `RESHAPED_LIB_KEY` from Task 1
 - Produces: component sets `TextField`, `Select`, `Switch`, `Checkbox`, `PinField`, `TextArea`, each published on `02 Components`. Returns `{ componentIds: {name: id}, componentKeys: {name: key} }`. Tasks 8–13 instance these by key.
 
-- [ ] **Step 1: Look at what Reshaped already does**
+- [x] **Step 1: Look at what Reshaped already does**
 
 If `RESHAPED_LIB_KEY` is not null:
 
@@ -635,7 +636,7 @@ search_design_system with query "text field input" and includeLibraryKeys [RESHA
 
 Read the geometry — height, padding, border weight, focus treatment — and match it. Reshaped's components are the reference for *proportion*; MyGist's variables are the source for *value*. Where they conflict, MyGist wins.
 
-- [ ] **Step 2: State the expected structure for TextField**
+- [x] **Step 2: State the expected structure for TextField**
 
 A component set named `TextField` with two variant properties:
 
@@ -659,7 +660,7 @@ State differences, and nothing else varies:
 
 `Error` **replaces** the helper rather than adding a line — the spec is explicit that error occupies the helper slot, so a field does not change height when it fails validation.
 
-- [ ] **Step 3: Build one variant, verify, then clone**
+- [x] **Step 3: Build one variant, verify, then clone**
 
 Build `State=Default` completely first, screenshot it, and only then clone for the other five. Building all six before looking at one is how six wrong things get made instead of one.
 
@@ -714,7 +715,7 @@ root.appendChild(helper);
 return { createdNodeIds: [root.id, label.id, box.id, value.id, helper.id], rootId: root.id };
 ```
 
-- [ ] **Step 4: Apply text styles and verify the one variant**
+- [x] **Step 4: Apply text styles and verify the one variant**
 
 Apply `headline-3` to `label`, `body-2` to `value`, `caption-1` to `helper` via `setTextStyleIdAsync`. Bind text fills to `ink`, `ink`, `muted-fg`. Then:
 
@@ -727,7 +728,7 @@ return { width: root.width, height: root.height,
 
 Expected: input box height exactly 36, no text node with width 0, nothing clipped. **Fix now if wrong** — five clones of a broken variant is five fixes later.
 
-- [ ] **Step 5: Clone into the remaining five variants and combine**
+- [x] **Step 5: Clone into the remaining five variants and combine**
 
 Clone `root` five times, rename each to `State=<name>`, apply the stroke/fill/helper differences from the Step 2 table, then:
 
@@ -742,7 +743,7 @@ return { componentSetId: set.id, key: set.key,
          variantNames: set.children.map(c => c.name) };
 ```
 
-- [ ] **Step 6: Build Select, TextArea, Switch, Checkbox, PinField**
+- [x] **Step 6: Build Select, TextArea, Switch, Checkbox, PinField**
 
 One `use_figma` call each, same pattern, same six states where they apply. Exact specifications:
 
@@ -754,7 +755,7 @@ One `use_figma` call each, same pattern, same six states where they apply. Exact
 | `Checkbox` | 18×18, `radius-s` (4) | `Unchecked`, `Checked`, `Indeterminate`, `Disabled` | checked fill `indigo`, tick in `card` |
 | `PinField` | six 40×48 cells, `radius-m`, gap `space-8` | `Empty`, `Partial`, `Complete`, `Error` | replaces the `input-otp` dependency; `Partial` shows 3 of 6 filled with a `indigo` 2px focus ring on cell 4 |
 
-- [ ] **Step 7: Verify the whole page and commit**
+- [x] **Step 7: Verify the whole page and commit**
 
 ```js
 const page = figma.root.children.find(p => p.name === '02 Components');
