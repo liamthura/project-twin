@@ -159,6 +159,10 @@ Produced by Task 1. `FILE_KEY` is already resolved inline everywhere it appears 
 - **`FONT_DECISION`**: `{ sans: 'Geist', mono: 'Geist Mono', regularStyle: 'Regular', semiboldStyle: 'SemiBold' }` — both `Geist` and `Geist Mono` are available (`listAvailableFontsAsync` rule 1 applied), so no Inter/Roboto Mono substitution is needed. Style strings are verbatim from `listAvailableFontsAsync()`: Geist and Geist Mono both expose `Black, Bold, ExtraBold, ExtraLight, Light, Medium, Regular, SemiBold, Thin` — note **no space** in `SemiBold`/`ExtraBold` (unlike Inter, which uses `Semi Bold`/`Extra Bold` with a space).
 - **`RESHAPED_LIB_KEY`**: `null` — the duplicated Reshaped v3.9 library did not appear in `libraries_available_to_add` for this file's team (`Khant Thura's team`; `libraries_available_to_add_next_offset` was `null`, so pagination is exhausted). This is now the correct, final value, not a failure — see `RESHAPED_REF_FILE_KEY` below for how later tasks get geometry reference instead.
 - **`RESHAPED_REF_FILE_KEY`**: `oR8g1o9qiluZAqHzMfieg0` — URL: `https://www.figma.com/design/oR8g1o9qiluZAqHzMfieg0/Reshaped-Design-System-v3.9--Community-`. The user provided this Reshaped v3.9 reference file directly. It is read as a **geometry reference only**, via `get_metadata` and `get_screenshot` — it is deliberately **not** a subscribed library, so nothing is ever instanced or imported from it. Tasks 5–7 copy proportions (heights, padding, focus-ring treatment, etc.) from it by eye/measurement and build every component locally in the app file.
+- **`COLOUR_COLLECTION_ID`**: `VariableCollectionId:4:2` — Produced by Task 2. This is the `Colour` variable collection's ID; later tasks resolve `COLLECTION_ID` from this value when binding colour variables.
+- **`LIGHT_MODE_ID`**: `4:0` — Produced by Task 2. The `Light` mode of the `Colour` collection.
+- **`DARK_MODE_ID`**: `4:1` — Produced by Task 2. The `Dark` mode of the `Colour` collection.
+- **Task 2 `variableIds`** (all in collection `VariableCollectionId:4:2`): `paper` = `VariableID:4:3`, `card` = `VariableID:4:4`, `muted` = `VariableID:4:5`, `ink` = `VariableID:4:6`, `muted-fg` = `VariableID:4:7`, `border` = `VariableID:4:8`, `indigo` = `VariableID:4:9`, `indigo-tint` = `VariableID:4:10`, `clay` = `VariableID:4:11`, `clay-tint` = `VariableID:4:12`, `verdigris` = `VariableID:4:13`, `verdigris-tint` = `VariableID:4:14`, `success` = `VariableID:4:15`, `warning` = `VariableID:4:16`, `destructive` = `VariableID:4:17`.
 
 ---
 
@@ -251,11 +255,11 @@ git commit -m "docs: record Figma file key, font decision and library key"
 - Consumes: `Ti7FlZLYOvX3goyvfypJBk` from Task 1
 - Produces: variable collection `Colour` with modes `Light` and `Dark`, and 15 `COLOR` variables named exactly `paper`, `card`, `muted`, `ink`, `muted-fg`, `border`, `indigo`, `indigo-tint`, `clay`, `clay-tint`, `verdigris`, `verdigris-tint`, `success`, `warning`, `destructive`. Returns `{ collectionId, variableIds: {name: id} }` — later tasks bind by name.
 
-- [ ] **Step 1: State the expected structure**
+- [x] **Step 1: State the expected structure**
 
 One collection named `Colour`, two modes (`Light`, `Dark`), 15 variables, every variable holding a value in both modes. Scopes: `["FRAME_FILL","SHAPE_FILL","STROKE_COLOR","TEXT_FILL"]` for all of them, because a token like `ink` legitimately fills text and a token like `border` legitimately strokes a frame — narrowing per-token here creates pickers that hide the right answer.
 
-- [ ] **Step 2: Create the collection and modes**
+- [x] **Step 2: Create the collection and modes**
 
 Invoke `figma:figma-use` and `figma:figma-generate-library`.
 
@@ -268,7 +272,7 @@ return { collectionId: c.id, lightModeId: c.modes[0].modeId, darkModeId: darkId,
          modes: c.modes.map(m => ({ id: m.modeId, name: m.name })) };
 ```
 
-- [ ] **Step 3: Create the first eight variables**
+- [x] **Step 3: Create the first eight variables**
 
 Ten logical operations is the ceiling, so this splits across two steps. Pass the IDs from Step 2 as string literals.
 
@@ -297,7 +301,7 @@ for (const [name, [light, dark]] of Object.entries(defs)) {
 return { variableIds: ids, count: Object.keys(ids).length };
 ```
 
-- [ ] **Step 4: Create the remaining seven variables**
+- [x] **Step 4: Create the remaining seven variables**
 
 Same script shape, same collection and mode IDs, with this `defs`:
 
@@ -313,7 +317,7 @@ const defs = {
 };
 ```
 
-- [ ] **Step 5: Verify all 15 exist with both modes populated**
+- [x] **Step 5: Verify all 15 exist with both modes populated**
 
 ```js
 const c = await figma.variables.getVariableCollectionByIdAsync('COLLECTION_ID');
@@ -328,7 +332,7 @@ return {
 
 Expected: `count: 15`, `missingValues: []`, `wrongScopes: []`, names matching the Task 2 interface list.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-04-mygist-app-reshaped-figma.md
