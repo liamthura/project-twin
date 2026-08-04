@@ -163,6 +163,10 @@ Produced by Task 1. `FILE_KEY` is already resolved inline everywhere it appears 
 - **`LIGHT_MODE_ID`**: `4:0` — Produced by Task 2. The `Light` mode of the `Colour` collection.
 - **`DARK_MODE_ID`**: `4:1` — Produced by Task 2. The `Dark` mode of the `Colour` collection.
 - **Task 2 `variableIds`** (all in collection `VariableCollectionId:4:2`): `paper` = `VariableID:4:3`, `card` = `VariableID:4:4`, `muted` = `VariableID:4:5`, `ink` = `VariableID:4:6`, `muted-fg` = `VariableID:4:7`, `border` = `VariableID:4:8`, `indigo` = `VariableID:4:9`, `indigo-tint` = `VariableID:4:10`, `clay` = `VariableID:4:11`, `clay-tint` = `VariableID:4:12`, `verdigris` = `VariableID:4:13`, `verdigris-tint` = `VariableID:4:14`, `success` = `VariableID:4:15`, `warning` = `VariableID:4:16`, `destructive` = `VariableID:4:17`.
+- **`SCALE_COLLECTION_ID`**: `VariableCollectionId:7:2` — Produced by Task 3. Mode `Mode 1` = `7:0`. Task 3 `variableIds`: `radius-s` = `VariableID:7:3`, `radius-m` = `VariableID:7:4`, `radius-l` = `VariableID:7:5`, `radius-xl` = `VariableID:7:6`, `space-4` = `VariableID:7:7`, `space-8` = `VariableID:7:8`, `space-12` = `VariableID:7:9`, `space-16` = `VariableID:7:10`, `space-24` = `VariableID:7:11`, `space-32` = `VariableID:7:12`.
+- **`MOTION_COLLECTION_ID`**: `VariableCollectionId:7:13` — Produced by Task 3. Mode `Mode 1` = `7:1`. Task 3 `variableIds`: `duration-fast` = `VariableID:7:14`, `duration-medium` = `VariableID:7:15`, `duration-slow` = `VariableID:7:16`, `duration-scroll` = `VariableID:7:17`, `easing-decelerate` = `VariableID:7:18`, `easing-accelerate` = `VariableID:7:19`, `easing-standard` = `VariableID:7:20`, `easing-emphasized` = `VariableID:7:21`.
+- **Task 3 `textStyleIds`**: `featured-2` = `S:8c53a2ec48cec65ae8dd09c82e5d2b1b92790edb,`, `featured-3` = `S:b64dd4d1f10e8f04d2ad75cd3ac3b4917138646f,`, `headline-1` = `S:2f151c5f267a1c937475bb62dca4fe1e782109be,`, `headline-2` = `S:8c19b10f1c13933916a09df777520734da81ebb0,`, `headline-3` = `S:868ef535b81546a8d4a15b32ef35a4bc2834d2ad,`, `body-1` = `S:4c0a7dfefeb26bf04e7d6d0767e14266acee373f,`, `body-2` = `S:7b2a17ce6a4397672b40e1ec6acaa2fc96987584,`, `caption-1` = `S:3fbb4e54fb967eef3923cb14852c06427f3c71e0,`, `caption-2` = `S:67d9c575f4707ce385fa563a0635917dc30f9e2d,`.
+- **Task 3 `effectStyleIds`**: `shadow-raised` = `S:a3d8d8cb802153b071804af1f587b398c0f2e244,`, `shadow-overlay` = `S:1c90f6baec2795d0eb0aea3a9cbb3001363b7988,`.
 
 ---
 
@@ -350,7 +354,7 @@ git commit -m "docs: record colour variable ids"
 - Consumes: `Ti7FlZLYOvX3goyvfypJBk`, `FONT_DECISION` from Task 1; `Colour` variable IDs from Task 2
 - Produces: collection `Scale` with `radius-s|m|l|xl` and `space-4|8|12|16|24|32` (`FLOAT`); collection `Motion` with `duration-fast|medium|slow|scroll` (`FLOAT`, ms) and `easing-decelerate|accelerate|standard|emphasized` (`STRING`); nine text styles named `featured-2`, `featured-3`, `headline-1`, `headline-2`, `headline-3`, `body-1`, `body-2`, `caption-1`, `caption-2`. Returns `{ scaleCollectionId, motionCollectionId, textStyleIds: {name: id} }`.
 
-- [ ] **Step 1: Create the Scale collection**
+- [x] **Step 1: Create the Scale collection**
 
 Invoke `figma:figma-use` and `figma:figma-generate-library`. One mode, since radius and space do not change between light and dark.
 
@@ -374,7 +378,7 @@ for (const [name, value, scopes] of defs) {
 return { scaleCollectionId: c.id, modeId: mode, variableIds: ids };
 ```
 
-- [ ] **Step 2: Create the Motion collection**
+- [x] **Step 2: Create the Motion collection**
 
 ```js
 const c = figma.variables.createVariableCollection('Motion');
@@ -401,7 +405,7 @@ return { motionCollectionId: c.id, modeId: mode, variableIds: ids };
 
 Durations and easings are documentation tokens here — Figma has no animatable property to scope them to. `ALL_SCOPES` is correct for these two groups and only these two.
 
-- [ ] **Step 3: Load the fonts before creating any text style**
+- [x] **Step 3: Load the fonts before creating any text style**
 
 Read `FONT_DECISION` from Task 1. Load every weight in one call, using the **exact** style strings Task 1 returned:
 
@@ -414,7 +418,7 @@ await figma.loadFontAsync({ family: MONO, style: REG });
 return { loaded: [SANS + '/' + REG, SANS + '/' + SEMI, MONO + '/' + REG] };
 ```
 
-- [ ] **Step 4: Create the nine text styles**
+- [x] **Step 4: Create the nine text styles**
 
 Same call, after the loads above. Line heights are percentages so they scale with size.
 
@@ -445,7 +449,7 @@ return { textStyleIds: ids, count: Object.keys(ids).length };
 
 `caption-2` carries +6% tracking and is **always typed in uppercase at the call site** — Figma text styles cannot force case, so every eyebrow string in Tasks 8–13 is written in capitals in the content itself.
 
-- [ ] **Step 5: Create the two effect styles**
+- [x] **Step 5: Create the two effect styles**
 
 Shadows are tinted with `ink`, never black. `ink` light is `{r:0.1100,g:0.0980,b:0.0900}`.
 
@@ -463,7 +467,7 @@ return { effectStyleIds: { raised: raised.id, overlay: overlay.id } };
 
 Effect shadow colours **do** take an `a` channel — that is the one place `{r,g,b,a}` is correct. Paint fills still do not.
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 ```js
 const textStyles = await figma.getLocalTextStylesAsync();
@@ -480,7 +484,7 @@ return {
 
 Expected: nine text styles with no `featured-1`; two effect styles; three collections — `Colour` (15 vars, 2 modes), `Scale` (10 vars, 1 mode), `Motion` (8 vars, 1 mode).
 
-- [ ] **Step 7: Commit the recorded IDs**
+- [x] **Step 7: Commit the recorded IDs**
 
 ```bash
 git add docs/superpowers/plans/2026-08-04-mygist-app-reshaped-figma.md
