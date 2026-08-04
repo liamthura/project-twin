@@ -14,6 +14,11 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 
 import jwt_auth
 
+# Pure logic -- nothing here reads or writes a persona, so the per-test row
+# wipe in conftest is dead weight. The marker only skips cleanup; it can
+# never make a test wrong, only slower to forget.
+pytestmark = pytest.mark.nodb
+
 ISSUER = "https://mygist.example"
 AUDIENCE = "https://mygist.example"
 

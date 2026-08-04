@@ -13,6 +13,11 @@ from fastapi.testclient import TestClient
 
 import auth_proxy
 
+# Pure logic -- nothing here reads or writes a persona, so the per-test row
+# wipe in conftest is dead weight. The marker only skips cleanup; it can
+# never make a test wrong, only slower to forget.
+pytestmark = pytest.mark.nodb
+
 
 def upstream_response(headers, body=b"ok", status=200):
     return httpx.Response(

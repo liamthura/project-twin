@@ -19,6 +19,11 @@ import auth_preflight
 import auth_proxy
 import jwt_auth
 
+# Pure logic -- nothing here reads or writes a persona, so the per-test row
+# wipe in conftest is dead weight. The marker only skips cleanup; it can
+# never make a test wrong, only slower to forget.
+pytestmark = pytest.mark.nodb
+
 
 ADVERTISED = "https://mygist.example/auth"
 METADATA_URL = f"http://auth.internal{auth_preflight._METADATA_PATH}"

@@ -71,7 +71,23 @@ something else.
 </Callout>
 
 These are not mocked tests. They run against real Postgres, with fixtures that
-truncate between cases and act as a signed-in user.
+clear the tables between cases and act as a signed-in user.
+
+The schema is built **once per session**, and each test then only deletes rows.
+It used to be dropped and re-migrated for every test, which cost about half a
+second each and made the suite roughly five times longer than the work in it.
+Two fixtures cover the cases row-level cleanup cannot:
+
+| Fixture | Use it when |
+|---|---|
+| `rerun_migrations` | Replaying migrations over existing data |
+| `fresh_schema` | The test issues its own DDL — dropping a table or a column |
+
+Either one marks the schema dirty, so the next test gets a genuine rebuild.
+A test that changes the schema without asking for one of these will leak into
+whatever runs next. A file that touches no persona data at all can add
+`pytestmark = pytest.mark.nodb` to skip the row wipe; that is an optimisation
+only, and forgetting it costs milliseconds rather than correctness.
 
 ## Frontend
 
