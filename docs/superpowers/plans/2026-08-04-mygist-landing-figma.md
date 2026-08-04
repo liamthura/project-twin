@@ -681,9 +681,13 @@ Widths: `1col` = 400, `2col` = 824. Row height 352 (the registry's `22rem`). Gap
 
 The `2col` tiles carry live-looking product UI in place of the registry's `background` slot. Leave a 760×200 region at the tile's foot, named `media slot`, which Task 9's product objects drop into.
 
-- [ ] **Step 3: Wire the hover state**
+- [ ] **Step 3: Record the hover spec, do not wire it**
 
-Figma variant interaction: on hover, the tile lifts its shadow from `sm` to `lift` over 240ms ease-out. The registry's icon-shrink and text-lift at 300ms is kept but not exceeded.
+Hover is wired in Task 13, which owns every interaction. Do not wire it here, and do not add a hover variant axis.
+
+The reason is a constraint worth knowing: Figma's `CHANGE_TO` reaction only resolves to sibling variants inside the same set, so a variant-driven hover needs its own property axis — which would contradict this task's four-variant contract. An earlier draft of this plan asked for both and could not have had them.
+
+Record the intended behaviour in the component's description instead, for Task 13 to implement: shadow `sm` → `lift` over 240ms ease-out, icon scales to 0.9, title lifts 3px. The registry's 300ms is the ceiling and is not exceeded.
 
 No CTA link is built. The registry's `href` and `cta` props go unused — a page with one action does not offer seven competing ones.
 
