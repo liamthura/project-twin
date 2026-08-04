@@ -130,6 +130,20 @@ Taken verbatim from the persona definition.
 - Nothing over 300ms
 - `prefers-reduced-motion` honoured throughout
 
+### Motion this page does not use
+
+Every animation on the page is triggered by arrival or by input, plays once, and
+stops. Nothing loops, drifts, pulses, shimmers or travels on its own.
+
+Ruled out by name, because they are the tempting ones: travelling beams along a
+path, aurora and gradient-shifting text, shimmer sweeps, meteors, particle
+fields, and any perpetual ambient background motion.
+
+Two reasons. Perpetual motion contradicts the 300ms ceiling by never resolving,
+and it is the most recognisable current AI-product tell — the same problem the
+display face was chosen to avoid. The grain and the gradient fields supply
+visual interest without anything needing to move.
+
 ### Gradient system
 
 Source is GRADIENTOOL (`gradientool.com`), a canvas 2D generator using layered
@@ -199,7 +213,6 @@ for adapting registry components over hand-rolling them.
 |---|---|
 | `bento-grid` | The features section |
 | `safari` | The product mockup frame |
-| `animated-beam` | Hero: persona card out to the client chips |
 | `blur-fade` | Section entrances |
 | `noise-texture` | Grain layer, alongside the GRADIENTOOL stills |
 
@@ -290,11 +303,21 @@ Neither competes with the waitlist as the primary action.
 
 ### Hero motion beat
 
-On load, three ghosted chat bubbles, each opening with the same self-introduction,
-stack up and collapse into the persona card. Thin lines then draw outward to the
-client chips. Repetition and portability in one gesture, 240ms entrance. It
-resolves rather than looping. This is the most expensive thing on the page to
-build well and should be prototyped last.
+On load, three ghosted chat bubbles, each opening with the same
+self-introduction, stack up and collapse into the framed mockup. The client chips
+then fade up one after another, 60ms apart. Sequence carries the idea that the
+context reaches them; nothing is drawn between the frame and the chips.
+
+Total elapsed time is under 600ms across the whole sequence, with no single step
+over 240ms. It plays once on arrival and never again.
+
+An earlier draft ran lines outward from the frame to each chip. Even drawn once
+rather than looping, a line from a product to a row of logos reads as the beam
+effect it was replacing. The staggered fade says the same thing and says it
+quietly.
+
+This is the most expensive thing on the page to build well and should be
+prototyped last.
 
 ## Copy deck
 
@@ -315,8 +338,8 @@ concise, no cheese.
 > `[ you@email.com ]` `[ Join the waitlist ]`
 >
 > *Visual: the editor in a recoloured `safari` frame, Maya's persona open, sitting
-> on the indigo gradient field. Thin beams run from the frame out to the client
-> chips.*
+> on the indigo gradient field. Client chips sit below it, unconnected by any
+> drawn line.*
 >
 > Invite-only while it's small. One email when your invite lands.
 >
@@ -475,7 +498,7 @@ is drawn, for the same reason.
 
 ## Open questions
 
-- **Which clients can be named.** The docs document Claude Desktop and Claude Code only. The hero promises context in "any assistant you open" and the audience is people juggling several, so a two-name row undersells the promise or oversells the docs, depending on which is out of date. Needs the owner's answer on what has actually been tested before section 2 and the hero beam are designed. Affects the client chip, the "Works with" row, and how many endpoints the `animated-beam` fans out to.
+- **Which clients can be named.** The docs document Claude Desktop and Claude Code only. The hero promises context in "any assistant you open" and the audience is people juggling several, so a two-name row undersells the promise or oversells the docs, depending on which is out of date. Needs the owner's answer on what has actually been tested before section 2 and the hero beam are designed. Affects the client chip and the "Works with" row.
 - Hero headline: "Write yourself down once." or "Explain yourself once." Decide from the Figma specimen.
 - Stack Sans Notch carries Koto's notch signature from the Stack Overflow identity. Free and legal to use, and not yet widely deployed, but a reader who knows the rebrand may make the association. Accepted knowingly.
 - Whether the gradient strips eventually ship as static exports or a live canvas. Deferred with the code target.
