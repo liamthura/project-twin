@@ -165,14 +165,14 @@ Produced by Task 1. Every later task reads these values from here — the litera
 
 **Files:**
 - Create: Figma design file `MyGist — App Redesign`
-- Modify: this plan document (record `FILE_KEY` and `FONT_DECISION`)
+- Modify: this plan document (record `Ti7FlZLYOvX3goyvfypJBk` and `FONT_DECISION`)
 
 **Interfaces:**
-- Produces: `FILE_KEY` — the file key, consumed by every later task. Nine named pages. `FONT_DECISION` — the exact `{family, style}` pairs every later text operation must use. `RESHAPED_LIB_KEY` — the Reshaped library key, or `null` if unavailable.
+- Produces: `Ti7FlZLYOvX3goyvfypJBk` — the file key, consumed by every later task. Nine named pages. `FONT_DECISION` — the exact `{family, style}` pairs every later text operation must use. `RESHAPED_LIB_KEY` — the Reshaped library key, or `null` if unavailable.
 
 - [x] **Step 1: Create the file**
 
-Invoke `figma:figma-create-new-file`. Create a `design` editor-type file named `MyGist — App Redesign`. Record the returned file key as `FILE_KEY` in this document, replacing every literal `FILE_KEY` below.
+Invoke `figma:figma-create-new-file`. Create a `design` editor-type file named `MyGist — App Redesign`. Record the returned file key as `Ti7FlZLYOvX3goyvfypJBk` in this document, replacing every literal `Ti7FlZLYOvX3goyvfypJBk` below.
 
 - [x] **Step 2: Create the nine pages**
 
@@ -195,7 +195,7 @@ return { renamed: figma.root.children[0].id, createdNodeIds: created,
 
 - [x] **Step 3: Verify page structure**
 
-Run `get_metadata` on `FILE_KEY`. Expected: exactly nine pages, names matching Step 2's list in order, no page named "Page 1".
+Run `get_metadata` on `Ti7FlZLYOvX3goyvfypJBk`. Expected: exactly nine pages, names matching Step 2's list in order, no page named "Page 1".
 
 - [x] **Step 4: Gate the fonts — this blocks every later task**
 
@@ -225,7 +225,7 @@ Write `FONT_DECISION` into this document. Every later task reads it from here.
 - [x] **Step 6: Subscribe the Reshaped library**
 
 ```
-get_libraries with fileKey = FILE_KEY
+get_libraries with fileKey = Ti7FlZLYOvX3goyvfypJBk
 ```
 
 Find the duplicated Reshaped v3.9 library in `libraries_available_to_add`. Record its key as `RESHAPED_LIB_KEY`. If the list is paginated, follow `libraries_available_to_add_next_offset` until found.
@@ -244,10 +244,10 @@ git commit -m "docs: record Figma file key, font decision and library key"
 ## Task 2: Colour variables
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, variable collection `Colour`
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, variable collection `Colour`
 
 **Interfaces:**
-- Consumes: `FILE_KEY` from Task 1
+- Consumes: `Ti7FlZLYOvX3goyvfypJBk` from Task 1
 - Produces: variable collection `Colour` with modes `Light` and `Dark`, and 15 `COLOR` variables named exactly `paper`, `card`, `muted`, `ink`, `muted-fg`, `border`, `indigo`, `indigo-tint`, `clay`, `clay-tint`, `verdigris`, `verdigris-tint`, `success`, `warning`, `destructive`. Returns `{ collectionId, variableIds: {name: id} }` — later tasks bind by name.
 
 - [ ] **Step 1: State the expected structure**
@@ -339,10 +339,10 @@ git commit -m "docs: record colour variable ids"
 ## Task 3: Type, radius, space, shadow and motion variables, plus text styles
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, collections `Type`, `Scale`, `Motion`; nine local text styles
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, collections `Type`, `Scale`, `Motion`; nine local text styles
 
 **Interfaces:**
-- Consumes: `FILE_KEY`, `FONT_DECISION` from Task 1; `Colour` variable IDs from Task 2
+- Consumes: `Ti7FlZLYOvX3goyvfypJBk`, `FONT_DECISION` from Task 1; `Colour` variable IDs from Task 2
 - Produces: collection `Scale` with `radius-s|m|l|xl` and `space-4|8|12|16|24|32` (`FLOAT`); collection `Motion` with `duration-fast|medium|slow|scroll` (`FLOAT`, ms) and `easing-decelerate|accelerate|standard|emphasized` (`STRING`); nine text styles named `featured-2`, `featured-3`, `headline-1`, `headline-2`, `headline-3`, `body-1`, `body-2`, `caption-1`, `caption-2`. Returns `{ scaleCollectionId, motionCollectionId, textStyleIds: {name: id} }`.
 
 - [ ] **Step 1: Create the Scale collection**
@@ -487,7 +487,7 @@ git commit -m "docs: record scale, motion and text style ids"
 ## Task 4: Foundations specimens
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, page `01 Foundations`
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, page `01 Foundations`
 
 **Interfaces:**
 - Consumes: all variable and style IDs from Tasks 2–3
@@ -600,7 +600,7 @@ return { createdNodeIds: created, count: created.length };
 - [ ] **Step 7: Commit**
 
 ```bash
-git commit --allow-empty -m "chore: foundations specimens built in Figma FILE_KEY"
+git commit --allow-empty -m "chore: foundations specimens built in Figma Ti7FlZLYOvX3goyvfypJBk"
 ```
 
 Figma work lives in Figma, so the commit records progress against the plan rather than files. Tick the checkboxes in this document in the same commit.
@@ -610,7 +610,7 @@ Figma work lives in Figma, so the commit records progress against the plan rathe
 ## Task 5: Form primitive components
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, page `02 Components`
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, page `02 Components`
 
 **Interfaces:**
 - Consumes: variables and text styles from Tasks 2–3; `RESHAPED_LIB_KEY` from Task 1
@@ -759,7 +759,7 @@ return sets.map(s => ({ name: s.name, key: s.key, variants: s.children.length,
 Expected: six sets — `TextField` 6, `Select` 6, `TextArea` 6, `Switch` 4, `Checkbox` 4, `PinField` 4 — each with a non-empty description. Record every `key` in this document; Tasks 8–13 import by key.
 
 ```bash
-git commit --allow-empty -m "chore: form primitives built in Figma FILE_KEY"
+git commit --allow-empty -m "chore: form primitives built in Figma Ti7FlZLYOvX3goyvfypJBk"
 ```
 
 ---
@@ -767,7 +767,7 @@ git commit --allow-empty -m "chore: form primitives built in Figma FILE_KEY"
 ## Task 6: Display and container components
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, page `02 Components`
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, page `02 Components`
 
 **Interfaces:**
 - Consumes: variables, text styles, and the Task 5 component keys
@@ -843,7 +843,7 @@ return { sets: sets.map(s => ({ name: s.name, variants: s.children.length })), u
 `unbound` should be empty. Any entry is a hardcoded colour that will not switch to dark mode.
 
 ```bash
-git commit --allow-empty -m "chore: display and container components built in Figma FILE_KEY"
+git commit --allow-empty -m "chore: display and container components built in Figma Ti7FlZLYOvX3goyvfypJBk"
 ```
 
 ---
@@ -851,7 +851,7 @@ git commit --allow-empty -m "chore: display and container components built in Fi
 ## Task 7: Navigation components
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, page `02 Components`
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, page `02 Components`
 
 **Interfaces:**
 - Consumes: variables, text styles, Task 5–6 keys
@@ -912,7 +912,7 @@ return {
 Expected: `markersPerVariant: [1,1,1]`, every `indicatorPerVariant` entry `1`.
 
 ```bash
-git commit --allow-empty -m "chore: navigation components built in Figma FILE_KEY"
+git commit --allow-empty -m "chore: navigation components built in Figma Ti7FlZLYOvX3goyvfypJBk"
 ```
 
 ---
@@ -920,7 +920,7 @@ git commit --allow-empty -m "chore: navigation components built in Figma FILE_KE
 ## Task 8: Shell and navigation screens
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, page `03 Shell & Navigation`
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, page `03 Shell & Navigation`
 - Read: `frontend/src/App.jsx:589-700` for what the header and rail actually contain today
 
 **Interfaces:**
@@ -1002,7 +1002,7 @@ Expected: three frames at 1440×1024, 390×844, 390×844. Screenshot in light an
 - [ ] **Step 8: Commit**
 
 ```bash
-git commit --allow-empty -m "chore: shell and navigation screens built in Figma FILE_KEY"
+git commit --allow-empty -m "chore: shell and navigation screens built in Figma Ti7FlZLYOvX3goyvfypJBk"
 ```
 
 ---
@@ -1010,7 +1010,7 @@ git commit --allow-empty -m "chore: shell and navigation screens built in Figma 
 ## Task 9: Section editor screens
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, page `04 Section editor`
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, page `04 Section editor`
 - Read: `backend/section_packs/preferences/manifest.json`, `profile/manifest.json`, `goals/manifest.json`
 
 **Interfaces:**
@@ -1077,7 +1077,7 @@ The light case: one card, no band, no rail sub-items — because a single untitl
 Full-page screenshot, light and dark. Confirm: six frames, every card an instance, no clipped text in the 7-field Profile grid, and the empty Code Style cards read as intentional rather than broken.
 
 ```bash
-git commit --allow-empty -m "chore: section editor screens built in Figma FILE_KEY"
+git commit --allow-empty -m "chore: section editor screens built in Figma Ti7FlZLYOvX3goyvfypJBk"
 ```
 
 ---
@@ -1085,7 +1085,7 @@ git commit --allow-empty -m "chore: section editor screens built in Figma FILE_K
 ## Task 10: Review screens
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, page `05 Review`
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, page `05 Review`
 - Read: `frontend/src/components/ProposalsPanel.jsx` for the real data shape
 
 **Interfaces:**
@@ -1135,7 +1135,7 @@ This replaces two raw unstyled `<select>` elements. Every control here must be a
 - [ ] **Step 8: Commit**
 
 ```bash
-git commit --allow-empty -m "chore: review screens built in Figma FILE_KEY"
+git commit --allow-empty -m "chore: review screens built in Figma Ti7FlZLYOvX3goyvfypJBk"
 ```
 
 ---
@@ -1143,7 +1143,7 @@ git commit --allow-empty -m "chore: review screens built in Figma FILE_KEY"
 ## Task 11: Onboarding screens
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, page `06 Onboarding`
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, page `06 Onboarding`
 
 **Interfaces:**
 - Consumes: shell from Task 8, all component keys
@@ -1199,7 +1199,7 @@ Verify: seven frames; the delegate offer appears above the first `EyebrowBand` i
 - [ ] **Step 7: Commit**
 
 ```bash
-git commit --allow-empty -m "chore: onboarding screens built in Figma FILE_KEY"
+git commit --allow-empty -m "chore: onboarding screens built in Figma Ti7FlZLYOvX3goyvfypJBk"
 ```
 
 ---
@@ -1207,7 +1207,7 @@ git commit --allow-empty -m "chore: onboarding screens built in Figma FILE_KEY"
 ## Task 12: Auth, settings and consent screens
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, page `07 Auth & Settings`
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, page `07 Auth & Settings`
 - Read: `frontend/src/components/WelcomeAuth.jsx`, `AuthShell.jsx`, `ConnectionSettings.jsx`, `Consent.jsx`, `InviteGate.jsx`
 
 **Interfaces:**
@@ -1259,7 +1259,7 @@ A 480 centred panel: `Claude wants to connect to your persona` in `headline-1`, 
 Thirteen frames. Confirm: the autosave `Switch` exists on `Settings — Account`; `Consent`'s Deny is `Neutral` not `Critical`; `Auth — OTP` uses a `PinField` instance rather than six drawn boxes.
 
 ```bash
-git commit --allow-empty -m "chore: auth, settings and consent screens built in Figma FILE_KEY"
+git commit --allow-empty -m "chore: auth, settings and consent screens built in Figma Ti7FlZLYOvX3goyvfypJBk"
 ```
 
 ---
@@ -1267,7 +1267,7 @@ git commit --allow-empty -m "chore: auth, settings and consent screens built in 
 ## Task 13: Motion annotations
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, page `08 Motion`
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, page `08 Motion`
 
 **Interfaces:**
 - Consumes: `Motion` variables from Task 3; the `Spy marker` and `Indicator` layers from Task 7; screens from Tasks 8–12
@@ -1306,7 +1306,7 @@ Static before/after frame pairs with the timing written beside each in `caption-
 Confirm the two animated nodes carry animation data and that the durations match the `Motion` collection values rather than hardcoded numbers.
 
 ```bash
-git commit --allow-empty -m "chore: motion annotations built in Figma FILE_KEY"
+git commit --allow-empty -m "chore: motion annotations built in Figma Ti7FlZLYOvX3goyvfypJBk"
 ```
 
 ---
@@ -1314,7 +1314,7 @@ git commit --allow-empty -m "chore: motion annotations built in Figma FILE_KEY"
 ## Task 14: Cover, final sweep, and handoff
 
 **Files:**
-- Modify: Figma file `FILE_KEY`, page `00 Cover`
+- Modify: Figma file `Ti7FlZLYOvX3goyvfypJBk`, page `00 Cover`
 - Modify: `docs/superpowers/specs/2026-08-04-mygist-app-reshaped-design.md` (add the file link)
 
 **Interfaces:**
