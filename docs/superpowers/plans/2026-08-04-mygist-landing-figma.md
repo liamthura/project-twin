@@ -83,7 +83,22 @@ The 40px floor is a **role boundary, not a legibility limit**. Task 4's specimen
 
 **Colour usage rule.** Clay and Verdigris are never used for body text. They appear as flat section tints and illustration fills only. Clay takes the larger share of tinted ground, because Verdigris and Indigo are both cool.
 
-**Gradient rule.** Gradient artwork is generated only from paper, ink, indigo, clay and verdigris. It never sits under text — type over gradient sits on a solid or scrimmed surface.
+**Gradient rule.** Gradient artwork follows the owner's reference ramp, not the brand palette. It never sits under text — type over gradient sits on a solid or scrimmed surface.
+
+```
+REFERENCE RAMP (authoritative)
+0.00  #1C1917   ink        (reference says #000000; substituted so the page has one black, and a warm one)
+0.44  #2345E0   blue       (deeper and more saturated than brand indigo #3D5DDB — deliberate)
+0.72  #FF9DC5   pink       (new to the system)
+1.00  #FBF0EE   cream      (new to the system)
+
+STRUCTURE          shape one peak · peakPos 0.5 · direction up · gradMap bar
+                   count 9 · depth 0.45 · curveExp 1 · widthExp 0 · mirror false
+                   gap 0 · jitter 0 · steps 0 · layout linear · margin 0
+RELIEF & GRAIN     shadow 1 · depth3d 0.55 · seam 0.05 · grainIntensity 0.52
+```
+
+An earlier draft locked gradient artwork to the five brand colours and produced mud, because clay and verdigris are near-complementary and interpolating between them passes through grey-brown. The reference works because lightness rises monotonically and every hue step is adjacent. Do not "correct" it back toward the brand palette — that is the thing that failed.
 
 **Copy rule.** British English. No em dashes in page copy. No "delve", "leverage", "seamless", "unlock", "empower". Copy is fixed in the spec's copy deck and is transcribed exactly, not improvised.
 

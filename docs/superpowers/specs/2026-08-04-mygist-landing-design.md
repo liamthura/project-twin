@@ -167,7 +167,9 @@ linear and radial gradients with grain, plus contour treatments where the
 
 Three rules keep it a system element rather than decoration:
 
-1. **Palette-locked.** Generated only from Paper, Ink, Indigo, Clay and Verdigris.
+1. **Follows the reference ramp.** Ink `#1C1917` → blue `#2345E0` → pink `#FF9DC5` → cream `#FBF0EE`, at positions 0, 0.44, 0.72, 1. Supplied by the owner as a GRADIENTOOL state. Pink and cream are new to the system and live only in gradient artwork.
+
+   An earlier version of this rule locked the artwork to the five brand colours. It produced mud: Clay and Verdigris are near-complementary, so interpolating between them passes through grey-brown. The reference avoids this because lightness rises monotonically and each hue step is adjacent to the last.
 2. **Three fixed roles.** A 12px full-bleed **edge strip** along the top of the
    page frame, recoloured per section and acting as the signature element; a
    large soft **field** behind the hero persona card; and a **tile cap** across
