@@ -25,6 +25,7 @@ existing app can draw from, so the two never drift.
 | Display face | Stack Sans Notch (Koto, variable 200–700, Google Fonts). |
 | Gradients | GRADIENTOOL output, palette-locked, in three fixed roles. |
 | Features | One bento grid, absorbing Scoped reads and Proposals as large tiles. Each tile carries one or two explanatory sentences. |
+| Accent pair | Clay `18 74% 60%` and Verdigris `188 38% 36%`, chosen from three candidate pairs viewed as section grounds. Verdigris replaces a green that sat 16° from the existing `--success`. |
 | Mockup frame | Magic UI `safari`, chrome recoloured to the warm neutrals. |
 | Component source | Magic UI registry where it fits, adapted to MyGist tokens. |
 
@@ -38,10 +39,17 @@ large-radius container, frosted glass on fixed elements only.
 
 One tension to hold. Stack Sans Notch is crafted but cool and screen-native, so
 it does not carry the "warm, tactile, a little handmade" quality on its own.
-Warmth therefore comes from three other places: the Clay and Moss tints get more
-surface area than a single-accent system would give them, radii sit at the top
-of the scale, and the gradient grain supplies the tactile layer. Type carries the
-edge; colour, shape and grain carry the warmth.
+Warmth therefore comes from three other places: radii sit at the top of the
+scale, the gradient grain supplies the tactile layer, and Clay carries the
+warm end of the palette on its own.
+
+The chosen accent pair sharpens this. Verdigris is a cool hue, and with Indigo
+already cool, two of the three accents pull away from warmth. Clay is therefore
+given the larger share of tinted surface across the page, and Verdigris is used
+where a section needs to read as distinctly separate rather than as warm. If the
+page starts to feel cold in Figma, the correction is more Clay ground, not a
+warmer Verdigris — the whole point of the hue is that nobody mistakes it for a
+status colour.
 
 ## Foundations
 
@@ -57,9 +65,9 @@ with the stone neutrals and far enough from indigo not to compete with a CTA.
 | Ink | `24 10% 10%` | `60 5% 96%` | Text (existing `--foreground`) |
 | Indigo | `228 69% 55%` | `228 94% 67%` | Primary, CTAs, the mark (existing, untouched) |
 | Clay | `18 74% 60%` | `18 66% 62%` | New. Section tint, illustration |
-| Moss | `158 34% 40%` | `158 30% 52%` | New. Section tint, illustration |
+| Verdigris | `188 38% 36%` | `188 40% 50%` | New. Section tint, illustration |
 
-Clay and Moss appear as large flat section tints and as illustration fills.
+Clay and Verdigris appear as large flat section tints and as illustration fills.
 Neither is ever used for body text, which keeps contrast testing to a small,
 enumerable set of pairs. Status colours (`success`, `warning`, `destructive`)
 stay semantic and out of the decorative palette.
@@ -70,7 +78,7 @@ Tints, used as section grounds:
 |---|---|---|
 | Indigo | `223 100% 96%` (existing `--accent`) | `227 22% 20%` (existing dark `--accent`) |
 | Clay | `18 74% 94%` | `18 30% 18%` |
-| Moss | `158 34% 94%` | `158 22% 16%` |
+| Verdigris | `188 26% 93%` | `188 26% 15%` |
 
 The indigo tint reuses the app's existing `--accent` rather than introducing a
 parallel value.
@@ -153,7 +161,7 @@ linear and radial gradients with grain, plus contour treatments where the
 
 Three rules keep it a system element rather than decoration:
 
-1. **Palette-locked.** Generated only from Paper, Ink, Indigo, Clay and Moss.
+1. **Palette-locked.** Generated only from Paper, Ink, Indigo, Clay and Verdigris.
 2. **Three fixed roles.** A 12px full-bleed **edge strip** along the top of the
    page frame, recoloured per section and acting as the signature element; a
    large soft **field** behind the hero persona card; and a **tile cap** across
@@ -271,11 +279,19 @@ Sections alternate grounds so the page does not read as one long white scroll.
 | 2 | Works with | Paper, quiet | Credibility |
 | 3 | How it works | Clay tint | Three steps, the spine |
 | 4 | What it does | Paper | Bento grid, seven tiles. Density and life |
-| 5 | Your data | Ink, full-bleed | Portability and passivity, told on dark |
-| 6 | Closing CTA | Indigo gradient | Second waitlist capture |
-| 7 | Footer | Ink | — |
+| 5 | Closing CTA | **Ink, full-bleed** + indigo gradient | Second waitlist capture, and the page's one dark beat |
+| 6 | Footer | Ink | — |
 
-Section 5 is the only full dark break, and it is where the grain reads best.
+A "Your data" section on ink previously sat between the bento and the closing
+CTA, carrying export, passivity and an honest line about who owns the hosted
+database. It is cut for now and will be reworked later. Its self-host point
+survives in the "Run it yourself" bento tile.
+
+Cutting it removed the page's only dark section, which left the whole scroll on
+paper and tint with no tonal break. The closing CTA therefore moves from an
+indigo gradient ground to ink, with the indigo gradient sitting on top of it.
+The page still resolves into dark, and the grain still gets the ground it reads
+best on.
 
 Scoped reads and Proposals were previously full-width narrative beats. They are
 now the two 2-col tiles inside the bento. With every tile carrying one or two
@@ -353,16 +369,16 @@ by eye.
 
 > `WORKS WITH`
 >
-> Claude Desktop · Claude Code · anything that speaks MCP
+> Claude · Codex · Raycast · Notion AI · Hermes · anything with MCP connectors
 >
 > One URL. Any client that speaks MCP picks it up.
 
-Named clients are limited to the two that `docs-site/content/docs/use/clients.mdx`
-documents with their own setup sections. Earlier drafts of this spec listed
-Cursor, ChatGPT and Notion AI, none of which appear anywhere in the docs. See
-Open questions: the client list needs the owner's answer before the section can
-be designed, because two logos and an "anything else" is a thinner row than the
-section was drawn for.
+Six chips: five named plus the generic. Confirmed by the owner rather than taken
+from the docs, which only document Claude Desktop and Claude Code with their own
+setup sections.
+
+ChatGPT is deliberately absent. It does not support MCP connectors by default,
+so Codex is named instead.
 
 ### 3 · How it works
 
@@ -430,31 +446,7 @@ The Scoped reads tile deliberately does not promise that a scope excludes other
 sections. An earlier draft claimed a `professional` read "never sees the personal
 sections", which overstates what the scope config guarantees.
 
-### 5 · Your data
-
-> `YOUR DATA`
->
-> ## Plain JSON, exportable any time.
->
-> One row per section, per account. View it, edit it, export it, delete it. There
-> is no proprietary format to get stuck in.
->
-> MyGist never reads your conversations. The MCP tools run only when a client
-> calls them, and there is no background process watching anything.
->
-> Hosted here, the database is ours, and you should trust us accordingly. If you'd
-> rather it were literally yours, the same Docker image runs on your own server.
-
-The third paragraph is set smaller than the first two rather than at equal
-weight. It is not an ownership claim: on the hosted instance the database belongs
-to whoever runs it, which the docs FAQ already states plainly. Printing the
-awkward part is a conversion asset for an audience that arrived looking for an
-alternative to vendor memory, and a visitor finds it in the FAQ regardless.
-
-This section is also the only nod to developers on the page, via the self-host
-line.
-
-### 6 · Closing
+### 5 · Closing
 
 > ## Stop starting from nothing.
 >
@@ -488,7 +480,7 @@ is drawn, for the same reason.
 ## Success criteria
 
 - A Figma file whose variables could be exported as CSS custom properties without renaming anything
-- Landing page at 1440 and 390, all seven sections
+- Landing page at 1440 and 390, all six sections
 - Bento grid at seven tiles, each with one or two explanatory sentences, and a one-column mobile collapse
 - Waitlist field prototyped through all five states
 - Every text-on-background pair in the file measured against WCAG AA
@@ -498,7 +490,7 @@ is drawn, for the same reason.
 
 ## Open questions
 
-- **Which clients can be named.** The docs document Claude Desktop and Claude Code only. The hero promises context in "any assistant you open" and the audience is people juggling several, so a two-name row undersells the promise or oversells the docs, depending on which is out of date. Needs the owner's answer on what has actually been tested before section 2 and the hero chip row are designed. Affects the client chip and the "Works with" row.
 - Hero headline: "Write yourself down once." or "Explain yourself once." Decide from the Figma specimen.
+- **The docs client list is narrower than the page's.** `clients.mdx` documents Claude Desktop and Claude Code with their own setup sections; the landing page names Claude, Codex, Raycast, Notion AI and Hermes on the owner's confirmation. The page is not wrong, but the docs are now behind it, and a visitor who follows a chip through to the docs finds no setup section for four of the five. Not a blocker for the design. Worth a docs pass before launch.
 - Stack Sans Notch carries Koto's notch signature from the Stack Overflow identity. Free and legal to use, and not yet widely deployed, but a reader who knows the rebrand may make the association. Accepted knowingly.
 - Whether the gradient strips eventually ship as static exports or a live canvas. Deferred with the code target.
