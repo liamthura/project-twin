@@ -12,6 +12,8 @@
 
 Every task's requirements implicitly include this section. Values are copied verbatim from the spec.
 
+**A write's return value is not evidence the write landed.** This bit the first execution of Task 1: the page-creation script returned all three page names while only one page actually existed. Every task that writes to Figma verifies with a *separate* read call afterwards — `get_metadata`, `get_variable_defs` or `get_screenshot` — never by inspecting what its own write returned. A task that reports success on the strength of its own return value has not verified anything.
+
 **Mandatory skill loading.** Before *every* `use_figma` call, invoke the `figma:figma-use` skill. Before `create_new_file`, invoke `figma:figma-create-new-file`. When building variables or components, load `figma:figma-generate-library` alongside `figma-use`. When assembling the page, load `figma:figma-generate-design`. Skipping these causes hard-to-debug failures.
 
 **Colour — light mode.**
@@ -94,9 +96,17 @@ destructive      0 74% 54%
 
 Run the `whoami` Figma MCP tool. Expected: a handle and at least one plan with a `Full` seat. If the seat is `Viewer` or the call errors, stop and report — nothing else in this plan can proceed.
 
-- [ ] **Step 2: Confirm Stack Sans Notch is available to Figma**
+- [ ] **Step 2: Create the file**
 
-Stack Sans Notch is on Google Fonts, which Figma serves natively. Invoke `figma:figma-use`, then run a `use_figma` call listing available fonts and filtering for it:
+`use_figma` requires an existing `fileKey` to execute against, so the file must exist before the font check can run. Invoke `figma:figma-create-new-file`, then create a `design` editor-type file named `MyGist — Design System & Landing`.
+
+Pass the name as a literal `&`. HTML-escaping it to `&amp;` produces a file with a mangled name, and this toolset has no rename or delete tool, so the mistake is only fixable by hand in the Figma UI.
+
+Report the returned file key as `FILE_KEY` — every later task needs it.
+
+- [ ] **Step 3: Confirm Stack Sans Notch is available to Figma**
+
+Stack Sans Notch is on Google Fonts, which Figma serves natively. Invoke `figma:figma-use`, then run a `use_figma` call against `FILE_KEY` listing available fonts and filtering for it:
 
 ```js
 const fonts = await figma.listAvailableFontsAsync()
@@ -104,11 +114,7 @@ const hits = fonts.filter(f => f.fontName.family.toLowerCase().includes('stack s
 return hits.map(f => `${f.fontName.family} ${f.fontName.style}`)
 ```
 
-Expected: entries including `Stack Sans Notch Medium` and `Stack Sans Notch SemiBold`. If the family is absent, stop and report — Task 4 depends on it and there is no substitute that preserves the design intent.
-
-- [ ] **Step 3: Create the file**
-
-Invoke `figma:figma-create-new-file`, then create a `design` editor-type file named `MyGist — Design System & Landing`. Record the returned file key as `FILE_KEY` in the plan checklist.
+Expected: entries including `Stack Sans Notch Medium` and `Stack Sans Notch SemiBold`. Report the exact family and style strings returned — later tasks need them verbatim, and a near-miss silently falls back to a default sans without erroring. If the family is absent, stop and report; Task 4 depends on it and there is no substitute that preserves the design intent.
 
 - [ ] **Step 4: Create the three pages**
 
@@ -125,6 +131,10 @@ return figma.root.children.map(p => p.name)
 ```
 
 Expected return: `["01 Foundations", "02 Components", "03 Landing"]`.
+
+**Do not trust that return value.** In the first execution of this plan it reported all three pages while only `01 Foundations` actually existed. Verify with a separate `get_metadata` call passing `fileKey` and no `nodeId`, which lists the document's top-level pages. If that call shows fewer than three pages, the write did not persist regardless of what the script returned.
+
+This is the general rule the whole plan rests on: a write's own return value is not evidence the write landed.
 
 - [ ] **Step 5: Create the repo scaffolding**
 
