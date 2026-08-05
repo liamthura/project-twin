@@ -715,7 +715,7 @@ No CTA link is built. The registry's `href` and `cta` props go unused — a page
 
 - [ ] **Step 4: Verify**
 
-Run `get_screenshot` on the component set. Expected: four variants, radius visibly larger than a default card, tile cap present, no grey text that is not `color/muted-fg`.
+Run `get_screenshot` on the component set. Expected: four variants at `radius/12`, no tile cap, no icon, an Indigo title, and on the `media = ui` variants the media visibly running off the bottom and right edges rather than sitting in a box.
 
 - [ ] **Step 5: Commit the checkpoint**
 
@@ -873,7 +873,9 @@ row 3   [ Consent 1col ] [ Skills 1col ] [ Run it yourself 1col ]
 
 `Scope payload` drops into the Scoped reads media slot; `Proposal card` into the Proposals media slot.
 
-In both cases, **replace the `media placeholder (demo only)` node and leave `fade mask` alone** — it is what makes the bleed dissolve, `isMask` masks later siblings so it must stay first, and deleting it leaves the media guillotined at the tile edge. Tile caps: Scoped reads and Proposals get `verdigris`, the four smaller tiles get `clay`, `indigo`, `clay`, `indigo` in reading order — Clay appearing more often than Verdigris, per the warmth rule.
+In both cases, **replace the `media placeholder (demo only)` node and leave `fade mask` alone** — it is what makes the bleed dissolve, `isMask` masks later siblings so it must stay first, and deleting it leaves the media guillotined at the tile edge.
+
+**There are no tile caps.** An earlier draft assigned a gradient cap colour per tile; caps were cut when the bento's direction was set from reference. Do not add them back, and do not colour the tiles individually — every tile is `color/card` with a `color/border` hairline, and the differentiation comes from the Indigo title and the bleeding product UI.
 
 Tile copy is transcribed from the spec's seven tile blocks, verbatim.
 
