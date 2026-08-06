@@ -168,6 +168,7 @@ Produced by Task 1. `FILE_KEY` is already resolved inline everywhere it appears 
 - **Task 3 `textStyleIds`**: `featured-2` = `S:8c53a2ec48cec65ae8dd09c82e5d2b1b92790edb,`, `featured-3` = `S:b64dd4d1f10e8f04d2ad75cd3ac3b4917138646f,`, `headline-1` = `S:2f151c5f267a1c937475bb62dca4fe1e782109be,`, `headline-2` = `S:8c19b10f1c13933916a09df777520734da81ebb0,`, `headline-3` = `S:868ef535b81546a8d4a15b32ef35a4bc2834d2ad,`, `body-1` = `S:4c0a7dfefeb26bf04e7d6d0767e14266acee373f,`, `body-2` = `S:7b2a17ce6a4397672b40e1ec6acaa2fc96987584,`, `caption-1` = `S:3fbb4e54fb967eef3923cb14852c06427f3c71e0,`, `caption-2` = `S:67d9c575f4707ce385fa563a0635917dc30f9e2d,`.
 - **Task 3 `effectStyleIds`**: `shadow-raised` = `S:a3d8d8cb802153b071804af1f587b398c0f2e244,`, `shadow-overlay` = `S:1c90f6baec2795d0eb0aea3a9cbb3001363b7988,`.
 - **Task 5 component sets** (all on page `02 Components`, `Ti7FlZLYOvX3goyvfypJBk`): `TextField` id `28:34` key `03456a0c6313dac68a36242f1b58d1aff3633f76` (6 variants); `Select` id `29:44` key `e0b8d0a3347f781580ec00daa7ef33a1a41e6003` (6 variants); `TextArea` id `30:38` key `68a397cd1d297404282a3860fd1fd15fe2618e66` (6 variants); `Switch` id `32:14` key `7a59f5e2f7fa475c526483a0ef2e9e26e5eba921` (4 variants); `Checkbox` id `37:12` key `3f6dbbcddfde74738d17ad7d7caa5b75ce5bcaca` (4 variants); `PinField` id `38:49` key `4e9b0daad2c4977f04aa1c2d86f8663db7e9d394` (4 variants). Reshaped reference file exposed no usable geometry (Community cover page only) so all proportions come from the brief's explicit values. Tasks 8–13 consume these sets via local `component.createInstance()`, not `importComponentByKeyAsync` — same file, no publish step exists.
+- **Task 6 component sets** (all on page `02 Components`, `Ti7FlZLYOvX3goyvfypJBk`): `Button` id `56:40` key `4871a5017692949546fad7ddbdd822529b3ad437` (20 variants); `Chip` id `58:11` key `bdf575f08fa0361dbd1ab864ca4ed5d0454e564d` (3 variants); `Badge` id `58:23` key `30c88a54e2dead82d77d25e75392f06dc9ce44a7` (5 variants); `FillSummary` id `58:30` key `05008ed91e402b98c42e97e7063f02d418391099` (3 variants); `SubsectionCard` id `61:21` key `d9e1ec26b3c7e0e2ed1a519dac16bd7c5bc1e4f2` (3 variants); `EmptyState` id `62:14` key `1f8c3400fb755420009ec2ebd4d1bf64323870df` (2 variants). `EyebrowBand` is a bare `COMPONENT` (not a set, per ruling): id `61:22` key `4fd0ca5a66db03b957b7e00b7c75b9952a8be938`. `SubsectionCard` nests a local `FillSummary` instance in its header via `createInstance()`; `EmptyState` nests local `Button` instances (Ghost/Default for `Card`, Primary/Default for `Page`) the same way. Discovered during this task: `combineAsVariants` resets bound-paint opacity to 1 on its children, the same failure mode as `setExplicitVariableModeForCollection` from Task 5's lessons — any fractional-opacity overlay/tint paint must be (re-)applied only after the last `combineAsVariants` or mode-switch call in the build order.
 
 ---
 
@@ -783,7 +784,7 @@ git commit --allow-empty -m "chore: form primitives built in Figma Ti7FlZLYOvX3g
 - Consumes: variables, text styles, and the Task 5 component keys
 - Produces: component sets `Button`, `Chip`, `Badge`, `FillSummary`, `SubsectionCard`, `EyebrowBand`, `EmptyState`. Returns `{ componentKeys: {name: key} }`.
 
-- [ ] **Step 1: State the expected structure**
+- [x] **Step 1: State the expected structure**
 
 | Component | Variants | Geometry |
 |---|---|---|
@@ -797,11 +798,11 @@ git commit --allow-empty -m "chore: form primitives built in Figma Ti7FlZLYOvX3g
 
 `Button` at 20 variants is the largest set here. Build `Primary/Default` first, verify, then clone — the same discipline as Task 5.
 
-- [ ] **Step 2: Build Button, Primary/Default only, and verify**
+- [x] **Step 2: Build Button, Primary/Default only, and verify**
 
 Full script pattern as Task 5 Step 3, with: fill bound to `indigo`, label `body-2` bound to `card`, height 36, `radius-m`, horizontal padding 16, `counterAxisAlignItems: 'CENTER'`. Screenshot at scale 2 and confirm the label is vertically centred and not clipped — a 36px box with 155% line height on 14px text is 21.7px of text in 36px of box, which is correct but easy to get wrong by 1px.
 
-- [ ] **Step 3: Complete the Button set**
+- [x] **Step 3: Complete the Button set**
 
 Clone to 20 variants. Differences only:
 
@@ -820,19 +821,19 @@ Clone to 20 variants. Differences only:
 | `Disabled` | 50% opacity, no overlay |
 | `Loading` | label replaced by a 16px spinner glyph, same fill |
 
-- [ ] **Step 4: Build Chip, Badge, FillSummary**
+- [x] **Step 4: Build Chip, Badge, FillSummary**
 
 One call. These are small enough to batch — three components, roughly nine operations.
 
-- [ ] **Step 5: Build SubsectionCard and EyebrowBand**
+- [x] **Step 5: Build SubsectionCard and EyebrowBand**
 
 `SubsectionCard` is the most reused component in the file and the one the whole redesign rests on. Build it with a nested instance of `FillSummary` in the header, so a card's count is swappable per instance rather than retyped. Its content area is an empty auto-layout named `Content` with `layoutSizingVertical = 'HUG'`, which every screen fills with instances.
 
-- [ ] **Step 6: Build EmptyState**
+- [x] **Step 6: Build EmptyState**
 
 Copy for the `Card` context is exactly: `Nothing here yet. Add a language, or let a client propose one.` For `Page`: headline `Nothing waiting`, line `Agents propose changes here as they notice them.` British English, no em dashes, not apologetic.
 
-- [ ] **Step 7: Verify and commit**
+- [x] **Step 7: Verify and commit**
 
 `get_metadata` plus a full-page screenshot in light and dark. Expected seven sets with the variant counts from Step 1, every one described, no unbound literal colour on any of them:
 
