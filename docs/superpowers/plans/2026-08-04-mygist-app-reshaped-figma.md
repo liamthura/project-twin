@@ -170,6 +170,7 @@ Produced by Task 1. `FILE_KEY` is already resolved inline everywhere it appears 
 - **Task 5 component sets** (all on page `02 Components`, `Ti7FlZLYOvX3goyvfypJBk`): `TextField` id `28:34` key `03456a0c6313dac68a36242f1b58d1aff3633f76` (6 variants); `Select` id `29:44` key `e0b8d0a3347f781580ec00daa7ef33a1a41e6003` (6 variants); `TextArea` id `30:38` key `68a397cd1d297404282a3860fd1fd15fe2618e66` (6 variants); `Switch` id `32:14` key `7a59f5e2f7fa475c526483a0ef2e9e26e5eba921` (4 variants); `Checkbox` id `37:12` key `3f6dbbcddfde74738d17ad7d7caa5b75ce5bcaca` (4 variants); `PinField` id `38:49` key `4e9b0daad2c4977f04aa1c2d86f8663db7e9d394` (4 variants). Reshaped reference file exposed no usable geometry (Community cover page only) so all proportions come from the brief's explicit values. Tasks 8–13 consume these sets via local `component.createInstance()`, not `importComponentByKeyAsync` — same file, no publish step exists.
 - **Task 6 component sets** (all on page `02 Components`, `Ti7FlZLYOvX3goyvfypJBk`): `Button` id `56:40` key `4871a5017692949546fad7ddbdd822529b3ad437` (20 variants); `Chip` id `58:11` key `bdf575f08fa0361dbd1ab864ca4ed5d0454e564d` (3 variants); `Badge` id `58:23` key `30c88a54e2dead82d77d25e75392f06dc9ce44a7` (5 variants); `FillSummary` id `58:30` key `05008ed91e402b98c42e97e7063f02d418391099` (3 variants); `SubsectionCard` id `61:21` key `d9e1ec26b3c7e0e2ed1a519dac16bd7c5bc1e4f2` (3 variants); `EmptyState` id `62:14` key `1f8c3400fb755420009ec2ebd4d1bf64323870df` (2 variants). `EyebrowBand` is a bare `COMPONENT` (not a set, per ruling): id `61:22` key `4fd0ca5a66db03b957b7e00b7c75b9952a8be938`. `SubsectionCard` nests a local `FillSummary` instance in its header via `createInstance()`; `EmptyState` nests local `Button` instances (Ghost/Default for `Card`, Primary/Default for `Page`) the same way. Discovered during this task: `combineAsVariants` resets bound-paint opacity to 1 on its children, the same failure mode as `setExplicitVariableModeForCollection` from Task 5's lessons — any fractional-opacity overlay/tint paint must be (re-)applied only after the last `combineAsVariants` or mode-switch call in the build order.
 - **Task 7 component sets** (all on page `02 Components`, `Ti7FlZLYOvX3goyvfypJBk`): `RailItem` id `75:55` key `50521c8912e7194d8defc0409594ecfbddd40830` (8 variants, State×Badge); `RailSubItem` id `75:78` key `2810226dd533949561d23cb3eb10430dd0c8c098` (3 variants); `Tabs` id `78:43` key `c6f5118001be3cd40595df2ae88f77797e336521` (2 variants, `Count=Two` only — Task 12 adds `Count=Three`); `Modal` id `85:24` key `44b231ebe794f45494a078baa17f9f667a62d98a` (2 variants); `Sheet` id `86:31` key `05ff4eb66e0da27e22dc2455fe533a15cdbe10b5` (2 variants); `SaveStateChip` id `79:28` key `e33f111008f80c29d13f08e70740b0eb48e0c9b2` (3 variants); `SectionSelector` id `86:40` key `a51d1763b19f0b57fe17b728cf3ab57557461c88` (2 variants). `RailSubItem` carries `Spy marker` (2×16, bound `indigo`) in all three variants, hidden except in `Current`; `Tabs` carries `Indicator` (2px bound `indigo`) in both variants, its inactive sibling named `Underline` so the per-variant `Indicator` count stays exactly one. RailItem's 36px `RailSubItem` indent and Sheet's handle-to-header gap are both composed from two bound spacing tokens rather than one literal, per the space-token constraint. Three lessons worth carrying forward: (1) `combineAsVariants` freezes the component-set frame's own bounding box from the pre-repositioning layout of its source components — repositioning variants into a grid afterward silently clips anything outside the stale box (`clipsContent` is true by default) unless you explicitly `resize()` the set to the new children's bounding box; this bit both `RailItem` and `SaveStateChip` here. (2) An empty auto-layout HUG container (the `Body`/`Content` slot pattern) does not re-shrink after a child is added then removed within the same or a later script call — it freezes at the child's last size; recovery is an explicit `resize(width, 1)` followed by re-applying `layoutSizingVertical = 'HUG'`, which does correctly re-collapse it. Do this immediately after any add/measure/remove HUG proof, or the proof itself leaves the component broken. (3) `node.query('[name=Some Name]')` silently returns zero matches when the name contains a space (unescaped in the selector), even though the node exists and `findAll(n => n.name === 'Some Name')` finds it correctly — the brief's own Step 6 `Spy marker` check script is affected by this and reports `[0,0,0]`; `findAll` is the reliable check.
+- **Task 8 frames** (page `03 Shell & Navigation`, `Ti7FlZLYOvX3goyvfypJBk`): `shellFrameId` (`Desktop 1440 — Shell`) = `91:5`; `mobileShellFrameId` (`Mobile 390 — Shell`) = `94:55`; section-sheet frame (`Mobile 390 — Section sheet`) = `94:92` — **load-bearing for Tasks 9–12, which clone the desktop shell (`91:5`) as their starting point.** Rail (`92:5`) holds 18 rows in order (10 sections, `Preferences`'s four `RailSubItem`s inserted immediately after it via `insertChild`, the divider, `Review` `Badge=Count` set to `3`, `Sections`, the version string); 16 are `INSTANCE`, the two deliberate non-instances are the `Divider` (`FRAME`, containing one `Divider line` rectangle) and the `v2.0.0 (a1b2c3)` version string (`TEXT`, `caption-2`). The mobile Section sheet's `Sheet` instance had to be **detached** (`detachInstance()`) before its `Body` slot would accept new children — the Plugin API refuses `appendChild` into any frame that is itself inside a live `INSTANCE`, which the brief's own `Body`/`Content` slot pattern (Task 7 lesson 2) does not mention; this is the one node in the whole page that is not an `INSTANCE` of `Sheet`, and it is intentional, not a detached-copy defect. Two further lessons: (1) **every purely-structural wrapper frame created via `figma.createAutoLayout()` carries a default opaque unbound white fill** that is invisible in light mode (indistinguishable from `paper`) but breaks dark mode outright — it neither switches nor lets the true background show through. This bit `Body`, `Rail`, `Content`, both `Brand`/`Right cluster` header groups (on all three frames, since the section-sheet clone copied the mobile shell's pre-fix state into new node IDs), and both `Divider` wrappers; every one needed an explicit `fills = []`, found only by diffing dark-mode screenshots against light and reading `fills` back to check for `boundVariables: {}` on an `{r:1,g:1,b:1}` solid. Audit this on every future frame that wraps content in a plain `createAutoLayout()` container without an intentional fill. (2) Ruling (c) held exactly as warned: `setExplicitVariableModeForCollection` reset the scrim's paint opacity from `0.4` back to `1` on **every** mode switch, including the final restore back to Light — the fix (reapply `0.4` as the last write, then re-verify by reading `fills[0].opacity` and by screenshot) had to be repeated three times (into dark, and again on the restore to light) rather than once.
 
 ---
 
@@ -939,11 +940,11 @@ git commit --allow-empty -m "chore: navigation components built in Figma Ti7FlZL
 - Consumes: every component key from Tasks 5–7
 - Produces: frames `Desktop 1440 — Shell`, `Mobile 390 — Shell`, `Mobile 390 — Section sheet`. Produces the reusable `AppShell` frame structure that Tasks 9–12 clone as their starting point. Returns `{ shellFrameId, mobileShellFrameId }`.
 
-- [ ] **Step 1: Read the current shell before designing its replacement**
+- [x] **Step 1: Read the current shell before designing its replacement**
 
 Read `frontend/src/App.jsx` lines 589–700. Confirm the header's real contents: logo svg, `MyGist` wordmark, autosave `Switch`, save-status text, disconnected `Badge`, theme cycle button, account chip. The redesign moves the switch out and replaces the status text with `SaveStateChip` — verify that is still what the code does before building against it.
 
-- [ ] **Step 2: State the expected structure**
+- [x] **Step 2: State the expected structure**
 
 `Desktop 1440 — Shell`: 1440×1024, `paper` fill.
 - Header: 1440×60, `card` fill, 1px bottom `border`, contents inset to a 1152 max-width centred column. Left: 22px logo mark + `MyGist` in `headline-2`. Right, in order, gap `space-16`: `SaveStateChip` (`Saved`), theme button 32×32 `radius-m` 1px `border`, account chip reading `Maya`.
@@ -951,7 +952,7 @@ Read `frontend/src/App.jsx` lines 589–700. Confirm the header's real contents:
 - Rail contents, in order: `RailItem` ×  the ten sections (`Profile`, `Preferences`, `Lifestyle`, `Knowledge`, `Projects`, `Goals`, `Circle`, `Media`, `Aesthetics`, `Learning log`), a 1px `border` divider with `space-12` above and below, `RailItem` `Review` with `Badge` `3`, `RailItem` `Sections`, then `v2.0.0 (a1b2c3)` in `caption-2`.
 - `Preferences` is `Active Expanded`, followed by four `RailSubItem`s: `Code Style`, `Communication` (`Current`), `Learning Style`, `Likes & Dislikes`.
 
-- [ ] **Step 3: Build the header**
+- [x] **Step 3: Build the header**
 
 Invoke `figma:figma-use` and `figma:figma-generate-design`. Import components by key before instancing:
 
@@ -984,21 +985,21 @@ header.resize(1440, 60);
 return { createdNodeIds: [screen.id, header.id, saved.id], screenId: screen.id };
 ```
 
-- [ ] **Step 4: Verify the header before building the rail**
+- [x] **Step 4: Verify the header before building the rail**
 
 Screenshot the header alone at scale 2. Check: 60px tall exactly, contents on the 1152 column, nothing clipped, the chip vertically centred. Fix before continuing.
 
-- [ ] **Step 5: Build the rail**
+- [x] **Step 5: Build the rail**
 
 Twelve `RailItem` instances plus four `RailSubItem`s plus a divider is sixteen operations. **Split into two calls** — the ten section items first, then Review/Sections/divider/version/sub-items.
 
-- [ ] **Step 6: Build the mobile shell**
+- [x] **Step 6: Build the mobile shell**
 
 `Mobile 390 — Shell`: 390×844. Header 390×56 with the logo, `SaveStateChip`, theme and account collapsed into a 32px overflow button. Below it a `SectionSelector` (`Closed`) reading `Preferences`. **No horizontal tab strip** — its absence is the point of the screen.
 
 `Mobile 390 — Section sheet`: the same frame with `Sheet` `Open` over a 40% `ink` scrim, listing all ten sections plus `Review` and `Sections`, with `Preferences` expanded showing its four sub-items. This is the screen that replaces the strip, so it must show that every subsection is reachable in two taps.
 
-- [ ] **Step 7: Verify all three frames**
+- [x] **Step 7: Verify all three frames**
 
 ```js
 const page = figma.root.children.find(p => p.name === '03 Shell & Navigation');
@@ -1011,7 +1012,7 @@ return { frames, suspectDetached: detached.map(n => n.name) };
 
 Expected: three frames at 1440×1024, 390×844, 390×844. Screenshot in light and dark. Confirm every rail row is an `INSTANCE`, not a local frame — a detached copy will not update when the component changes.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git commit --allow-empty -m "chore: shell and navigation screens built in Figma Ti7FlZLYOvX3goyvfypJBk"
