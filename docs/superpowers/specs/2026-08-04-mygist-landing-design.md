@@ -271,7 +271,7 @@ for adapting registry components over hand-rolling them.
 
 `bento-grid` ships as TSX with `rounded-xl` (12px), hardcoded `neutral-*` text
 colours, its own box-shadows and a dependency on `@radix-ui/react-icons`.
-Adapting it means: radius to 24px, text to `foreground` and `muted-foreground`,
+Adapting it means: radius to 12px, text to `foreground` and `muted-foreground`,
 shadows to the `sm` and `lift` steps, and icons from `lucide-react` to match the
 rest of the app. Its hover behaviour (icon scales down, text lifts, CTA fades up)
 runs at 300ms, which sits exactly on the motion ceiling and is kept.
@@ -300,7 +300,7 @@ mirrors its variant names, so Code Connect is close to free later.
 **Content**
 
 6. Section header — mono eyebrow, display, body sub
-7. Bento tile — adapted from `bento-grid`, 24px radius, `card` fill, hairline border. **No tile cap and no icon.** Title in Indigo, description in `muted-fg`. Product UI sits oversized at the foot, clipped by the tile so it bleeds off the bottom and right with a soft fade. Variants: 1-col and 2-col × media none/ui
+7. Bento tile — adapted from `bento-grid`, 12px radius, `card` fill, hairline border. **No tile cap and no icon.** Title in Indigo, description in `muted-fg`. Product UI sits oversized at the foot, clipped by the tile so it bleeds off the bottom and right with a soft fade. Variants: 1-col and 2-col × media none/ui
 8. Step card — numbered
 9. Pull-quote
 

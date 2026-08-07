@@ -269,15 +269,18 @@ const TOKENS = {
   'ink':            [[24,10,10],   [60,5,96]],
   'card':           [[0,0,100],    [60,2,10]],
   'muted':          [[60,5,96],    [60,1,14]],
-  'muted-fg':       [[25,5,45],    [24,5,64]],
+  'muted-fg':       [[25,5,42],    [24,5,64]],   // 42, not 45: 45 failed AA on clay-tint and muted
   'border':         [[20,6,90],    [60,2,16]],
-  'indigo':         [[228,69,55],  [228,94,67]],
+  'indigo':         [[228,69,55],  [228,94,62]], // FILLS only. 62, not 67: white labels failed at 67
+  'link':           [[228,69,55],  [228,94,68]], // interactive TEXT only. Lighter than indigo on purpose
   'on-primary':     [[0,0,100],    [0,0,100]],   // white in BOTH modes
   'indigo-tint':    [[223,100,96], [227,22,20]],
   'clay':           [[18,74,60],   [18,66,62]],
   'clay-tint':      [[18,74,94],   [18,30,18]],
   'verdigris':      [[188,38,36],  [188,40,50]],
   'verdigris-tint': [[188,26,93],  [188,26,15]],
+  'ground-inverse': [[24,10,10],   [24,8,14]],   // the dark break. Dark in BOTH modes
+  'on-inverse':     [[60,5,96],    [60,5,96]],   // text on it. Light in BOTH modes
   'success':        [[142,71,35],  [142,60,50]],
   'warning':        [[43,96,40],   [43,90,55]],
   'destructive':    [[0,65,48],    [0,74,54]],
@@ -844,7 +847,7 @@ Invoke `figma:figma-use` and `figma:figma-generate-design`. Frame `Landing — 1
 |---|---|---|
 | 1 | Hero | `color/paper` + `hero-field` gradient |
 | 2 | How it works | `color/clay-tint` |
-| 4 | What it does | `color/paper` |
+| 3 | What it does | `color/paper` |
 | 4 | Closing CTA | `color/ground-inverse` + indigo gradient |
 | 5 | Footer | `color/ground-inverse` |
 
@@ -882,7 +885,7 @@ Tile copy is transcribed from the spec's seven tile blocks, verbatim.
 
 - [ ] **Step 5: Assemble the closing and footer**
 
-Closing on `color/ink`: display `Stop starting from nothing.` at `type/56`, sub `Leave your email and we'll send an invite when a slot opens.`, then a `Waitlist field`. The indigo gradient sits over the ink ground.
+Closing on `color/ground-inverse`: display `Stop starting from nothing.` at `type/56`, sub `Leave your email and we'll send an invite when a slot opens.`, then a `Waitlist field`. The indigo gradient sits over the ink ground.
 
 Footer: `Footer` component.
 
