@@ -169,6 +169,7 @@ Produced by Task 1. `FILE_KEY` is already resolved inline everywhere it appears 
 - **Task 3 `effectStyleIds`**: `shadow-raised` = `S:a3d8d8cb802153b071804af1f587b398c0f2e244,`, `shadow-overlay` = `S:1c90f6baec2795d0eb0aea3a9cbb3001363b7988,`.
 - **Task 5 component sets** (all on page `02 Components`, `Ti7FlZLYOvX3goyvfypJBk`): `TextField` id `28:34` key `03456a0c6313dac68a36242f1b58d1aff3633f76` (6 variants); `Select` id `29:44` key `e0b8d0a3347f781580ec00daa7ef33a1a41e6003` (6 variants); `TextArea` id `30:38` key `68a397cd1d297404282a3860fd1fd15fe2618e66` (6 variants); `Switch` id `32:14` key `7a59f5e2f7fa475c526483a0ef2e9e26e5eba921` (4 variants); `Checkbox` id `37:12` key `3f6dbbcddfde74738d17ad7d7caa5b75ce5bcaca` (4 variants); `PinField` id `38:49` key `4e9b0daad2c4977f04aa1c2d86f8663db7e9d394` (4 variants). Reshaped reference file exposed no usable geometry (Community cover page only) so all proportions come from the brief's explicit values. Tasks 8–13 consume these sets via local `component.createInstance()`, not `importComponentByKeyAsync` — same file, no publish step exists.
 - **Task 6 component sets** (all on page `02 Components`, `Ti7FlZLYOvX3goyvfypJBk`): `Button` id `56:40` key `4871a5017692949546fad7ddbdd822529b3ad437` (20 variants); `Chip` id `58:11` key `bdf575f08fa0361dbd1ab864ca4ed5d0454e564d` (3 variants); `Badge` id `58:23` key `30c88a54e2dead82d77d25e75392f06dc9ce44a7` (5 variants); `FillSummary` id `58:30` key `05008ed91e402b98c42e97e7063f02d418391099` (3 variants); `SubsectionCard` id `61:21` key `d9e1ec26b3c7e0e2ed1a519dac16bd7c5bc1e4f2` (3 variants); `EmptyState` id `62:14` key `1f8c3400fb755420009ec2ebd4d1bf64323870df` (2 variants). `EyebrowBand` is a bare `COMPONENT` (not a set, per ruling): id `61:22` key `4fd0ca5a66db03b957b7e00b7c75b9952a8be938`. `SubsectionCard` nests a local `FillSummary` instance in its header via `createInstance()`; `EmptyState` nests local `Button` instances (Ghost/Default for `Card`, Primary/Default for `Page`) the same way. Discovered during this task: `combineAsVariants` resets bound-paint opacity to 1 on its children, the same failure mode as `setExplicitVariableModeForCollection` from Task 5's lessons — any fractional-opacity overlay/tint paint must be (re-)applied only after the last `combineAsVariants` or mode-switch call in the build order.
+- **Task 7 component sets** (all on page `02 Components`, `Ti7FlZLYOvX3goyvfypJBk`): `RailItem` id `75:55` key `50521c8912e7194d8defc0409594ecfbddd40830` (8 variants, State×Badge); `RailSubItem` id `75:78` key `2810226dd533949561d23cb3eb10430dd0c8c098` (3 variants); `Tabs` id `78:43` key `c6f5118001be3cd40595df2ae88f77797e336521` (2 variants, `Count=Two` only — Task 12 adds `Count=Three`); `Modal` id `85:24` key `44b231ebe794f45494a078baa17f9f667a62d98a` (2 variants); `Sheet` id `86:31` key `05ff4eb66e0da27e22dc2455fe533a15cdbe10b5` (2 variants); `SaveStateChip` id `79:28` key `e33f111008f80c29d13f08e70740b0eb48e0c9b2` (3 variants); `SectionSelector` id `86:40` key `a51d1763b19f0b57fe17b728cf3ab57557461c88` (2 variants). `RailSubItem` carries `Spy marker` (2×16, bound `indigo`) in all three variants, hidden except in `Current`; `Tabs` carries `Indicator` (2px bound `indigo`) in both variants, its inactive sibling named `Underline` so the per-variant `Indicator` count stays exactly one. RailItem's 36px `RailSubItem` indent and Sheet's handle-to-header gap are both composed from two bound spacing tokens rather than one literal, per the space-token constraint. Three lessons worth carrying forward: (1) `combineAsVariants` freezes the component-set frame's own bounding box from the pre-repositioning layout of its source components — repositioning variants into a grid afterward silently clips anything outside the stale box (`clipsContent` is true by default) unless you explicitly `resize()` the set to the new children's bounding box; this bit both `RailItem` and `SaveStateChip` here. (2) An empty auto-layout HUG container (the `Body`/`Content` slot pattern) does not re-shrink after a child is added then removed within the same or a later script call — it freezes at the child's last size; recovery is an explicit `resize(width, 1)` followed by re-applying `layoutSizingVertical = 'HUG'`, which does correctly re-collapse it. Do this immediately after any add/measure/remove HUG proof, or the proof itself leaves the component broken. (3) `node.query('[name=Some Name]')` silently returns zero matches when the name contains a space (unescaped in the selector), even though the node exists and `findAll(n => n.name === 'Some Name')` finds it correctly — the brief's own Step 6 `Spy marker` check script is affected by this and reports `[0,0,0]`; `findAll` is the reliable check.
 
 ---
 
@@ -868,7 +869,7 @@ git commit --allow-empty -m "chore: display and container components built in Fi
 - Consumes: variables, text styles, Task 5–6 keys
 - Produces: component sets `RailItem`, `RailSubItem`, `Tabs`, `Modal`, `Sheet`, `SaveStateChip`, `SectionSelector`. Returns `{ componentKeys: {name: key} }`.
 
-- [ ] **Step 1: State the expected structure**
+- [x] **Step 1: State the expected structure**
 
 | Component | Variants | Geometry |
 |---|---|---|
@@ -880,11 +881,11 @@ git commit --allow-empty -m "chore: display and container components built in Fi
 | `SaveStateChip` | `State`: `Saved`, `Saving`, `Unsaved` | height 28, `radius-xl`, `caption-1`. `Saved` `muted` + `success` tick; `Saving` `muted` + spinner; `Unsaved` `warning` at 12% + inline `Save now` Ghost button |
 | `SectionSelector` | `State`: `Closed`, `Open` | mobile, height 44, full width, `card` fill, 1px bottom `border`, section name `headline-2` + chevron |
 
-- [ ] **Step 2: Build RailItem, verify at both 240 width and in dark mode**
+- [x] **Step 2: Build RailItem, verify at both 240 width and in dark mode**
 
 The rail is 240px and its items must fill it exactly. After `appendChild` into a 240-wide auto-layout parent, set `layoutSizingHorizontal = 'FILL'`. Screenshot `Active` in both colour modes — `indigo-tint` on `paper` is the pairing most likely to disappear in dark mode, and it is worth catching here rather than on five screens.
 
-- [ ] **Step 3: Build RailSubItem with a named Spy marker layer**
+- [x] **Step 3: Build RailSubItem with a named Spy marker layer**
 
 ```js
 // The marker is a separate, named node because Task 14 animates its Y position
@@ -899,13 +900,13 @@ marker.fills = [figma.variables.setBoundVariableForPaint(
 
 In `Default` and `Hover` the marker is present but `visible = false`, so all three variants share one structure and the animation has something to interpolate in every state.
 
-- [ ] **Step 4: Build Tabs, SaveStateChip**
+- [x] **Step 4: Build Tabs, SaveStateChip**
 
 `Tabs` content for the Review surface: `Inbox` with a `Badge` reading `3`, `Observations` with `2`. The `Indicator` layer is named and separate for the same reason as `Spy marker`.
 
-- [ ] **Step 5: Build Modal, Sheet, SectionSelector**
+- [x] **Step 5: Build Modal, Sheet, SectionSelector**
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Same verification script as Task 6 Step 7. Expected seven sets. Additionally confirm `RailSubItem` contains a node named exactly `Spy marker` in all three variants, and `Tabs` a node named exactly `Indicator`:
 
