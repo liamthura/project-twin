@@ -145,6 +145,18 @@ Four steps, all tinted with Ink rather than black so they stay warm.
 
 Frosted glass is reserved for the fixed nav pill.
 
+### Tap targets
+
+Controls smaller than 44px keep a 44px **hit area** rather than being drawn
+larger. The app already does this: `frontend/src/globals.css` defines a
+`.tap-target` utility that expands the hit box via `::after { inset: -6px }`
+without changing layout.
+
+This applies to the client chips (34px tall) and the `Sign in` text links. They
+are not undersized controls to be corrected by making them visually bigger —
+enlarging them would break the chip row's proportions. In Figma the hit area is
+invisible, so it is recorded here instead.
+
 ### Motion
 
 Taken verbatim from the persona definition.
