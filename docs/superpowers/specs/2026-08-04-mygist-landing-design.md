@@ -63,7 +63,8 @@ with the stone neutrals and far enough from indigo not to compete with a CTA.
 |---|---|---|---|
 | Paper | `60 9% 98%` | `60 3% 7%` | Page ground (existing `--background`) |
 | Ink | `24 10% 10%` | `60 5% 96%` | Text (existing `--foreground`) |
-| Indigo | `228 69% 55%` | `228 94% 67%` | Primary, CTAs, the mark (existing, untouched) |
+| Indigo | `228 69% 55%` | `228 94% 62%` | **Fills only** — buttons, CTAs, the mark |
+| Link | `228 69% 55%` | `228 94% 68%` | **Interactive text only** |
 | On-primary | `0 0% 100%` | `0 0% 100%` | Text on Indigo. White in **both** modes (existing `--primary-foreground`) |
 | Ground-inverse | `24 10% 10%` | `24 8% 14%` | The dark break section's ground. Dark in **both** modes |
 | On-inverse | `60 5% 96%` | `60 5% 96%` | Text on Ground-inverse. Light in **both** modes |
@@ -87,7 +88,13 @@ The indigo tint reuses the app's existing `--accent` rather than introducing a
 parallel value.
 
 Every foreground/background pair in use is checked against WCAG AA by
-measurement, not by eye.
+measurement, not by eye. The results are in `design/contrast-audit.md`.
+
+**Indigo and Link are deliberately separate.** One token cannot serve as both a
+button fill and as interactive text: text *on* a fill wants the fill darker, while
+the same colour used *as* text wants it lighter. The app's single `--primary` was
+tuned for the text case, which left white button labels at 3.69 in dark mode —
+below AA, in the shipping product. Splitting the roles fixes both.
 
 ### Type
 
