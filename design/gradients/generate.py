@@ -8,7 +8,7 @@ This script IS the reproducibility record. An earlier version of the plan asked
 for a prose block of slider values per asset; that is approximate and rots. This
 is exact: run it and you get the committed PNGs back, byte for byte.
 
-Why not GRADIENTOOL itself? The tool renders in a canvas, and driving it через
+Why not GRADIENTOOL itself? The tool renders in a canvas, and driving it through
 Playwright at 2880x1600 with its grain workers exhausted memory on the owner's
 machine. The two things that actually matter are reimplemented here:
 

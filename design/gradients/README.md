@@ -1,8 +1,14 @@
 # Gradient assets
 
-Ten stills — five light, five dark — used in three fixed roles on the landing
-page: a 12px **edge strip** on the page frame, a soft **hero field** behind the
-product mockup, and a **tile cap** across the top of each bento tile.
+Ten stills, five light and five dark, in **two** live roles on the landing page:
+a 12px **edge strip** across the very top of the page, full-bleed to the viewport
+edges, and a soft **hero field** behind the product mockup.
+
+**The six `tile-cap-*` files are currently unused.** A third role put a gradient
+cap on each bento tile; it was cut when the bento's direction was set from
+reference images, because an 8px saturated band fought the calm of plain cards
+whose colour comes from an Indigo title and the bleeding product UI. The files are
+kept rather than deleted since `generate.py` reproduces them in nine seconds.
 
 ## Regenerating
 
@@ -64,7 +70,7 @@ at 2880×24.
 |---|---|---|
 | `edge-strip-{light,dark}` | 2880×24 | The signature element. Reads at 12px on the page, so the band structure stays coarse. |
 | `hero-field-{light,dark}` | 2880×1600 | Deliberately pale, peaking at 30% ink over paper (42% dark). A product mockup sits on top and type sits nearby. Blue-leaning, chosen over a pink-forward variant so it harmonises with Indigo as the brand primary. |
-| `tile-cap-{blue,violet,pink}-{light,dark}` | 1200×16 | Three slices of the *same* ramp rather than three separate hues — one element recoloured by position, which is what makes it a system rather than decoration. |
+| `tile-cap-{blue,violet,pink}-{light,dark}` | 1200×16 | **Unused.** Three slices of the same ramp, kept in case tile caps return. |
 
 ## Rule
 

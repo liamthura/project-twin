@@ -45,8 +45,9 @@ const hsl = (h, s, l) => { s/=100; l/=100
 ```
 paper           60 9% 98%      ink             24 10% 10%
 card             0 0% 100%     muted           60 5% 96%
-muted-fg        25 5% 45%      border          20 6% 90%
+muted-fg        25 5% 42%      border          20 6% 90%
 indigo         228 69% 55%     indigo-tint    223 100% 96%
+link           228 69% 55%     (interactive TEXT; indigo is fills only)
 on-primary       0 0% 100%     (white in BOTH modes)
 clay            18 74% 60%     clay-tint       18 74% 94%
 verdigris      188 38% 36%     verdigris-tint 188 26% 93%
@@ -59,7 +60,8 @@ destructive      0 65% 48%
 paper           60 3% 7%       ink             60 5% 96%
 card            60 2% 10%      muted           60 1% 14%
 muted-fg        24 5% 64%      border          60 2% 16%
-indigo         228 94% 67%     indigo-tint    227 22% 20%
+indigo         228 94% 62%     indigo-tint    227 22% 20%
+link           228 94% 68%     (interactive TEXT; indigo is fills only)
 on-primary       0 0% 100%     (white in BOTH modes)
 clay            18 66% 62%     clay-tint       18 30% 18%
 verdigris      188 40% 50%     verdigris-tint 188 26% 15%
@@ -296,7 +298,7 @@ return made
 
 - [ ] **Step 3: Verify by reading back, not by trusting the write**
 
-Read the variables back with the Plugin API snippet in Global Constraints — not `get_variable_defs`, which needs a selection and will fail on this empty page. Expected: 16 variables under the `color/` prefix, each resolving to a different value in Light and Dark. Spot-check three by hand:
+Read the variables back with the Plugin API snippet in Global Constraints — not `get_variable_defs`, which needs a selection and will fail on this empty page. Expected: 19 variables under the `color/` prefix, each resolving to a different value in Light and Dark. Spot-check three by hand:
 
 - `color/paper` Light must be `#FAFAF9` (±1 per channel from rounding)
 - `color/verdigris` Light must be `#39757F` (±1)
@@ -350,7 +352,7 @@ return [
 
 - [ ] **Step 2: Verify**
 
-Read the variables back with the Plugin API snippet in Global Constraints. Expected: 8 radius, 11 space, 9 type = 28 new variables, on top of the 16 colours from Task 2.
+Read the variables back with the Plugin API snippet in Global Constraints. Expected: 8 radius, 11 space, 9 type = 28 new variables, on top of the 19 colours from Task 2, giving 47.
 
 If the count is short, a value collided with an existing name — list the collection contents and reconcile before continuing.
 
@@ -497,10 +499,10 @@ Only after the direction is approved.
 | `edge-strip-dark` | 2880×24 | same, dark values | |
 | `hero-field-light` | 2880×1600 | indigo dominant, paper falloff | Soft, low contrast. It sits behind the mockup and must not compete with it. |
 | `hero-field-dark` | 2880×1600 | same, dark values | |
-| `tile-cap-indigo-light` | 1200×16 | indigo | |
-| `tile-cap-clay-light` | 1200×16 | clay | |
-| `tile-cap-verdigris-light` | 1200×16 | verdigris | |
-| `tile-cap-{indigo,clay,verdigris}-dark` | 1200×16 | dark values | Three files |
+| `tile-cap-blue-light` | 1200×16 | ramp slice 0.34–0.56 | Currently unused |
+| `tile-cap-violet-light` | 1200×16 | ramp slice 0.56–0.74 | Currently unused |
+| `tile-cap-pink-light` | 1200×16 | ramp slice 0.74–0.92 | Currently unused |
+| `tile-cap-{blue,violet,pink}-dark` | 1200×16 | dark values | Three files. **Currently unused** — tile caps were cut when the bento direction changed |
 
 Export each at 2x into `design/gradients/`.
 
@@ -510,7 +512,7 @@ For each asset, append a block to `design/gradients/README.md` under `## Assets`
 
 ```markdown
 ### edge-strip-light.png
-2880x24 @2x · stops: indigo #3D5DDB, clay #E47B4E, verdigris #39757F
+2880x24 @2x · stops: ink #1C1917, blue #2345E0, pink #FF9DC5, cream #FBF0EE
 grain 0.52 · seam 0.05 · depth3d 0.55 · treatment: contour / filled bands
 frequency <value> · weight <value> · angle <value> · layers <value>
 ```
@@ -644,7 +646,7 @@ The strip cannot live inside `Page frame`: a 32px-radius container would clip it
 
 `Section header` — vertical stack: eyebrow (Geist Mono, `type/13`, uppercase, 0.12em tracking, `color/muted-fg`), display (Stack Sans Notch SemiBold, `type/56`), sub (Geist, `type/18`, `color/muted-fg`). Gap `space/12`.
 
-`Step card` — numbered, radius `radius/24`, fill `color/card`, shadow `sm`.
+`Step card` — numbered, radius `radius/12`, fill `color/card`, shadow `sm`.
 
 `Pull-quote` — Geist Medium `type/28`, no quotation marks drawn, a 3px `color/clay` rule at the left.
 
@@ -677,7 +679,7 @@ Adapted from Magic UI's `bento-grid`. That component ships `rounded-xl` (12px), 
 
 - [ ] **Step 1: Build the tile**
 
-Radius `radius/24` — not the registry's 12px. Fill `color/card`, 1px `color/border` stroke. Shadow `sm` at rest. **Title in Geist SemiBold `type/20` bound to `color/indigo`** — not ink. Body in Geist `type/16` bound to `color/muted-fg`.
+Radius `radius/12` — the owner set cards to 12px against the running app, whose own radius is 8px. Fill `color/card`, 1px `color/border` stroke. Shadow `sm` at rest. **Title in Geist SemiBold `type/20` bound to `color/link`** — not ink, and not `color/indigo`: indigo is fills only, `link` is interactive text, and the two carry different lightness so both pass AA. Body in Geist `type/16` bound to `color/muted-fg`.
 
 **No icon and no tile cap.** Both were built and then cut once the visual direction was set from reference images: the tiles are plain cards whose colour arrives from the Indigo title and the product UI, and an 8px gradient band fought that. The gradient signature lives on the page frame's edge strip instead.
 
@@ -830,7 +832,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: every component from Tasks 7–9, gradients from Task 5
-- Produces: frame `Landing — 1440`, six sections in order.
+- Produces: frame `Landing — 1440`, five sections in order.
 
 Copy is transcribed exactly from the spec's copy deck at `docs/superpowers/specs/2026-08-04-mygist-landing-design.md`. Do not improvise, tighten or "improve" it — it has already been through an editing pass.
 
@@ -841,11 +843,10 @@ Invoke `figma:figma-use` and `figma:figma-generate-design`. Frame `Landing — 1
 | # | Section | Ground |
 |---|---|---|
 | 1 | Hero | `color/paper` + `hero-field` gradient |
-| 2 | Works with | `color/paper` |
-| 3 | How it works | `color/clay-tint` |
+| 2 | How it works | `color/clay-tint` |
 | 4 | What it does | `color/paper` |
-| 5 | Closing CTA | `color/ink` + indigo gradient |
-| 6 | Footer | `color/ink` |
+| 4 | Closing CTA | `color/ground-inverse` + indigo gradient |
+| 5 | Footer | `color/ground-inverse` |
 
 Section padding `space/120` top and bottom, `space/80` horizontal.
 

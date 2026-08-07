@@ -24,6 +24,10 @@ export default {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
         },
+        // Interactive text. Separate from primary because a colour used as a
+        // fill wants to be darker (so its label passes) while the same colour
+        // used as text wants to be lighter (so it passes on the page).
+        link: "hsl(var(--link))",
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",

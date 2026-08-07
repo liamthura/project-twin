@@ -24,7 +24,6 @@ level rather than by nudging individual layers.
 | muted-fg | muted | muted surfaces | 4.5 | 4.88 | 6.17 |
 | link | paper | interactive text on page ground | 4.5 | 5.33 | 5.29 |
 | link | card | interactive text in cards | 4.5 | 5.55 | 4.93 |
-| indigo | card | bento tile title, 20px SemiBold | 3.0 | 5.55 | 3.79 |
 | on-primary | indigo | button labels | 4.5 | 5.55 | 4.60 |
 | on-inverse | ground-inverse | closing CTA and footer text | 4.5 | 16.07 | 14.32 |
 
@@ -58,9 +57,29 @@ Light mode needed no split; `228 69% 55%` already passes in both roles.
 
 The app does not yet have a separate link token. It uses `--primary` for
 interactive text, which after this change measures 4.06 on the dark page ground —
-below AA. **Recommended follow-up, not done here because it is app work rather
-than design work:** add `--link` at `228 94% 68%` in `.dark` and point
-interactive text at it.
+below AA. This was fixed rather than deferred, because darkening `--primary` **introduced**
+the failure — primary-as-text measured 5.06 before this branch and 4.06 after.
+Shipping that as a "follow-up" would have meant knowingly leaving a regression in
+the app.
+
+`--link` now exists at `228 69% 55%` light and `228 94% 68%` dark, is exposed
+through `tailwind.config.js`, and the two genuine interactive-text usages point at
+it: `components/ui/button.jsx`'s `link` variant and `renderers/ListRenderer.jsx`.
+The remaining `text-primary` usages are icons and a bullet glyph, which are UI
+components at the 3.0 threshold and pass at 4.06.
+
+## One pair deliberately absent
+
+`indigo` on `card` is not in the table. An earlier draft listed it as the bento
+tile title and passed it at the 3.0 large-text threshold on the strength of "20px
+SemiBold". That was the table's only verdict resting on a judgement call, and the
+call was doubtful: WCAG's large-text allowance wants **bold**, and weight 600 is
+not obviously that. At the 4.5 normal-text threshold the pair measured 3.79 and
+would have failed.
+
+It is moot now. Tile titles bind to `link`, not `indigo`, so the pair in use is
+`link` on `card` — 5.55 light, 4.93 dark, passing at 4.5 with no judgement call
+required. `indigo` is fills only.
 
 ## Not measured
 
