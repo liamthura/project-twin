@@ -1293,7 +1293,7 @@ git commit --allow-empty -m "chore: auth, settings and consent screens built in 
 - Consumes: `Motion` variables from Task 3; the `Spy marker` and `Indicator` layers from Task 7; screens from Tasks 8–12
 - Produces: page `08 Motion` with seven annotated motion specs, and real animation on the two that carry the most weight. Returns `{ frameIds: [...], animatedNodeIds: [...] }`.
 
-- [ ] **Step 1: Build the specification table**
+- [x] **Step 1: Build the specification table**
 
 One frame listing all seven named motions with trigger, property, duration token, easing token. Values read from the `Motion` collection, not retyped:
 
@@ -1309,25 +1309,27 @@ One frame listing all seven named motions with trigger, property, duration token
 
 Plus the three standing rules and the reduced-motion rule, verbatim from the spec's Global Constraints.
 
-- [ ] **Step 2: Animate the scroll-spy marker**
+- [x] **Step 2: Animate the scroll-spy marker**
 
 Invoke `figma:figma-use-motion` alongside `figma-use`. Clone the rail from Task 8 twice — marker on `Code Style`, marker on `Communication` — and animate the `Spy marker` node's Y between them at 200ms with `cubic-bezier(.4, 0, .2, 1)`. This is the highest-value motion in the design, so it is the one that must actually move rather than be described.
 
-- [ ] **Step 3: Animate the approve/reject row exit**
+- [x] **Step 3: Animate the approve/reject row exit**
 
 Clone the Task 10 Inbox rows. Animate row 1: `x` +8, `opacity` to 0, `height` to 0 over 240ms `accelerate`, with rows below closing the gap on the same curve.
 
-- [ ] **Step 4: Annotate the remaining five**
+- [x] **Step 4: Annotate the remaining five**
 
 Static before/after frame pairs with the timing written beside each in `caption-2`. Do not animate all seven — two working examples plus five precise specs is more useful than seven half-built ones.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Confirm the two animated nodes carry animation data and that the durations match the `Motion` collection values rather than hardcoded numbers.
 
 ```bash
 git commit --allow-empty -m "chore: motion annotations built in Figma Ti7FlZLYOvX3goyvfypJBk"
 ```
+
+**Recorded values:** Page `08 Motion` (`1:9`) holds five top-level frames — spec table `200:2` (7-row table + standing rules + reduced-motion rule + ruling (c)/(d) notes, all durations/easings read live from `Motion` collection `VariableCollectionId:7:13` mode `7:1`), Motion 1 scroll-spy wrapper `201:56` (Before rail `201:57`, Live rail `201:74`, After rail `201:91`), Motion 3 approve/reject wrapper `204:124` (cloned Inbox row list `204:94`), Step 4 static annotations wrapper `205:62` (motions 2/4/5/6/7), and the ruling (f) Tabs test wrapper `206:62`. The two genuinely-animated nodes: Spy marker `201:1866` (`TRANSLATION_Y` 0→36px, 200ms, `cubic-bezier(.4,0,.2,1)`, on the Live rail — detached from its instance first, since the Plugin API rejects keyframes on instance sublayers; its own 32px-tall row frame `201:1863` had to have `clipsContent` set to `false`, since the sliding marker otherwise gets clipped by its own row bounds mid-transit — verified this exact failure mode by exporting before the fix, then confirmed the slide completes and settles beside "Communication" after) and Row — Add hobby `204:95` plus its divider `204:104` (`TRANSLATION_X` 0→8, `OPACITY` 1→0, `HEIGHT` 44→~0, 240ms, `cubic-bezier(.4,0,1,1)`, verified by exported video showing rows 2–3 close the gap via the parent auto-layout's own reflow). Ruling (b) route: built the two rail states fresh, instancing `RailSubItem` `State=Current` (`75:77`) for every row rather than cloning, then overriding label colour (indigo `VariableID:4:9` for current, ink `VariableID:4:6` otherwise) and marker opacity (1 for current, 0 for the other three) on all 12 instances across the Before/Live/After rails — enumerated and re-read after build: `201:58`=1(current), `201:62`=0, `201:66`=0, `201:70`=0 (Before); `201:75`(later detached to `201:1863`, marker `201:1866`)=1(current), `201:79`=0, `201:83`=0, `201:87`=0 (Live); `201:92`=0, `201:96`=1(current), `201:100`=0, `201:104`=0 (After) — all matched intent, no unwanted resets observed. Ruling (f) finding: Task 7's per-tab in-flow `Indicator` **cannot** currently animate between tabs — a `TRANSLATION_X`/`WIDTH` keyframe test on the `Count=Two, Active=First` variant's `Indicator` (test frame `206:62`, indicator node `206:84`) reproduced the exact "renders invisible" failure within ~70ms of the transition starting, because each `Indicator` is clipped by its own parent `Tab` frame (`clipsContent:true`, sized to that tab's own width, e.g. `206:80` at width 68). Setting that one frame's `clipsContent` to `false` made the same keyframes slide and settle correctly under "Observations" — confirming clipping, not the per-tab architecture itself, is the blocker, and that the fix is small and localised (disable `clipsContent` on each `Tab` frame, or move `Indicator` to a non-clipping shared ancestor). This is routed back as a Task 7 component finding, not fixed in place (Task 13 is not tasked with editing the shared `Tabs` component). No `clay`/`verdigris` tokens used anywhere on the page; a full audit of the five frames found zero unbound fills, zero unbound text fills, and zero non-token corner radii among content authored in Task 13 (the only flagged items — icon fills inside cloned `Button` instances, `Vector` icon strokes, `RailSubItem`'s own internal `itemSpacing:0`, and the shared `Spy marker` component's `cornerRadius:1` — are all inherited from pre-existing Task 7/8/10 components, not introduced here).
 
 ---
 
