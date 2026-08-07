@@ -65,6 +65,8 @@ with the stone neutrals and far enough from indigo not to compete with a CTA.
 | Ink | `24 10% 10%` | `60 5% 96%` | Text (existing `--foreground`) |
 | Indigo | `228 69% 55%` | `228 94% 67%` | Primary, CTAs, the mark (existing, untouched) |
 | On-primary | `0 0% 100%` | `0 0% 100%` | Text on Indigo. White in **both** modes (existing `--primary-foreground`) |
+| Ground-inverse | `24 10% 10%` | `24 8% 14%` | The dark break section's ground. Dark in **both** modes |
+| On-inverse | `60 5% 96%` | `60 5% 96%` | Text on Ground-inverse. Light in **both** modes |
 | Clay | `18 74% 60%` | `18 66% 62%` | New. Section tint, illustration |
 | Verdigris | `188 38% 36%` | `188 40% 50%` | New. Section tint, illustration |
 
@@ -315,12 +317,17 @@ Sections alternate grounds so the page does not read as one long white scroll.
 
 | # | Section | Ground | Job |
 |---|---|---|---|
-| 1 | Hero | Paper + indigo gradient field | Framed product mockup, waitlist capture |
-| 2 | Works with | Paper, quiet | Credibility |
-| 3 | How it works | Clay tint | Three steps, the spine |
-| 4 | What it does | Paper | Bento grid, seven tiles. Density and life |
-| 5 | Closing CTA | **Ink, full-bleed** + indigo gradient | Second waitlist capture, and the page's one dark beat |
-| 6 | Footer | Ink | — |
+| 1 | Hero | Paper + indigo gradient field | Framed product mockup, client chips, waitlist capture |
+| 2 | How it works | Clay tint | Three steps, the spine |
+| 3 | What it does | Paper | Bento grid, seven tiles. Density and life |
+| 5 | Closing CTA | **Ground-inverse, full-bleed** + indigo gradient | Second waitlist capture, and the page's one dark beat |
+| 6 | Footer | Ground-inverse | — |
+
+Sections 5 and 6 use `Ground-inverse`, not `Ink`. Assembly showed why: `Ink` and
+`Paper` invert together, so an ink-grounded section comes out *lighter* than the
+page in dark mode and the tonal arc runs backwards. `Ground-inverse` stays dark in
+both modes, with `On-inverse` for its text, so the page resolves into dark either
+way and the grain keeps the ground it reads best on.
 
 A "Your data" section on ink previously sat between the bento and the closing
 CTA, carrying export, passivity and an honest line about who owns the hosted
