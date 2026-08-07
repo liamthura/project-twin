@@ -390,8 +390,14 @@ self-introduction, stack up and collapse into the framed mockup. The client chip
 then fade up one after another, 60ms apart. Sequence carries the idea that the
 context reaches them; nothing is drawn between the frame and the chips.
 
-Total elapsed time is under 600ms across the whole sequence, with no single step
-over 240ms. It plays once on arrival and never again.
+The sequence resolves in roughly 900ms, with no single step over 240ms. It plays
+once on arrival and never again.
+
+An earlier version of this spec claimed "under 600ms", which was arithmetically
+impossible alongside its own other numbers: three bubbles 80ms apart at 240ms each
+finish at 400ms, and the 240ms collapse takes it to 640ms before a single chip
+moves. The 300ms per-step ceiling is the rule that matters and it holds; the total
+was a figure asserted rather than added up.
 
 An earlier draft ran lines outward from the frame to each chip. Even drawn once
 rather than looping, a line from a product to a row of logos reads as the beam
@@ -400,6 +406,27 @@ quietly.
 
 This is the most expensive thing on the page to build well and should be
 prototyped last.
+
+### What Figma cannot express
+
+Three items in this section are real behaviour that Figma's prototyping API has no
+way to represent. They are recorded here rather than approximated, because a
+plausible-looking substitute would break the motion rules:
+
+1. **Scroll-triggered section entrances.** Figma's `Trigger` union has no scroll
+   equivalent, so the `blur-fade` on sections 2 to 5 exists only as a written
+   specification.
+2. **Bento tile hover and button press.** `CHANGE_TO` resolves only to sibling
+   variants within a set, so a hover state needs its own variant axis — which
+   would break the four-variant contract those components are built on. The
+   intended behaviour lives in each component's description.
+3. **Mobile waitlist state machine.** The 390 build placed the waitlist field as
+   static frames rather than component instances, so its five states cannot be
+   wired there. Desktop is fully wired.
+
+All three are straightforward in code. None is a design decision — they are tool
+limits, and whoever implements this should not read their absence from the
+prototype as intent.
 
 ## Copy deck
 
