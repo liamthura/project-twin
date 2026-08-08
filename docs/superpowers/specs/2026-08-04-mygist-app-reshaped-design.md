@@ -891,3 +891,11 @@ justified departure from it.
   full opacity (`1`) at both paint and node level, using a colour change
   instead. Not a defect — just a correction to a stale expectation, confirmed
   by reading all `Switch` and `Checkbox` variants directly.
+- **`Button`'s icon slot holds one unbound paint, and it is harmless.** A
+  build note once listed it as an outstanding defect. It is not: the unbound
+  white fill belongs to the slot's invisible placeholder, which renders
+  nothing, while every swapped-in icon is properly bound. The file's only
+  genuine unbound-paint exception is the `Logo Mark` stroke recorded above.
+  Noted here because the original claim lived only in a scratch ledger that
+  does not survive this branch, so without this line the correction would
+  vanish and the stale version is the one people might remember.
