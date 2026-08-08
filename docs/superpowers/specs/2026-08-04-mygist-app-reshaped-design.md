@@ -553,8 +553,10 @@ itself is never deleted — it is a view over fields that already exist, so
 
 ## Figma prototype
 
-New file **`MyGist — App Redesign`**. Token names are identical to the landing
-file's so the two merge into one library later.
+New file **`MyGist — App Redesign`** — `Ti7FlZLYOvX3goyvfypJBk`
+(<https://www.figma.com/design/Ti7FlZLYOvX3goyvfypJBk/MyGist-%E2%80%94-App-Redesign>).
+Token names are identical to the landing file's so the two merge into one
+library later.
 
 ```
 00 Cover
@@ -614,3 +616,147 @@ geometry and states, not of token names.
 | Scroll-spy accuracy with variable card heights | `IntersectionObserver` per card with a root margin matching the sticky header; the marker follows the topmost intersecting card |
 | Seeding silently does nothing on a read-only connection | Onboarding shows granted scopes and calls out a missing `propose` scope |
 | Onboarding basics write to two sections at once | Both paths already exist in the manifests; writes go through the same `/files/{key}` endpoint the editors use |
+
+## Prototype divergences
+
+Recorded during Task 14's final audit of the Figma file
+(`Ti7FlZLYOvX3goyvfypJBk`), against this spec. Where a check failed outright it
+is marked **FAIL**; everything else either matches the spec or is a considered,
+justified departure from it.
+
+- **Font: none.** `Geist` and `Geist Mono` were both available in
+  `listAvailableFontsAsync()` (`Regular`, `SemiBold`, no space), so no
+  Inter/Roboto Mono substitution was ever needed. Recorded on the cover.
+- **Reshaped v3.9 was never usable as a geometry reference.** Neither the
+  duplicated community file nor the user-provided reference file
+  (`oR8g1o9qiluZAqHzMfieg0`) exposed component geometry through `get_metadata`
+  or `get_screenshot` — the community file showed only a cover page. Every
+  component (Tasks 5–7) was built from the brief's explicit values; no
+  proportions were borrowed from Reshaped.
+- **Detached container components.** `SubsectionCard`, `Modal` and `Sheet` are
+  deliberately detached on screens, because the Plugin API refuses
+  `appendChild` into a descendant of a live instance. 38 detached/cloned
+  non-instance frames are present in the file today: 1 `Sheet` (`03 Shell &
+  Navigation`, mobile section sheet, `96:67`), 27 `SubsectionCard` (`04 Section
+  editor`), 5 `SubsectionCard`/`Modal` (`05 Review`), 5 `Modal`/`Sheet` (`07
+  Auth & Settings`). **Cost:** later edits to those three components in `02
+  Components` will not propagate into any of these 38 built screens — each is
+  a frozen copy from the moment it was detached.
+- **Onboarding was redesigned late, at the user's direction**, into a
+  **standalone stepped flow with no app shell** (`Onboarding — Welcome`, `—
+  About you`, `— How you like answers`, `— Complete`, plus a mobile variant),
+  deliberately reversing the earlier decision that made onboarding a rail
+  destination inside the app shell. As a side effect, `06 Onboarding` now
+  holds **zero fractional-opacity paints** file-wide (confirmed by audit) —
+  only twelve node-level `Spy marker` opacities remain across the file, none
+  of them on this page's new flow.
+  **Open item, not resolved by this audit:** the page still also contains the
+  *pre-redesign* rail-embedded flow (`Desktop — Spine`, `Desktop — Delegate
+  offer`, `Desktop — Spine complete`, `Mobile — Spine`, each still wrapped in
+  a `Header`/`Body` app shell). Nothing in the task record authorizes keeping
+  both; a reader opening `06 Onboarding` today finds two competing onboarding
+  implementations side by side with no marker of which is canonical. Flagged
+  for the coordinator rather than deleted unilaterally.
+- **Spec check 6 (delegate offer before the field groups): FAIL.** In the
+  current standalone flow, `Onboarding — Welcome` (the flow's first screen)
+  never mentions delegation, and `Onboarding — About you` (step 1 of 4) has no
+  delegate offer either. The only delegate-offer content — `"Let a client do
+  this for you"` — sits inside `Onboarding — How you like answers` (step 2 of
+  4), positioned **after** that step's own `Tone`/`Locale`/`Detail level`
+  fields, immediately above its `Continue` button. The full pitch text ("Would
+  you rather your client did this?", the copyable prompt) survives only in
+  the superseded pre-redesign `Desktop — Delegate offer` frame. Delegation is
+  currently offered after the work, on one step out of four, not before it —
+  the opposite of the spec's intent. This needs a design decision, not a
+  Task 14 fix.
+- **`RailItem` gained an `INSTANCE_SWAP` icon slot** (`Icon#224:0`) **and
+  thirteen icon components** late in the build — `IconProfile`,
+  `IconPreferences`, `IconLifestyle`, `IconKnowledge`, `IconGettingStarted`,
+  `IconProjects`, `IconGoals`, `IconCircle`, `IconMedia`, `IconAesthetics`,
+  `IconLearningLog`, `IconReview`, `IconSections` — replacing placeholder black
+  squares across the rail on four pages. (A separate three-icon set,
+  `IconTick`/`IconCross`/`IconChevron`, was added earlier for `Button`'s icon
+  slot — 16 `Icon*` components total on `02 Components`.)
+- **`Tabs` gained `Count=Four`**, not `Count=Three`. Four settings tabs
+  (`Account`/`Server`/`Token`/`Connected apps`) were required once Step 3's own
+  table was reconciled; `Count=Three` was built first, then kept in place
+  unused rather than churned, per the coordinator's instruction. Confirmed
+  live: `Tabs`' property definitions read `Count: [Two, Three, Four]`. `Tabs`
+  was also repaired after Task 7 signed off — its `Tab` frames had
+  `clipsContent: true`, which clipped the `Indicator` out of any transition.
+- **A `scrim` token was added** (`VariableID:140:2`, key
+  `93bb5f52ae2ad5c9936d61dda83cec01e41e6446`) after the token layer was built,
+  because binding scrims to `ink` inverted them in dark mode (a semantic text
+  token that goes near-white in Dark). Confirmed mode-invariant: both `4:0` and
+  `4:1` resolve to the same value.
+- **`Button` gained a hidden-by-default swappable `Icon` slot**
+  (`Icon#139:0`) so row actions could carry icons alongside labels, at the
+  user's direction.
+- **`RailSubItem`'s `State=Current` trap is real, but narrower than first
+  recorded.** Of all 64 `RailSubItem` instances in the file, 49 (on `03 Shell &
+  Navigation`, `04 Section editor`, `05 Review`) correctly vary between
+  `Default` and `Current`. Only the demonstration rails on `06 Onboarding` (4
+  instances) and `08 Motion` (11 instances) — 15 in total, not twelve — are
+  *all* built from the `State=Current` master and instead distinguish the true
+  current row by the `Spy marker`'s own per-instance opacity (`0` for the fake
+  defaults). This is because `createInstance()` drops a `visible:false` child,
+  so the marker cannot be hidden by variant alone. **Trap for future editors:**
+  "correcting" those instances back to `State=Default` would delete the
+  animation target and silently break the scroll-spy motion on those two
+  pages.
+- **Consent scopes are `read`/`propose`/`write`**, not `read`/`search`/
+  `propose` — the code (`Consent.jsx`) was the source of truth, not the
+  brief's table. Confirmed live: the three `CheckboxGroup` labels read "Read
+  your persona", "Suggest changes for your approval", "Change your persona
+  directly".
+- **Seven of the ten sections have no screen of their own.** `04 Section
+  editor` holds exactly `Desktop — Preferences`, `— Profile`, `— Goals` (plus
+  variant frames of those three) — confirmed by reading the page's frame list.
+  Lifestyle, Knowledge, Projects, Circle, Media, Aesthetics and Learning log
+  are structurally identical to Goals and were not built separately.
+- **Five of the seven motions are annotated rather than animated**,
+  deliberately (Task 13). Confirmed on `08 Motion`: exactly five Before/After
+  static comparison pairs exist (subsection expand, approve/reject exit,
+  inline list edit, save tick, sheet/modal); the scroll-spy marker travel and
+  the loading shimmer are the two built as real motion rather than annotation.
+- **Fractional-opacity fragility is real, and now measured precisely.**
+  Switching a frame's `Colour` collection mode resets every **paint-level**
+  fractional opacity back to `1` — confirmed freshly in this audit on `Button`
+  hover/pressed overlays, `Badge`/`Chip` tints, both `scrim` rectangles, the
+  `Scope notice`, and `SaveStateChip Unsaved`, both going into Dark and again
+  restoring to Light (each of the ~57 file-wide fractional-opacity paints had
+  to be re-applied and re-measured twice). **Node-level** opacity does not
+  reset: `Button`'s four `State=Disabled` variants (`opacity: 0.5`) and all
+  twelve `Spy marker` node-opacities (`0`) read back unchanged across every
+  mode switch, with no reapplication needed, confirmed by a direct
+  before/after read on the same nodes across a live mode switch. **This means
+  the prototype is fragile in the user's hands, not just at build time**: any
+  future editor who binds a semi-transparent *paint* and then previews Dark
+  mode will silently lose that opacity; the same editor is safe if they use
+  node-level opacity instead. Recommend node-level opacity for any future
+  overlay/tint that must survive casual mode-switching.
+- **Residual off-token spacing, left unfixed.** `TextField`/`Select`/
+  `TextArea` (`02 Components`) carry an internal `itemSpacing: 6` on their own
+  label/input/helper stack (18 occurrences across the three component sets'
+  variants, inherited by roughly 44 downstream instances across `04`–`07`).
+  6px is off the 4·8·12·16·24·32 scale — a real constraint violation — but
+  every frame that uses these components has an explicit, screenshot-verified
+  pixel height recorded in the plan (Tasks 9–12). Changing the shared
+  component's internal spacing would change every one of those heights at
+  once and require re-verifying every affected frame; left untouched as
+  previously logged in Tasks 9–12, and reconfirmed here rather than fixed.
+  Separately, **15 off-token `itemSpacing: 2` gaps found on `01 Foundations`**
+  (the colour-swatch `labels` frames) were new, page-local, and safe — fixed
+  to `space-4` and reverified (`itemSpacing: 4`, bound to `VariableID:7:7`),
+  with no downstream instances affected.
+- **`Logo Mark`'s glyph is deliberately not theme-bound.** Its two vector
+  paths carry a literal white stroke (`{r:1,g:1,b:1}`) with no bound variable,
+  by design (a fixed brand mark, not a themed surface) — 2 hits on the source
+  component plus 14 on its nested instances across `07 Auth & Settings` are
+  the only residual colour-audit hits in the file; every other node checked
+  file-wide (fills and strokes, including inside `INSTANCE`s) is bound.
+- **The brief expected `Switch`/`Checkbox` disabled states to use fractional
+  opacity; they don't.** Both components render their `Disabled` variants at
+  full opacity (`1`) at both paint and node level, using a colour change
+  instead. Not a defect — just a correction to a stale expectation, confirmed
+  by reading all `Switch` and `Checkbox` variants directly.

@@ -1345,11 +1345,11 @@ git commit --allow-empty -m "chore: motion annotations built in Figma Ti7FlZLYOv
 - Consumes: everything
 - Produces: a cover page, a verified file, and a written record of any place the prototype knowingly diverges from the spec
 
-- [ ] **Step 1: Build the cover**
+- [x] **Step 1: Build the cover**
 
 `MyGist — App Redesign` in `featured-2`, a `caption-1` line naming the spec path, the date `2026-08-04`, and a `caption-2` line recording `FONT_DECISION` — so anyone opening the file learns immediately whether they are looking at Geist or a substitute.
 
-- [ ] **Step 2: Full-file audit for hardcoded colour**
+- [x] **Step 2: Full-file audit for hardcoded colour**
 
 Fan out one `use_figma` call per screen page in a single message (Rule: one page switch per call). Each returns any node with a solid fill that has no bound variable:
 
@@ -1370,11 +1370,15 @@ return { unboundCount: bad.length, unbound: bad.slice(0, 40) };
 
 Every hit is a node that will not switch to dark mode. Fix them all.
 
-- [ ] **Step 3: Dark mode sweep**
+**Task 14 ruling (a) applied:** the script above checks `n.boundVariables.fills` and skips `INSTANCE` nodes — both wrong (paint bindings live on each paint's own `boundVariables.color`; instances can carry their own unbound overrides). Audited instead with a per-paint, per-slot (`fills`/`strokes`), all-node-types sweep across all nine pages. Result: clean everywhere except `Logo Mark`'s two glyph vector strokes (literal white, deliberately not theme-bound — a fixed brand mark) and their 14 nested-instance copies across `07 Auth & Settings`; see the spec's Prototype divergences section. A separate `itemSpacing` sweep (not in the brief's Step 2) found the known 18 off-token `6px` gaps baked into `TextField`/`Select`/`TextArea` (`02 Components`, left unfixed — many downstream instances with previously-verified pixel heights) and 15 off-token `2px` gaps on `01 Foundations`'s swatch labels (new, safe, fixed to `space-4`).
+
+- [x] **Step 3: Dark mode sweep**
 
 Set every page's Colour mode to `Dark` and screenshot each. Look for: `indigo-tint` surfaces vanishing into `card`, `clay-tint` losing contrast against `paper`, and any text that drops below readable contrast. Record and fix.
 
-- [ ] **Step 4: Detached instance sweep**
+**Task 14 ruling (c) applied:** before any mode switch, inventoried every fractional opacity file-wide, read-only (~57 paint-level + 12 node-level `Spy marker` hits). Switched all nine pages to Dark and screenshotted; confirmed no `indigo-tint`/`clay-tint` contrast failures. As expected, every paint-level fractional opacity reset to `1` on the switch — reapplied and remeasured in Dark, then restored to Light `4:0` on all nine pages and reapplied/remeasured a second time (mode switches reset paint opacity on the way back too). Node-level opacity (`Button` `Disabled` `0.5`, all twelve `Spy marker` `0`) was directly tested and confirmed to survive every switch unchanged, settling the open paint-vs-node question definitively. See the spec's Prototype divergences section for the full inventory and the fragility this implies for future editors.
+
+- [x] **Step 4: Detached instance sweep**
 
 Confirm no screen contains a locally-built copy of something that exists as a component:
 
@@ -1391,22 +1395,26 @@ return { suspects };
 
 Any `FRAME` (not `INSTANCE`) named after a component is a detached copy. Fix or rename.
 
-- [ ] **Step 5: Spec coverage check**
+**Task 14 ruling (b) applied:** the name-substring script above would flag ~40 authorised detaches (`SubsectionCard`/`Modal`/`Sheet`) as defects, since Figma rejects `appendChild` into a live instance's descendants. Diffed a structural sweep (non-instance rounded `FRAME`s, cross-checked by name) against the plan's enumerated detach lists across all nine pages. Result — three lists: **enumerated-and-found: 38** (1 `Sheet` exception on `03`, 27 `SubsectionCard` on `04`, 5 on `05`, 5 `Modal`/`Sheet` on `07`); **enumerated-but-missing: 10** (all of Task 11's onboarding `SubsectionCard` detaches/clones — obsolete, because `06 Onboarding` was rebuilt in its later redesign and now contains zero `SubsectionCard`-shaped frames); **found-but-unenumerated: 0**. Full detail in the spec's Prototype divergences section.
+
+- [x] **Step 5: Spec coverage check**
 
 Walk the spec section by section and confirm a frame exists for each. Specifically confirm these six, because they are the requirements most likely to be quietly dropped:
 
-- [ ] `SaveStateChip` in the header, and **no** autosave switch there
-- [ ] Numeric badge on the Review rail item, not a dot
-- [ ] **No** horizontal tab strip on any mobile frame
-- [ ] The `No propose scope` Review frame exists
-- [ ] The autosave switch is on `Settings — Account`
-- [ ] The delegate offer sits **above** the first eyebrow band in the basics panel
+- [x] `SaveStateChip` in the header, and **no** autosave switch there — confirmed: header instances are `SaveStateChip`, `RailItem`s, `Icon`s and a `Badge`; no `Switch` present.
+- [x] Numeric badge on the Review rail item, not a dot — confirmed: `Review` rail row carries a `Badge` reading `3`.
+- [x] **No** horizontal tab strip on any mobile frame — confirmed against the spec text (the removed strip was the old 12-section edge-faded mobile nav, replaced everywhere by `SectionSelector`; zero `Tabs` instances on any mobile *navigation* frame). The `Tabs` instances found on `Mobile — Inbox` and `Mobile — Settings Account` are the spec-required in-content tab bars (Inbox/Observations; Account/Server/Token/Connected apps), not the removed strip.
+- [x] The `No propose scope` Review frame exists — confirmed: `130:975`, read-only reconnect banner and empty inbox, matches spec.
+- [x] The autosave switch is on `Settings — Account` — confirmed by screenshot: `Auto-save` `Switch` present, on.
+- [ ] **FAIL — the delegate offer does not appear before the field groups.** In the current redesigned standalone flow, `Onboarding — Welcome` and `— About you` (step 1 of 4) contain no delegate-offer content at all; the only offer (`"Let a client do this for you"`) sits inside `— How you like answers` (step 2 of 4), positioned **after** that step's own fields. The full pitch survives only in the superseded pre-redesign `Desktop — Delegate offer` frame. Delegation is currently offered after the work, not before — routed to the coordinator rather than fixed here; see the spec's Prototype divergences section.
 
-- [ ] **Step 6: Record divergences**
+- [x] **Step 6: Record divergences**
 
 Add a `## Prototype divergences` section to the spec listing anything the Figma file does differently and why — font substitution, any component built without the Reshaped reference, any frame skipped. If there are none, write "None." An empty list stated is worth more than an absent one.
 
-- [ ] **Step 7: Link the file and commit**
+Done — not "None": the spec's `## Prototype divergences` section lists font (none), the Reshaped v3.9 reference (unusable), 38 detached container components and their propagation cost, the onboarding redesign and its leftover pre-redesign frames, the Step 5.6 failure, `RailItem`'s 13 new icons, `Tabs Count=Four`, the `scrim` token, `Button`'s icon slot, the narrowed `RailSubItem State=Current` trap (15 instances, not 12, on two demo pages only), Consent's real scopes, the seven sections with no dedicated screen, the 5-of-7 annotated motions, the paint-vs-node opacity fragility finding, and the residual off-token `TextField`/`Select`/`TextArea` spacing left unfixed.
+
+- [x] **Step 7: Link the file and commit**
 
 ```bash
 git add docs/superpowers/specs/2026-08-04-mygist-app-reshaped-design.md \
