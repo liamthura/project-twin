@@ -545,14 +545,18 @@ itself is never deleted — it is a view over fields that already exist, so
   and forgot become three states of one card with inline validation on blur
   through `FormControl`'s error slot.
 - **OTP moves to Reshaped `PinField`**, removing the `input-otp` dependency.
-- **InviteGate** — one field, one explanation, no chrome.
+- **InviteGate** — one field, one explanation, no chrome. The field is a
+  segmented `InviteCodeField`, not a plain text input: four cells, a
+  prerendered dash, four cells. See iteration round 2 below.
 - **ResetPassword** — two fields with a live match hint.
 - **ConnectionSettings** is one dialog doing three jobs. It becomes a `Modal`
   with `Tabs`: **Account** (email, add email, password, sign out, and the
-  relocated autosave preference), **Server** (URL plus a connection test showing
-  the verdigris live state), **Token** (create, copy, revoke a scoped token).
-- **ConnectedApps** — one row per client with a verdigris live dot, granted
-  scopes, last used, and revoke.
+  relocated autosave preference), **Server** (MyGist Cloud shown as the default
+  with self-hosting demoted to a hint; the URL field and connection test move to
+  their own custom-server state), **Token** (a list of named tokens, each with
+  copy and a red revoke, plus a create form).
+- **ConnectedApps** — one row per client with a verdigris live dot, its grants
+  in plain language rather than raw scope strings, last used, and a red revoke.
 - **Consent** names the client, lists requested scopes as a `CheckboxGroup` in
   plain language, and pairs Allow with a **neutral** Deny. Deny is not
   destructive; it is the safe choice.
@@ -899,3 +903,126 @@ justified departure from it.
   Noted here because the original claim lived only in a scratch ledger that
   does not survive this branch, so without this line the correction would
   vanish and the stale version is the one people might remember.
+
+## Iteration round 2 — user-directed changes, 2026-08-08
+
+A second review of the built file produced eleven directed changes. They are
+recorded here because several of them **supersede sentences written above**, and
+because three involved a judgement call that the reader may want to overrule.
+
+### Component additions
+
+- **`Button` gained a `Show label` boolean** (`Show label#275:0`), bound to
+  `Label.visible` across all 16 labelled variants. The four `Loading` variants
+  have no `Label` layer and are correctly unbound. Setting it `false` yields a
+  48×36 icon-only button. **A hidden label disappears from `instance.children`
+  entirely** — detect icon-only buttons through `componentProperties`, not by
+  looking for an invisible child. That cost one wasted pass.
+- **`ProgressBar`** (`276:51`), variants `Step=One…Four` at 25/50/75/100%. It is
+  deliberately **not** auto-layout: the `Fill` child uses `SCALE`/`STRETCH`
+  constraints so resizing an instance keeps the proportion. Verified at 640
+  (→160) and 358 (→90).
+- **`InviteCodeField`** (`278:103`), `State=Empty|Partial|Complete|Error`. Cells
+  are 32 wide rather than PinField's 40 so that eight of them plus the dash fit
+  the 352px auth panel; fill, stroke, 6px radius and 20px SemiBold type are
+  taken from `PinField` by measurement, not by guess.
+- **`IconChevronDown`** (`289:43`) and **`IconChevronUp`** (`289:45`), built to
+  `IconChevron`'s own stroke weight (1.667) and `ROUND` cap.
+
+### The eleven changes
+
+1. **Approve and Reject keep icon + label; Expand does not.** Nine expand
+   controls across `Desktop — Inbox`, `Desktop — Inbox row expanded` and
+   `Mobile — Inbox` are now icon-only at 48px.
+2. **Expand uses a down chevron, not the right-pointing `IconChevron`.** Once
+   the label went, direction carried all the meaning, and the spec says the row
+   "expands in place". The one row that is already open
+   (`Row — Add hobby` on `126:69`, the row followed by a `Row detail —` sibling)
+   gets `IconChevronUp`.
+3. **Destructive actions are red.** The four observation `Delete` buttons and
+   the two Connected-apps `Revoke` buttons moved to `Variant=Critical`. Token-tab
+   revoke and `Sign out` were already Critical.
+4. **`Forgot password?` moved below the Sign in button** on `Auth — Sign in` and
+   `Mobile — Sign in`. It previously sat between the username and password
+   fields.
+5. **"Use an access token instead" is gone** from Sign in, Sign up and
+   Mobile — Sign in. BetterAuth supersedes it.
+6. **The invite code is a segmented field** with the dash prerendered, so the
+   helper no longer claims the dash is optional to type.
+7. **The Server tab leads with MyGist Cloud.** Self-hosting is a one-line hint
+   plus a ghost link. The URL field and connection test were not deleted — they
+   moved to a new frame, `Settings — Server (custom)` (`281:235`).
+8. **The Token tab lists three named tokens** (`Laptop CLI`, `Raycast script`,
+   `Home server backup`), each with a masked secret, a grants-and-last-used line,
+   Copy and a red Revoke. The create form gained a `Name` field, since tokens are
+   now plural and need telling apart.
+9. **Connected apps state grants in plain language** — "Can read and propose
+   changes to your persona" rather than `persona:read persona:propose` — and
+   those lines moved off **Geist Mono**, which was right for a scope string and
+   wrong for a sentence.
+10. **Onboarding shows a progress bar instead of "Step N of 4".** The bar
+    replaces the hairline rather than sitting beside it, so the divider and the
+    progress indicator are the same object.
+11. **The section editor has breathing space, and the mobile section switcher is
+    a dropdown.** See the two subsections below.
+
+### The section editor's spacing was literally zero
+
+Every `Content` column on `04 Section editor` was `VERTICAL gap=0` — measured,
+not inferred: title block, eyebrow bands and subsection cards all butted
+directly against each other, held apart only by their own borders. Each column
+is now grouped, one `Group` frame per eyebrow band (anything before the first
+band forms its own group), with **`space-16` inside a group and `space-32`
+between groups**, both bound. `Desktop — Preferences` grew 1471 → 1663 and
+`Desktop — Profile` 1177 → 1305; the three 1024-tall frames had slack and were
+left alone. `Mobile — Preferences` was on a uniform `24` and outside `Body`, so
+the first pass skipped it — it now carries the same grouped rhythm.
+
+### The section sheet is now a dropdown
+
+`Mobile 390 — Section sheet` was the inconsistency: the `SectionSelector` bar sat
+in its `Open` state while what opened below it was sheet chrome — a grab handle
+and a "Sections" title. Both are gone. The panel is renamed `Section dropdown`,
+anchored under the selector at `(16, 108)`, 358 wide, `card` ground, `border`
+stroke, `radius-l`, and it borrows `Modal`'s elevation so it speaks the same
+elevation language. The frame is renamed `Mobile 390 — Section dropdown`. The
+scrim stays, because tap-outside-to-dismiss is still the behaviour.
+
+Two Figma traps showed up here and are worth knowing: the panel is itself an
+auto-layout frame, so `body.x = 8` was silently ignored and the inset had to come
+from **padding**; and the body carried stretch constraints, so resizing the panel
+dragged the list from 342 to 310 wide.
+
+### Judgement calls the reader may want to overrule
+
+- **`Reject` was left `Neutral`, not red.** The instruction named delete and
+  revoke. Reject discards a suggestion rather than destroying stored data, and
+  making it Critical would put a filled red button on every inbox row. Stated
+  rather than assumed.
+- **`Revoke` is a filled red button, not red text.** This follows the file's own
+  precedent (`Sign out`, token revoke) at the cost of two fairly loud buttons in
+  a two-row list.
+- **Token metadata was shortened to fit.** The first build of the token list
+  clipped its own text: the info column had 310px and the strings wanted ~328.
+  The grants line is now terse ("Read and propose · last used 2 hours ago")
+  while Connected apps, which has more room, keeps the full sentence. Widest row
+  now measures 301 of 310 available.
+
+### Audit after the round
+
+Per-page paint audit, instance-opacity repair and gap sweep across the six
+touched pages: **zero unbound paints introduced.** The 14 hits on
+`07 Auth & Settings` are all instances of the `Logo Mark` glyph stroke already
+recorded above as a deliberate exception; the 2 on `02 Components` are its
+source. Every off-token gap found (18 + 16 + 3 + 13 + 12) is the same inherited
+`6px` `TextField`/`Select`/`TextArea` internal already on record — the new
+components and frames added none. All nine pages confirmed in Light.
+
+**The paint-opacity fragility recorded above bit again, exactly as predicted.**
+Cloning the `connected` badge produced a solid green pill with invisible text,
+because the `Positive` ground is `success` at **0.12 paint opacity** and the
+clone came back at `1.0`. It was fixed by a general repair — compare each
+instance's ground paint against its main component's and restore the opacity
+where the bound colour matches but the opacity has drifted — which found a second
+drifted badge on the custom-server frame that had not been noticed. That repair
+is worth re-running after any future clone-heavy edit.
