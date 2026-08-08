@@ -701,18 +701,44 @@ justified departure from it.
 - **`Button` gained a hidden-by-default swappable `Icon` slot**
   (`Icon#139:0`) so row actions could carry icons alongside labels, at the
   user's direction.
-- **`RailSubItem`'s `State=Current` trap is real, but narrower than first
-  recorded.** Of all 64 `RailSubItem` instances in the file, 49 (on `03 Shell &
-  Navigation`, `04 Section editor`, `05 Review`) correctly vary between
-  `Default` and `Current`. Only the demonstration rails on `06 Onboarding` (4
-  instances) and `08 Motion` (11 instances) — 15 in total, not twelve — are
-  *all* built from the `State=Current` master and instead distinguish the true
-  current row by the `Spy marker`'s own per-instance opacity (`0` for the fake
-  defaults). This is because `createInstance()` drops a `visible:false` child,
-  so the marker cannot be hidden by variant alone. **Trap for future editors:**
-  "correcting" those instances back to `State=Default` would delete the
-  animation target and silently break the scroll-spy motion on those two
-  pages.
+- **`RailSubItem`'s `State=Current` trap, closed by full enumeration — the
+  figure is 12, not 15 or 12-as-previously-meant, and there is a 65th node.**
+  A prior pass through this record stated 15 without reading every instance's
+  actual `State`, marker presence and marker opacity; a re-reviewer correctly
+  refused to accept that number and asked for it to be read, not carried
+  forward. It has now been read, file-wide, node by node (table in the Task
+  14 report). Total `RailSubItem`-shaped nodes: **65** — 64 live `INSTANCE`s
+  plus **one previously-undetected detached `FRAME`** (`201:1863`, named
+  `RailSubItem`, on `08 Motion`'s `Rail — Live (animated, 200ms standard)`),
+  which Task 14's original Step 4 sweep missed because `RailSubItem` carries
+  no corner radius and so never matched the rounded-frame detach heuristic —
+  this is a genuine **found-but-unenumerated** detach the Step 4 diff should
+  have caught and did not; noted for the coordinator, not fixed here.
+  Of the 64 instances: **49** (`03 Shell & Navigation` 8, `04 Section editor`
+  17, `05 Review` 24) are plain, unmodified variants with no workaround at
+  all — 38 `State=Default` (no `Spy marker` child present — `createInstance()`
+  dropped it, since the master's `Default`-variant marker is
+  `visible:false`, which is harmless here because these rails only ever show
+  one static "you are here" row) and 11 `State=Current` (marker present,
+  `opacity:1`, `Label` bound to `indigo`). The remaining **15** instances (`06
+  Onboarding` 4, `08 Motion` 11) all report `State=Current` as their variant
+  property, confirming the earlier "15, not twelve" correction was right
+  about *which instances are built from the `Current` master* — but of those
+  15, only **12** actually carry the fake-`Default` workaround (`Spy marker`
+  present, `opacity:0`, `Label` rebound from `indigo` to `ink`: 3 on `06
+  Onboarding`, 9 on `08 Motion`). The other **3** of the 15 are simply,
+  correctly current (marker `opacity:1`, `Label` on `indigo`: `159:346` on
+  Onboarding; `201:58` and `201:96` on Motion) — plus the detached frame
+  `201:1863` functions as a fourth genuine-current row on Motion, built by
+  hand instead of as an instance, for reasons not documented anywhere in the
+  plan. **The trap applies to exactly those 12**, not to all 15 and not to
+  all 64: "correcting" `165:1545`/`165:1549`/`165:1553` (Onboarding) or
+  `201:62`/`201:66`/`201:70`/`201:79`/`201:83`/`201:87`/`201:92`/`201:100`/
+  `201:104` (Motion) back to a plain `State=Default` build would delete the
+  animation target and silently break the scroll-spy/motion demo on those two
+  pages — the other 52 `RailSubItem`-shaped nodes in the file (49 plain
+  instances + 3 genuinely-current instances-on-demo-pages + the 1 detached
+  frame) are not at risk from that particular correction.
 - **Consent scopes are `read`/`propose`/`write`**, not `read`/`search`/
   `propose` — the code (`Consent.jsx`) was the source of truth, not the
   brief's table. Confirmed live: the three `CheckboxGroup` labels read "Read
