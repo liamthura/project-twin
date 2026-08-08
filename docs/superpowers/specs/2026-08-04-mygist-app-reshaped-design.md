@@ -1026,3 +1026,59 @@ instance's ground paint against its main component's and restore the opacity
 where the bound colour matches but the opacity has drifted — which found a second
 drifted badge on the custom-server frame that had not been noticed. That repair
 is worth re-running after any future clone-heavy edit.
+
+### Follow-up: `Link`, because a Ghost Button is not a link
+
+The partner spotted that every text link in the file "seems to be missing an
+accompanying icon since they all have a left padding", and pointed at
+<https://www.reshaped.so/docs/components/link>. The diagnosis was exactly right
+and the cause was a **wrong primitive**, not a missing icon: these affordances
+were `Button` instances at `Variant=Ghost`, and `Button` carries `0/16/0/16`
+padding. In a left-aligned column that indents the label 16px from the text above
+it, which the eye reads as a hole where an icon should be. Visible on
+`Settings — Account` ("Add email", "Change password" indented from
+`maya@example.com`) and on `Settings — Server` ("Use a custom server" indented
+from its own hint line).
+
+**`Link` (`294:67`)** is now a real component, modelled on Reshaped's:
+
+- **Zero padding on all six variants** — that is the whole point of it.
+- `Variant=Plain|Underline` × `State=Default|Hover|Disabled`. Type is copied off
+  `Button`'s Ghost label by measurement (Geist Regular 14, 155% line height), so
+  swapping one for the other changes position and nothing else.
+- `Show icon#294:0` (BOOLEAN, default `false`) and `Icon#294:7` (INSTANCE_SWAP),
+  representing Reshaped's `icon` prop. No link in the file uses it yet.
+
+**Where each variant is used, and why not just underline everything.** Reshaped
+recommends `underline` "to visually differentiate it from the rest of the text" —
+advice aimed at a link sitting *inside a sentence*. So:
+
+- **`Underline`** for links inside a sentence. The four auth footers were single
+  Ghost buttons whose label was a whole sentence
+  ("New to MyGist? Create an account"), which is a modelling error as much as a
+  padding one. They are now prose in `muted-fg` plus an underlined `Link` on the
+  clickable part only.
+- **`Plain`** for the eleven standalone action links on their own row, where the
+  indigo already carries the affordance and an underline would read as heavy:
+  Add email, Change password (×2 breakpoints each), Use a custom server, Use
+  MyGist Cloud instead, Forgot password? (×2), Resend code, Back to sign in (×2),
+  Reconnect, and Skip this group (×3).
+
+**What deliberately stayed a Ghost `Button`:** `Copy` in the token rows (it sits
+in a cluster with a filled red `Revoke`, so it should read as a button), the nine
+icon-only expand controls, and onboarding's `Back` (paired with a Primary
+`Continue`). A padded box is correct in a button cluster.
+
+Divergences worth stating: **only `color="primary"` is built** — Reshaped also
+offers `critical`, `positive`, `warning` and `inherit`. And **hover inverts the
+underline in both directions** (Plain gains one, Underline loses one) because the
+palette has no darker indigo to shift to; a colour shift would be the more
+conventional choice if a token is added later. A `Link` is 22px tall against the
+Ghost Button's 36, which is inherent to an inline text link but is under the 44px
+touch-target guidance on the mobile frames.
+
+Re-audited after the swap: `02 Components` still shows only the two `Logo Mark`
+strokes, `07 Auth & Settings` only its 14 `Logo Mark` instances (asserted by
+predicate, not by reading the list), `06 Onboarding` zero. `Link` added no
+unbound paint and no off-token gap, and instance-opacity drift is zero across all
+three.
