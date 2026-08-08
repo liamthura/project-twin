@@ -1082,3 +1082,90 @@ strokes, `07 Auth & Settings` only its 14 `Logo Mark` instances (asserted by
 predicate, not by reading the list), `06 Onboarding` zero. `Link` added no
 unbound paint and no off-token gap, and instance-opacity drift is zero across all
 three.
+
+### Follow-up: empty states against a six-point checklist
+
+`EmptyState` was audited against a supplied checklist (icon, heading, description,
+primary action, zero-vs-no-results, error variant). It failed four of the six.
+
+**What was actually wrong, measured not assumed:**
+
+- **The card variant had no heading and no icon** — it was a single line of
+  `Regular 13` text doing both jobs at once ("Nothing here yet. Add a language, or
+  let a client propose one.").
+- **Neither variant had any visual.**
+- **There was no zero / no-results / error distinction at all** — one `Context`
+  axis, nothing else.
+- **Both Review empty states had their CTA hidden.** This was invisible to a
+  normal read: Figma omits an invisible instance sub-layer from `children` *and*
+  from `findAll`, and `getNodeByIdAsync` will not return it either. It only showed
+  up in `instance.overrides`, which reported `visible` overridden on
+  `I130:400;62:12`. So `Desktop — Empty` had shipped with no next step. Fixed with
+  `resetOverrides()`, which was safe here because the component's own copy was
+  already identical to the instance's.
+
+**`EmptyState` now has six variants** — `Context=Card|Page` ×
+`Kind=Zero|NoResults|Error`:
+
+| | Zero | NoResults | Error |
+|---|---|---|---|
+| Icon | `IconPlus` | `IconSearch`, `muted-fg` | `IconAlert`, `destructive` |
+| Card ground | `clay-tint` | `muted` | `muted` |
+| Page disc | `clay-tint` | `border` | `border` |
+| Action | creates the first item | `Clear search` / `Clear filters` | `Try again` |
+
+Three new 16×16 icons back this — `IconPlus` (`300:43`), `IconSearch` (`300:45`),
+`IconAlert` (`300:48`) — all built to `IconChevron`'s stroke weight (1.667) and
+`ROUND` cap, so the set stays coherent and they are reusable in `Button` and
+`RailItem` slots.
+
+**Reconciling the checklist with this spec's own rule.** The Review section above
+says empty states must never carry "an illustration at card size". Both hold: the
+**card** variant gets a 16px icon, which is not an illustration; the **page**
+variant gets a 40px tinted disc around the icon, which is the illustration role at
+page scale. That is why the two contexts are visually different rather than one
+scaled copy.
+
+**Copy now separates heading from description.** The six section-editor card
+states name what is missing and then say what belongs there — "No languages yet" /
+"The languages you speak, so replies match. A client can propose these too." — 
+rather than compressing both into one sentence. Their actions already created the
+first item (`Add a language`, not `Go to settings`), which was the one checklist
+point the original passed.
+
+**The error copy states that nothing is lost**, because the specific failure the
+checklist warns about is a user reading a load error as data loss: "Something went
+wrong on our end. Nothing has been lost — try again."
+
+**Two new frames, so these states exist in situ and not only in the library:**
+
+- **`Desktop — Failed to load`** (`306:654`, `05 Review`). Beyond swapping the
+  variant it also **blanks the tab counts to `—`** and **removes the keyboard-shortcut
+  line**, because counts cannot be known when the fetch failed and shortcuts are
+  meaningless with nothing loaded. A variant switch **preserves text overrides**,
+  so the zero-state copy had to be rewritten explicitly rather than left to follow
+  the variant.
+- **`Desktop — List search no results`** (`307:636`, `04 Section editor`). Carries
+  a real query ("brack") in a `Filled` search field with "Searching 14 entries."
+  as its helper, so the no-results state has something to be the result *of*. The
+  escape route is `Clear search`.
+
+**Deliberate gaps, stated rather than hidden:**
+
+- **`Desktop — No propose scope` keeps its CTA hidden.** Its emptiness is caused
+  by a missing scope, and the fix — `Reconnect` — already sits on the frame in the
+  Scope notice. A second button telling the reader to copy a prompt would be
+  actively wrong there, since the spec notes a read-only connection makes the
+  pasted prompt do nothing.
+- **`Context=Page, Kind=NoResults` is a library variant with no screen using it.**
+  Review has tabs, not filters, so there is nowhere for a page-level no-results
+  state to live until a filter UI exists. Built for completeness against the
+  checklist; its copy assumes a filter.
+- **No mobile frame for either no-results or error.** Both new frames are 1440
+  only.
+- The icon disc's `cornerRadius` is a literal `20` — a full-round shape on a 40px
+  square, not a radius-token decision.
+
+Re-audited: `02 Components` still only the two `Logo Mark` strokes, `04` and `05`
+zero unbound, zero opacity drift on all three, and every off-token gap remains the
+inherited `6px` field internal.
