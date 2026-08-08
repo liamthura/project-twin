@@ -412,6 +412,12 @@ the connected client lacks the `propose` scope, a line saying so — see below.
 
 ## Onboarding
 
+**See [Prototype divergences](#prototype-divergences):** the built prototype
+implements a standalone stepped flow instead of the rail-embedded panel
+described below, reversed deliberately at the user's direction. Anyone
+implementing from this section of the spec body would build the wrong
+onboarding; read the divergence entry first.
+
 Not a wizard, and not a card with inputs crammed into it. Two pieces: a
 **progress spine** that lives above the section title, and a **rail destination**
 where the basics are actually filled in.
@@ -650,14 +656,30 @@ justified departure from it.
   every other node on this list — the Plugin API refuses to add an animation
   to a node living inside an instance — except here the thing being animated
   is Task 13's `Spy marker` Y-position on that specific frame, not a content
-  slot. **Correcting Step 4's own figure:** the sweep's three-list result was
-  reported as enumerated-and-found 38, enumerated-but-missing 10,
-  found-but-unenumerated **0** — that last number was wrong; it is **1**
-  (`201:1863`). The sweep's detach heuristic matched non-instance frames with
-  a nonzero corner radius, and `RailSubItem` has no corner radius, so it was
-  structurally invisible to that check. Read plainly: the sweep has a
-  shape-dependent blind spot, and a "0" from it should not be trusted for any
-  component that doesn't carry a radius.
+  slot.
+  **A 40th detached node exists outside this count and was also missed by the
+  original sweep:** `210:79` on `08 Motion`, a non-instance `FRAME` named
+  `Tabs` — Task 13's ruling-(f) diagnostic copy, detached from the fixed
+  `Tabs` component (`78:43`) and kept purely as a motion demonstration next to
+  caption `206:63` (see the caption correction above; the caption used to
+  claim this frame proved the component fix, which a detached copy cannot
+  do).
+  **Correcting Step 4's own figure, a second time:** the sweep's three-list
+  result was reported as enumerated-and-found 38, enumerated-but-missing 10,
+  found-but-unenumerated **0** — that last number was wrong twice over; it is
+  **2** (`201:1863` and `210:79`), not the 1 recorded after the first
+  correction. Two compounding, independent blind spots let both through: (1)
+  the sweep's detach heuristic matched non-instance frames with a **nonzero
+  corner radius**, and neither `RailSubItem` (`201:1863`) nor this `Tabs`
+  copy (`210:79`, `cornerRadius: 0`) carries one, so both were structurally
+  invisible to that check; (2) the sweep's component-name cross-check never
+  included `Tabs`, `Modal` or `Sheet` in its watch-list at all — it relied on
+  the plan's own enumerated detach lists for those three components rather
+  than searching for their names directly, so a detach the plan's prose never
+  mentioned (this one) had no second path to be caught by. Read plainly: the
+  sweep has two independent blind spots, not one, and a "0" from it should
+  not be trusted for any component that is both radius-free and outside its
+  name watch-list.
 - **Onboarding was redesigned late, at the user's direction**, into a
   **standalone stepped flow with no app shell** (`Onboarding — Welcome`, `—
   About you`, `— How you like answers`, `— Complete`, plus a mobile variant),
@@ -766,9 +788,21 @@ justified departure from it.
   are structurally identical to Goals and were not built separately.
 - **Five of the seven motions are annotated rather than animated**,
   deliberately (Task 13). Confirmed on `08 Motion`: exactly five Before/After
-  static comparison pairs exist (subsection expand, approve/reject exit,
-  inline list edit, save tick, sheet/modal); the scroll-spy marker travel and
-  the loading shimmer are the two built as real motion rather than annotation.
+  static comparison pairs exist (subsection expand, inline list edit, save
+  tick, sheet/modal, **loading shimmer**); the **scroll-spy marker travel**
+  (`201:1866`, `TRANSLATION_Y` 0→36px, 200ms) and the **approve/reject exit**
+  (`204:95`/`204:104`, `TRANSLATION_X`/`OPACITY`/`HEIGHT`, 240ms) are the two
+  built as real motion rather than annotation — **of the seven numbered
+  motions**, exactly two are genuinely animated; the loading shimmer is
+  static, one of the five annotated pairs, not one of the two. **Correcting
+  a drift from the build ledger:** an earlier pass through this record named
+  the animated pair as the scroll-spy marker and the loading shimmer, which
+  is wrong; the build ledger (Task 14 report) had the approve/reject exit
+  right, and this entry now matches it. A third animated frame also exists
+  outside the seven-motion numbering: the `Tabs` `Indicator` diagnostic on
+  this page (`206:62`/`210:84`, `TRANSLATION_X`/`WIDTH`, 200ms), built to
+  verify the `Tabs` `clipsContent` component fix, not counted among the seven
+  named motions.
 - **The single most useful warning in this handoff: viewing any page of this
   file in Dark mode permanently strips every paint-level opacity in the
   file.** Anyone who opens this prototype and switches a page to Dark to look
@@ -828,6 +862,30 @@ justified departure from it.
   direction. Binding to either token trades a mark that is correct in both
   themes today for one that is correct in only one. Left literal; recorded
   here as the exception rather than silently passed over.
+- **No no-`propose`-scope onboarding state was built; recorded here rather
+  than built.** The spec requires the spine's step 1 to show the connected
+  client's granted scopes, and requires step 3 and the delegate offer to say
+  so and point at reconnection when `propose` is missing — the spec calls
+  this failure mode "complete silence" and lists it in its Risks table.
+  `05 Review` has its equivalent frame (`130:975`, `Desktop — No propose
+  scope`); onboarding has none — step 1 shows only `connected · Claude`
+  (`I151:277;58:22`, on `Desktop — Spine`, `149:2`) with no scopes listed at
+  all. This is a genuine gap against the spec, not a silent omission: it is
+  recorded honestly here instead of being built under this fix round.
+- **The post-redesign `clay` treatment now differs by page, and the spec's
+  own sentence about it is stale.** `06 Onboarding`'s redesign (above) left
+  `clay` as only a 2px left rule on the delegate-offer card. But `04 Section
+  editor`'s `Desktop — Preferences` (`109:2`) still opens with three large
+  `clay-tint` `EmptyState` panels (`109:116`, `109:133`, `109:150`, confirmed
+  live) — the same filled-panel pattern the user objected to elsewhere, which
+  the colour rule does sanction on `EmptyState` grounds. The Foundations →
+  Colour section's sentence "clay tints the onboarding spine, the
+  delegate-to-client offer, and empty-state surfaces" is therefore now true
+  of only the third clause; the first two describe the pre-redesign
+  onboarding, not what is built. Recorded rather than reconciled: reconciling
+  it means either reintroducing filled clay panels to onboarding (reversing
+  the redesign) or removing them from Preferences' empty states (a
+  components-page change out of scope for this fix round).
 - **The brief expected `Switch`/`Checkbox` disabled states to use fractional
   opacity; they don't.** Both components render their `Disabled` variants at
   full opacity (`1`) at both paint and node level, using a colour change
