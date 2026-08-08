@@ -642,6 +642,22 @@ justified departure from it.
   Auth & Settings`). **Cost:** later edits to those three components in `02
   Components` will not propagate into any of these 38 built screens — each is
   a frozen copy from the moment it was detached.
+  **A 39th detached node exists outside this count and was missed by the
+  original sweep:** `201:1863` on `08 Motion`, a detached `RailSubItem`
+  (`Indent`/`Label`/`Spy marker`, marker `opacity:1`, `Label` bound to
+  `indigo`) acting as the fourth genuine-current row of `Rail — Live
+  (animated, 200ms standard)`. It had to be detached for the same reason as
+  every other node on this list — the Plugin API refuses to add an animation
+  to a node living inside an instance — except here the thing being animated
+  is Task 13's `Spy marker` Y-position on that specific frame, not a content
+  slot. **Correcting Step 4's own figure:** the sweep's three-list result was
+  reported as enumerated-and-found 38, enumerated-but-missing 10,
+  found-but-unenumerated **0** — that last number was wrong; it is **1**
+  (`201:1863`). The sweep's detach heuristic matched non-instance frames with
+  a nonzero corner radius, and `RailSubItem` has no corner radius, so it was
+  structurally invisible to that check. Read plainly: the sweep has a
+  shape-dependent blind spot, and a "0" from it should not be trusted for any
+  component that doesn't carry a radius.
 - **Onboarding was redesigned late, at the user's direction**, into a
   **standalone stepped flow with no app shell** (`Onboarding — Welcome`, `—
   About you`, `— How you like answers`, `— Complete`, plus a mobile variant),
@@ -702,18 +718,16 @@ justified departure from it.
   (`Icon#139:0`) so row actions could carry icons alongside labels, at the
   user's direction.
 - **`RailSubItem`'s `State=Current` trap, closed by full enumeration — the
-  figure is 12, not 15 or 12-as-previously-meant, and there is a 65th node.**
-  A prior pass through this record stated 15 without reading every instance's
-  actual `State`, marker presence and marker opacity; a re-reviewer correctly
-  refused to accept that number and asked for it to be read, not carried
-  forward. It has now been read, file-wide, node by node (table in the Task
-  14 report). Total `RailSubItem`-shaped nodes: **65** — 64 live `INSTANCE`s
-  plus **one previously-undetected detached `FRAME`** (`201:1863`, named
-  `RailSubItem`, on `08 Motion`'s `Rail — Live (animated, 200ms standard)`),
-  which Task 14's original Step 4 sweep missed because `RailSubItem` carries
-  no corner radius and so never matched the rounded-frame detach heuristic —
-  this is a genuine **found-but-unenumerated** detach the Step 4 diff should
-  have caught and did not; noted for the coordinator, not fixed here.
+  figure is 12, not 15, and not universal.** A prior pass through this record
+  stated 15 without reading every instance's actual `State`, marker presence
+  and marker opacity; a re-reviewer correctly refused to accept that number
+  and asked for it to be read, not carried forward. It has now been read,
+  file-wide, node by node (table in the Task 14 report). **The enumerated
+  figures: 65 `RailSubItem`-shaped nodes total (64 `INSTANCE`s + the one
+  detached `FRAME`, `201:1863`, above) — 38 `State=Default`, 26
+  `State=Current`, 0 `State=Hover`. Of the 26 `Current` instances, 14 are
+  genuinely current and 12 carry the fake-`Default` workaround, split 3 on
+  `06 Onboarding` and 9 on `08 Motion`.**
   Of the 64 instances: **49** (`03 Shell & Navigation` 8, `04 Section editor`
   17, `05 Review` 24) are plain, unmodified variants with no workaround at
   all — 38 `State=Default` (no `Spy marker` child present — `createInstance()`
@@ -729,14 +743,15 @@ justified departure from it.
   Onboarding`, 9 on `08 Motion`). The other **3** of the 15 are simply,
   correctly current (marker `opacity:1`, `Label` on `indigo`: `159:346` on
   Onboarding; `201:58` and `201:96` on Motion) — plus the detached frame
-  `201:1863` functions as a fourth genuine-current row on Motion, built by
-  hand instead of as an instance, for reasons not documented anywhere in the
-  plan. **The trap applies to exactly those 12**, not to all 15 and not to
-  all 64: "correcting" `165:1545`/`165:1549`/`165:1553` (Onboarding) or
+  `201:1863` is the 14th genuinely-current row (see above for why it had to
+  be detached: its `Spy marker`'s Y-position is what Task 13 animates on that
+  frame, and the Plugin API refuses to add an animation inside a live
+  instance). **The trap applies to exactly those 12**, not to all 15 and not to
+  all 64 or 65: "correcting" `165:1545`/`165:1549`/`165:1553` (Onboarding) or
   `201:62`/`201:66`/`201:70`/`201:79`/`201:83`/`201:87`/`201:92`/`201:100`/
   `201:104` (Motion) back to a plain `State=Default` build would delete the
   animation target and silently break the scroll-spy/motion demo on those two
-  pages — the other 52 `RailSubItem`-shaped nodes in the file (49 plain
+  pages — the other 53 `RailSubItem`-shaped nodes in the file (49 plain
   instances + 3 genuinely-current instances-on-demo-pages + the 1 detached
   frame) are not at risk from that particular correction.
 - **Consent scopes are `read`/`propose`/`write`**, not `read`/`search`/
