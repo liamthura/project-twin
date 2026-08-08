@@ -650,25 +650,34 @@ justified departure from it.
   holds **zero fractional-opacity paints** file-wide (confirmed by audit) —
   only twelve node-level `Spy marker` opacities remain across the file, none
   of them on this page's new flow.
-  **Open item, not resolved by this audit:** the page still also contains the
-  *pre-redesign* rail-embedded flow (`Desktop — Spine`, `Desktop — Delegate
-  offer`, `Desktop — Spine complete`, `Mobile — Spine`, each still wrapped in
-  a `Header`/`Body` app shell). Nothing in the task record authorizes keeping
-  both; a reader opening `06 Onboarding` today finds two competing onboarding
-  implementations side by side with no marker of which is canonical. Flagged
-  for the coordinator rather than deleted unilaterally.
-- **Spec check 6 (delegate offer before the field groups): FAIL.** In the
-  current standalone flow, `Onboarding — Welcome` (the flow's first screen)
-  never mentions delegation, and `Onboarding — About you` (step 1 of 4) has no
-  delegate offer either. The only delegate-offer content — `"Let a client do
-  this for you"` — sits inside `Onboarding — How you like answers` (step 2 of
-  4), positioned **after** that step's own `Tone`/`Locale`/`Detail level`
-  fields, immediately above its `Continue` button. The full pitch text ("Would
-  you rather your client did this?", the copyable prompt) survives only in
-  the superseded pre-redesign `Desktop — Delegate offer` frame. Delegation is
-  currently offered after the work, on one step out of four, not before it —
-  the opposite of the spec's intent. This needs a design decision, not a
-  Task 14 fix.
+  **The page also still contains the pre-redesign rail-embedded flow**
+  (`Desktop — Spine`, `Desktop — Delegate offer`, `Desktop — Spine complete`,
+  `Mobile — Spine`, each still wrapped in a `Header`/`Body` app shell) — this
+  is deliberate, not leftover: the coordinator's Task 11R brief instructs
+  keeping these because the **spine card lives on the Profile screen as the
+  entry point and resume affordance into onboarding**, and is unaffected by
+  the standalone-flow ruling. Read together: the spine card is the entry
+  point (and, via `Desktop — Delegate offer`, the expanded prompt view
+  reachable from either path), and the standalone flow (`Onboarding —
+  Welcome`/`— About you`/`— How you like answers`/`— Complete`) is the work
+  itself. Both are intentional and neither supersedes the other.
+- **Spec check 6 (delegate offer before the field groups): PASS, after a
+  fix.** The redesign's Task 11R brief placed the offer on `Onboarding — How
+  you like answers` (step 2 of 4), where it landed **after** that step's own
+  `Tone`/`Locale`/`Detail level` fields — the fault was the placement
+  instruction, not the build. Fixed by moving the card (`235:319`, not a
+  copy — the original node) into `Onboarding — Welcome`'s column, directly
+  below the heading/supporting line and above the `Group preview` list and
+  the primary `Get started` action; its body copy was generalised from
+  "proposes answers here" to "proposes your whole profile", since it now
+  precedes all four groups rather than just one. Confirmed by a fresh
+  file-wide text search: the offer's copy now appears in exactly two places —
+  once on `Onboarding — Welcome` (the current flow, before any field) and
+  once on the superseded `Desktop — Delegate offer` (the retained expanded
+  view, see above) — and zero times on `— How you like answers`, which now
+  reads `Progress row → Hairline → Heading block → Fields → Footer` with no
+  gap where the card used to sit. Delegation is offered before the work, not
+  after, on the flow a reader actually uses today.
 - **`RailItem` gained an `INSTANCE_SWAP` icon slot** (`Icon#224:0`) **and
   thirteen icon components** late in the build — `IconProfile`,
   `IconPreferences`, `IconLifestyle`, `IconKnowledge`, `IconGettingStarted`,
@@ -719,8 +728,21 @@ justified departure from it.
   static comparison pairs exist (subsection expand, approve/reject exit,
   inline list edit, save tick, sheet/modal); the scroll-spy marker travel and
   the loading shimmer are the two built as real motion rather than annotation.
-- **Fractional-opacity fragility is real, and now measured precisely.**
-  Switching a frame's `Colour` collection mode resets every **paint-level**
+- **The single most useful warning in this handoff: viewing any page of this
+  file in Dark mode permanently strips every paint-level opacity in the
+  file.** Anyone who opens this prototype and switches a page to Dark to look
+  at it — not to edit it, just to review it — will silently flatten every
+  tinted overlay (`Button` hover/pressed states, `Badge`/`Chip` tints, both
+  `scrim`s, the `Scope notice`, `SaveStateChip Unsaved`) to full opacity.
+  Node-level opacity (`Button Disabled`, the `Spy marker`s) is unaffected.
+  This is invisible until it has already happened — there is no warning
+  dialog, and switching back to Light does not undo it, since the restore
+  triggers the same reset. **Anyone reviewing this file in Dark mode should
+  expect every tinted surface to render at full strength afterward, and
+  should re-apply the values below (or re-run this audit) before treating the
+  file as clean again.** Fractional-opacity fragility is real, and now
+  measured precisely. Switching a frame's `Colour` collection mode resets
+  every **paint-level**
   fractional opacity back to `1` — confirmed freshly in this audit on `Button`
   hover/pressed overlays, `Badge`/`Chip` tints, both `scrim` rectangles, the
   `Scope notice`, and `SaveStateChip Unsaved`, both going into Dark and again
@@ -749,12 +771,22 @@ justified departure from it.
   (the colour-swatch `labels` frames) were new, page-local, and safe — fixed
   to `space-4` and reverified (`itemSpacing: 4`, bound to `VariableID:7:7`),
   with no downstream instances affected.
-- **`Logo Mark`'s glyph is deliberately not theme-bound.** Its two vector
-  paths carry a literal white stroke (`{r:1,g:1,b:1}`) with no bound variable,
-  by design (a fixed brand mark, not a themed surface) — 2 hits on the source
-  component plus 14 on its nested instances across `07 Auth & Settings` are
-  the only residual colour-audit hits in the file; every other node checked
-  file-wide (fills and strokes, including inside `INSTANCE`s) is bound.
+- **`Logo Mark`'s glyph stroke is a named, considered exception — left
+  literal on purpose, not by oversight.** Its two vector paths carry a
+  literal white stroke (`{r:1,g:1,b:1}`) with no bound variable — 2 hits on
+  the source component plus 14 on its nested instances across `07 Auth &
+  Settings`, the only residual colour-audit hits in the file. Binding was
+  evaluated and rejected: `Logo Mark`'s own fill is bound to `indigo`, and
+  `indigo` **does not invert** between modes (`4:0` `{0.24,0.36,0.86}` vs
+  `4:1` `{0.36,0.48,0.98}` — both a medium-bright saturated blue), so a
+  literal white glyph reads correctly against it in both themes already.
+  Both candidate tokens **do** invert and would each break one mode: `ink`
+  goes near-black in Light (`{0.11,0.10,0.09}`) — muddy, low-contrast against
+  indigo, precisely where the mark needs to be crisp — and `card` goes
+  near-black in Dark (`{0.10,0.10,0.10}`) for the same reason in the other
+  direction. Binding to either token trades a mark that is correct in both
+  themes today for one that is correct in only one. Left literal; recorded
+  here as the exception rather than silently passed over.
 - **The brief expected `Switch`/`Checkbox` disabled states to use fractional
   opacity; they don't.** Both components render their `Disabled` variants at
   full opacity (`1`) at both paint and node level, using a colour change
