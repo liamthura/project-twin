@@ -384,7 +384,7 @@ to free later.
 **Content**
 
 6. Section header — mono eyebrow, display, body sub
-7. Bento tile — adapted from `bento-grid`, 12px radius, `card` fill, hairline border. **No tile cap and no icon.** Title in Indigo, description in `muted-fg`. Product UI sits oversized at the foot, clipped by the tile so it bleeds off the bottom and right with a soft fade. Variants: 1-col and 2-col × media none/ui
+7. Bento tile — adapted from `bento-grid`, 12px radius, `card` fill, hairline border. **No tile cap and no icon.** Title in Indigo, description in `muted-fg`. Product UI sits oversized at the foot, clipped by the tile so it bleeds off the bottom and right with a soft fade. Variants: 1-col and 2-col × media none/ui. Vertical auto-layout, so the media slot follows however many lines the copy runs to
 8. Step card — display numeral in Stack Sans Notch at the 40px floor, hairline border, equal heights across the row
 9. Pull-quote
 9b. FAQ item — one question with `state=collapsed | expanded`. Chevron flips,
@@ -581,10 +581,26 @@ card to `media=none` and carry the media as the last child of the tile's own
 auto-layout, so the slot sits at `body end + 16` whatever the copy does. Tile
 height is `74 + bodyH + 16 + 192`, which is derived rather than hand-set.
 
-Two things follow. **Desktop still has the latent version of this bug** — the
-absolute slot is in the component, so desktop body copy must stay within two
-lines at 848px and four at 400px or it will overlap in the same way. And the
-mobile media uses `scaleMode: "CROP"` at **native pixels, anchored top-left**,
+**The component itself now reflows.** All four variants were plain frames with
+absolutely-placed children, and `body` carried `textAutoResize: "TRUNCATE"` in a
+fixed two-line box — so on desktop, over-long copy did not overlap, it silently
+disappeared. Which is worse: an overlap is visible in review, a truncation reads
+as finished copy. The variants are now `VERTICAL` auto-layout with `itemSpacing`
+12, `body` hugs its height, and the media slot follows the copy.
+
+The per-variant gap before the media (60px at 1col, 44px at 2col) is folded into
+the media slot as transparent top inset rather than expressed as a second
+`itemSpacing`, which auto-layout has no way to express. That kept the change
+free of any reparenting — wrapping `header` and `body` in a new frame would have
+been the tidier structure, but every tile's copy lives as an instance override
+and reparenting inside a main component risks dropping them.
+
+The mobile tiles keep their own media child. They overlay their copy on the card
+rather than overriding the card's own text, so the component's auto-layout
+cannot see it. Moving that copy into the instances would let mobile use
+`media=ui` again and delete the workaround; it is not done.
+
+The mobile media uses `scaleMode: "CROP"` at **native pixels, anchored top-left**,
 not `FILL`. `FILL` is a centre crop, so the same image in a 520×280 slot and a
 1000×300 slot gets a different zoom and a different centre — on mobile that cut
 every heading off and left only sentence tails. Top-left anchoring is what makes
