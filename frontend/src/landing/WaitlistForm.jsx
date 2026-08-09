@@ -11,10 +11,13 @@ import { cn } from "@/lib/utils";
  * because the hero and the closing CTA are the same control twice, and two
  * copies would drift.
  *
- * THE ENDPOINT DOES NOT EXIST YET. `POST /api/waitlist` is what this calls and
- * nothing serves it; the design spec puts "the waitlist backend endpoint and
- * storage" explicitly out of scope. Until it is built, a real submission lands
- * in the error state. Pass `onSubmit` to override.
+ * Posts to `POST /api/waitlist`, which is public because the person filling it
+ * in has no account -- that is what they are asking for. Pass `onSubmit` to
+ * override.
+ *
+ * The server gives the same answer whether or not the address is already on
+ * the list, so this cannot report "already joined" and must not try: doing so
+ * would turn the form into a membership oracle.
  */
 export function WaitlistForm({ label, tone = "default", onSubmit, className }) {
   const id = useId();
@@ -44,7 +47,16 @@ export function WaitlistForm({ label, tone = "default", onSubmit, className }) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: value }),
           });
-          if (!res.ok) throw new Error(`Waitlist signup failed (${res.status})`);
+          if (res.ok) return;
+          // The server rejects an address it cannot use, and its reason is
+          // better than anything this can guess. Anything else is ours to
+          // apologise for, not the visitor's to decode.
+          const detail = await res.json().catch(() => null);
+          throw new Error(
+            res.status === 422 && typeof detail?.detail === "string"
+              ? detail.detail
+              : "Something went wrong. Try again, or email liam@thuradev.qzz.io.",
+          );
         });
       await send(email);
       setState("done");
@@ -52,7 +64,7 @@ export function WaitlistForm({ label, tone = "default", onSubmit, className }) {
     } catch (err) {
       setState("error");
       setMessage(
-        err?.message ?? "Something went wrong. Try again, or email liam@thuradev.qzz.io.",
+        err?.message || "Something went wrong. Try again, or email liam@thuradev.qzz.io.",
       );
     }
   };

@@ -1,5 +1,5 @@
 import { HERO, CLIENTS } from "./content";
-import { Screenshot } from "./Screenshot";
+import { EditorMock } from "./mini";
 import { Column } from "./primitives";
 import { WaitlistForm } from "./WaitlistForm";
 
@@ -70,10 +70,10 @@ export function Hero({ onSignIn }) {
 /**
  * The editor, in browser chrome.
  *
- * The screenshot is captured from the running app -- step 4 of the build order
- * exists ("run the app and capture the real editor") precisely so this is not
- * drawn from memory. If the asset is missing the frame still renders, which is
- * a quieter failure than a broken <img> in the hero.
+ * Markup rather than a screenshot, so it follows the theme and can be checked
+ * against the files it claims to depict. The chrome is decorative -- three dots
+ * and a rule, no fake URL bar, because a fake URL is a claim about a domain
+ * that does not exist yet.
  */
 function ProductShot() {
   return (
@@ -83,13 +83,7 @@ function ProductShot() {
         <span className="h-3 w-3 rounded-full bg-muted-foreground/25" />
         <span className="h-3 w-3 rounded-full bg-muted-foreground/25" />
       </div>
-      <Screenshot
-        src="/landing/hero-editor.png"
-        alt="The MyGist editor, with a persona open and its sections listed down the left."
-        width={2560}
-        height={1440}
-        className="block w-full"
-      />
+      <EditorMock />
     </figure>
   );
 }

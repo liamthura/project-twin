@@ -2,6 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The display face, used by the marketing page at 40px and above.
+ *
+ * The file is NOT in the repository -- see public/fonts/README.md for what to
+ * drop in and the licence question that has to be settled first. Until it is
+ * there this rule simply never matches and everything falls through to Geist,
+ * which is the next family in the `display` stack. That is a silent
+ * degradation, so it is stated here rather than left to be discovered.
+ *
+ * No <link rel="preload"> for the same reason: preloading a file that is not
+ * there costs every visitor a 404 to save a font swap for nobody.
+ */
+@font-face {
+  font-family: "Stack Sans Notch";
+  src: url("/fonts/stack-sans-notch.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  /* swap, not optional: the headline is the page's largest element and the
+     one thing a visitor is guaranteed to read. Better it re-renders once than
+     that a slow connection settles permanently on the fallback. */
+  font-display: swap;
+}
+
 @layer base {
   :root {
     --background: 60 9% 98%;

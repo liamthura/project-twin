@@ -1,6 +1,6 @@
 import { BENTO } from "./content";
 import { Column, Section, SectionHeader } from "./primitives";
-import { Screenshot } from "./Screenshot";
+import { TILE_MEDIA } from "./mini";
 import { cn } from "@/lib/utils";
 
 /**
@@ -67,17 +67,21 @@ function Tile({ tile }) {
  * a transition placed in the back half of the ramp is invisible.
  */
 function TileMedia({ tile }) {
+  const Media = TILE_MEDIA[tile.id];
+  if (!Media) return null;
+
   return (
     <div className="relative mt-10 min-h-[192px] flex-1 overflow-hidden" aria-hidden="true">
-      <Screenshot
-        src={`/landing/bento/${tile.id}.png`}
-        className="absolute left-8 top-0 max-w-none origin-top-left"
+      <div
+        className="absolute left-8 top-0"
         style={{
           WebkitMaskImage:
             "linear-gradient(135deg, #000 0%, #000 42%, transparent 68%)",
           maskImage: "linear-gradient(135deg, #000 0%, #000 42%, transparent 68%)",
         }}
-      />
+      >
+        <Media />
+      </div>
     </div>
   );
 }

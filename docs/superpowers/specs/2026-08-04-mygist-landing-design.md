@@ -786,8 +786,13 @@ is drawn, for the same reason.
 
 ## Out of scope
 
-- Choosing a code target, and any implementation of it
-- The waitlist backend endpoint and storage
+**Two of these were later brought in scope and built** — see "Implementation"
+below. They are kept on the list because the design decisions above were made
+without them, and reading the spec as if implementation had always been in
+scope would misrepresent why some things were settled the way they were.
+
+- ~~Choosing a code target, and any implementation of it~~ — built, in React
+- ~~The waitlist backend endpoint and storage~~ — built, `POST /api/waitlist`
 - Pricing, testimonials, or a blog
 - Changes to the existing app or docs site
 - Any change to the app's current semantic tokens
@@ -808,3 +813,53 @@ is drawn, for the same reason.
 - **The docs client list is narrower than the page's.** `clients.mdx` documents Claude Desktop and Claude Code with their own setup sections; the landing page names Claude, Codex, Raycast, Notion AI and Hermes on the owner's confirmation. The page is not wrong, but the docs are now behind it, and a visitor who follows a chip through to the docs finds no setup section for four of the five. Not a blocker for the design. Worth a docs pass before launch.
 - Stack Sans Notch carries Koto's notch signature from the Stack Overflow identity. Free and legal to use, and not yet widely deployed, but a reader who knows the rebrand may make the association. Accepted knowingly.
 - Whether the gradient strips eventually ship as static exports or a live canvas. Deferred with the code target.
+
+## Implementation
+
+The page is built in `frontend/src/landing/`, and is what a visitor with no
+credential gets at `/`. Before this, that state dropped straight to a sign-in
+form — an app telling someone who had never heard of it to sign in.
+
+### Where it departs from the Figma build, deliberately
+
+**The tile visuals are markup, not baked images.** The Figma build bakes each
+mini-UI as an image fill, and this spec already recorded the cost: "Consequence:
+they are light-mode pixels. A dark landing frame would show light UI inside
+every bento tile." In code they are components in `landing/mini.jsx`, so they
+follow the theme. The second reason matters more: a screenshot cannot be
+reviewed against the file it claims to depict, and five of these visuals were
+invented and wrong on the first pass. Each component now names its source file
+in a docstring and takes its strings from it.
+
+**The nav CTA carries an `aria-label`.** It shows "Join the waitlist" at desktop
+and "Join" at mobile, and both spans are in the accessibility tree regardless of
+which one CSS is showing — a screen reader read "Join the waitlistJoin".
+
+**Gradients ship as WebP.** The PNG masters are 7.4MB for the two hero fields
+alone. `design/gradients/generate.py` now builds the web assets too, so the
+derivation stays reproducible: 152KB for all four.
+
+### The waitlist
+
+`POST /api/waitlist`, public, backed by a `waitlist` table (migration
+`0007_waitlist`). Public because the person filling it in has no account, which
+is the thing they are asking for — requiring a credential would mean only
+existing users could join a waitlist.
+
+It answers identically whether or not the address is already on the list.
+Saying "you are already on the list" confirms an address to whoever typed it,
+which turns the form into a membership oracle for the price of one request. A
+waitlist entry is not admission: that still runs through `invite_codes`.
+
+### Still open: the display face
+
+**No webfont ships for Stack Sans Notch**, so every heading at 40px and above
+currently renders in Geist. The `@font-face` rule is written and the fallback is
+silent, which is exactly why `frontend/public/fonts/README.md` exists.
+
+The font was available to Figma as a desktop font, and a desktop licence is not
+a webfont licence. This cannot be closed by copying a file out of a system fonts
+folder. It needs one of: the webfont licence bought, an openly-licensed face
+substituted (which re-opens the 40px floor decision, since that floor is a
+property of *this* face), or the display face dropped in favour of Geist at a
+heavier weight.

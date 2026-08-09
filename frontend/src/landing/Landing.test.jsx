@@ -92,7 +92,7 @@ describe("Landing: the waitlist field", () => {
   });
 
   it("surfaces a failure rather than pretending it worked", async () => {
-    global.fetch.mockResolvedValue({ ok: false, status: 404 });
+    global.fetch.mockResolvedValue({ ok: false, status: 500, json: async () => null });
     const user = userEvent.setup();
     render(<Landing />);
 
@@ -100,8 +100,27 @@ describe("Landing: the waitlist field", () => {
     await user.type(field, "maya@example.com");
     await user.click(submit);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/404/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/something went wrong/i);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("repeats the server's reason when it rejects the address", async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({ detail: "That does not look like an email address." }),
+    });
+    const user = userEvent.setup();
+    render(<Landing />);
+
+    // Passes this component's own check, so only the server can reject it.
+    const { field, submit } = heroWaitlist();
+    await user.type(field, "maya@example.x");
+    await user.click(submit);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /does not look like an email address/i,
+    );
   });
 });
 
