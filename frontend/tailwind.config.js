@@ -54,6 +54,18 @@ export default {
         },
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
+        // Brand layer, marketing page only. See globals.css: ground-inverse
+        // and on-inverse deliberately do not invert between modes.
+        "ground-inverse": "hsl(var(--ground-inverse))",
+        "on-inverse": "hsl(var(--on-inverse))",
+        clay: {
+          DEFAULT: "hsl(var(--clay))",
+          tint: "hsl(var(--tint-clay))",
+        },
+        verdigris: {
+          DEFAULT: "hsl(var(--verdigris))",
+          tint: "hsl(var(--tint-verdigris))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -63,6 +75,13 @@ export default {
       fontFamily: {
         sans: ["Geist", "system-ui", "sans-serif"],
         mono: ["Geist Mono", "monospace"],
+        // Display face, marketing page only, and only at 40px and above --
+        // below that the notches stop being a signal and it just reads as a
+        // slightly-off Geist. NO WEBFONT IS LOADED YET: the design was set in
+        // Stack Sans Notch inside Figma and the licensed file is not in the
+        // repo, so this currently falls through to Geist everywhere. See
+        // docs/superpowers/specs/2026-08-04-mygist-landing-design.md.
+        display: ["Stack Sans Notch", "Geist", "system-ui", "sans-serif"],
       },
       keyframes: {
         "accordion-down": {

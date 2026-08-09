@@ -186,6 +186,32 @@ def tile_cap(slice_name, dark):
     return add_grain(img, GRAIN, seed=31 + list(TILE_SLICES).index(slice_name))
 
 
+# ------------------------------------------------------------------- web build
+# The PNG masters are the design record; the landing page does not ship them.
+# Full-size PNG of a grained gradient is around 7 MB for the two hero fields
+# alone, which is not a defensible hero background. WebP at these settings is
+# 152 KB for all four, and the hero field downsamples cleanly because it is a
+# soft wash with no fine detail and never carries type.
+WEB_OUT = os.path.normpath(os.path.join(OUT, "..", "..", "frontend", "public", "landing"))
+WEB_ASSETS = [
+    ("hero-field-light.png", "hero-field-light.webp", 1920, 80),
+    ("hero-field-dark.png", "hero-field-dark.webp", 1920, 80),
+    ("edge-strip-light.png", "edge-strip-light.webp", 2880, 90),
+    ("edge-strip-dark.png", "edge-strip-dark.webp", 2880, 90),
+]
+
+
+def build_web_assets():
+    os.makedirs(WEB_OUT, exist_ok=True)
+    for src, dst, width, quality in WEB_ASSETS:
+        im = Image.open(os.path.join(OUT, src)).convert("RGB")
+        if im.width > width:
+            im = im.resize((width, max(1, round(im.height * width / im.width))), Image.LANCZOS)
+        path = os.path.join(WEB_OUT, dst)
+        im.save(path, "WEBP", quality=quality, method=6)
+        print(f"  {dst:34s} {im.width}x{im.height}  {os.path.getsize(path) / 1024:.1f} KB")
+
+
 if __name__ == "__main__":
     print("Generating gradient assets from the reference ramp:")
     for dark in (False, True):
@@ -195,3 +221,5 @@ if __name__ == "__main__":
         for name in TILE_SLICES:
             write(f"tile-cap-{name}-{suffix}.png", tile_cap(name, dark))
     print("Done. 10 assets.")
+    print("Building web assets for the landing page:")
+    build_web_assets()

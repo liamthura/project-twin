@@ -52,6 +52,8 @@ import { AuthShell } from "@/components/AuthShell";
 import { ResetPassword } from "@/components/ResetPassword";
 import { AddEmailBanner } from "@/components/AddEmailBanner";
 import Consent from "@/components/Consent";
+import Landing from "@/landing/Landing";
+import { goToRoute, isAuthRoute, readRoute } from "@/lib/routes.js";
 import SectionRenderer from "@/renderers/SectionRenderer";
 
 // Debounce hook
@@ -309,6 +311,24 @@ export default function App() {
   // Above the early returns because hooks cannot be conditional; the condition
   // is therefore inside it.
   const showingAuth = error && !hasCredential;
+
+  // Which of the two no-credential screens is up: the marketing page, or the
+  // sign-in form. WelcomeAuth listens for hash changes once it is mounted, but
+  // the landing page has to be able to hand over to it, so App needs to see
+  // the route too. Note goToRoute uses pushState, which fires neither
+  // hashchange nor popstate -- hence setRoute at the call site rather than
+  // relying on the listener alone.
+  const [route, setRoute] = useState(() => readRoute());
+  useEffect(() => {
+    const sync = () => setRoute(readRoute());
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate", sync);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate", sync);
+    };
+  }, []);
+
   useEffect(() => {
     // Nothing is decided yet while the first load is in flight, and writing a
     // tab route here would put #/profile in the address bar for the moment
@@ -512,6 +532,20 @@ export default function App() {
   // an HttpOnly cookie, so a signed-in account has no token here and would
   // otherwise be shown the sign-in screen the moment any request failed --
   // told to sign in while already signed in.
+  // No credential and no auth route asked for: this is a visitor, not a user
+  // locked out. Show them the page that explains what MyGist is. Sign in and
+  // the landing page hands over to WelcomeAuth below.
+  if (showingAuth && !isAuthRoute(route)) {
+    return (
+      <Landing
+        onSignIn={() => {
+          goToRoute("signin");
+          setRoute("signin");
+        }}
+      />
+    );
+  }
+
   if (showingAuth) {
     return (
       <AuthShell

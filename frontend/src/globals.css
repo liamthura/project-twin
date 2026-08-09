@@ -27,6 +27,17 @@
     --input: 20 6% 90%;
     --ring: 228 69% 55%;
     --radius: 0.5rem;
+
+    /* Brand layer, beneath the semantic tokens above. Used by the marketing
+       page only; the app reads the semantic names. Ground-inverse and
+       On-inverse do NOT invert -- the dark break section has to stay dark in
+       both modes, or the page's tonal arc runs backwards in dark mode. */
+    --ground-inverse: 24 10% 10%;
+    --on-inverse: 60 5% 96%;
+    --clay: 18 74% 60%;
+    --verdigris: 188 38% 36%;
+    --tint-clay: 18 74% 94%;
+    --tint-verdigris: 188 26% 93%;
   }
 
   .dark {
@@ -52,6 +63,13 @@
     --border: 60 2% 16%;
     --input: 60 2% 16%;
     --ring: 228 94% 62%;
+
+    --ground-inverse: 24 8% 14%;
+    --on-inverse: 60 5% 96%;
+    --clay: 18 66% 62%;
+    --verdigris: 188 40% 50%;
+    --tint-clay: 18 30% 18%;
+    --tint-verdigris: 188 26% 15%;
   }
 }
 
