@@ -571,6 +571,25 @@ the back half of the ramp is invisible. Content that matters therefore sits
 top-left — the consent switches needed 152px of right padding to stay inside the
 visible window.
 
+**On mobile the media is a flow child, not a fixed offset.** The tile component
+positions its header and media slot absolutely, at `y=32` and `y=168`. That is
+correct only while the body is exactly four lines. The mobile frame overlays its
+own copy on top of the card instead of using the card's text, so the slot never
+reflowed — four of the seven tiles had body text running straight through the
+mini-UI, worst on Proposals at 32px of overlap. The mobile tiles now swap the
+card to `media=none` and carry the media as the last child of the tile's own
+auto-layout, so the slot sits at `body end + 16` whatever the copy does. Tile
+height is `74 + bodyH + 16 + 192`, which is derived rather than hand-set.
+
+Two things follow. **Desktop still has the latent version of this bug** — the
+absolute slot is in the component, so desktop body copy must stay within two
+lines at 848px and four at 400px or it will overlap in the same way. And the
+mobile media uses `scaleMode: "CROP"` at **native pixels, anchored top-left**,
+not `FILL`. `FILL` is a centre crop, so the same image in a 520×280 slot and a
+1000×300 slot gets a different zoom and a different centre — on mobile that cut
+every heading off and left only sentence tails. Top-left anchoring is what makes
+the bleed rule work: the part that matters is the part that survives.
+
 Sign-in appears twice, both quiet: as a small text link under the hero waitlist
 field ("Already have a code? Sign in.", the link half in `--link`) and at the
 right of the nav bar. Neither competes with the waitlist as the primary action.
@@ -677,9 +696,9 @@ to accept.
 
 **Scoped reads** — 2col, the Preferences section in the background slot with a mono scope label
 
-> Every client sees only the slice you allow. A work assistant asks for
-> `professional` and gets your tone rules and what you're working on; ask for
-> `minimal` and it's a name and a role.
+> An assistant asks for a named scope and gets only that slice. Ask for
+> `minimal` and it's a name and a role; ask for `professional` and it's your
+> tone rules and what you're working on.
 
 **Search** — 1col
 
@@ -700,14 +719,14 @@ to accept.
 
 **Consent** — 1col
 
-> Connecting a client takes one URL. You get a consent screen where you choose
-> what it may read, and whether it may write anything at all.
+> Connecting a client takes one URL. The consent screen settles one thing:
+> whether it may only read, suggest changes for your approval, or write to your
+> gist directly.
 
 **Skills** — 1col
 
-> Four short guides ship with MyGist, telling assistants how to read a persona
-> and what is worth proposing. Your experience does not change depending on which
-> app you happened to open.
+> Four short guides ship with MyGist — how to read a gist, and what's worth
+> proposing. The same behaviour in every client.
 
 **Run it yourself** — 1col
 
@@ -717,6 +736,14 @@ to accept.
 The Scoped reads tile deliberately does not promise that a scope excludes other
 sections. An earlier draft claimed a `professional` read "never sees the personal
 sections", which overstates what the scope config guarantees.
+
+It also no longer says "the slice **you** allow". `scope` is a parameter on
+`get_context` (`backend/server.py:2813`), defaulting to `minimal`, and the
+**client** passes it per call — nothing gates it by OAuth scope, so any
+connection holding `persona:read` can ask for `full`. The tile now says the
+assistant asks and gets that slice, which is what happens. The control the owner
+actually holds is the one the Consent tile shows: read, propose, or write. Two
+tiles, two different mechanisms — worth not blurring them.
 
 ### 4 · Closing
 
