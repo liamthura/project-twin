@@ -34,8 +34,21 @@ existing app can draw from, so the two never drift.
 Playful Editorial, as defined in the owner's persona. The governing split is
 energy on the way in, quiet once someone is working. A landing page is entirely
 "on the way in", so it takes the full-strength treatment: pill controls,
-container radii at 16–32px, a floating detached nav pill, the page framed in a
-large-radius container, frosted glass on fixed elements only.
+container radii at 16–32px, the page framed in a large-radius container.
+
+The nav was a floating detached pill until review. It held two items across
+640px and read as unfinished, and its pill container fought the 12px card
+language everywhere below it. It is now an **anchored full-width bar**: mark and
+wordmark on the same 80px gutter as every section, then **Docs, Sign in and the
+waitlist CTA on the right**, with a hairline bottom rule under the gradient edge
+strip. Frosted glass went with it — nothing on the page is fixed and translucent
+any more.
+
+A first pass at the bar put *How it works* and *What it does* in the centre.
+Those went: the page is one scroll, so links to its own two middle sections earn
+nothing, and the centre group made the bar busier than a waitlist page needs. On
+390 the same three items sit at smaller type — no hamburger, because with no
+collapsed links there is nothing behind it.
 
 One tension to hold. Stack Sans Notch is crafted but cool and screen-native, so
 it does not carry the "warm, tactile, a little handmade" quality on its own.
@@ -114,6 +127,26 @@ body stay visibly separate, and the display face remains an event rather than a
 default. Anything below 40px is Geist, however well Stack Sans Notch would in
 fact survive there.
 
+**One exception: the wordmark.** `MyGist` is set in Stack Sans Notch SemiBold at
+20px (19 on mobile), well under the floor. A logotype is not display type and
+not UI type — it is a fixed piece of artwork that happens to be made of letters,
+so the role boundary the floor protects does not apply to it. Because the floor
+is the owner's rule, the exception is written down rather than assumed.
+
+Two details the swap needed. Notch sets **optically smaller than Geist**, so
+carrying the old 18px across would have quietly shrunk the wordmark; 20px holds
+the same presence. And it needs **+1.5% tracking** — the face is drawn tight for
+headline sizes, and at 20px the default fit reads cramped beside the mark's
+2.25px stroke.
+
+The wordmark inside the **Product mockup is deliberately still Geist.** That
+mockup depicts the running app, and the app renders its wordmark at
+`frontend/src/App.jsx:617` with Tailwind configured for `Geist` and `Geist Mono`
+only — no display family is registered. Changing the mockup would show a product
+that does not exist. Bringing the app in line is a three-part code change (load
+the webfont, add a `display` family to `frontend/tailwind.config.js`, switch that
+`h1`), and it is not part of this design work.
+
 At 72px the notches carry the headline on their own, so display weight stays at
 500–600 rather than 700.
 
@@ -148,9 +181,10 @@ Four steps, all tinted with Ink rather than black so they stay warm.
 | `none` | — | Flat tiles on tinted grounds |
 | `sm` | `0 1px 2px ink/6%` | Resting cards |
 | `lift` | `0 8px 24px ink/10%` | Card hover, persona card |
-| `pop` | `0 12px 32px ink/14%` | Floating nav pill |
+| `pop` | `0 12px 32px ink/14%` | Unused since the nav stopped floating |
 
-Frosted glass is reserved for the fixed nav pill.
+Frosted glass is not used. It existed only for the floating nav pill, which the
+anchored bar replaced.
 
 ### Tap targets
 
@@ -202,7 +236,7 @@ Three rules keep it a system element rather than decoration:
 
    An earlier version of this rule locked the artwork to the five brand colours. It produced mud: Clay and Verdigris are near-complementary, so interpolating between them passes through grey-brown. The reference avoids this because lightness rises monotonically and each hue step is adjacent to the last.
 2. **Two fixed roles.** A 12px **edge strip** across the very top of the page,
-   full-bleed to the viewport edges and above everything including the nav pill,
+   full-bleed to the viewport edges and sitting directly above the nav bar,
    acting as the signature element seen once; a
    large soft **field** behind the hero mockup.
 
@@ -282,15 +316,65 @@ neutrals so it does not fight the 24–32px warm containers around it.
 The per-tile `href` and `cta` props go unused. A landing page with one action
 should not offer six competing ones.
 
+## Brand marks
+
+A `Brand guide` frame on **01 Foundations** carries the marks, in the same
+1440 / 80px-padding / Geist Mono caption convention as the type specimen beside
+it. Sections: the mark, five lockups, eight colour variants, clear space and
+minimum size, six worked misuse examples, and the wordmark spec.
+
+Everything derives from two files in the repo — `frontend/public/logo.svg` (the
+mark) and `frontend/public/favicon.svg` (the app icon: an Indigo rounded square,
+radius 0.229 of the square, with the mark knocked out in white). If either
+changes, the guide is wrong until it is redrawn.
+
+| Component | Use |
+|---|---|
+| `Logo / Lockup horizontal` | Primary. Mark 24 + wordmark 20, gap 10 |
+| `Logo / Lockup stacked` | Square and vertical spaces |
+| `Logo / Wordmark` | Only where the mark is already nearby |
+| `Logo / MyGist mark` | Favicons, avatars, loading states |
+| `Logo / App icon` | Favicon and installed-app tile |
+
+**The mark is stored as outlined paths.** It was built from live strokes at
+first, which does not survive scaling: `resize()` scales geometry but not stroke
+weight, so the 24px mark blown up to 160px for this guide kept its 2.25px stroke
+and came out spindly. Outlining converts the strokes to fills, and the children
+carry `SCALE` constraints so an instance can be resized to any size correctly.
+
+Rules worth keeping: clear space is **X, the height of the mark**, on every
+side; the horizontal lockup stops at **88px wide** and the mark alone at
+**16px**, below which the descender merges with the ring; and there is
+deliberately **no on-gradient variant**, because the system already forbids type
+over gradient artwork.
+
+**One lockup, four places.** `Nav bar`, `Nav bar — mobile`, `Footer` and
+`Footer — mobile` all instance `Logo / Lockup horizontal`; none of them
+hand-builds a mark-plus-wordmark pair any more. That was a real drift risk while
+it lasted — four copies that happened to agree because they were edited together.
+
+Two consequences worth knowing. The mobile lockup is now **102×26 like desktop**,
+not the 96×25 it was: the rest of the mobile shell steps type down a notch, but a
+logo that changes size by 6% between breakpoints is a second mark, not a
+responsive one. And the footer instances override only the **wordmark** to
+`color/on-inverse` — the mark keeps Indigo, which is what the guide's
+Ground-inverse cell prescribes.
+
 ## Components
 
-Fifteen. Anything with an existing counterpart in `frontend/src/components/ui`
-mirrors its variant names, so Code Connect is close to free later.
+Nineteen, after review added `Nav bar`, `Nav bar — mobile`, `Footer — mobile`
+and `FAQ item`. Anything with an existing counterpart in
+`frontend/src/components/ui` mirrors its variant names, so Code Connect is close
+to free later.
 
 **Shell**
 1. Page frame — whole page inside a 32px-radius container
-2. Nav pill — floating, frosted, detached; carries Sign in at top right
-3. Footer
+2. Nav bar — anchored, full width, hairline bottom rule. Mark + wordmark left;
+   Docs, Sign in and the waitlist CTA right. A `Nav bar — mobile` sibling
+   carries the same three items at smaller type.
+3. Footer — brand column, three link groups (Product / Developers / Legal), and
+   a bottom bar behind a hairline. `Footer — mobile` narrows the gutter to 24
+   and stacks the bottom bar.
 
 **Actions**
 
@@ -301,8 +385,10 @@ mirrors its variant names, so Code Connect is close to free later.
 
 6. Section header — mono eyebrow, display, body sub
 7. Bento tile — adapted from `bento-grid`, 12px radius, `card` fill, hairline border. **No tile cap and no icon.** Title in Indigo, description in `muted-fg`. Product UI sits oversized at the foot, clipped by the tile so it bleeds off the bottom and right with a soft fade. Variants: 1-col and 2-col × media none/ui
-8. Step card — numbered
+8. Step card — display numeral in Stack Sans Notch at the 40px floor, hairline border, equal heights across the row
 9. Pull-quote
+9b. FAQ item — one question with `state=collapsed | expanded`. Chevron flips,
+    answer measure capped at 680, hairline rule beneath
 
 **Product objects** — these do the selling and get the most attention. All are
 drawn from the running MyGist UI rather than invented for the page. Fifteen
@@ -315,7 +401,12 @@ components in total.
     summary layout. No such view exists — the Profile section is a form. Maya's
     tone rules and goals are real data, but they live in the Preferences and Goals
     sections, not on one card.
-12. Client chip — pill. Contents pending the client-list answer below
+12. Client chip — pill, carrying a 16px brand mark and a label. Five chips:
+    Claude, Codex, Raycast, Notion AI, Hermes. A sixth reading "anything with
+    MCP connectors" was cut — it named no product, so it had no mark, and a
+    chip row is for things a visitor recognises. `showIcon` survives on the
+    component for any future markless chip. See `design/logos/README.md` —
+    three marks are real, two are dashed placeholders
 13. Scope payload — the editor's **Preferences** section as captured, carrying Maya's tone rules and dislikes, with a Geist Mono label naming the scope that returned it
 
     Not a selector. There is no scope-selector UI in MyGist: read scopes
@@ -335,13 +426,34 @@ components in total.
 
 Sections alternate grounds so the page does not read as one long white scroll.
 
+### One content column
+
+Every section sits in a **1280 column at x=80** on the 1440 frame, and 342 at
+x=24 on the 390 frame. Section headers and the steps row fill that column rather
+than hugging their own text.
+
+This is a fix, not a restatement. Because the headers hugged and their sections
+centre their children, each header's left edge landed wherever its text happened
+to end: x=440 in How it works, x=217 in What it does, against content at x=208
+and x=80. Three different left edges down one page. That drift was most of what
+"the nav bar is not consistent" was pointing at — the nav was the clearest
+offender, but it was not the only one.
+
 | # | Section | Ground | Job |
 |---|---|---|---|
 | 1 | Hero | Paper + indigo gradient field | Framed product mockup, client chips, waitlist capture |
 | 2 | How it works | Clay tint | Three steps, the spine |
 | 3 | What it does | Paper | Bento grid, seven tiles. Density and life |
+| 4 | FAQ | **Verdigris tint** | Nine questions in three topic groups, then a contact block |
 | 5 | Closing CTA | **Ground-inverse, full-bleed** + indigo gradient | Second waitlist capture, and the page's one dark beat |
 | 6 | Footer | Ground-inverse | — |
+
+The FAQ ground is where **Verdigris finally does something**. It was picked in
+Set C and then went unused on the whole page — an audit of every fill and stroke
+on the 1440 frame found zero bindings to `color/verdigris` or its tint. Putting
+the FAQ on `#E9F1F2` also fixes the tonal arc, which had two paper sections
+running into each other: the page now reads paper+blue → warm → paper → cool →
+dark → dark.
 
 Sections 5 and 6 use `Ground-inverse`, not `Ink`. Assembly showed why: `Ink` and
 `Paper` invert together, so an ink-grounded section comes out *lighter* than the
@@ -365,6 +477,44 @@ now the two 2-col tiles inside the bento. With every tile carrying one or two
 explanatory sentences, the tiles do the work those sections were doing, and the
 page gets its density from one rich grid instead of four scrolling beats.
 
+### FAQ
+
+Nine questions, three topic groups, built against the
+[Checklist Design FAQ checklist](https://www.checklist.design/).
+
+Two-column at 1440: the topic label sits in a 280px left column, questions fill
+the 864px right. At 390 the label stacks above its questions. Each question is a
+`FAQ item` instance with `state=collapsed | expanded`; the **first question in
+each group ships expanded**, so three answers are readable without a click and
+the disclosure pattern is still obvious. Answer measure is capped at 680px.
+
+**Every answer is lifted from the repository, not written fresh.** Seven come
+from `docs-site/content/docs/use/faq.mdx`, which is the canonical FAQ and was
+already grouped by topic. The rest come from `README.md` (which clients, running
+it yourself) and `frontend/src/components/Consent.jsx` (what an assistant may
+change). Given the bento invented five product visuals in a row, nothing on this
+section is allowed to be composed from memory.
+
+#### Checklist coverage
+
+| Item | Done | Note |
+|---|---|---|
+| Purposeful information | yes | Every question is one a prospect asks *before* signing up. The docs FAQ's "I'm already using it and stuck" questions were left in the docs. |
+| Contact options | yes | Two, ascending effort: `liam@thuradev.qzz.io` first (one tap, a person answers), then the full documentation. |
+| Navigate by topic | yes | Before you connect / What it can see and change / Where it lives. |
+| Table of contents | **no** | The checklist gates this on "a large amount of questions". Nine, already grouped, on a page section rather than a page — a ToC would be longer than the thing it indexes. |
+| Search | **no** | Same reason. Keyword search over nine visible questions costs a visitor more than reading them. It belongs on `/docs`, which has it. |
+
+Two items are deliberately skipped because the checklist is written for a
+standalone FAQ **page** and this is a landing-page **section**. If a full FAQ
+page is ever built, both come back.
+
+#### What is not answered
+
+**Cost.** Nothing in the repository settles pricing, and the owner chose to leave
+it out rather than ship a vague answer immediately above the waitlist CTA. The
+hero's "invite-only while it's small" carries the expectation instead.
+
 ### Bento layout
 
 Three columns, three rows, every row summing to three.
@@ -375,14 +525,55 @@ row 2   [ Your sections 1col ] [ Proposals         2col ]
 row 3   [ Consent 1col ] [ Skills 1col ] [ Run it yourself 1col ]
 ```
 
-The two 2-col tiles carry live-looking product UI in their `background` slot:
-the scope payload in one, the proposal card in the other. The five 1-col tiles
-carry an icon and copy only, so the grid has a clear rhythm of heavy and light
-rather than seven tiles all shouting.
+**All seven tiles carry product UI.** The original plan gave the five 1-col
+tiles an icon and copy only, for a rhythm of heavy and light. Built out, that
+rhythm did not read as rhythm — it read as five unfinished cards with 200–300px
+of dead white under three lines of text, and it was the first thing the owner
+named on review. Each 1-col tile now has its own visual, clipped and bleeding
+under the same diagonal fade as the 2-col tiles:
+
+| Tile | Visual | Sourced from |
+|---|---|---|
+| Scoped reads | scope payload (existing) | — |
+| Search | a `search_context` call over three ranked results | `backend/search_index.py` |
+| Your sections | the ten packs, plus the manifest that adds an eleventh | `backend/section_packs/*/manifest.json` |
+| Proposals | proposal card (existing) | — |
+| Consent | the three OAuth scope switches | `frontend/src/components/Consent.jsx` |
+| Skills | the four skills in `skills/` | `skills/*/SKILL.md` |
+| Run it yourself | the quick-start build and run | `README.md`, `Dockerfile` |
+
+**Every one of these was invented on the first pass, and every one was wrong.**
+The first drafts showed relevance scores of `0.94` (real scores are reciprocal
+rank fusion, `1/(60 + rank)`, so they live between 0.01 and 0.04), four skill
+files that do not exist (`read-persona.md` and friends, against the real
+`mygist`, `mygist-reading`, `mygist-writing`, `mygist-capture`), a consent screen
+with per-section checkboxes (the real one has three OAuth scope switches and no
+section choice at all), a section manifest with a `fields` key it does not have,
+and `ghcr.io/liamthura/mygist:v2` on port 8080 against a real port of **1120**
+and no published image whatsoever.
+
+This is the third time on this branch that plausible-looking product UI has been
+drawn from imagination rather than from the repository. **The rule: a bento
+visual cites a file.** The table above carries that column for exactly that
+reason — a visual with nothing in the right-hand column has not been checked.
+
+The five are built as editable frames on the Components page (`Bento media / …`)
+and baked into the tiles as image fills, matching how the two original tiles
+already worked. **Consequence: they are light-mode pixels.** A dark landing
+frame would show light UI inside every bento tile. That was already true of the
+two original tiles; it is now true of seven.
+
+The fade runs **top-left opaque to bottom-right transparent**, so the media
+softens off the bottom and right edges. Its stops are `0 / 0.42 / 0.68` rather
+than `0 / 1`, because the media slot overhangs the tile: only ~71% of the ramp
+horizontally and ~66% vertically is ever on screen, so a transition placed in
+the back half of the ramp is invisible. Content that matters therefore sits
+top-left — the consent switches needed 152px of right padding to stay inside the
+visible window.
 
 Sign-in appears twice, both quiet: as a small text link under the hero waitlist
-field ("Already have a code? Sign in.") and at the top right of the nav pill.
-Neither competes with the waitlist as the primary action.
+field ("Already have a code? Sign in.", the link half in `--link`) and at the
+right of the nav bar. Neither competes with the waitlist as the primary action.
 
 ### Hero motion beat
 
