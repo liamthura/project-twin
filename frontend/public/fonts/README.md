@@ -19,12 +19,22 @@ its stack — Geist. **Every display heading on the landing page is currently se
 in the wrong face**, at the right size and weight. It does not look broken,
 which is precisely why this file exists.
 
+## Where it is not
+
+**Not on Google Fonts**, despite the design spec's decision table having said so
+until this was checked. `fonts.googleapis.com/css2` returns **400** for
+`Stack Sans Notch`, `Stack Sans` and `Koto` — the same request shape that
+returns 200 for `Geist`. It cannot be added to the `<link>` in `index.html`.
+
+**Not installed on the machine the design was built on** either: neither
+`~/Library/Fonts` nor `/Library/Fonts` has it. Figma was reading it from
+somewhere, and that somewhere is not recorded.
+
 ## The licence question, which is not settled
 
-The design was set in Stack Sans Notch inside Figma, where it was available as a
-desktop font. A desktop licence is not a webfont licence — they are separately
-granted by most foundries, and self-hosting a `.woff2` on a public marketing
-page is unambiguously web use.
+Wherever the file came from, a desktop licence is not a webfont licence — most
+foundries grant them separately, and self-hosting a `.woff2` on a public
+marketing page is unambiguously web use.
 
 So before this ships, one of:
 
