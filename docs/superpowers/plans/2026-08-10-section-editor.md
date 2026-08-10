@@ -84,7 +84,7 @@ Three rules the design spec states loosely and this plan fixes:
 
 Pure, and in its own file rather than inside `SubsectionCard`, because "what counts as filled" is the kind of rule that gets re-answered differently in a second place. `// @vitest-environment node` — it imports nothing.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // @vitest-environment node
@@ -131,11 +131,11 @@ describe("fillSummary", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 `npm test -- --project unit src/renderers/fillSummary.test.js` → FAIL, no such module.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```js
 // How full a `fields` node is, for the count in its card header ("6 of 7").
@@ -158,7 +158,7 @@ function isFilled(v) {
 }
 ```
 
-- [ ] **Step 4: Green, then commit**
+- [x] **Step 4: Green, then commit**
 
 ```bash
 git add frontend/src/renderers/fillSummary.js frontend/src/renderers/fillSummary.test.js
@@ -177,11 +177,11 @@ git commit -m "feat(editor): fillSummary, the denominator a fields card header r
 
 The rule is `aria-hidden` decoration (`role="separator"` would put it in the a11y tree as a divider between things it is actually labelling). The label keeps its `InfoButton` if the group declares `info`, so no group loses its explainer in the restructure.
 
-- [ ] **Step 1: Write the failing test** — asserts: renders the title as a level-3 heading; the label is `font-mono`, `uppercase`, `tracking-[0.06em]`, `text-[13px]`, muted; a rule element exists and is `aria-hidden`; an `info` prop renders the `About <title>` button in the same row; no `info` renders no button.
+- [x] **Step 1: Write the failing test** — asserts: renders the title as a level-3 heading; the label is `font-mono`, `uppercase`, `tracking-[0.06em]`, `text-[13px]`, muted; a rule element exists and is `aria-hidden`; an `info` prop renders the `About <title>` button in the same row; no `info` renders no button.
 
-- [ ] **Step 2: Run it, watch it fail.**
+- [x] **Step 2: Run it, watch it fail.**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```jsx
 export function EyebrowBand({ title, info }) {
@@ -197,7 +197,7 @@ export function EyebrowBand({ title, info }) {
 }
 ```
 
-- [ ] **Step 4: Green, then commit.**
+- [x] **Step 4: Green, then commit.**
 
 ---
 
@@ -228,11 +228,11 @@ borderRadius: {
 },
 ```
 
-- [ ] **Step 1: Write the failing test** — asserts: the title renders at `h3` for depth 0 and `h4` for depth 1; geometry classes `rounded-xl border p-4` and a 12px header/content gap; `action` renders inside the header row, not the content; `count` likewise; children render in the content region; no `action`/`count` renders no empty right slot; `tick: "in"` renders `[data-save-tick]` and `tick: null` does not; the tick is `aria-hidden`; `tick: "out"` carries `opacity-0` and `data-motion="fade"`.
+- [x] **Step 1: Write the failing test** — asserts: the title renders at `h3` for depth 0 and `h4` for depth 1; geometry classes `rounded-xl border p-4` and a 12px header/content gap; `action` renders inside the header row, not the content; `count` likewise; children render in the content region; no `action`/`count` renders no empty right slot; `tick: "in"` renders `[data-save-tick]` and `tick: null` does not; the tick is `aria-hidden`; `tick: "out"` carries `opacity-0` and `data-motion="fade"`.
 
-- [ ] **Step 2: Run it, watch it fail.**
+- [x] **Step 2: Run it, watch it fail.**
 
-- [ ] **Step 3: Implement** — one file, with a local `SaveTick`:
+- [x] **Step 3: Implement** — one file, with a local `SaveTick`:
 
 ```jsx
 // The tick is decoration: the header's save chip is the role="status" that
@@ -259,7 +259,7 @@ function SaveTick({ phase }) {
 
 Card shell: `<Card className="rounded-xl p-4 shadow-none">` containing a header row (`flex items-start justify-between gap-2 min-h-9`) and `<div className="mt-3">{children}</div>`. `min-h-9` (36px) is the header height the `+ Add` button sets in the file (`114:414`); a card without a button keeps the same header height so cards side by side align their content.
 
-- [ ] **Step 4: Add the keyframe to `globals.css`**
+- [x] **Step 4: Add the keyframe to `globals.css`**
 
 ```css
 /* Save tick, per card: scales 0.8 to 1 with a fade. The design spec's 160ms is
@@ -275,7 +275,7 @@ Card shell: `<Card className="rounded-xl p-4 shadow-none">` containing a header 
 }
 ```
 
-- [ ] **Step 5: Green, then commit.**
+- [x] **Step 5: Green, then commit.**
 
 ---
 
@@ -313,7 +313,7 @@ function toRuns(nodes) {
 }
 ```
 
-- [ ] **Step 1: Write the failing tests** in a new `describe("the section's structure")`:
+- [x] **Step 1: Write the failing tests** in a new `describe("the section's structure")`:
   - the pack title renders as an `h2` above everything, with the description beneath it, and **not** inside any card;
   - each titled top-level node gets its own card — `preferences` yields five card elements, one per top-level child plus one per grouped child, and no card contains another;
   - a group renders an eyebrow band whose label is its title, and its children as cards after it;
@@ -324,13 +324,13 @@ function toRuns(nodes) {
   - a list node's `+ Add` lands in its own card header — for an untitled node, in that card's header, no longer in a page-level row;
   - the untitled node's `InfoButton` moves with it into the card header.
 
-- [ ] **Step 2: Run them, watch them fail.** Also run the whole file and record which existing tests break — expect the separator suite (delete it), the "only one heading" case in `describe("node.title")` (now two: page title plus the untitled node's card title), and any test reaching for the pack title's row.
+- [x] **Step 2: Run them, watch them fail.** Also run the whole file and record which existing tests break — expect the separator suite (delete it), the "only one heading" case in `describe("node.title")` (now two: page title plus the untitled node's card title), and any test reaching for the pack title's row.
 
-- [ ] **Step 3: Implement** the new render: title block (`space-y-1` : `h2` `text-xl font-semibold` + `p` `text-[13px] text-muted-foreground`), then `space-y-8` over runs, each run `space-y-4`, a group run rendering `<EyebrowBand>` then its children in `grid gap-4` (`lg:grid-cols-2` unless the group holds a `fields` child — Task 5), each leaf a `SubsectionCard`.
+- [x] **Step 3: Implement** the new render: title block (`space-y-1` : `h2` `text-xl font-semibold` + `p` `text-[13px] text-muted-foreground`), then `space-y-8` over runs, each run `space-y-4`, a group run rendering `<EyebrowBand>` then its children in `grid gap-4` (`lg:grid-cols-2` unless the group holds a `fields` child — Task 5), each leaf a `SubsectionCard`.
 
-- [ ] **Step 4: Delete the separator suite and fix the fallout**, one edit per broken test, each with a comment naming why the expectation moved.
+- [x] **Step 4: Delete the separator suite and fix the fallout**, one edit per broken test, each with a comment naming why the expectation moved.
 
-- [ ] **Step 5: Full suite green, then commit.**
+- [x] **Step 5: Full suite green, then commit.**
 
 ---
 
@@ -338,10 +338,10 @@ function toRuns(nodes) {
 
 **Files:** Modify `SectionRenderer.jsx`, `SectionRenderer.test.jsx`
 
-- [ ] **Step 1: Write the failing test** — `preferences`' `Code Style` (3 × `strings`) and `profile`'s `Contact & Links` (2 × `list`) carry `lg:grid-cols-2`; `preferences`' `Communication` (holds a `fields` node) does not; a run of ungrouped leaves never does.
-- [ ] **Step 2: Run it, watch it fail** (Task 4 ships single column).
-- [ ] **Step 3: Implement** — `const twoUp = run.items.every(({ node }) => node.kind !== "fields")` on group runs only, with the derivation and the rejected alternative in a comment.
-- [ ] **Step 4: Green, commit.**
+- [x] **Step 1: Write the failing test** — `preferences`' `Code Style` (3 × `strings`) and `profile`'s `Contact & Links` (2 × `list`) carry `lg:grid-cols-2`; `preferences`' `Communication` (holds a `fields` node) does not; a run of ungrouped leaves never does.
+- [x] **Step 2: Run it, watch it fail** (Task 4 ships single column).
+- [x] **Step 3: Implement** — `const twoUp = run.items.every(({ node }) => node.kind !== "fields")` on group runs only, with the derivation and the rejected alternative in a comment.
+- [x] **Step 4: Green, commit.**
 
 ---
 
@@ -351,10 +351,10 @@ function toRuns(nodes) {
 
 No shipping manifest nests a group inside a group, so this is the defensive path that stops a future manifest inventing a third tier. A group at depth ≥ 1 renders as **one** card titled with the group's title, its children stacked inside under `headline-3` labels — never a second eyebrow, never a card inside a card.
 
-- [ ] **Step 1: Write the failing test** with a synthetic pack (group → group → two `strings` nodes): the inner group's title renders as a `headline-3`-styled label *inside* the outer card; exactly one card exists for that branch; no second `[data-eyebrow-rule]`; the nested nodes' values still bind against the section root; a fourth level flattens into the same card rather than nesting further.
-- [ ] **Step 2: Run it, watch it fail** — today's recursion would emit a nested block, and after Task 4 it would emit a card inside a card.
-- [ ] **Step 3: Implement** — in `renderSectionNode`, a `group` at `depth >= 1` returns a labelled `<div>` (`h4`/`h5` by depth, `text-sm font-semibold`) plus its children rendered at `depth + 1` with `inCard` true, so leaves render bare rather than as cards.
-- [ ] **Step 4: Green, commit.**
+- [x] **Step 1: Write the failing test** with a synthetic pack (group → group → two `strings` nodes): the inner group's title renders as a `headline-3`-styled label *inside* the outer card; exactly one card exists for that branch; no second `[data-eyebrow-rule]`; the nested nodes' values still bind against the section root; a fourth level flattens into the same card rather than nesting further.
+- [x] **Step 2: Run it, watch it fail** — today's recursion would emit a nested block, and after Task 4 it would emit a card inside a card.
+- [x] **Step 3: Implement** — in `renderSectionNode`, a `group` at `depth >= 1` returns a labelled `<div>` (`h4`/`h5` by depth, `text-sm font-semibold`) plus its children rendered at `depth + 1` with `inCard` true, so leaves render bare rather than as cards.
+- [x] **Step 4: Green, commit.**
 
 ---
 
@@ -362,10 +362,10 @@ No shipping manifest nests a group inside a group, so this is the defensive path
 
 **Files:** Modify `SectionRenderer.jsx`, `SectionRenderer.test.jsx`
 
-- [ ] **Step 1: Write the failing test** — `preferences`' `Default Communication Style` with all three keys set shows `3 of 3` in its card header; with one set, `1 of 3`; with none, `Nothing yet`; the count is **not** `font-mono`; a `list` node's header shows `+ Add` and no count; `profile`'s Personal Information reports against its declared key set. Assert position: the count is inside the card's header element, opposite the title.
-- [ ] **Step 2: Run it, watch it fail.**
-- [ ] **Step 3: Implement** — `fields` nodes only: `const { filled, total } = fillSummary(node, value)`, rendering `total === 0 ? null : filled === 0 ? "Nothing yet" : `${filled} of ${total}`` in `text-[13px] text-muted-foreground tabular-nums`. `tabular-nums` and not mono: the design spec is explicit that a count is a sentence fragment, and mono is what made the old onboarding summaries read as debug output.
-- [ ] **Step 4: Green, commit.**
+- [x] **Step 1: Write the failing test** — `preferences`' `Default Communication Style` with all three keys set shows `3 of 3` in its card header; with one set, `1 of 3`; with none, `Nothing yet`; the count is **not** `font-mono`; a `list` node's header shows `+ Add` and no count; `profile`'s Personal Information reports against its declared key set. Assert position: the count is inside the card's header element, opposite the title.
+- [x] **Step 2: Run it, watch it fail.**
+- [x] **Step 3: Implement** — `fields` nodes only: `const { filled, total } = fillSummary(node, value)`, rendering `total === 0 ? null : filled === 0 ? "Nothing yet" : `${filled} of ${total}`` in `text-[13px] text-muted-foreground tabular-nums`. `tabular-nums` and not mono: the design spec is explicit that a count is a sentence fragment, and mono is what made the old onboarding summaries read as debug output.
+- [x] **Step 4: Green, commit.**
 
 ---
 
@@ -379,11 +379,11 @@ Three changes, one behaviour:
 2. `SectionRenderer` takes `savedAt` and shows the tick on the card whose node last changed.
 3. The header chip stops lying. `saveState` is currently `isSaving ? "saving" : isAutosaveEnabled ? "saved" : "unsaved"`, so with autosave off the chip reads "Unsaved" forever — including immediately after a successful `Save now`. Track a dirty flag instead: set on a change while autosave is off, cleared on a successful save.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   - `SectionRenderer`: editing a field then bumping `savedAt` renders `[data-save-tick]` inside **that** node's card and no other; the tick is gone after the hold (fake timers, 1600ms); a `savedAt` change with no preceding edit renders no tick (the remount-after-a-previous-save case); a second edit elsewhere then another `savedAt` moves the tick rather than showing two.
   - `App`: an autosave flush produces no "Saved" toast; a failed flush still produces a destructive one; with autosave off, a change makes the chip read "Unsaved" and a successful `Save now` makes it read "Saved".
-- [ ] **Step 2: Run them, watch them fail.**
-- [ ] **Step 3: Implement.** In `SectionRenderer`, a `lastEditedRef` written by the per-node `onValue` wrapper, and an effect keyed on `savedAt`:
+- [x] **Step 2: Run them, watch them fail.**
+- [x] **Step 3: Implement.** In `SectionRenderer`, a `lastEditedRef` written by the per-node `onValue` wrapper, and an effect keyed on `savedAt`:
 
 ```js
 // 200ms in, 1.2s hold, 200ms out -- the spec's "plays once". The timers live
@@ -401,7 +401,7 @@ useEffect(() => {
 
 `savedAt` is App's existing `lastSaved`, which already updates on every successful `saveFile` **and** `saveAll` — so `Save now` ticks the card you were editing, which is correct.
 
-- [ ] **Step 4: Green, commit.**
+- [x] **Step 4: Green, commit.**
 
 ---
 
@@ -411,16 +411,16 @@ useEffect(() => {
 
 The restructure moved every wrapper `data-band` sits on. The existing `describe("scroll-spy anchors")` covers the old shape; this proves the new one, and proves it against the rail rather than against itself.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   - for each of `profile`, `preferences`, `lifestyle`, `knowledge`: the set of `[data-band]` values rendered equals `outline(pack).map(b => b.id)`, in order;
   - a group's `data-band` is on the wrapper that holds the eyebrow **and** its cards, so scrolling to it lands on the label;
   - a top-level leaf's `data-band` is on its card wrapper;
   - no `[data-band]` inside a card (a grouped child is not a rail destination);
   - every anchor still carries `scroll-mt-[60px]`;
   - in `App.test.jsx`: clicking the rail's Contact & Links scrolls to the element the band names, through the real editor (the existing scroll tests use `education`, a leaf — this covers the group wrapper).
-- [ ] **Step 2: Run, watch fail where they should** (some will already pass — mark those as guards in a comment rather than claiming them).
-- [ ] **Step 3: Fix whatever they catch.**
-- [ ] **Step 4: Green, commit.**
+- [x] **Step 2: Run, watch fail where they should** (some will already pass — mark those as guards in a comment rather than claiming them).
+- [x] **Step 3: Fix whatever they catch.**
+- [x] **Step 4: Green, commit.**
 
 ---
 
@@ -428,29 +428,43 @@ The restructure moved every wrapper `data-band` sits on. The existing `describe(
 
 **Files:** Modify this plan (fill the checklist), `docs/superpowers/specs/2026-08-04-mygist-app-reshaped-design.md` (record the run divergence under "Prototype divergences")
 
-- [ ] **Step 1:** `npm test -- --project unit` green; `node design/app-contrast.mjs` exits 0 (from the repo root).
-- [ ] **Step 2:** Rebuild the Docker preview at the slice head and confirm in the served bundle what unit tests cannot prove: the `save-tick-in` keyframe, `rounded-xl` resolving to `calc(var(--radius) + 4px)`, `lg:grid-cols-2`, `tracking-[0.06em]`, and the absence of the deleted `<hr>` rules.
-- [ ] **Step 3:** Walk the checklist below at `http://127.0.0.1:8100` against the Figma frames, then hand it to the owner.
+- [x] **Step 1:** `npm test -- --project unit` green; `node design/app-contrast.mjs` exits 0 (from the repo root).
+- [x] **Step 2:** Rebuild the Docker preview at the slice head and confirm in the served bundle what unit tests cannot prove: the `save-tick-in` keyframe, `rounded-xl` resolving to `calc(var(--radius) + 4px)`, `lg:grid-cols-2`, `tracking-[0.06em]`, and the absence of the deleted `<hr>` rules.
+- [x] **Step 3:** Walk the checklist below at `http://127.0.0.1:8100` against the Figma frames, then hand it to the owner.
+
+**✓ = verified mechanically** (a rule present in the served CSS bundle, or an
+assertion in the suite). **eye = needs the owner's eyes at
+`http://127.0.0.1:8100`**, which is the half of "checklist + preview eyeball"
+that is not mine to sign. The preview is rebuilt at `64ef967` and healthy.
 
 | Property | Value | Figma node | ✓ |
 |---|---|---|---|
-| Page title | 20/600 Geist, above the first card, not in it | `114:355` | |
-| Page description | 13/400, muted | `114:356` | |
-| Title block → first run | 32px | `114:149` | |
-| Between runs | 32px | `114:149` | |
-| Inside a run | 16px | `287:620` | |
-| Eyebrow label | 13 Geist Mono, +0.06em, uppercase, muted | `I109:98;61:23` | |
-| Eyebrow rule | 1px, border colour, fills the row | `I109:98;61:24` | |
-| Card | radius 12, 1px border, no shadow, padding 16 | `114:363` | |
-| Card header → content | 12px | `114:363` | |
-| Card title | 16/600 Geist | `114:365` | |
-| Header right — `fields` | `6 of 7`, 13/400 Geist Regular, **not** mono | `114:366` | |
-| Header right — `list`/`strings` | ghost `+ Add`, 36 tall | `315:765` | |
-| Two-across group | `CODE STYLE`, `CONTACT & LINKS`, `LEARNING STYLE` | `109:101`, `114:442`, `110:278` | |
-| Single-column group (holds `fields`) | `COMMUNICATION` | `287:618` | |
-| Mobile 390 | one column, cards 358, same 16/32 rhythm | `116:405` | |
-| Save tick | check, scale 0.8→1 + fade 200ms, holds 1.2s, fades 200ms, once | `1:9` | |
-| Reduced motion | tick still appears and holds; no scale; 100ms fade | — | |
+| Page title | 20/600 Geist, above the first card, not in it | `114:355` | ✓ h2 outside every card, asserted |
+| Page description | 13/400, muted | `114:356` | ✓ |
+| Title block → first run | 32px | `114:149` | ✓ `space-y-8` in the bundle |
+| Between runs | 32px | `114:149` | ✓ same container |
+| Inside a run | 16px | `287:620` | ✓ `space-y-4` / `gap-4` |
+| Eyebrow label | 13 Geist Mono, +0.06em, uppercase, muted | `I109:98;61:23` | ✓ `.tracking-[0.06em]{letter-spacing:.06em}` emitted |
+| Eyebrow rule | 1px, border colour, fills the row | `I109:98;61:24` | ✓ |
+| Card | radius 12, 1px border, no shadow, padding 16 | `114:363` | ✓ `.rounded-xl{border-radius:calc(var(--radius) + 4px)}` |
+| Card header → content | 12px | `114:363` | ✓ `mt-3` |
+| Card title | 16/600 Geist | `114:365` | ✓ |
+| Header right — `fields` | `6 of 7`, 13/400 Geist Regular, **not** mono | `114:366` | ✓ asserted both ways |
+| Header right — `list`/`strings` | ghost `+ Add`, 36 tall | `315:765` | ✓ unchanged from the earlier round |
+| Two-across group | `CODE STYLE`, `CONTACT & LINKS`, `LEARNING STYLE` | `109:101`, `114:442`, `110:278` | ✓ `lg\:grid-cols-2` emitted; **eye** for the real column widths |
+| Single-column group (holds `fields`) | `COMMUNICATION` | `287:618` | ✓ |
+| Mobile 390 | one column, cards 358, same 16/32 rhythm | `116:405` | **eye** — jsdom applies no CSS, so nothing here proves the `lg` breakpoint behaves |
+| Save tick | check, scale 0.8→1 + fade 200ms, holds 1.2s, fades 200ms, once | `1:9` | ✓ keyframe and timings asserted; **eye** for whether it reads as feedback |
+| Reduced motion | tick still appears and holds; no scale; 100ms fade | — | **eye** — needs the OS setting on |
+
+Verified in the served bundle at `64ef967`, which is where a class asserted in a
+unit test but never emitted by Tailwind would show up: `save-tick-in` and
+`.animate-save-tick-in`, `lg\:grid-cols-2`, `.tracking-[0.06em]`,
+`.text-[13px]`, `.rounded-xl` resolving to `calc(var(--radius) + 4px)`,
+`space-y-8`, `tabular-nums`, `duration-medium`, and
+`@keyframes save-tick-in{0%{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}`.
+Gone from the JS: `border-l pl-4` (the old nested-group indent) and
+`tab-strip-fade`.
 
 ---
 
@@ -459,6 +473,32 @@ The restructure moved every wrapper `data-band` sits on. The existing `describe(
 **Field patterns** — the design spec's "Field patterns" subsection (chip paste splitting on comma/newline, list rows expanding inline to edit, search appearing past six items, remove behind an overflow menu, `fields` labels at `headline-3`). The umbrella spec's decomposition assigns slice 2 four things — eyebrow bands, one card per subsection, the two-tier cap, save feedback — and field patterns are none of them. They change editing behaviour rather than page structure, and they land in `ListRenderer.jsx` (36KB, 83KB of tests) and `StringsRenderer.jsx`. Folding them in would roughly triple this slice and delay a shippable merge. **They are not dropped:** they become slice 2b, to be specced after this merges. Recorded here because the umbrella spec's table is the only other place they could have gone, and it does not mention them.
 
 Also out: the `Add` icon-colour rule and 44px touch-target caveat (Figma-only concerns), `FillSummary`'s mono treatment in the prototype (superseded here — the code renders the count in Geist Regular per the spec's own rule), and anything in slices 3–5.
+
+## What changed while building it
+
+Five departures from the plan as written, each with its reason:
+
+1. **No `min-h-9` on the card header.** The plan reserved 36px so cards side by
+   side would align their content. Measuring the file killed it: headers are 22
+   tall without an `+ Add` button (`114:364`) and 36 with one (`114:414`), and the
+   two-across rule already guarantees a row's cards are homogeneous — a `fields`
+   node forces its whole group single column. So the header sizes to content and
+   matches the file.
+2. **Node descriptions were nearly deleted.** The plan's card API had no
+   `description`, because no card in the prototype has one. Eleven manifest nodes
+   declare one, and that copy had already gone missing once before. Both the card
+   and the band render it; recorded as a divergence in the design spec.
+3. **Tasks 4–6 landed as one commit.** The plan split the restructure, the grid
+   and the tier cap. Between them the intermediate states are knowingly wrong
+   (a depth-1 group would have drawn a second eyebrow), and "every merge ships"
+   applies inside a slice too. Tests were still written first for all three.
+4. **The count landed with the restructure**, not as Task 7, for the same
+   reason. Its tests were confirmed red against a stubbed `countFor` rather than
+   against the old file, so each still proves its own assertion.
+5. **One existing App test had to change**, not just move: it turned autosave off
+   and clicked `Save now` with nothing pending, which the honest chip no longer
+   offers. It now edits a field first — a better test, because it proves an edit
+   reaches the server.
 
 ## Self-review
 
