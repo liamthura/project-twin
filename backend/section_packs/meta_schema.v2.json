@@ -1,0 +1,748 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Section pack manifest, format v2",
+  "$comment": "Format v2. Lands beside meta_schema.json and validates nothing shipped yet; it becomes meta_schema.json at the cutover (see docs/superpowers/plans/2026-08-11-manifest-format-v2.md, Task 6). The whole format rests on one sentence, which CONTRIBUTING-PACKS.md should open with: a node's `kind` states the SHAPE OF THE VALUE AT ITS `path`. group binds nothing, fields is an object, list is an array of objects, strings is an array of bare strings. Everything else follows from that. What v1 spread across an authored `entities` block, nine parallel arrays and four maps keyed by field name, v2 says once per field, in one field descriptor. Rigidity is the point: every object here is `additionalProperties: false`, so a typo is a startup error rather than a key silently ignored for six waves.",
+  "type": "object",
+  "required": [
+    "key",
+    "title",
+    "description",
+    "core",
+    "position",
+    "defaults",
+    "id_lists",
+    "sections"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "key": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Must equal the pack's directory name. Cross-checked by the loader, not by this schema, which never sees the path it was read from."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "core": {
+      "type": "boolean"
+    },
+    "default_enabled": {
+      "type": "boolean",
+      "description": "Optional, default true (backend/sections.py:71). The opt-in packs declare it false."
+    },
+    "position": {
+      "type": "integer"
+    },
+    "defaults": {
+      "type": "object",
+      "description": "The empty shape a new persona starts with."
+    },
+    "id_lists": {
+      "type": "array",
+      "description": "[path, id prefix] pairs. Shape unchanged from v1; v2 only validates the paths against the section tree as well as against `defaults` (loader cross-check 9). Folding these into the field descriptors is explicitly out of scope -- pack_loader and search_index both consume them.",
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "scope_contributions": {
+      "type": "object",
+      "description": "Optional. Scope name -> the paths that scope includes. Scope names are checked against sections.SCOPES by the loader.",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "sections": {
+      "$comment": "v1 wrapped this in a `ui` object that only ever held this one key, and also permitted a legacy flat map keyed by list name. Both are deleted: one shape, at the top level.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    }
+  },
+  "$defs": {
+    "node": {
+      "$comment": "A dispatcher, not a shape. It pins `kind` to the closed set of four and then hands the whole node to the branch that kind names, each of which is independently closed. Written as allOf/if/then rather than oneOf so that a validation error names the RULE THAT FAILED ('additional properties not allowed: badges') instead of 'not valid under any of the given schemas' with the node dumped four times over. That is the same reason validate_manifest reaches for best_match; see pack_loader.py:46.",
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "group",
+            "fields",
+            "list",
+            "strings"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "group"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/groupNode"
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "fields"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/fieldsNode"
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "list"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/listNode"
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "strings"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/stringsNode"
+          }
+        }
+      ]
+    },
+    "groupNode": {
+      "$comment": "Six keys. An eyebrow band over its children and nothing else: it binds no storage, so it takes no `path`, no `entity` and no `fields`. Declaring any of those means the node was meant to be a list or a fields node, which is a mistake worth a startup error rather than a silently ignored key. A group is also the ONE node kind that must carry a title -- the band is a label, and a band with nothing in it is not a thing.",
+      "type": "object",
+      "required": [
+        "kind",
+        "title",
+        "sections"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "group"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "$ref": "#/$defs/nodeDescription"
+        },
+        "info": {
+          "$ref": "#/$defs/info"
+        },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "$comment": {
+          "$ref": "#/$defs/authoringNote"
+        }
+      }
+    },
+    "fieldsNode": {
+      "$comment": "Nine keys. The value at `path` is one object with named keys, and the NODE is the record -- which is why `entity` sits directly on it rather than inside an `item` block. `path: []` is legal and meaningful here: it addresses the section root, which is how profile's Personal Information binds its scalars. That is exactly why the non-empty-path rule below is per-kind rather than a blanket minItems.",
+      "type": "object",
+      "required": [
+        "kind",
+        "path",
+        "entity",
+        "fields"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "fields"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "$ref": "#/$defs/nodeDescription"
+        },
+        "info": {
+          "$ref": "#/$defs/info"
+        },
+        "entity": {
+          "$ref": "#/$defs/entityName"
+        },
+        "actions": {
+          "$comment": "Optional, default [\"update\"] for a fields node: a singleton object is edited in place, never added to or removed.",
+          "$ref": "#/$defs/actions"
+        },
+        "fields": {
+          "$ref": "#/$defs/fieldList"
+        },
+        "$comment": {
+          "$ref": "#/$defs/authoringNote"
+        }
+      }
+    },
+    "listNode": {
+      "$comment": "Ten keys, the largest any node kind gets -- down from the 33 v1 permitted on one list node. The value at `path` is an array of objects, so the ROW is the record and `entity`/`identifier`/`fields` live inside `item`. `path` must be non-empty: an empty path addresses the containing object itself, and writes go through setAt, where `path.length === 0` returns the new value -- so the first write would REPLACE the section's whole stored object. Array.isArray([]) is true, so no renderer-side guard catches it.",
+      "type": "object",
+      "required": [
+        "kind",
+        "path",
+        "item"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "list"
+        },
+        "path": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/path"
+            },
+            {
+              "minItems": 1
+            }
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "$ref": "#/$defs/nodeDescription"
+        },
+        "info": {
+          "$ref": "#/$defs/info"
+        },
+        "search": {
+          "type": "boolean",
+          "description": "Optional, default false. Shows a filter box over the rows."
+        },
+        "facets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Optional. Field names to offer as filter chips. Each must name a declared field whose type is `enum` -- the loader checks both (cross-check 3). All five facets in use today already are enums.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "sort": {
+          "$ref": "#/$defs/sort"
+        },
+        "item": {
+          "$ref": "#/$defs/item"
+        },
+        "$comment": {
+          "$ref": "#/$defs/authoringNote"
+        }
+      }
+    },
+    "stringsNode": {
+      "$comment": "Eight keys. The value at `path` is an array of bare strings -- no keys, so no field descriptors and no entity: there is no record here to name. `path` must be non-empty for the same reason a list node's must.",
+      "type": "object",
+      "required": [
+        "kind",
+        "path"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "strings"
+        },
+        "path": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/path"
+            },
+            {
+              "minItems": 1
+            }
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "$ref": "#/$defs/nodeDescription"
+        },
+        "info": {
+          "$ref": "#/$defs/info"
+        },
+        "control": {
+          "$ref": "#/$defs/stringsControl"
+        },
+        "placeholder": {
+          "type": "string",
+          "description": "Placeholder for this node's one input."
+        },
+        "$comment": {
+          "$ref": "#/$defs/authoringNote"
+        }
+      }
+    },
+    "item": {
+      "$comment": "What one record looks like. Used by a list node and by a `type: \"list\"` field, and it means the same thing in both places -- which is how v2 deletes `children`. v1's nested `children` bound against the ROW while a group's children bound against the SECTION ROOT, a documented confusion; as a field inside item.fields, binding against the row is the only reading available. `entity` is required and is NOT derivable from `path` (profile's education list holds `education` records; nothing in the path says so).",
+      "type": "object",
+      "required": [
+        "entity",
+        "identifier",
+        "fields"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "entity": {
+          "$ref": "#/$defs/entityName"
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The field that names a row. Must name a declared field in this item (loader cross-check 1)."
+        },
+        "actions": {
+          "$comment": "Optional, default [\"add\", \"update\", \"remove\"] for a list item.",
+          "$ref": "#/$defs/actions"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "MCP-facing: what this record is, for a client choosing an entity. Distinct from a node's `description`, which is on-screen helper text."
+        },
+        "variants": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Extra MCP entity names over this same stored list. `preferences` needs this and nothing else does: `like` and `dislike` are two entities over one `likes_dislikes` array, identical but for their description. Without it `dislike` -- which binds no node -- could not be derived at all, and dropping it would silently contract the MCP surface.",
+          "items": {
+            "$ref": "#/$defs/variant"
+          }
+        },
+        "fields": {
+          "$ref": "#/$defs/fieldList"
+        }
+      }
+    },
+    "variant": {
+      "$comment": "Deliberately only two keys. A variant may differ from its parent item in its MCP name and its MCP-facing description, and in nothing else -- same stored list, same fields, same identifier, same actions. Anything more and it is a second item, not a variant of this one.",
+      "type": "object",
+      "required": [
+        "entity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "entity": {
+          "$ref": "#/$defs/entityName"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "field": {
+      "$comment": "Nineteen keys, and every one of them means the same thing wherever it appears -- which is the whole exercise. v1 said the same things with thirteen arrays and maps keyed by field name (`badges`, `detail_fields`, `date_fields`, `field_defaults`, `field_placeholders`, `enum`, ...), so a field's identity was spread across the node, the entities block and server.py's FIELD_ALIASES, and `institution` was named five times in profile's manifest. `name` is the only required key, and it is the STORED key -- the authority this repo did not have (see tests/test_ui_schema.py: 'There is no authority on storage keys in this repo').",
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The stored key. Not an MCP input spelling -- those go in `alias`."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional. Defaults to a title-cased `name` (\"detail_level\" -> \"Detail level\"), so declare it only where that reads wrong."
+        },
+        "type": {
+          "$comment": "Optional, default \"text\". Each maps to a control ScalarField already renders; nothing new is invented. `strings` stores an array of bare strings (v1's `array_fields`), `list` an array of objects (v1's `children`). `bool` existed in v1 as `bool_fields` and no pack ever used it.",
+          "enum": [
+            "text",
+            "longtext",
+            "enum",
+            "date",
+            "time",
+            "bool",
+            "strings",
+            "list"
+          ]
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Required if and only if type is `enum`, and forbidden otherwise (see the iff rules below).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "default": {
+          "$comment": "Not restricted to strings: a `bool` field's default is a boolean. Every default in the shipped packs happens to be a string today.",
+          "type": [
+            "string",
+            "boolean",
+            "number"
+          ]
+        },
+        "placeholder": {
+          "type": "string",
+          "description": "Optional. A concrete example earns its place here; a restatement of the label does not."
+        },
+        "suggestions": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Optional. Offered in the add dialog.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Optional, default false. Derives the entity's `required` list."
+        },
+        "role": {
+          "$comment": "An enum of one, rather than a boolean `title: true`, so a second role can be added without a second key. Exactly one field per item may carry it, and a list item must have one (loader cross-check 2).",
+          "enum": [
+            "title"
+          ]
+        },
+        "show": {
+          "$comment": "An ARRAY because `status` is a badge and a form field at once. Order within a position comes from the `fields` array, which is how v2 replaces two independent orderings (v1's `badges` order and its `detail_fields` order) with one. Must be non-empty when present: a field that renders nowhere says `write_only: true`, because one way to say one thing is the point of the exercise.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "form",
+              "badge",
+              "row",
+              "count"
+            ]
+          }
+        },
+        "format": {
+          "$comment": "Display only. The stored value is untouched; an unparseable one is shown verbatim.",
+          "enum": [
+            "date",
+            "datetime"
+          ]
+        },
+        "alias": {
+          "$comment": "Accepted MCP input spellings. alias[0] is the PRIMARY one -- the spelling today's entity block declares, and what the derived `required`/`optional`/`identifier` use; later entries are additional accepted spellings, from server.py's FIELD_ALIASES. This is where the names that are declared for MCP and rendered by nothing belong: `course` is an alias of profile Coursework's `name`, not a field of its own. Making the runtime READ this is out of scope; a test asserts agreement with FIELD_ALIASES instead.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "write_only": {
+          "type": "boolean",
+          "description": "Optional. In the MCP contract, rendered nowhere. `conversation_metadata` and `related_entries` on learning_log entries, and lifestyle's `day_type` -- a router that server.py:2295 never stores."
+        },
+        "exclusive": {
+          "type": "boolean",
+          "description": "Optional. At most one item in the list may hold this. Derives the entity's `exclusive_fields`."
+        },
+        "allow_custom": {
+          "$comment": "Replaces the `custom_` naming convention, which was a magic prefix a renderer matched on (ScalarField.jsx did `(meta.optional || []).includes(\"custom_\" + field)`) and which nothing declared anywhere. Enum only. It contributes `custom_<name>` to the derived entity's `optional`, so the MCP contract does not change.",
+          "type": "boolean"
+        },
+        "pin": {
+          "$ref": "#/$defs/pin"
+        },
+        "control": {
+          "$comment": "Overrides the control `type` would pick. Only meaningful on a `strings` field today, where it replaces v1's node-level `item_control`. NOTE the rename: v1's default was spelled \"tag\", v2 spells it \"chips\", which is what ArrayInput actually renders. No shipped pack declares the default (all five uses are \"input\"), so the converter never has to emit it.",
+          "$ref": "#/$defs/stringsControl"
+        },
+        "item": {
+          "$comment": "Required if and only if type is `list`. This is v2's replacement for v1's `children`.",
+          "$ref": "#/$defs/item"
+        },
+        "$comment": {
+          "$ref": "#/$defs/authoringNote"
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "`values` iff type is enum, stated in both directions. Written as two implications on `required` rather than one conditional on the value of `type`, because `type` is optional -- its absence means \"text\", and a rule phrased over the value alone would not fire on a field that omits it.",
+          "if": {
+            "required": [
+              "values"
+            ]
+          },
+          "then": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "enum"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "enum"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "values"
+            ]
+          }
+        },
+        {
+          "$comment": "`item` iff type is list, both directions.",
+          "if": {
+            "required": [
+              "item"
+            ]
+          },
+          "then": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "list"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "list"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "item"
+            ]
+          }
+        },
+        {
+          "$comment": "`allow_custom` only on an enum -- there is no vocabulary for a free-text box to be an escape from otherwise. One direction only: an enum field without it is the ordinary case. Note this fires on `allow_custom: false` too, which is deliberate: declaring it on a text field is a mistake whatever the value, and the way to not want it is to omit it.",
+          "if": {
+            "required": [
+              "allow_custom"
+            ]
+          },
+          "then": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "enum"
+              }
+            }
+          }
+        },
+        {
+          "$comment": "`pin` only on a bool field. The pinned row is claimed by a flag, and the star that claims it toggles a boolean.",
+          "if": {
+            "required": [
+              "pin"
+            ]
+          },
+          "then": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "bool"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "fieldList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/field"
+      }
+    },
+    "path": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "entityName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The name an MCP client passes. Unique across the whole pack, variants included (loader cross-check 8)."
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "add",
+          "update",
+          "remove"
+        ]
+      }
+    },
+    "stringsControl": {
+      "$comment": "How each stored string is presented. \"chips\" (the default) renders ArrayInput's chips -- right for short, word-like values you add and remove but never revise. \"input\" renders one editable row per string with its own delete -- right for sentence-like values where a typo would otherwise mean retyping the whole thing.",
+      "enum": [
+        "chips",
+        "input"
+      ]
+    },
+    "nodeDescription": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One muted line under the node's title, saying what belongs here. User-facing, unlike `$comment` (an authoring note), and shorter than `info` (a dialog). A node whose title is self-explanatory should omit it rather than restate itself."
+    },
+    "authoringNote": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A note for the next author, carried in the manifest because JSON has no comment syntax. Ignored by the loader and by every renderer, and never shipped to an MCP client -- build_entity_schema strips it, because the meta-schema promises `description` is the client-facing text and `$comment` is not."
+    },
+    "info": {
+      "type": "object",
+      "required": [
+        "overview",
+        "tips"
+      ],
+      "additionalProperties": false,
+      "description": "Content for the section's info dialog.",
+      "properties": {
+        "overview": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tips": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "sort": {
+      "type": "object",
+      "required": [
+        "field"
+      ],
+      "additionalProperties": false,
+      "description": "Display order only. Rows are sorted by this field; the stored array is never reordered. Two numbers compare numerically; everything else compares as text. Items where the key is missing or an empty string sort last, regardless of direction.",
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dir": {
+          "enum": [
+            "asc",
+            "desc"
+          ]
+        }
+      }
+    },
+    "pin": {
+      "$comment": "v1 spelled this `pinned` and put it on the node, with the field name inside it. In v2 it sits ON the field it pins, so the name is not repeated.",
+      "type": "object",
+      "required": [
+        "title",
+        "empty",
+        "noun"
+      ],
+      "additionalProperties": false,
+      "description": "Lifts the ONE row holding this field out of the list and renders it above, as the section's answer to a question the list cannot answer -- \"which of these is your design language\". The lifted row is excluded from the list below rather than shown twice, the field never renders as an editable control or appears in the Add dialog, and every other row gets a star to claim the slot. Pair it with `exclusive: true` so both writers keep it to one.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "empty": {
+          "type": "string",
+          "minLength": 1
+        },
+        "noun": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the slot is called in a control's accessible name, e.g. \"primary\" -> \"Make Brutalist primary\"."
+        }
+      }
+    }
+  }
+}

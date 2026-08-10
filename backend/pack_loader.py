@@ -20,6 +20,11 @@ logger = logging.getLogger(__name__)
 
 PACKS_DIR = Path(__file__).parent / "section_packs"
 META_SCHEMA_PATH = PACKS_DIR / "meta_schema.json"
+# Format v2, in flight. Nothing shipped validates against it yet -- it is reached
+# only from validate_manifest_v2, which only the tests call until the cutover
+# replaces META_SCHEMA_PATH with it. See
+# docs/superpowers/plans/2026-08-11-manifest-format-v2.md.
+META_SCHEMA_V2_PATH = PACKS_DIR / "meta_schema.v2.json"
 
 # Mirrors sections.SCOPES keys; asserted equal in tests to prevent drift.
 GLOBAL_SCOPE_NAMES = frozenset({"minimal", "professional", "personal", "learning", "full"})
@@ -30,6 +35,7 @@ class PackError(Exception):
 
 
 _meta_validator = None
+_meta_validator_v2 = None
 
 
 def _validator() -> jsonschema.Draft202012Validator:
@@ -38,6 +44,14 @@ def _validator() -> jsonschema.Draft202012Validator:
         schema = json.loads(META_SCHEMA_PATH.read_text())
         _meta_validator = jsonschema.Draft202012Validator(schema)
     return _meta_validator
+
+
+def _validator_v2() -> jsonschema.Draft202012Validator:
+    global _meta_validator_v2
+    if _meta_validator_v2 is None:
+        schema = json.loads(META_SCHEMA_V2_PATH.read_text())
+        _meta_validator_v2 = jsonschema.Draft202012Validator(schema)
+    return _meta_validator_v2
 
 
 def validate_manifest(manifest: dict) -> None:
@@ -62,6 +76,30 @@ def validate_manifest(manifest: dict) -> None:
     for scope in manifest.get("scope_contributions", {}):
         if scope not in GLOBAL_SCOPE_NAMES:
             raise PackError(f"unknown scope '{scope}' in scope_contributions")
+
+
+def validate_manifest_v2(manifest: dict) -> None:
+    """Format v2: schema validation. Raises PackError.
+
+    Nothing shipped is in v2 yet, so nothing but the tests calls this. It becomes
+    `validate_manifest` at the cutover, at which point the two collapse into one.
+
+    The semantic cross-checks -- does `identifier` name a declared field, is a
+    `facets` entry actually an enum, is an entity name used twice in the pack --
+    arrive next, in `_cross_check`, called from here after schema validation so a
+    shape error is always reported before a semantic one. Two rules the spec
+    listed as cross-checks turned out to be statable structurally and live in the
+    schema instead: `values` iff `type: "enum"`, and `item` iff `type: "list"`.
+    """
+    error = best_match(_validator_v2().iter_errors(manifest))
+    # Same reason as validate_manifest: best_match descends into the branch's own
+    # errors rather than reporting "not valid under any of the given schemas".
+    # The v2 node dispatcher is allOf/if/then on `kind` for the same purpose --
+    # a node whose kind is `list` is measured against the list branch alone, so
+    # the error names the offending key rather than dumping the node four times.
+    if error is not None:
+        where = "/".join(str(p) for p in error.path) or "<root>"
+        raise PackError(f"manifest schema violation at {where}: {error.message}")
 
 
 def load_packs(packs_dir: Path = PACKS_DIR, strict: bool = False) -> dict[str, dict]:

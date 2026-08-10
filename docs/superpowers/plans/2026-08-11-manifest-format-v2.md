@@ -242,15 +242,27 @@ git commit -m "test: freeze the entity schema and the rendered-field census befo
 
 The schema lands beside the old one and validates nothing shipped yet, so this task cannot break the app.
 
-- [ ] **Step 1: Write the schema** — `$defs` for `node` (four `kind` branches via `allOf`/`if`/`then`), `item`, and `field`, every object `additionalProperties: false`, with the exact key sets from the spec's "The format" section. Top level takes `sections`, not `ui`; no `entities`.
+- [x] **Step 1: Write the schema** — `$defs` for `node` (four `kind` branches via `allOf`/`if`/`then`), `item`, and `field`, every object `additionalProperties: false`, with the exact key sets from the spec's "The format" section. Top level takes `sections`, not `ui`; no `entities`.
 
-- [ ] **Step 2: Write accept/reject tests** — one synthetic manifest per case, mirroring the style of `test_ui_schema.py`: each of the four kinds accepted in its minimal form; an unknown key on a node rejected; an unknown key on a field rejected; `values` without `type: "enum"` rejected; `type: "enum"` without `values` rejected; `type: "list"` without `item` rejected; `item` on a non-list field rejected; a `group` with a `path` rejected; a `list` without `item` rejected; `show: []` rejected; a field with no `name` rejected.
+- [x] **Step 2: Write accept/reject tests** — one synthetic manifest per case, mirroring the style of `test_ui_schema.py`: each of the four kinds accepted in its minimal form; an unknown key on a node rejected; an unknown key on a field rejected; `values` without `type: "enum"` rejected; `type: "enum"` without `values` rejected; `type: "list"` without `item` rejected; `item` on a non-list field rejected; a `group` with a `path` rejected; a `list` without `item` rejected; `show: []` rejected; a field with no `name` rejected.
 
-- [ ] **Step 3: Run them, watch them fail** (no schema file resolved yet), then implement until green.
+- [x] **Step 3: Run them, watch them fail** (no schema file resolved yet), then implement until green.
 
-- [ ] **Step 4: Add `validate_manifest_v2(manifest)`** to `pack_loader.py`, alongside `validate_manifest`, with its own cached validator. Nothing calls it yet except the tests.
+- [x] **Step 4: Add `validate_manifest_v2(manifest)`** to `pack_loader.py`, alongside `validate_manifest`, with its own cached validator. Nothing calls it yet except the tests.
 
-- [ ] **Step 5: Commit.**
+**Recorded during Task 2** — four findings that change later tasks:
+
+1. **Cross-checks 4 and 5 are statable structurally, so they live in the schema, not `_cross_check`.** `values` iff `type: "enum"` and `item` iff `type: "list"` are expressed as paired `if`/`then` implications on `required` (phrased over `required` rather than over `type`'s value, because `type` is optional — a rule reading the value alone would not fire on a field that omits it). `allow_custom`-only-on-enum and `pin`-only-on-bool went the same way. Task 3 should keep its tests for these rules but expect the schema to satisfy them; both layers raise `PackError` through the same entry point, so no test cares which caught it.
+
+2. **Cross-check 8 as written is violated by a shipped pack.** `lifestyle` declares `entity: "sleep"` on **two** `fields` nodes — `wellness.sleep.weekday` and `wellness.sleep.weekend` — so "entity names are unique across the whole pack" would reject it. Task 3 must either scope the rule to *distinct declarations of the same entity must agree field-for-field*, or exempt `fields` nodes. Do not weaken it to a warning: two list items sharing an entity name is still the silent bug the rule was written for.
+
+3. **`item_control: "tag"` is spelled `control: "chips"` in v2.** A rename, not a behaviour change — v1's default value was `"tag"` while what `ArrayInput` renders is chips. All five shipped uses are `"input"`, so the converter never emits the default and no manifest changes meaning.
+
+4. **Entity `$comment` has no home in `item`, and does not need one.** Six entities carry substantive wave-6/7/8 drift notes (`profile.link`, `profile.language`, `profile.work_experience`, `projects.project`, `lifestyle.stress_trigger`, `circle.connection`). The converter moves each to the enclosing **node**'s `$comment` (or, for a nested list, the **field**'s), which loses nothing because there is exactly one item per node. Adding `$comment` to `item` would create two places to put one kind of note, which is the thing v2 exists to stop.
+
+**Verified beyond the tests:** the spec's worked `profile.education` example validates as transcribed; `check_schema` passes; no unresolved or unused `$defs`; and the per-kind key counts are exactly what the spec promised — group 6, strings 8, fields 9, list 10, **16 across all four kinds**, **19 field keys**.
+
+- [x] **Step 5: Commit.**
 
 ---
 
