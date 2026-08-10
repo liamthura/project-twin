@@ -67,3 +67,47 @@ def pending_count() -> int:
             "select count(*) as n from waitlist where invited_at is null"
         ).fetchone()
     return row["n"] if row else 0
+
+
+def listing(include_invited: bool = False) -> list[dict]:
+    """The list, oldest first -- which is the order it should be worked in."""
+    sql = "select email, created_at, invited_at, note from waitlist"
+    if not include_invited:
+        sql += " where invited_at is null"
+    sql += " order by created_at"
+    with db.get_pool().connection() as conn:
+        return list(conn.execute(sql).fetchall())
+
+
+def mark_invited(email: str) -> bool:
+    """Stamp `invited_at`. Returns False if the address is not on the list.
+
+    Idempotent by design: re-stamping keeps the FIRST timestamp, because the
+    question this column answers is "when did we tell them", and the answer
+    does not change because you ran the command twice.
+    """
+    email = normalise(email)
+    with db.get_pool().connection() as conn:
+        row = conn.execute(
+            """
+            update waitlist set invited_at = coalesce(invited_at, now())
+             where email = %s
+            returning email
+            """,
+            (email,),
+        ).fetchone()
+    return row is not None
+
+
+def remove(email: str) -> bool:
+    """Drop an address. Returns False if it was not there.
+
+    For test rows and for anyone who asks to come off the list -- the second
+    reason is why this exists at all rather than being a psql one-liner.
+    """
+    email = normalise(email)
+    with db.get_pool().connection() as conn:
+        row = conn.execute(
+            "delete from waitlist where email = %s returning email", (email,)
+        ).fetchone()
+    return row is not None
