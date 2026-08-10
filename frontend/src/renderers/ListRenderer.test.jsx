@@ -216,7 +216,7 @@ describe("ListRenderer", () => {
 
     await user.click(screen.getByRole("button", { name: "Add" }));
 
-    expect(screen.getByRole("heading", { name: "Add Aesthetic style" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Add to Aesthetic style" })).toBeInTheDocument();
   });
 
   it("uses node.long_text (array form) over the default long-text set to render a textarea", async () => {

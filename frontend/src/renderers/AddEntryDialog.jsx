@@ -52,7 +52,12 @@ export function AddEntryDialog({ node, entity, items, onAdd, open, onOpenChange,
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            Add {(node.title ?? node.entity ?? "item").replace(/_/g, " ")}
+            {/* A container name takes "Add to" -- the list is the destination, not the
+                thing being added. An entity name is already the singular noun, so it
+                takes a bare "Add". `Add Likes & Dislikes` was the old string. */}
+            {node.title
+              ? `Add to ${node.title}`
+              : `Add ${(node.entity ?? "item").replace(/_/g, " ")}`}
           </DialogTitle>
           <DialogDescription>
             {node.description ?? `Add one entry to ${node.title ?? "this list"}.`}

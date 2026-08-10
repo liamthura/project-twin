@@ -19,4 +19,21 @@ describe("AddEntryDialog accessibility", () => {
     expect(describedBy).toBeTruthy();
     expect(document.getElementById(describedBy)).toBeInTheDocument();
   });
+
+  it("says 'Add to <list>' when the node names its container, not 'Add <list>'", () => {
+    render(
+      <AddEntryDialog node={node} entity={undefined} items={[]}
+        onAdd={vi.fn()} open onOpenChange={vi.fn()} />
+    );
+    expect(screen.getByRole("heading", { name: "Add to Likes & Dislikes" })).toBeInTheDocument();
+  });
+
+  it("says a bare 'Add <entity>' when there is no container title to add to", () => {
+    const untitled = { ...node, title: undefined, entity: "mental_tab" };
+    render(
+      <AddEntryDialog node={untitled} entity={undefined} items={[]}
+        onAdd={vi.fn()} open onOpenChange={vi.fn()} />
+    );
+    expect(screen.getByRole("heading", { name: "Add mental tab" })).toBeInTheDocument();
+  });
 });
