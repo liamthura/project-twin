@@ -43,9 +43,33 @@ landing audit established. One pair — the input field boundary — fails and i
 
 All pairs pass (or are known, accepted, and tracked).
 
-## Known, accepted failure: the input field boundary
+## Resolved: the input field boundary
 
-`border` and `--input` (`frontend/src/globals.css`) hold the same value —
+**Ruled 2026-08-10 — the token moved, the exemption did not stand.** `--input`
+is now `20 6% 57%` Light and `60 2% 40%` Dark: in each mode, the *minimum*
+lightness that clears 3:1 against both `card` and `paper`. Measured 3.16/3.03
+Light and 3.11/3.35 Dark. `design/app-contrast.mjs`'s `KNOWN_FAILURES` list is
+now empty, and the pair passes on its own merits.
+
+**`border` deliberately did not move with it.** The two tokens held the same
+value for as long as they did because nobody had separated their jobs; they now
+differ in value because they differ in job. Darkening `border` too would have
+repainted every hairline divider in the app to fix a control boundary, and it
+would have pulled against the editorial direction the redesign chose.
+
+The Figma prototype gained a matching `input` variable
+(`VariableID:348:59`, `STROKE_COLOR` scope only) and 48 field-boundary strokes
+across `TextField`, `Select`, `TextArea`, `PinField`, `InviteCodeField`,
+`Checkbox` and `SectionSelector` were rebound from `border` to it. Four
+`Disabled` variants were deliberately left on `border`: 1.4.11 exempts
+inactive components, and a muted edge is the intended reading.
+
+The reasoning that produced the ruling is kept below, because it is the part
+worth re-reading if `--input` is ever revisited.
+
+### Why it needed a ruling at all
+
+`border` and `--input` (`frontend/src/globals.css`) held the same value —
 `20 6% 90%` Light, `60 2% 16%` Dark — but they carry two different jobs, and
 only one of those jobs is exempt from a contrast requirement.
 
@@ -63,18 +87,30 @@ without it, the field's extent is invisible against `card`. At the current
 `--input` value this measures **~1.26 Light / 1.21 Dark**, a real failure, not
 a decorative exemption.
 
-This is a **pre-existing condition in the shipping app**, not something this
-plan or this branch introduced — `--input` has held this value since before
-the reconciliation started, and it agrees exactly with the Figma prototype's
-own `border` binding on every form primitive. It is deliberately **not fixed
-by this task**: correcting it would change every input border in both the
-production CSS and the Figma prototype, which is a visible, system-wide
-change well outside a contrast-audit's authority to make unilaterally. It is
-tracked instead — `input border / card` is a permanent entry in
-`design/app-contrast.mjs`'s `PAIRS`, reported as `KNOWN` rather than silently
-passing or silently failing, via the script's `KNOWN_FAILURES` mechanism —
-so it stays visible on every future run until an owner rules on a new
-`--input` value.
+It was a **pre-existing condition in the shipping app**, not something the
+reconciliation introduced — `--input` had held that value since before the work
+started, and it agreed exactly with the Figma prototype's own `border` binding
+on every form primitive. It was tracked rather than quietly fixed, because
+correcting it changes every input border in both the production CSS and the
+prototype, which is a visible system-wide change and an owner's call rather
+than a contrast audit's.
+
+**One thing the numbers made plain, and which is worth remembering:** passing
+3:1 was not a nudge. It moved the border from `90%` to `57%` lightness in Light
+and `16%` to `40%` in Dark — a visible mid-grey edge on every field, not a
+firmer hairline. The tradeoff was real in both directions, and the ruling went
+to the criterion: a field whose extent you cannot see is precisely what 1.4.11
+exists to prevent.
+
+### Still open: the Neutral button's edge
+
+`Button`'s `Variant=Neutral` fills with `card` and sits on `card` surfaces, so
+its border is the only thing that identifies it as a control — the same
+argument that moved `--input`. Its stroke is still bound to `border`, measuring
+the same failing ~1.26. It was left alone because the ruling covered form
+fields, and a button is a distinct judgement: the label inside it is arguably
+identification enough, which is a defensible reading of 1.4.11 that a text
+field's empty box cannot claim. **Not fixed, not exempt — undecided.**
 
 ## What was wrong, and why
 

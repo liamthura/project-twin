@@ -22,7 +22,7 @@ const T = {
     // here, not because the colour differs, but because the USE differs: a
     // form field's edge is not a decorative divider (see the input-border pair
     // in KNOWN_FAILURES below).
-    'input-border': [231,229,228],
+    'input-border': [152,143,139],
   },
   Dark: {
     paper: [18,18,17], card: [26,26,25], muted: [36,36,35], ink: [245,245,244],
@@ -34,7 +34,7 @@ const T = {
     'indigo-ink': [165,180,252], 'success-ink': [110,231,183],
     'destructive-ink': [252,165,165], 'warning-ink': [252,211,77],
     'success-tint': [16,33,29], 'destructive-tint': [43,20,19], 'warning-tint': [43,26,16],
-    'input-border': [42,42,40],
+    'input-border': [104,104,100],
   },
 };
 
@@ -75,7 +75,14 @@ const PAIRS = [
 // is misusing it -- the whole point of this calculator is that failures are
 // visible, not that they can be made to disappear.
 const KNOWN_FAILURES = new Map([
-  ['input border / card', 'Pre-existing in the shipping app (--input === --border in globals.css). Not a decorative divider like border/card once was -- a form field edge is UI-component-boundary contrast WCAG 1.4.11 actually requires, and it fails (~1.26 Light). Not fixed here: changing it touches every input border in code and prototype alike. Needs the owner’s ruling; see design/app-contrast-audit.md.'],
+  // Empty, and worth keeping that way.
+  //
+  // It held `input border / card` until 2026-08-10, when the owner ruled the
+  // token should move rather than the exemption stand: --input went to the
+  // minimum lightness that clears 3:1 (20 6% 57% Light, 60 2% 40% Dark).
+  // --border did NOT move with it -- a decorative divider is exempt, a control
+  // boundary is not, and the two tokens now differ in value because they differ
+  // in job.
 ]);
 
 let failed = 0;
@@ -98,4 +105,9 @@ if (known.length) {
   for (const name of known) console.log(`- ${name}: ${KNOWN_FAILURES.get(name)}`);
 }
 if (failed) { console.error(`\n${failed} unexpected pair(s) below threshold.`); process.exit(1); }
-console.log('\nAll pairs pass (or are known, accepted, and tracked -- see above).');
+// Only hedge when there is something to hedge about: an empty exemption list
+// means every pair genuinely passes, and saying otherwise trains the reader to
+// skim the last line.
+console.log(known.length
+  ? '\nAll pairs pass (or are known, accepted, and tracked -- see above).'
+  : '\nAll pairs pass.');

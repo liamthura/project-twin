@@ -1392,6 +1392,27 @@ Mobile Preferences ×2, and the four new frames.
 - **A user-facing sort control.** See above — real but new.
 - **No mobile frame for filters or sort.**
 
+### Ruled: clay and verdigris are sanctioned in-app, 2026-08-10
+
+**The owner accepted the proposal below.** `clay` and `verdigris` may be used in
+the app as well as on the marketing page, each carrying exactly one meaning:
+
+| Token | Sanctioned in-app meaning | Not for |
+|---|---|---|
+| `clay` | the delegate-to-client offer, as a 2px left rule | any other accent, warning, or emphasis |
+| `verdigris` | live / streaming state (the `Live` badge) | success, "active", or general positive tone |
+
+The narrowness is the point. These are not general accents: `success`,
+`warning`, `destructive` and `indigo` already carry the semantic work, and a
+brand colour that can mean anything stops meaning anything. `ground-inverse`
+and `on-inverse` remain **marketing-only** — they did not form part of this
+ruling.
+
+Recorded in `frontend/src/globals.css` and `frontend/tailwind.config.js`, whose
+"marketing page only" comments were the thing this contradicted.
+
+The original question, kept for the reasoning:
+
 ### Open question: clay and verdigris in the app, 2026-08-10
 
 > `main`'s `globals.css` and `tailwind.config.js` both comment the `clay` and

@@ -54,8 +54,14 @@ export default {
         },
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
-        // Brand layer, marketing page only. See globals.css: ground-inverse
-        // and on-inverse deliberately do not invert between modes.
+        // Brand layer. ground-inverse and on-inverse are marketing-only and
+        // deliberately do not invert between modes -- see globals.css.
+        //
+        // clay and verdigris are sanctioned in the app too (ruled 2026-08-10),
+        // each with exactly one meaning: clay marks the delegate-to-client
+        // offer, verdigris marks live/streaming state. They are not general
+        // accents -- reach for the semantic names for anything else, or the
+        // palette stops meaning anything.
         "ground-inverse": "hsl(var(--ground-inverse))",
         "on-inverse": "hsl(var(--on-inverse))",
         clay: {
