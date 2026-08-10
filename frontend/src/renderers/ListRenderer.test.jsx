@@ -1973,4 +1973,35 @@ describe("sort control", () => {
     // Nothing else opened: the count on screen still matches the one row.
     expect(screen.getAllByRole("textbox")).toHaveLength(EXPANDED_CONTROLS);
   });
+
+  // These two exist because the arrangement drifted from the prototype without
+  // failing anything: the count was rendered FIRST, so it read immediately left
+  // of the Sort control instead of opposite it. Every toolbar row in the Figma
+  // file is SPACE_BETWEEN with the count last -- `Order` row 327:1124 and
+  // `Filters` row 324:1169. A full suite of 657 tests had nothing to say about
+  // it, which is exactly why the assertion is worth writing down.
+  const countEl = () => screen.getByText(/^\d+( of \d+)? entr(y|ies)$/);
+
+  it("puts the count last in the row and pushes it to the far right", () => {
+    render(<ListRenderer node={sortNode} items={entries} onItems={vi.fn()} />);
+
+    const count = countEl();
+    // DOCUMENT_POSITION_FOLLOWING == `count` comes after the control in
+    // document order, which is the ordering claim; ml-auto is what turns that
+    // ordering into the visual gap between them.
+    const rel = control().compareDocumentPosition(count);
+    expect(rel & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(count.className).toContain("ml-auto");
+  });
+
+  it("leaves a lone count unpushed, having nothing to sit opposite", () => {
+    // No facets, no date field: the row is the count by itself, and shoving it
+    // against the right edge would just look like a mistake.
+    const plain = { kind: "list", path: ["entries"], title_field: "topic" };
+    render(<ListRenderer node={plain} items={[{ topic: "Alpha" }]} onItems={vi.fn()} />);
+
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+    expect(countEl()).toHaveTextContent("1 entry");
+    expect(countEl().className).not.toContain("ml-auto");
+  });
 });

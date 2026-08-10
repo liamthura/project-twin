@@ -232,6 +232,14 @@ export default function ListRenderer({
   // an entry present but `undefined` is a field left on "All" and does not
   // count as active.
   const facetsActive = (node.facets || []).some((f) => facetValues[f] !== undefined);
+  // The facets that will actually draw a control. Resolved here rather than
+  // inside the render map because two things need the answer: the row below
+  // decides whether it has any left-hand content at all, and a node whose
+  // every facet field resolves to no options must not render an empty group.
+  const facetFields = (node.facets || []).filter((f) => (facetOptions(f) || []).length > 0);
+  // Does anything sit to the LEFT of the count in the row below? When nothing
+  // does, the count is the row's only child and stays where it always was.
+  const hasRowControls = facetFields.length > 0 || Boolean(sortField);
 
   // The one Add dialog this list has, trigger included. Built here rather than
   // in the section header because `addItem` (and the three invariants
@@ -302,13 +310,17 @@ export default function ListRenderer({
           controls that change it there was nothing to connect the two.
           Rendered even for a node with neither facets nor search, where this
           row is the count alone -- it is the only thing that tells the reader
-          how long the list is. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="text-sm text-muted-foreground">
-          {q || facetsActive ? `${visible.length} of ${items.length}` : items.length}{" "}
-          {items.length === 1 ? "entry" : "entries"}
-        </div>
+          how long the list is.
 
+          Within the row the controls lead and the count is pushed to the far
+          right, which is the prototype's arrangement: every toolbar row there
+          is SPACE_BETWEEN with the count last (`Order` row 327:1124, `Filters`
+          row 324:1169). Reading order follows cause then effect -- you change a
+          control on the left, the number on the right answers. The push is
+          `ml-auto` rather than `justify-between` on the row because the row can
+          hold three things (facets, sort, count) and justify-between would
+          spread the two controls apart instead of keeping them grouped. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {/* Facets: display-only row filters, drawn above the list. Each entry
             in node.facets names an enum storage key; `facetOptions` above
             resolves that field's option set. A field with no resolvable
@@ -319,11 +331,10 @@ export default function ListRenderer({
             toggle EnumControl uses elsewhere; the mapping back to `undefined`
             (== no filter on this field) happens in the onChange below, never
             stored, never threaded through onItems. */}
-        {(node.facets || []).length > 0 && (
+        {facetFields.length > 0 && (
           <div role="group" aria-label="Filters" className="flex flex-wrap gap-x-4 gap-y-2">
-            {node.facets.map((f) => {
+            {facetFields.map((f) => {
               const options = facetOptions(f);
-              if (!options || options.length === 0) return null;
               return (
                 <div
                   key={f}
@@ -371,6 +382,15 @@ export default function ListRenderer({
             </Select>
           </div>
         )}
+
+        {/* Last in the row, and pushed right only when something precedes it --
+            with no facets and no sort this is the row's only child, and a lone
+            count belongs where it has always been rather than stranded against
+            the right edge with nothing to sit opposite. */}
+        <div className={`text-sm text-muted-foreground${hasRowControls ? " ml-auto" : ""}`}>
+          {q || facetsActive ? `${visible.length} of ${items.length}` : items.length}{" "}
+          {items.length === 1 ? "entry" : "entries"}
+        </div>
       </div>
 
       {suggestions.length > 0 && (
