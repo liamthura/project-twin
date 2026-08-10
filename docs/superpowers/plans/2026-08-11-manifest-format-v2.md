@@ -89,7 +89,7 @@ then   slices 3/4/5   4 now safe to author against the final format
 
 Nothing in this task changes behaviour. It exists so that "unchanged" is a claim a test can make.
 
-- [ ] **Step 1: Generate the entity-schema snapshot**
+- [x] **Step 1: Generate the entity-schema snapshot**
 
 ```bash
 cd backend && python -c "
@@ -100,9 +100,9 @@ print(sum(len(v) for v in schema.values()), 'entities across', len(schema), 'pac
 "
 ```
 
-Expected: 43 entities across 11 packs (the count the inventory measured; if it differs, stop and find out why before continuing).
+Expected: 42 entities across 10 packs. (An earlier draft of this plan said 43 across 11, from counting the `section_packs/` directory listing. `_template` declares one entity, `example_item`, but `load_packs` skips any directory whose name starts with `_` — pack_loader.py:93 — so it is not part of the contract. If the count differs from 42/10, stop and find out why before continuing.)
 
-- [ ] **Step 2: Write the test that pins it**
+- [x] **Step 2: Write the test that pins it**
 
 ```python
 # backend/tests/test_entity_schema_frozen.py
@@ -146,11 +146,11 @@ def test_every_entity_matches_field_for_field():
                     assert actual[key] == value, f"{pack}.{name}.{key}"
 ```
 
-- [ ] **Step 3: Run it — it must pass immediately**
+- [x] **Step 3: Run it — it must pass immediately**
 
 `cd backend && pytest tests/test_entity_schema_frozen.py -v` → 2 passed. It compares today against itself; a failure here means the snapshot was generated from a different tree.
 
-- [ ] **Step 4: Write the rendered-field census**
+- [x] **Step 4: Write the rendered-field census**
 
 Pure, and derived from the same rules the renderers use, so it can run before and after without rendering anything:
 
@@ -197,7 +197,7 @@ function fieldsOf(node) {
 }
 ```
 
-- [ ] **Step 5: Freeze the census and test it**
+- [x] **Step 5: Freeze the census and test it**
 
 ```js
 // frontend/src/renderers/fieldCensus.test.js -- @vitest-environment node
@@ -225,7 +225,7 @@ describe("the rendered-field census", () => {
 
 Generate the fixture with a throwaway script, eyeball two packs against the app, and commit it.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/tests frontend/src/renderers/fieldCensus.* frontend/src/__fixtures__/field-census-v1.json
@@ -396,7 +396,7 @@ This is what makes Phase A provable: after the packs convert, the renderers keep
 
 One commit, because the halves are not separately shippable: converted manifests with a v1 loader is a dead app.
 
-- [ ] **Step 1: Run the converter** over all 11 packs. Read the diff for two packs in full — `profile` (the heaviest) and `goals` (the `allow_custom` case).
+- [ ] **Step 1: Run the converter** over all 10 shipped packs (plus `_template`, which Task 11 rewrites by hand). Read the diff for two packs in full — `profile` (the heaviest) and `goals` (the `allow_custom` case).
 - [ ] **Step 2: Replace `meta_schema.json`** with the v2 schema; `validate_manifest` becomes the v2 validator; delete the v1 validator and its `$schema` path.
 - [ ] **Step 3: `load_packs` reads top-level `sections`;** `build_entity_schema` derives, per the spec's derivation table. Delete the authored-`entities` read.
 - [ ] **Step 4: `PACK_META` (`backend/sections.py:74`) ships `sections` and the *derived* `entities`.** This is the step it would be easy to miss: `/settings` feeds `ProposalsPanel.promotionTargets`, so dropping `entities` from the payload breaks the Review surface with nothing in the backend tests to notice.

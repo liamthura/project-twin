@@ -1,0 +1,815 @@
+{
+  "aesthetics": {
+    "aesthetic": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "exclusive_fields": [
+        "primary"
+      ],
+      "field_defaults": {
+        "stance": "like"
+      },
+      "identifier": "name",
+      "list": "styles",
+      "optional": [
+        "domain",
+        "stance",
+        "primary",
+        "notes",
+        "references"
+      ],
+      "required": [
+        "name"
+      ],
+      "valid_values": {
+        "domain": [
+          "ui",
+          "graphic",
+          "typography",
+          "color",
+          "illustration",
+          "photography",
+          "fashion",
+          "interior",
+          "general"
+        ],
+        "stance": [
+          "love",
+          "like",
+          "avoid"
+        ]
+      }
+    }
+  },
+  "circle": {
+    "connection": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "name",
+      "optional": [
+        "relationship",
+        "traits",
+        "notes"
+      ],
+      "required": [
+        "name"
+      ]
+    }
+  },
+  "goals": {
+    "goal": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "title",
+      "optional": [
+        "type",
+        "custom_type",
+        "status",
+        "target_date",
+        "why",
+        "notes"
+      ],
+      "required": [
+        "title"
+      ],
+      "valid_values": {
+        "status": [
+          "active",
+          "achieved",
+          "paused",
+          "dropped"
+        ],
+        "type": [
+          "career",
+          "learning",
+          "personal",
+          "health",
+          "financial",
+          "creative",
+          "other"
+        ]
+      }
+    }
+  },
+  "knowledge": {
+    "domain": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "name",
+      "optional": [
+        "level",
+        "notes",
+        "references"
+      ],
+      "required": [
+        "name"
+      ],
+      "valid_values": {
+        "level": [
+          "beginner",
+          "learning",
+          "intermediate",
+          "advanced",
+          "expert"
+        ]
+      }
+    },
+    "domain_reference": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "ref_name",
+      "optional": [
+        "url",
+        "notes"
+      ],
+      "parent": "domain_name",
+      "required": [
+        "domain_name",
+        "ref_name"
+      ]
+    },
+    "knowledge": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "description": "Generic knowledge entry with category support",
+      "identifier": "name",
+      "optional": [
+        "category",
+        "level",
+        "notes",
+        "references"
+      ],
+      "required": [
+        "name"
+      ]
+    },
+    "mental_tab": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "description": "Saved topics and bookmarks to revisit later \u2014 a shelf, not an inbox",
+      "identifier": "title",
+      "optional": [
+        "notes",
+        "tags",
+        "status",
+        "references"
+      ],
+      "required": [
+        "title"
+      ],
+      "valid_values": {
+        "status": [
+          "open",
+          "closed",
+          "archived"
+        ]
+      }
+    },
+    "mental_tab_reference": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "ref_name",
+      "optional": [
+        "url",
+        "notes"
+      ],
+      "parent": "title",
+      "required": [
+        "title",
+        "ref_name"
+      ]
+    }
+  },
+  "learning_log": {
+    "learning_entry": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "topic",
+      "optional": [
+        "source",
+        "tags",
+        "conversation_metadata",
+        "key_decisions",
+        "followup_items",
+        "new_topic",
+        "related_entries"
+      ],
+      "required": [
+        "topic",
+        "details"
+      ]
+    }
+  },
+  "lifestyle": {
+    "energy_peak": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "identifier": "peak",
+      "optional": [],
+      "required": [
+        "peak"
+      ]
+    },
+    "hobby": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "name",
+      "optional": [
+        "skill_level",
+        "status",
+        "notes",
+        "specifics",
+        "references"
+      ],
+      "required": [
+        "name"
+      ],
+      "valid_values": {
+        "skill_level": [
+          "beginner",
+          "learning",
+          "intermediate",
+          "advanced",
+          "expert"
+        ],
+        "status": [
+          "active",
+          "inactive",
+          "paused"
+        ]
+      }
+    },
+    "hobby_reference": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "ref_name",
+      "optional": [
+        "url",
+        "notes"
+      ],
+      "parent": "hobby_name",
+      "required": [
+        "hobby_name",
+        "ref_name"
+      ]
+    },
+    "hobby_specific": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "identifier": "specific",
+      "optional": [],
+      "parent": "hobby_name",
+      "required": [
+        "hobby_name",
+        "specific"
+      ]
+    },
+    "interest": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "description": "Things you're into: kind=passion for what you love doing/following, kind=curiosity for what you want to explore",
+      "identifier": "name",
+      "list": "interests",
+      "optional": [
+        "kind",
+        "notes"
+      ],
+      "required": [
+        "name"
+      ],
+      "valid_values": {
+        "kind": [
+          "passion",
+          "curiosity"
+        ]
+      }
+    },
+    "personality_trait": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "identifier": "trait",
+      "optional": [],
+      "required": [
+        "trait"
+      ]
+    },
+    "sleep": {
+      "actions": [
+        "update"
+      ],
+      "identifier": "day_type",
+      "optional": [
+        "bedtime",
+        "wakeup"
+      ],
+      "required": [
+        "day_type"
+      ],
+      "valid_values": {
+        "day_type": [
+          "weekday",
+          "weekend"
+        ]
+      }
+    },
+    "stress_trigger": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "description": "A situation or pattern that tends to increase your stress. Stored as a bare string in wellness.stress_triggers.",
+      "identifier": "trigger",
+      "optional": [],
+      "required": [
+        "trigger"
+      ]
+    },
+    "value": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "identifier": "value",
+      "optional": [],
+      "required": [
+        "value"
+      ]
+    }
+  },
+  "media": {
+    "media_item": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "title",
+      "list": "items",
+      "optional": [
+        "kind",
+        "status",
+        "reaction",
+        "url",
+        "notes",
+        "tags"
+      ],
+      "required": [
+        "title"
+      ],
+      "valid_values": {
+        "kind": [
+          "book",
+          "article",
+          "podcast",
+          "show",
+          "film",
+          "game",
+          "video",
+          "music"
+        ],
+        "reaction": [
+          "loved",
+          "liked",
+          "disliked"
+        ],
+        "status": [
+          "want",
+          "in_progress",
+          "finished",
+          "dropped"
+        ]
+      }
+    }
+  },
+  "preferences": {
+    "communication_default": {
+      "actions": [
+        "update"
+      ],
+      "description": "Update-only singleton for default communication style",
+      "identifier": null,
+      "optional": [
+        "tone",
+        "detail_level",
+        "locale"
+      ],
+      "required": []
+    },
+    "dislike": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "description": "Something you dislike; stored in the shared likes_dislikes list with stance=dislike unless you send stance explicitly",
+      "identifier": "item",
+      "list": "likes_dislikes",
+      "optional": [
+        "stance"
+      ],
+      "required": [
+        "item"
+      ],
+      "valid_values": {
+        "stance": [
+          "like",
+          "dislike"
+        ]
+      }
+    },
+    "like": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "description": "Something you like; stored in the shared likes_dislikes list with stance=like unless you send stance explicitly",
+      "identifier": "item",
+      "list": "likes_dislikes",
+      "optional": [
+        "stance"
+      ],
+      "required": [
+        "item"
+      ],
+      "valid_values": {
+        "stance": [
+          "like",
+          "dislike"
+        ]
+      }
+    },
+    "mood_override": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "mood",
+      "optional": [
+        "tone",
+        "detail_level"
+      ],
+      "required": [
+        "mood"
+      ]
+    },
+    "preference": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "description": "Generic key-value preference with category support",
+      "identifier": "key",
+      "optional": [
+        "category",
+        "value"
+      ],
+      "required": [
+        "key"
+      ]
+    },
+    "response_format": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "description": "One statement about how you want answers shaped. Bare strings, like lifestyle's energy_peaks.",
+      "identifier": "item",
+      "optional": [],
+      "required": [
+        "item"
+      ]
+    }
+  },
+  "profile": {
+    "basic_info": {
+      "actions": [
+        "update"
+      ],
+      "description": "Update-only singleton for top-level profile fields",
+      "identifier": null,
+      "optional": [
+        "name",
+        "preferred_name",
+        "current_role",
+        "organisation",
+        "location",
+        "nationality",
+        "bio"
+      ],
+      "required": []
+    },
+    "club": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "description": "A society or extracurricular. Stored as {name, activities_involved}.",
+      "identifier": "name",
+      "optional": [
+        "activities_involved"
+      ],
+      "parent": "institution",
+      "required": [
+        "institution",
+        "name"
+      ]
+    },
+    "coursework": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "description": "A module or class. Stored as {name, topics}; `course` is the input spelling for `name`.",
+      "identifier": "course",
+      "optional": [
+        "topics"
+      ],
+      "parent": "institution",
+      "required": [
+        "institution",
+        "course"
+      ]
+    },
+    "coursework_topic": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "description": "Alias for `coursework` -- same list, same object shape.",
+      "identifier": "course",
+      "optional": [
+        "topics"
+      ],
+      "parent": "institution",
+      "required": [
+        "institution",
+        "course"
+      ]
+    },
+    "education": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "institution",
+      "optional": [
+        "degree_level",
+        "field_of_study",
+        "start_year",
+        "end_year",
+        "status",
+        "highlights",
+        "coursework",
+        "clubs"
+      ],
+      "required": [
+        "institution"
+      ]
+    },
+    "education_highlight": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "identifier": "highlight",
+      "optional": [],
+      "parent": "institution",
+      "required": [
+        "institution",
+        "highlight"
+      ]
+    },
+    "email": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "address",
+      "optional": [],
+      "required": [
+        "address",
+        "purpose"
+      ]
+    },
+    "language": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "name",
+      "optional": [],
+      "required": [
+        "name",
+        "fluency"
+      ],
+      "valid_values": {
+        "fluency": [
+          "native",
+          "fluent",
+          "conversational",
+          "basic"
+        ]
+      }
+    },
+    "link": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "description": "A profile link. `label` identifies the row, so renaming one on update means sending `new_label`.",
+      "identifier": "label",
+      "optional": [
+        "new_label"
+      ],
+      "required": [
+        "url",
+        "label"
+      ]
+    },
+    "work_experience": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "company",
+      "optional": [
+        "location",
+        "description",
+        "skills",
+        "highlights"
+      ],
+      "required": [
+        "company",
+        "role",
+        "type",
+        "period"
+      ]
+    },
+    "work_highlight": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "identifier": "highlight",
+      "optional": [],
+      "parent": "company",
+      "required": [
+        "company",
+        "highlight"
+      ]
+    },
+    "work_skill": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "description": "A skill or technology used in a role. Bare strings on the parent row, like work_highlight.",
+      "identifier": "skill",
+      "optional": [
+        "skills"
+      ],
+      "parent": "company",
+      "required": [
+        "company",
+        "skill"
+      ]
+    }
+  },
+  "projects": {
+    "project": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "name",
+      "optional": [
+        "status",
+        "tags",
+        "notes",
+        "highlights",
+        "references"
+      ],
+      "required": [
+        "name",
+        "description"
+      ],
+      "valid_values": {
+        "status": [
+          "active",
+          "paused",
+          "completed",
+          "archived",
+          "idea"
+        ]
+      }
+    },
+    "project_highlight": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "identifier": "highlight",
+      "optional": [],
+      "parent": "project_name",
+      "required": [
+        "project_name",
+        "highlight"
+      ]
+    },
+    "project_reference": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "identifier": "ref_name",
+      "optional": [
+        "url",
+        "notes"
+      ],
+      "parent": "project_name",
+      "required": [
+        "project_name",
+        "ref_name"
+      ]
+    },
+    "project_tag": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "identifier": "tag",
+      "optional": [],
+      "parent": "project_name",
+      "required": [
+        "project_name",
+        "tag"
+      ]
+    },
+    "top_of_mind": {
+      "actions": [
+        "add",
+        "remove"
+      ],
+      "description": "Inbox for fleeting ideas and current thoughts \u2014 expect entries to be pruned",
+      "identifier": "item",
+      "optional": [
+        "note"
+      ],
+      "required": [
+        "item"
+      ]
+    }
+  }
+}
