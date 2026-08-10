@@ -37,6 +37,10 @@ def static_app(tmp_path):
     docs.mkdir()
     (docs / "index.html").write_text("<!doctype html><title>Docs</title>")
 
+    landing = tmp_path / "landing"
+    landing.mkdir()
+    (landing / "edge-strip-light.webp").write_bytes(b"RIFF____WEBP")
+
     app = _bare_app()
     mounted = main.register_static_routes(app, tmp_path)
     assert mounted is True
@@ -164,3 +168,53 @@ def test_docs_mount_is_optional(tmp_path):
     app = _bare_app()
     assert main.register_static_routes(app, tmp_path) is True
     assert not any(getattr(r, "path", "") == "/docs" for r in app.routes)
+
+
+# --- marketing-page artwork -------------------------------------------------
+#
+# These 404'd in a built image while working perfectly under `vite dev`, which
+# serves the whole of public/ and so hides a missing route entirely. The bug is
+# only reachable through the container, which is why it is pinned here.
+
+
+def test_landing_artwork_is_served(static_app):
+    client = TestClient(static_app)
+    resp = client.get("/landing/edge-strip-light.webp")
+    assert resp.status_code == 200
+    assert resp.content == b"RIFF____WEBP"
+
+
+def test_landing_artwork_is_typed_as_an_image(static_app):
+    """Python 3.11's mimetypes has no .webp and the runtime image carries no
+    /etc/mime.types, so StaticFiles typed these `text/plain`. Combined with the
+    X-Content-Type-Options: nosniff this app sends, a browser then refuses to
+    render them -- invisible artwork behind a 200, with nothing in any log."""
+    resp = TestClient(static_app).get("/landing/edge-strip-light.webp")
+    assert resp.headers["content-type"] == "image/webp"
+
+
+def test_landing_artwork_is_revalidated_not_immutable(static_app):
+    """Stable filenames, unlike the content-hashed /assets. Marking them
+    immutable would pin a gradient that had since been regenerated."""
+    resp = TestClient(static_app).get("/landing/edge-strip-light.webp")
+    assert "immutable" not in resp.headers.get("cache-control", "")
+    assert resp.headers.get("etag")
+
+
+def test_a_missing_landing_file_404s_rather_than_serving_the_spa(static_app):
+    """The SPA shell is returned for app routes, not for a missing asset --
+    an <img> that silently receives HTML is a broken image with a 200."""
+    resp = TestClient(static_app).get("/landing/not-here.webp")
+    assert resp.status_code == 404
+
+
+def test_registration_survives_a_build_without_the_landing_folder(tmp_path):
+    """An older build, or a frontend that has dropped the folder. The mount is
+    conditional, so this must not throw at import time."""
+    (tmp_path / "index.html").write_text("<!doctype html>")
+    (tmp_path / "favicon.svg").write_text("<svg/>")
+    (tmp_path / "logo.svg").write_text("<svg/>")
+
+    app = _bare_app()
+    assert main.register_static_routes(app, tmp_path) is True
+    assert TestClient(app).get("/landing/edge-strip-light.webp").status_code == 404
