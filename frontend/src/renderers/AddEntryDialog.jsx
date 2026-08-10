@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
   DialogFooter, DialogTrigger,
 } from "@/components/ui/dialog";
 import { FOCUS_RING } from "@/components/controls";
@@ -54,6 +54,9 @@ export function AddEntryDialog({ node, entity, items, onAdd, open, onOpenChange,
           <DialogTitle>
             Add {(node.title ?? node.entity ?? "item").replace(/_/g, " ")}
           </DialogTitle>
+          <DialogDescription>
+            {node.description ?? `Add one entry to ${node.title ?? "this list"}.`}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
