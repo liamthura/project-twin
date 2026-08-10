@@ -75,15 +75,37 @@ cannot drift. HSL triplets, light then dark.
 | card | `backgroundElevationRaised`, `backgroundElevationOverlay` | `0 0% 100%` | `60 2% 10%` |
 | muted | `backgroundNeutralFaded` | `60 5% 96%` | `60 1% 14%` |
 | ink | `foregroundNeutral` | `24 10% 10%` | `60 5% 96%` |
-| muted-fg | `foregroundNeutralFaded` | `25 5% 45%` | `24 5% 64%` |
+| muted-fg | `foregroundNeutralFaded` | `22 5% 42%` | `20 5% 64%` |
 | border | `borderNeutralFaded` | `20 6% 90%` | `60 2% 16%` |
-| indigo | `primary`, `brand`, `borderPrimary` | `228 69% 55%` | `228 94% 67%` |
-| indigo-tint | `primaryFaded`, `backgroundPrimaryFaded` | `223 100% 96%` | `227 22% 20%` |
+| indigo | `primary`, `brand`, `borderPrimary` | `228 69% 55%` | `228 94% 62%` |
+| indigo-tint | `primaryFaded`, `backgroundPrimaryFaded` | `223 100% 96%` | `246 27% 14%` |
+| link | interactive text — Ghost buttons, Tabs active, RailSubItem current | `228 69% 55%` | `228 94% 68%` |
+| on-primary | Primary button label | `0 0% 100%` | `0 0% 100%` |
 | destructive | `critical` | `0 65% 48%` | `0 74% 54%` |
 | success | `positive` | `142 71% 35%` | `142 60% 50%` |
 | warning | `warning` | `43 96% 40%` | `43 90% 55%` |
+| indigo-ink | Badge Primary text | `228 69% 55%` | `230 94% 82%` |
+| success-ink | Badge Positive text | `163 94% 24%` | `156 72% 67%` |
+| destructive-ink | Badge Critical text | `0 74% 42%` | `0 94% 82%` |
+| warning-ink | Badge Warning text | `23 82% 31%` | `46 97% 65%` |
+| success-tint | Badge Positive ground | `152 81% 96%` | `166 35% 10%` |
+| destructive-tint | Badge Critical ground | `0 86% 97%` | `2 39% 12%` |
+| warning-tint | Badge Warning ground | `48 100% 96%` | `22 46% 12%` |
 
-`on*` foregrounds are generated, never hand-picked.
+`on*` foregrounds are generated, never hand-picked, with one exception:
+`on-primary` is a fixed white in both modes rather than a per-mode pair,
+because a Primary button is indigo in both modes, so its label is white in
+both — there is no light/dark split to carry. It replaces an earlier binding
+to `card`, which measured a body-text-adjacent ratio that had nothing to do
+with what actually sits behind the label; see
+`design/app-contrast-audit.md`. `indigo` and `link` are a second split for the
+same reason the landing page split them first: `indigo` is fills only (a
+button, a border, a brand mark), `link` is interactive text only, and the two
+roles want different values in Dark. `link` needed no split from `indigo` in
+Light. The badge tint/ink pairs replace a self-tinted 12% wash that failed AA
+on four of six tones — see `design/app-contrast-audit.md` for the measured
+before/after and why `indigo-tint` also had to move in Dark, not just the text
+bound to it.
 
 **Clay and verdigris get one job each, not a semantic slot.** The landing rule
 forbids both on body text, and a form-dense app has almost no tinted ground to
@@ -1333,7 +1355,11 @@ Each value carries its own icon and tone from `VALUE_META`: `like` → thumbs-up
 plain foreground; `dislike` → thumbs-down, **amber**. New components `IconThumbsUp`
 (`328:59`) and `IconThumbsDown` (`328:61`).
 
-**`Badge` gained `Tone=Warning`** (`4:16` at 0.12, matching the other tinted tones)
+**`Badge` gained `Tone=Warning`** (`4:16`, grounded on `warning-tint` with
+`warning-ink` text, the same tint/ink pair every other tinted tone now uses —
+not a 12% opacity wash of its own colour, which is how tones used to ground
+themselves before the contrast audit found that wash failing AA on four of the
+six badge tones and replaced it file-wide; see `design/app-contrast-audit.md`)
 and **10 `dislike` badges moved off `Tone=Critical`**. Red says *destructive*, and
 disliking something is not destructive — the original design tints it amber
 (`bg-amber-50 text-amber-800`). Frames touched: Preferences ×2, List expanded ×2,
@@ -1365,3 +1391,17 @@ Mobile Preferences ×2, and the four new frames.
   the value moves away from `other`). No frame draws it.
 - **A user-facing sort control.** See above — real but new.
 - **No mobile frame for filters or sort.**
+
+### Open question: clay and verdigris in the app, 2026-08-10
+
+> `main`'s `globals.css` and `tailwind.config.js` both comment the `clay` and
+> `verdigris` tokens "Brand layer, marketing page only; the app reads the
+> semantic names." This redesign uses `clay` for the delegate-to-client offer
+> and `verdigris` for the Live badge, both in-app. The values themselves agree
+> exactly between code and prototype, so nothing is broken today — but the
+> declared boundary and the design disagree, and one of them should move. The
+> proposal is to promote both to app-sanctioned use with their sanctioned
+> meanings named (`clay` = the delegate offer only; `verdigris` = live/streaming
+> state only), because the alternative is inventing two more semantic tokens
+> for one usage each. **This needs the owner's ruling and is not implemented by
+> this plan.**
