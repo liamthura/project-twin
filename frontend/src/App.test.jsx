@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import packsFixture from "@/__fixtures__/packs.json";
@@ -215,5 +215,77 @@ describe("App: circle and learning_log render through the renderer kit", () => {
       expect(body.learning_log).toEqual(learningLogData);
       expect(body).toHaveProperty("profile");
     });
+  });
+});
+
+// Clicking a rail sub-item moved the marker and the URL but never moved the
+// page: navigate() set state and wrote the hash, and nothing scrolled. Reported
+// from the running app, where scroll-spy worked and clicking did not.
+describe("App: clicking a sub-item goes there", () => {
+  beforeEach(() => {
+    // jsdom keeps location.hash across tests in a file, and an earlier test in
+    // this one asserts on it -- so without this the app starts on whatever
+    // section ran last.
+    window.location.hash = "";
+  });
+
+  it("scrolls to the band a rail click asked for", async () => {
+    mockApi({ packs: packsFixture });
+    const user = userEvent.setup();
+    const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView");
+    render(<App />);
+
+    await waitFor(() => expect(railItem(/Education/)).toBeTruthy());
+    await user.click(railItem(/Education/));
+
+    await waitFor(() => {
+      const target = document.querySelector('[data-band="education"]');
+      expect(target).not.toBeNull();
+      expect(scrollIntoView.mock.instances).toContain(target);
+    });
+    scrollIntoView.mockRestore();
+  });
+
+  it("puts the band in the address bar as a pushed entry", async () => {
+    mockApi({ packs: packsFixture });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await waitFor(() => expect(railItem(/Education/)).toBeTruthy());
+    await user.click(railItem(/Education/));
+    expect(window.location.hash).toBe("#/profile/education");
+  });
+
+  it("scrolls to the band a cold deep link named, once the content exists", async () => {
+    // The rail can render from the manifest immediately, but the anchor only
+    // exists after SectionRenderer mounts -- so the scroll has to wait for it
+    // rather than happening once and missing.
+    window.location.hash = "#/profile/work-experience";
+    mockApi({ packs: packsFixture });
+    const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView");
+    render(<App />);
+
+    await waitFor(() => {
+      const target = document.querySelector('[data-band="work-experience"]');
+      expect(target).not.toBeNull();
+      expect(scrollIntoView.mock.instances).toContain(target);
+    });
+    scrollIntoView.mockRestore();
+  });
+
+  it("does not scroll when only a section was chosen", async () => {
+    // A section click means "start at the top", which is where the page already
+    // is after a section change. Scrolling to nothing in particular would fight
+    // that.
+    mockApi({ packs: packsFixture });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await waitFor(() => expect(railItem(/Learning Log/)).toBeTruthy());
+    const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView");
+    await user.click(railItem(/Learning Log/));
+    await waitFor(() => expect(window.location.hash).toBe("#/learning_log"));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    scrollIntoView.mockRestore();
   });
 });

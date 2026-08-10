@@ -34,14 +34,22 @@ export function Rail({
   onNavigate,
 }) {
   const activePack = packs.find((p) => p.key === activeSection);
-  // Derived from the manifest, so this is complete on a cold deep link before
-  // any content has mounted -- the whole reason the outline is not built by the
-  // bands registering themselves.
-  const bands = activePack ? outline(activePack) : [];
+  // Every pack's bands, not just the active one's -- a collapsed section still
+  // has to know whether it has anything to disclose. Derived from the manifest,
+  // so all of this is complete on a cold deep link before any content has
+  // mounted, which is the whole reason the outline is not built by the bands
+  // registering themselves.
+  const bandsByPack = new Map(packs.map((p) => [p.key, outline(p)]));
+  const bands = activePack ? bandsByPack.get(activePack.key) : [];
   const activeIndex = bands.findIndex((b) => b.id === activeBand);
 
   const sectionItem = (key, title, Icon, extra) => {
     const isActive = activeSection === key;
+    // A caret promises something to expand, so it is drawn only where there is
+    // something. That rules out Review and Sections, and also a pack whose
+    // children are all untitled (learning_log) -- which is why the test is
+    // "has bands" rather than "is a pack".
+    const hasBands = (bandsByPack.get(key) || []).length > 0;
     return (
       <li key={key}>
         <button
@@ -52,14 +60,19 @@ export function Rail({
             isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground"
           }`}
         >
-          {/* The disclosure caret is decoration: the button already announces
-              its state through aria-current, and a second spoken "expanded"
-              would describe the sub-items twice. */}
-          {isActive ? (
-            <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          )}
+          {/* The slot is always here even when the caret is not, so a row
+              without one does not shift its icon left of every other row.
+              The caret is decoration: the button already announces its state
+              through aria-current, and a spoken "expanded" on top of that would
+              describe the sub-items twice. */}
+          <span data-caret-slot aria-hidden="true" className="flex h-3.5 w-3.5 shrink-0">
+            {hasBands &&
+              (isActive ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              ))}
+          </span>
           <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="truncate">{title}</span>
           {extra}

@@ -142,3 +142,44 @@ describe("Rail", () => {
     expect(rail().className).toContain("w-60");
   });
 });
+
+describe("the disclosure caret", () => {
+  it("appears on a section that actually has sub-items", () => {
+    renderRail();
+    expect(item("Preferences").querySelector(".lucide-chevron-down")).not.toBeNull();
+    expect(item("Profile").querySelector(".lucide-chevron-right")).not.toBeNull();
+  });
+
+  it("does not appear on Review or Sections, which have none", () => {
+    // A caret promises something to expand. Neither of these is a persona
+    // section and neither has bands, so the promise is false.
+    renderRail();
+    for (const name of ["Review", "Sections"]) {
+      expect(item(name).querySelector(".lucide-chevron-down")).toBeNull();
+      expect(item(name).querySelector(".lucide-chevron-right")).toBeNull();
+    }
+  });
+
+  it("does not appear on a pack whose children are all untitled", () => {
+    // learning_log's shape: one untitled list, named by the Card's own header.
+    // outline() returns nothing for it, so there is nothing to disclose -- and
+    // this is the case a hardcoded "packs get carets, the rest do not" rule
+    // would get wrong.
+    renderRail();
+    expect(outline(learningLog)).toEqual([]);
+    const learning = item("Learning Log");
+    expect(learning.querySelector(".lucide-chevron-down")).toBeNull();
+    expect(learning.querySelector(".lucide-chevron-right")).toBeNull();
+  });
+
+  it("keeps the icons aligned whether or not a caret is drawn", () => {
+    // Dropping the caret entirely would shift those rows' icons left of the
+    // others; the slot stays and only its contents go.
+    renderRail();
+    const withCaret = item("Profile").querySelector("[data-caret-slot]");
+    const without = item("Review").querySelector("[data-caret-slot]");
+    expect(withCaret).not.toBeNull();
+    expect(without).not.toBeNull();
+    expect(without.className).toBe(withCaret.className);
+  });
+});

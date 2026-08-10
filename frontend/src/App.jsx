@@ -151,6 +151,19 @@ export default function App() {
   const [{ section: activeSection, band: activeBand }, setPlace] = useState(() =>
     parseRoute(readRoute() || "profile")
   );
+
+  // A band we owe a scroll to, and have not delivered yet.
+  //
+  // Seeded from the URL so a cold deep link scrolls too: the rail can render
+  // from the manifest immediately, but the anchor does not exist until
+  // SectionRenderer has mounted, so the scroll has to wait for it rather than
+  // firing once and missing.
+  const pendingBandRef = useRef(parseRoute(readRoute()).band);
+  // Until when scroll-spy's URL writes are ignored. A smooth scroll crosses the
+  // bands in between, and each one gets reported -- so without this the address
+  // bar and the marker chase the scroll backwards past every band on the way,
+  // and the click's own destination is overwritten before it arrives.
+  const spyQuietUntilRef = useRef(0);
   // Data for enabled sections WITHOUT a bespoke editor, keyed by section key.
   const [packData, setPackData] = useState({});
 
@@ -239,6 +252,9 @@ export default function App() {
   const navigate = useCallback((section, band) => {
     setPlace({ section, band: band ?? null });
     goToRoute(band ? `${section}/${band}` : section);
+    // A section click means "start at the top", which is where a section change
+    // already puts you -- only a band click owes a scroll.
+    pendingBandRef.current = band ?? null;
   }, []);
 
   // Nothing re-picks a valid destination for us, so this does. Turn off the
@@ -294,12 +310,36 @@ export default function App() {
   // address bar follows it.
   const spiedBand = useScrollSpy(activeBands.map((b) => b.id));
 
+  // Deliver the scroll a click (or a deep link) asked for.
+  //
+  // Runs on every render that could have produced the anchor, rather than once:
+  // clicking a band in a different section changes what is mounted, and the
+  // element does not exist on the render that handled the click. If it is still
+  // missing the request stays pending and the next render tries again.
+  useEffect(() => {
+    const band = pendingBandRef.current;
+    if (!band) return;
+    const target = document.querySelector(`[data-band="${band}"]`);
+    if (!target) return;
+    pendingBandRef.current = null;
+    // `scroll-mt-[60px]` on the anchor is what keeps the heading clear of the
+    // sticky header; `block: "start"` is what makes that margin apply.
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    target.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    // Long enough to cover --duration-scroll, after which whatever is under the
+    // header genuinely is where the reader ended up.
+    spyQuietUntilRef.current = Date.now() + 500;
+  }, [activeSection, activeBand, packData, isLoading]);
+
   useEffect(() => {
     // Nothing is decided yet while the first load is in flight, and writing a
     // route here would put #/profile in the address bar for the moment before
     // the welcome screen replaces it with #/signin.
     if (isLoading || showingAuth) return;
     if (!spiedBand || spiedBand === activeBand) return;
+    // A scroll we started is still in flight: the bands it is crossing are not
+    // places the reader chose to be.
+    if (pendingBandRef.current || Date.now() < spyQuietUntilRef.current) return;
     // replaceState: a position you scrolled to is not a place you navigated to,
     // so it must stay invisible to the back button. Rail clicks push; this does
     // not. Guarded on a CHANGE of band, not on every observer callback.
