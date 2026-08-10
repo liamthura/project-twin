@@ -33,14 +33,25 @@
     --success: 142 71% 35%;
     --warning: 43 96% 40%;
     --border: 20 6% 90%;
-    --input: 20 6% 90%;
+    /* Deliberately darker than --border, and no longer the same value.
+       A decorative divider is exempt from WCAG 1.4.11; the edge of a text field
+       is not -- it is "visual information required to identify a user interface
+       component", which wants 3:1. At the old shared 90% it measured 1.26 and
+       failed. 57% is the minimum lightness that clears 3:1 against both card
+       and paper (3.16 / 3.03). --border stays put on purpose: darkening it too
+       would repaint every hairline in the app to fix a control boundary.
+       Verify with: node design/app-contrast.mjs */
+    --input: 20 6% 57%;
     --ring: 228 69% 55%;
     --radius: 0.5rem;
 
-    /* Brand layer, beneath the semantic tokens above. Used by the marketing
-       page only; the app reads the semantic names. Ground-inverse and
+    /* Brand layer, beneath the semantic tokens above. Ground-inverse and
        On-inverse do NOT invert -- the dark break section has to stay dark in
-       both modes, or the page's tonal arc runs backwards in dark mode. */
+       both modes, or the page's tonal arc runs backwards in dark mode.
+       clay and verdigris are sanctioned for in-app use as well as marketing,
+       ruled 2026-08-10, each with ONE meaning: clay is the delegate-to-client
+       offer, verdigris is live/streaming state. Anything else in the app reads
+       the semantic names above. */
     --ground-inverse: 24 10% 10%;
     --on-inverse: 60 5% 96%;
     --clay: 18 74% 60%;
@@ -70,7 +81,9 @@
     --success: 142 60% 50%;
     --warning: 43 90% 55%;
     --border: 60 2% 16%;
-    --input: 60 2% 16%;
+    /* See the Light note above. Dark failed harder -- 1.21 at the shared 16% --
+       and 40% is the minimum that clears 3:1 on both grounds (3.11 / 3.35). */
+    --input: 60 2% 40%;
     --ring: 228 94% 62%;
 
     --ground-inverse: 24 8% 14%;

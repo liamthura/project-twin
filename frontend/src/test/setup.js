@@ -69,7 +69,32 @@ if (typeof document !== "undefined" && !document.elementFromPoint) {
   document.elementFromPoint = () => null;
 }
 
-// A third jsdom gap, from the marketing page's section entrances: Magic UI's
+// A third set of jsdom gaps, from Radix Select -- reached the moment a test
+// actually OPENS one rather than only asserting on its closed trigger, which
+// is what the sort control's tests do.
+//
+// Radix tracks pointer capture so a press-drag-release over the list selects
+// in one gesture, and scrolls the active option into view when the list opens.
+// jsdom implements neither, and `hasPointerCapture` throws from inside Radix's
+// own pointerdown handler -- so the failure surfaces as an unhandled exception
+// with a stack inside node_modules, not as a readable assertion failure.
+//
+// Element.prototype, not a per-test spy: any Radix Select in any future test
+// hits the same three calls, and the alternative is this block copied into
+// every file that opens one.
+if (typeof Element !== "undefined") {
+  if (!Element.prototype.hasPointerCapture) {
+    // No pointer is captured in a DOM with no pointer, and `false` is what the
+    // real API answers for exactly that.
+    Element.prototype.hasPointerCapture = () => false;
+  }
+  if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {};
+  if (!Element.prototype.releasePointerCapture) Element.prototype.releasePointerCapture = () => {};
+  // Layout-less, so there is nothing to scroll and nowhere to scroll it.
+  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
+}
+
+// A fourth jsdom gap, from the marketing page's section entrances: Magic UI's
 // blur-fade uses motion's `useInView`, which constructs an IntersectionObserver
 // on mount. jsdom does no layout and does not implement it.
 //

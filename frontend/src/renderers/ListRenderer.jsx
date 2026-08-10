@@ -10,12 +10,15 @@
 //   - `node.enum` and `node.field_defaults` take precedence over the
 //     entity's, for sections whose manifest field names are not their
 //     storage keys (unused by today's packs, needed by waves 3-6)
-import { useState } from "react";
+import { useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Trash2, ChevronDown, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfoButton } from "@/components/ui/info-button";
@@ -96,6 +99,11 @@ export default function ListRenderer({
   // on its account. Never fed back through `onItems` -- see applyFacets in
   // listPipeline.js and the facet bar below, neither of which touches items.
   const [facetValues, setFacetValues] = useState({});
+  // Reader-chosen display order, or null for "whatever the section declares".
+  // Deliberately not persisted: it is display state, so it needs no storage
+  // key and adds nothing to the storage-keys reference.
+  const [sortDir, setSortDir] = useState(null);
+  const sortId = useId();
   const titleField = node.title_field;
   const badges = node.badges || [];
   const detailFields = node.detail_fields || [];
@@ -167,7 +175,41 @@ export default function ListRenderer({
     onShowConfirmation,
   });
 
-  const order = buildOrder(items, node.sort);
+  // The one field this list can offer to re-order by: a display field the
+  // manifest formats as a date. Sourced from `display_formats` rather than
+  // from any key that merely looks like a date, which is what keeps
+  // `knowledge`'s `created_at` out of it -- that manifest records that its two
+  // write paths disagree (one local time labelled UTC, one real UTC), so any
+  // ordering by it would be wrong by the offset for half the entries. It is
+  // not a display field, and this rule only ever reads display fields.
+  //
+  // Today exactly one shipped node qualifies: learning_log/entries.
+  const sortField = (node.display_fields || []).find((f) =>
+    ["datetime", "date"].includes(node.display_formats?.[f]),
+  );
+  // What the control shows. Falls back to the declared direction when the
+  // section declares one on this same field, so learning_log opens on
+  // "Newest" -- the order it already had.
+  // `sortField &&` is load-bearing: without it, a node with neither a date
+  // field nor a declared sort compares undefined === undefined, takes the
+  // true branch, and dereferences a `node.sort` that isn't there.
+  const sortValue =
+    sortDir ??
+    (sortField && node.sort?.field === sortField ? (node.sort.dir ?? "asc") : "desc");
+
+  // Display order. `sortDir` is null until the reader touches the control, so
+  // an untouched list sorts exactly as its manifest declares -- adding the
+  // control changed no node's initial order.
+  //
+  // This is a one-line change for a reason worth keeping: `buildOrder` sorts
+  // STORED INDEXES rather than the array (see listPipeline.js), and `expanded`
+  // is keyed by stored index too, so re-ordering the display cannot point an
+  // expansion key at the wrong row. Sorting also never writes -- the schema
+  // calls `sort` "display order only" -- so nothing here touches `onItems`.
+  // Untouched (`sortDir === null`) falls through to `node.sort` verbatim, so
+  // this cannot change any node's initial order -- not even one whose declared
+  // sort names a different field than the date field the control offers.
+  const order = buildOrder(items, sortDir ? { field: sortField, dir: sortDir } : node.sort);
   const searchFields = [
     ...new Set([titleField, ...badges, ...detailFields, ...meta.array_fields]),
   ];
@@ -305,6 +347,28 @@ export default function ListRenderer({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Order, beside the filters and the count they all feed. Two options
+            and no empty state, which is why this is a plain Select rather than
+            EnumControl: both of EnumControl's shapes offer a way back to "no
+            value" (segmented clears on active-click, the dropdown grows a
+            Clear item), and a list is always in SOME order. */}
+        {sortField && (
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor={sortId} className="text-xs font-medium text-muted-foreground">
+              Sort
+            </Label>
+            <Select value={sortValue} onValueChange={setSortDir}>
+              <SelectTrigger id={sortId} className="h-9 w-auto min-w-[130px] gap-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="desc">Newest</SelectItem>
+                <SelectItem value="asc">Oldest</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         )}
       </div>
