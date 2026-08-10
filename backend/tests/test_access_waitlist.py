@@ -177,3 +177,94 @@ def test_columns_are_sized_to_the_content_not_truncated():
     waitlist_store.join(long_address)
 
     assert long_address in run_cli("waitlist").stdout
+
+
+# --- the invite link, and sending it ----------------------------------------
+
+
+def test_admit_prints_a_link_when_it_knows_the_origin(waiting):
+    result = run_cli("admit", waiting, "--url", "https://mygist.example.com")
+
+    assert result.returncode == 0
+    code = next(w for w in result.stdout.split() if len(w) == 9 and w[4] == "-")
+    assert f"https://mygist.example.com/?invite={code}" in result.stdout
+
+
+def test_a_trailing_slash_on_the_origin_does_not_double_up(waiting):
+    result = run_cli("admit", waiting, "--url", "https://mygist.example.com/")
+    assert "com//?invite=" not in result.stdout
+    assert "com/?invite=" in result.stdout
+
+
+def test_admit_says_how_to_get_a_link_when_it_has_no_origin(waiting):
+    """Without one there is nothing to paste into an email, and the reason is
+    a missing variable rather than anything the operator did wrong."""
+    result = run_cli("admit", waiting)
+
+    assert result.returncode == 0
+    assert "--url" in result.stdout
+    assert "Nothing has been sent" in result.stdout
+
+
+def test_send_without_an_origin_fails_before_minting(waiting):
+    """A code minted for an email that cannot be composed is a code nobody
+    will ever use, and a waitlist row stamped for nothing."""
+    result = run_cli("admit", waiting, "--send")
+
+    assert result.returncode != 0
+    assert "--url" in (result.stdout + result.stderr)
+    # Nothing happened: they are still waiting, with no code to their name.
+    assert waitlist_store.pending_count() == 1
+    assert waiting not in run_cli("codes").stdout
+
+
+def test_send_prints_the_message_when_no_provider_is_configured(waiting):
+    """auth/src/email.js makes the same choice for password reset. A silent
+    no-op would be worse than either sending or failing, because you would
+    think the mail went."""
+    env = {k: v for k, v in os.environ.items() if k not in ("RESEND_API_KEY", "EMAIL_FROM")}
+    result = subprocess.run(
+        [sys.executable, str(BACKEND / "scripts" / "access.py"),
+         "admit", waiting, "--send", "--url", "https://mygist.example.com"],
+        capture_output=True, text=True, env=env, cwd=str(BACKEND),
+    )
+
+    assert result.returncode == 0
+    assert "Not sent" in result.stdout
+    assert "RESEND_API_KEY" in result.stdout
+    # The message itself has to be readable, or there is nothing to copy.
+    assert "https://mygist.example.com/?invite=" in result.stdout
+    assert "Your MyGist invite" in result.stdout
+    # And it still did the database half.
+    assert waitlist_store.pending_count() == 0
+
+
+def test_the_invite_email_carries_the_code_as_well_as_the_link():
+    """Links get mangled by mail clients and by people reading on a phone,
+    so the code has to be typeable out of the same message."""
+    from scripts.access import invite_email
+
+    subject, text = invite_email("GRSE-0W11", "https://x.example/?invite=GRSE-0W11", 1, None)
+
+    assert "GRSE-0W11" in text
+    assert "https://x.example/?invite=GRSE-0W11" in text
+    assert subject
+
+
+def test_the_invite_email_states_an_expiry_when_there_is_one():
+    from datetime import datetime, timezone
+
+    from scripts.access import invite_email
+
+    _, text = invite_email(
+        "GRSE-0W11", "https://x.example/", 1, datetime(2026, 9, 9, tzinfo=timezone.utc)
+    )
+    assert "9 September 2026" in text
+
+
+def test_mint_prints_a_link_but_stays_on_two_lines(waiting):
+    """The one-line contract was about the code not being buried. A link is
+    the other half of the same job, so it earns the second line and nothing
+    else does."""
+    result = run_cli("mint", "--label", "reddit", "--url", "https://mygist.example.com")
+    assert len(result.stdout.strip().splitlines()) == 2

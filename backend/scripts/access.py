@@ -12,26 +12,39 @@ that matters, "send this person a code", spanned both halves and belonged to
 neither.
 
     DATABASE_URL=... python scripts/access.py waitlist [--all]
-    DATABASE_URL=... python scripts/access.py admit sarah@example.com [--expires 30d]
+    DATABASE_URL=... python scripts/access.py admit sarah@example.com [--expires 30d] [--send]
     DATABASE_URL=... python scripts/access.py drop sarah@example.com
 
     DATABASE_URL=... python scripts/access.py mint --label "sarah" [--uses N] [--expires 30d]
     DATABASE_URL=... python scripts/access.py codes [--all]
     DATABASE_URL=... python scripts/access.py revoke CODE
 
-`admit` is the reason the two halves are one script. It mints a code and stamps
-the waitlist row in one go, so the list cannot drift from the codes -- which is
-exactly what happens when the two are separate commands and you get distracted
-between them.
+`admit` is the reason the two halves are one script. It mints a code, stamps the
+waitlist row and emails the sign-up link in one go, so the list cannot drift
+from the codes -- which is exactly what happens when the two are separate
+commands and you get distracted between them.
+
+Mail goes through Resend, reading `RESEND_API_KEY` and `EMAIL_FROM`, the same
+two variables the auth service reads. With either unset it prints the message
+instead of sending, which is the same choice auth/src/email.js makes and for the
+same reason: the flow can be walked end to end before anyone has a Resend
+account, and a silent no-op would be worse than either sending or failing.
+
+The link needs a public origin, from `--url`, `PUBLIC_URL` or `BETTER_AUTH_URL`.
+The app container sets none of those today, so pass `--url` or add one.
 
 The rule that decides whether a code admits someone lives in the auth service
 (auth/src/invite.js) and is the single implementation of it. Nothing here
 duplicates that logic; this only ever writes and reads rows.
 """
 import argparse
+import json
+import os
 import re
 import secrets
 import sys
+import urllib.error
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -78,6 +91,90 @@ def normalise_code(code: str) -> str:
     if "-" not in normalised and len(normalised) == GROUP * 2:
         normalised = f"{normalised[:GROUP]}-{normalised[GROUP:]}"
     return normalised
+
+
+# --------------------------------------------------------------- invite links
+RESEND_ENDPOINT = "https://api.resend.com/emails"
+
+
+def base_url(explicit: str | None) -> str | None:
+    """Where the sign-up form lives.
+
+    `BETTER_AUTH_URL` is checked because it already means "the public origin the
+    browser uses" -- the auth service builds its cookies and redirects from it,
+    so if it is wrong here it is wrong everywhere. `--url` wins so a link can be
+    minted for production from a machine pointed at a local database.
+    """
+    for candidate in (explicit, os.environ.get("PUBLIC_URL"), os.environ.get("BETTER_AUTH_URL")):
+        if candidate:
+            return candidate.rstrip("/")
+    return None
+
+
+def invite_link(base: str, code: str) -> str:
+    """`?invite=CODE`, which WelcomeAuth reads once at mount and uses to skip
+    the code-entry screen. A query parameter rather than a hash, because the
+    hash never reaches the server and this has to survive the auth redirects."""
+    return f"{base}/?invite={code}"
+
+
+def invite_email(code: str, link: str, uses: int, expires_at: datetime | None) -> tuple[str, str]:
+    """Subject and body. Plain text, because an invite is four lines and HTML
+    would be four lines wrapped in a table."""
+    lines = [
+        "You asked for an invite to MyGist, so here is one.",
+        "",
+        f"  {link}",
+        "",
+        f"That link fills the code in. To type it by hand instead, it is {code}.",
+    ]
+    if expires_at:
+        lines.append(f"It stops working on {expires_at.strftime('%-d %B %Y')}.")
+    if uses > 1:
+        lines.append(f"It is good for {uses} accounts.")
+    lines += ["", "MyGist is invite-only while it is small. Thanks for waiting."]
+    return "Your MyGist invite", "\n".join(lines)
+
+
+def send_email(to: str, subject: str, text: str) -> bool:
+    """Send through Resend, or print when there is no provider.
+
+    Printing is deliberate rather than a fallback, and it is the same choice
+    auth/src/email.js makes for password reset: the whole flow can be walked
+    locally before anyone has a Resend account. A silent no-op would be worse
+    than either sending or failing, because you would think the mail went.
+
+    Returns True if it actually left the building.
+    """
+    api_key = os.environ.get("RESEND_API_KEY")
+    sender = os.environ.get("EMAIL_FROM")
+
+    if not api_key or not sender:
+        print("\n  Not sent: RESEND_API_KEY and EMAIL_FROM are unset here.")
+        print(f"  to:      {to}")
+        print(f"  subject: {subject}")
+        for line in text.split("\n"):
+            print(f"  {line}" if line else "")
+        return False
+
+    request = urllib.request.Request(
+        RESEND_ENDPOINT,
+        data=json.dumps({"from": sender, "to": to, "subject": subject, "text": text}).encode(),
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15):
+            pass
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")[:200]
+        # Raised, not swallowed. The code is already minted and the row already
+        # stamped, so silence here would leave someone marked invited with
+        # nothing in their inbox and no record of why.
+        raise SystemExit(f"Resend responded {exc.code}: {detail}")
+    except urllib.error.URLError as exc:
+        raise SystemExit(f"could not reach Resend: {exc.reason}")
+    return True
 
 
 # ------------------------------------------------------------------ printing
@@ -131,7 +228,7 @@ def overview() -> None:
     print()
     print("  WAITLIST")
     print("    waitlist [--all]            who is waiting, oldest first")
-    print("    admit EMAIL [--expires 30d] mint a code and stamp them invited")
+    print("    admit EMAIL [--send]        mint a code, stamp them, email the link")
     print("    drop EMAIL                  remove an address")
     print()
     print("  CODES")
@@ -142,7 +239,11 @@ def overview() -> None:
     print("  EXAMPLES")
     print("    access.py waitlist")
     print("    access.py admit sarah@example.com --expires 30d")
+    print("    access.py admit sarah@example.com --send --url https://mygist.example.com")
     print('    access.py mint --label "reddit thread" --uses 10 --expires 30d')
+    print()
+    print("  Links need a public origin: --url, PUBLIC_URL or BETTER_AUTH_URL.")
+    print("  --send needs RESEND_API_KEY and EMAIL_FROM, or it prints the message.")
     print()
     print("  Run where DATABASE_URL reaches the database -- in the container.")
     print("  access.py <command> --help explains one command.")
@@ -165,12 +266,17 @@ def create_code(label: str, uses: int, expires: str | None) -> str:
     return code
 
 
-def mint(label: str, uses: int, expires: str | None) -> None:
+def mint(label: str, uses: int, expires: str | None, url: str | None) -> None:
     code = create_code(label, uses, expires)
     expires_at = parse_expiry(expires) if expires else None
     plural = "use" if uses == 1 else "uses"
     when = expires_at.strftime("%Y-%m-%d") if expires_at else "no expiry"
+    # One line, still. This output IS the code, and a test holds it to that.
     print(f"  {code}   {uses} {plural}   {when}")
+
+    base = base_url(url)
+    if base:
+        print(f"  {invite_link(base, code)}")
 
 
 def status_of(row) -> str:
@@ -291,13 +397,17 @@ def show_waitlist(show_all: bool) -> None:
     )
 
 
-def admit(email: str, uses: int, expires: str | None) -> None:
+def admit(email: str, uses: int, expires: str | None, url: str | None, send: bool) -> None:
     """Mint a code for someone on the list and stamp them invited.
 
     Order matters. The code is minted first: if the stamp fails, you have a
     spare code and a row that still says "waiting", which is recoverable by
     running this again. Stamping first and failing to mint would mark someone
     invited who never received anything, and nothing would ever show that.
+
+    The email goes last, for the same reason. A send that fails leaves a real
+    code and a stamped row, and re-running produces a second code that works.
+    Sending first would risk mailing a code that was never written down.
     """
     email = waitlist_store.normalise(email)
     on_list = any(r["email"] == email for r in waitlist_store.listing(include_invited=True))
@@ -307,20 +417,43 @@ def admit(email: str, uses: int, expires: str | None) -> None:
             f'  access.py mint --label "{email}"'
         )
 
+    base = base_url(url)
+    if send and not base:
+        # Checked before minting, because this one is pure user error and
+        # failing here costs nothing. An email with a bare code in it and no
+        # link is not the thing that was asked for.
+        raise SystemExit(
+            "--send needs to know where the sign-up form is.\n"
+            "  access.py admit EMAIL --send --url https://mygist.example.com\n"
+            "  or set PUBLIC_URL in this container."
+        )
+
     code = create_code(label=email, uses=uses, expires=expires)
     waitlist_store.mark_invited(email)
 
     expires_at = parse_expiry(expires) if expires else None
     when = expires_at.strftime("%Y-%m-%d") if expires_at else "no expiry"
-    table(
-        ["EMAIL", "CODE", "USES", "EXPIRES"],
-        [[email, code, str(uses), when]],
-    )
+    table(["EMAIL", "CODE", "USES", "EXPIRES"], [[email, code, str(uses), when]])
+    if base:
+        print(f"\n  {invite_link(base, code)}")
     print(f"\n  {waitlist_store.pending_count()} still waiting.")
-    hint(
-        "Send them the code with the sign-up link.",
-        "Nothing has emailed them -- that part is still you.",
-    )
+
+    if send:
+        subject, text = invite_email(code, invite_link(base, code), uses, expires_at)
+        if send_email(email, subject, text):
+            hint(f"Sent to {email}.")
+        else:
+            hint("Copy the message above, or set the two variables and run it again.")
+    elif base:
+        hint(
+            "Email it yourself, or add --send.",
+            "Nothing has been sent.",
+        )
+    else:
+        hint(
+            "Add a link: access.py admit <email> --url https://your-host",
+            "Nothing has been sent.",
+        )
 
 
 def drop(email: str) -> None:
@@ -358,6 +491,15 @@ def main() -> None:
     p_admit.add_argument("email")
     p_admit.add_argument("--uses", type=int, default=1, help="how many accounts (default 1)")
     p_admit.add_argument("--expires", help="30d, 12h, or 2026-08-30")
+    p_admit.add_argument(
+        "--url", help="where the sign-up form is, if PUBLIC_URL is not set here"
+    )
+    p_admit.add_argument(
+        "--send",
+        action="store_true",
+        help="email the invite to them. Prints it instead when RESEND_API_KEY "
+        "and EMAIL_FROM are unset",
+    )
 
     p_drop = sub.add_parser("drop", help="remove an address from the waitlist")
     p_drop.add_argument("email")
@@ -371,6 +513,9 @@ def main() -> None:
     )
     p_mint.add_argument("--uses", type=int, default=1, help="how many accounts (default 1)")
     p_mint.add_argument("--expires", help="30d, 12h, or 2026-08-30")
+    p_mint.add_argument(
+        "--url", help="where the sign-up form is, if PUBLIC_URL is not set here"
+    )
 
     p_codes = sub.add_parser("codes", help="show invite codes")
     p_codes.add_argument(
@@ -393,11 +538,11 @@ def main() -> None:
         if args.command == "waitlist":
             show_waitlist(args.all)
         elif args.command == "admit":
-            admit(args.email, args.uses, args.expires)
+            admit(args.email, args.uses, args.expires, args.url, args.send)
         elif args.command == "drop":
             drop(args.email)
         elif args.command == "mint":
-            mint(args.label, args.uses, args.expires)
+            mint(args.label, args.uses, args.expires, args.url)
         elif args.command == "codes":
             list_codes(args.all)
         elif args.command == "revoke":
