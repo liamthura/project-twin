@@ -27,6 +27,15 @@ const lifestylePack = packs.find((p) => p.key === "lifestyle");
 const preferencesPack = packs.find((p) => p.key === "preferences");
 const profilePack = packs.find((p) => p.key === "profile");
 
+// A list's header Add trigger, found by its VISIBLE text rather than by
+// accessible name. It reads a bare "Add" beside the heading that already names
+// the list, and carries an aria-label naming what it adds -- the same name the
+// empty panel's call to action spells out on screen. So an empty list answers
+// to "Add <thing>" twice and a name-based query cannot say which one it meant,
+// while the visible text tells them apart. Only unambiguous while the dialog
+// is closed: its submit button reads a bare "Add" too.
+const headerAdd = (scope = screen) => scope.getByText("Add", { selector: "button" });
+
 // Shared reasons for the two exclusion entries nearly every pack needs --
 // spelled out once so every call site's exclusion map still requires a real,
 // non-empty reason (the check in describeGuards below) without retyping the
@@ -651,7 +660,7 @@ describe("SectionRenderer", () => {
       const { user, latest, initial } = renderSection({
         pack: projectsPack, initial: projectsData,
       });
-      await user.click(within(topOfMindBlock()).getByRole("button", { name: "Add" }));
+      await user.click(headerAdd(within(topOfMindBlock())));
 
       const dialog = screen.getByRole("dialog");
       await user.type(within(dialog).getAllByRole("textbox")[0], "Sketch a CLI");
@@ -901,7 +910,7 @@ describe("SectionRenderer", () => {
       const { user, latest, initial } = renderSection({
         pack: knowledgePack, initial: knowledgeData,
       });
-      await user.click(within(mentalTabsBlock()).getByRole("button", { name: "Add" }));
+      await user.click(headerAdd(within(mentalTabsBlock())));
 
       const dialog = screen.getByRole("dialog");
       await user.type(within(dialog).getAllByRole("textbox")[0], "Reading list");
@@ -926,7 +935,7 @@ describe("SectionRenderer", () => {
       const { user, latest } = renderSection({
         pack: knowledgePack, initial: knowledgeData,
       });
-      await user.click(within(mentalTabsBlock()).getByRole("button", { name: "Add" }));
+      await user.click(headerAdd(within(mentalTabsBlock())));
       const dialog = screen.getByRole("dialog");
       await user.type(within(dialog).getAllByRole("textbox")[0], "Reading list");
       await user.click(within(dialog).getByRole("button", { name: "Add" }));
@@ -1696,8 +1705,10 @@ describe("section headings and info placement", () => {
       // first item, so each migration asserts the empty state explicitly.
       renderSection({ pack: lifestylePack, initial: {} });
 
-      expect(screen.getByRole("button", { name: "Add hobby" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Add interest" })).toBeInTheDocument();
+      // Two each, on an empty list: the header trigger (visibly a bare "Add",
+      // labelled for a screen reader) and the empty panel's call to action.
+      expect(screen.getAllByRole("button", { name: "Add hobby" })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: "Add interest" })).toHaveLength(2);
       for (const heading of ["Personality Traits", "Values", "Energy Peaks", "Stress Triggers"]) {
         expect(within(block(heading)).getByRole("textbox")).toBeEnabled();
       }
@@ -1762,7 +1773,7 @@ describe("section headings and info placement", () => {
       // under `when_feeling` is unreachable by every MCP lookup.
       const { user, latest } = renderSection({ pack: preferencesPack, initial: preferencesData });
 
-      await user.click(within(block("When I'm feeling...")).getByRole("button", { name: "Add" }));
+      await user.click(headerAdd(within(block("When I'm feeling..."))));
       const dialog = screen.getByRole("dialog");
       await user.type(within(dialog).getAllByRole("textbox")[0], "tired");
       await user.click(within(dialog).getByRole("button", { name: "Add" }));
@@ -1847,8 +1858,8 @@ describe("section headings and info placement", () => {
         expect(within(block(heading)).getByRole("textbox")).toBeEnabled();
       }
       expect(screen.getByLabelText("Tone")).toHaveValue("");
-      expect(screen.getByRole("button", { name: "Add mood override" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Add like" })).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Add mood override" })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: "Add like" })).toHaveLength(2);
     });
   });
 
@@ -2167,7 +2178,7 @@ describe("section headings and info placement", () => {
       await user.click(screen.getByText("Northumbria University"));
 
       const coursework = uiNode("Coursework / Modules");
-      await user.click(within(coursework).getByRole("button", { name: "Add" }));
+      await user.click(headerAdd(within(coursework)));
       const dialog = screen.getByRole("dialog");
       await user.type(within(dialog).getAllByRole("textbox")[0], "Type Theory");
       await user.click(within(dialog).getByRole("button", { name: "Add" }));
@@ -2302,7 +2313,9 @@ describe("section headings and info placement", () => {
       expect(screen.getByLabelText("Name")).toHaveValue("");
       for (const label of ["Add education", "Add work experience", "Add email",
                            "Add link", "Add language"]) {
-        expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+        // The header trigger and the empty panel's button, both naming what
+        // they add -- neither route leaves a screen reader with a bare "Add".
+        expect(screen.getAllByRole("button", { name: label })).toHaveLength(2);
       }
     });
 
@@ -2323,15 +2336,19 @@ describe("section headings and info placement", () => {
   });
 
   it("labels each Add button with the singular entity, not the plural heading", () => {
-    // Empty, because the labelled Add lives in the empty panel -- the header
-    // button stays a bare "Add" beside a populated list.
+    // Empty, so both ways into each list are on screen: the header trigger and
+    // the empty panel's call to action. They name the same action, so they name
+    // it the same way -- the trigger via aria-label, the panel visibly.
     renderSection({ pack: knowledgePack, initial: {} });
 
     // The headings are "Skills & Domains" and "Mental Tabs"; the buttons add
     // one thing each, so they name the entity.
-    expect(screen.getByRole("button", { name: "Add domain" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add mental tab" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Add domain" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Add mental tab" })).toHaveLength(2);
     expect(screen.queryByRole("button", { name: /Add Skills & Domains/ })).not.toBeInTheDocument();
+    // And nothing is left announcing a bare "Add", which is what several list
+    // nodes in one section used to give a screen reader: "Add", then "Add".
+    expect(screen.queryByRole("button", { name: "Add" })).not.toBeInTheDocument();
   });
 });
 
@@ -2361,10 +2378,10 @@ describe("the Add trigger and the entry count", () => {
     const nodeEl = uiNode("Likes & Dislikes");
 
     expect(
-      within(headingRowOf(nodeEl)).getByRole("button", { name: "Add" })
+      headerAdd(within(headingRowOf(nodeEl)))
     ).toBeInTheDocument();
     // Exactly one: it MOVED, rather than gaining a second copy in the body.
-    expect(within(nodeEl).getAllByRole("button", { name: "Add" })).toHaveLength(1);
+    expect(within(nodeEl).getAllByText("Add", { selector: "button" })).toHaveLength(1);
   });
 
   it("puts an untitled node's Add trigger in the Card's own header row, the only heading it has", () => {
@@ -2375,11 +2392,11 @@ describe("the Add trigger and the entry count", () => {
 
     const cardTitle = screen.getByRole("heading", { name: /Goals/ });
     const headerRow = cardTitle.parentElement.parentElement;
-    expect(headerRow).toContainElement(screen.getByRole("button", { name: "Add" }));
+    expect(headerRow).toContainElement(headerAdd());
     // The row is the header's, not the whole Card's -- otherwise this would
     // pass with the button still sitting down in the list body.
     expect(headerRow).not.toContainElement(screen.getByText("Ship MyGist v3"));
-    expect(screen.getAllByRole("button", { name: "Add" })).toHaveLength(1);
+    expect(screen.getAllByText("Add", { selector: "button" })).toHaveLength(1);
   });
 
   it("does not let a child list inside an expanded row hijack its parent's header slot", async () => {
@@ -2390,10 +2407,10 @@ describe("the Add trigger and the entry count", () => {
     await user.click(screen.getByText("MyGist"));
 
     expect(
-      within(uiNode("References")).getByRole("button", { name: "Add" })
+      headerAdd(within(uiNode("References")))
     ).toBeInTheDocument();
     expect(
-      within(headingRowOf(uiNode("Projects"))).getAllByRole("button", { name: "Add" })
+      within(headingRowOf(uiNode("Projects"))).getAllByText("Add", { selector: "button" })
     ).toHaveLength(1);
   });
 

@@ -58,6 +58,20 @@ function renderStateful(initialItems) {
   return { ...utils, user: userEvent.setup(), latest: () => seen };
 }
 
+// The two ways into the Add dialog, picked apart by VISIBLE text rather than
+// by accessible name, because they deliberately share one: the header trigger
+// reads a bare "Add" beside the heading that names the list and carries an
+// aria-label naming what it adds, while the empty panel's call to action
+// spells the same thing out on screen. An empty list therefore answers to
+// "Add <thing>" twice, and a name-based query cannot say which one it meant.
+//
+// `headerAdd` is only unambiguous while the dialog is CLOSED -- the dialog's
+// own submit button reads a bare "Add" too, which is exactly why the trigger
+// needed the aria-label in the first place.
+const headerAdd = (scope = screen) => scope.getByText("Add", { selector: "button" });
+const emptyPanel = () => screen.getByText(/Nothing here yet/).parentElement;
+const panelAdd = () => within(emptyPanel()).getByRole("button", { name: /^Add / });
+
 describe("ListRenderer", () => {
   it("renders each row's title, and badges for fields listed in node.badges", () => {
     render(
@@ -128,13 +142,34 @@ describe("ListRenderer", () => {
     render(
       <ListRenderer node={node} entity={entity} items={[scandinavian]} onItems={() => {}} />
     );
-    expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add aesthetic" })).toBeInTheDocument();
+  });
+
+  // A section with several list nodes renders one of these triggers per node,
+  // and read out of its heading's context a bare "Add" distinguishes none of
+  // them. The visible label stays short because the heading beside it is
+  // already saying what the list is; only the accessible name spells it out.
+  it("tells a screen reader what the header trigger adds, while its visible text stays a bare Add", () => {
+    render(
+      <ListRenderer node={node} entity={entity} items={[scandinavian]} onItems={() => {}} />
+    );
+    const trigger = screen.getByRole("button", { name: "Add aesthetic" });
+    expect(trigger).toHaveTextContent(/^Add$/);
+  });
+
+  it("names an untitled, entityless node's trigger after nothing it does not have", () => {
+    // `node.entity ?? node.title ?? "item"`, the same fallback chain the empty
+    // panel's button uses -- an accessible name of "Add undefined" would be
+    // worse than the bare "Add" this replaced.
+    const entityless = { kind: "list", path: ["goals"], title_field: "title" };
+    render(<ListRenderer node={entityless} items={[{ title: "Ship it" }]} onItems={() => {}} />);
+    expect(screen.getByRole("button", { name: "Add item" })).toBeInTheDocument();
   });
 
   it("merges entity.field_defaults into a new item added via the dialog", async () => {
     const { user, latest } = renderStateful([scandinavian]);
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(headerAdd());
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "Y2K");
@@ -147,7 +182,7 @@ describe("ListRenderer", () => {
     const initial = [scandinavian];
     const { user, latest } = renderStateful(initial);
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(headerAdd());
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "scandinavian");
@@ -166,7 +201,7 @@ describe("ListRenderer", () => {
   it("keeps the rest of the draft on screen when the title collides, so a duplicate name doesn't discard everything else the user typed", async () => {
     const { user } = renderStateful([scandinavian]);
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(headerAdd());
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "Scandinavian");
@@ -217,7 +252,7 @@ describe("ListRenderer", () => {
       <ListRenderer node={entitylessNode} entity={undefined} items={[]} onItems={() => {}} />
     );
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(headerAdd());
 
     expect(screen.getByRole("heading", { name: "Add item" })).toBeInTheDocument();
   });
@@ -227,7 +262,7 @@ describe("ListRenderer", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={titledNode} entity={entity} items={[]} onItems={() => {}} />);
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(headerAdd());
 
     expect(screen.getByRole("heading", { name: "Add to Aesthetic style" })).toBeInTheDocument();
   });
@@ -316,7 +351,7 @@ describe("ListRenderer", () => {
     await user.click(screen.getByText("React Server Components"));
     expect(screen.getByDisplayValue("note-1")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(headerAdd());
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "New Entry");
@@ -375,7 +410,7 @@ describe("@now in field_defaults", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[]} onItems={onItems} />);
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(headerAdd());
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "React Server Components");
@@ -392,7 +427,7 @@ describe("@now in field_defaults", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(headerAdd());
     // `timestamp` has no control of its own, but `source` proves defaults still
     // preselect; a literal "@now" anywhere on screen means the token escaped.
     expect(screen.getByDisplayValue("manual")).toBeInTheDocument();
@@ -410,7 +445,7 @@ describe("@now in field_defaults", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(headerAdd());
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "T");
@@ -428,7 +463,7 @@ describe("@now in field_defaults", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[]} onItems={onItems} />);
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(headerAdd());
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "@now");
@@ -632,7 +667,7 @@ describe("search", () => {
     await user.type(screen.getByRole("searchbox"), "grace");
     expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(headerAdd());
     const dialog = screen.getByRole("dialog");
     const titleInput = within(dialog).getAllByRole("textbox")[0];
     await user.type(titleInput, "Bob Smith");
@@ -945,7 +980,7 @@ describe("title field also listed in detail_fields", () => {
   it("shows exactly one control for the title field in the Add dialog", async () => {
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(headerAdd());
     const dialog = screen.getByRole("dialog");
     // Both the dedicated title control and a duplicate from editFields.map
     // would carry the literal label text "topic" (the dedicated one is
@@ -1218,7 +1253,7 @@ describe("children", () => {
     const { user, latest } = renderStatefulParent(items);
 
     await user.click(screen.getByText("Beta"));
-    await user.click(within(childBlock("References")).getByRole("button", { name: "Add" }));
+    await user.click(headerAdd(within(childBlock("References"))));
 
     const dialog = screen.getByRole("dialog");
     await user.type(within(dialog).getAllByRole("textbox")[0], "Ref B3");
@@ -1432,7 +1467,7 @@ describe("children", () => {
     const { user, latest } = renderStatefulParent([gamma]);
 
     await user.click(screen.getByText("Gamma"));
-    await user.click(within(childBlock("References")).getByRole("button", { name: "Add" }));
+    await user.click(headerAdd(within(childBlock("References"))));
     const dialog = screen.getByRole("dialog");
     await user.type(within(dialog).getAllByRole("textbox")[0], "First ref");
     await user.click(within(dialog).getByRole("button", { name: "Add" }));
@@ -1721,7 +1756,7 @@ describe("empty state offers a way in", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={{ ...node, title: "Mental tab" }} items={[]} onItems={vi.fn()} />);
 
-    const cta = screen.getByRole("button", { name: "Add thing" });
+    const cta = within(emptyPanel()).getByRole("button", { name: "Add thing" });
     await user.click(cta);
 
     // Opens the same dialog the header trigger does -- one dialog, not two.
@@ -1732,10 +1767,18 @@ describe("empty state offers a way in", () => {
   it("seeds field_defaults identically whether opened from the panel or the header", async () => {
     const withDefaults = { ...node, detail_fields: ["stance"], field_defaults: { stance: "like" } };
     const user = userEvent.setup();
-    render(<ListRenderer node={withDefaults} items={[]} onItems={vi.fn()} />);
+    const seeded = () => within(screen.getByRole("dialog")).getByDisplayValue("like");
 
-    await user.click(screen.getByRole("button", { name: "Add thing" }));
-    expect(within(screen.getByRole("dialog")).getByDisplayValue("like")).toBeInTheDocument();
+    const { unmount } = render(<ListRenderer node={withDefaults} items={[]} onItems={vi.fn()} />);
+    await user.click(panelAdd());
+    expect(seeded()).toBeInTheDocument();
+
+    // A fresh mount, so this asserts the header's FIRST open rather than a
+    // reopen -- reopening from either route is pinned separately below.
+    unmount();
+    render(<ListRenderer node={withDefaults} items={[]} onItems={vi.fn()} />);
+    await user.click(headerAdd());
+    expect(seeded()).toBeInTheDocument();
   });
 
   it("does not mention suggestions when the node has none", () => {
@@ -1757,9 +1800,62 @@ describe("empty state offers a way in", () => {
 
     await user.type(screen.getByRole("searchbox"), "zzz");
 
-    expect(screen.getByText(/No matches/)).toBeInTheDocument();
+    const panel = screen.getByText(/No matches/);
+    expect(panel).toBeInTheDocument();
     // The Add call to action is for an empty list, not a filtered-empty one --
     // offering it here would suggest adding is the way to see hidden rows.
-    expect(screen.queryByRole("button", { name: /^Add thing$/ })).not.toBeInTheDocument();
+    // Asked of the panel rather than the whole screen: the header trigger is
+    // still there, and it names what it adds now, so a screen-wide query for
+    // "Add thing" would find it and say nothing about this panel.
+    expect(within(panel).queryByRole("button")).not.toBeInTheDocument();
+  });
+});
+
+// The draft has to survive the SECOND open as well as the first, from either
+// entry point and after either way out. Radix's `onOpenChange` cannot carry
+// that on its own: it fires only for a close/open Radix itself performed, so
+// the empty panel's button (which sets `open` in ListRenderer's own state) and
+// the dialog's own Cancel button (which calls the `onOpenChange` prop rather
+// than Radix's wrapper) both bypassed it. Two shipped consequences, both
+// asserted below: reopening from the panel after an Escape showed no defaults,
+// and Cancel left the abandoned draft in the fields.
+describe("the Add dialog's draft across repeated opens", () => {
+  const node = {
+    kind: "list", path: ["items"], title: "Mental tab", title_field: "name",
+    entity: "thing", detail_fields: ["stance"], field_defaults: { stance: "like" },
+  };
+
+  const titleInput = () => within(screen.getByRole("dialog")).getAllByRole("textbox")[0];
+
+  it("re-seeds field_defaults on a reopen from the panel after a close Radix performed", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
+
+    // First open, from the header trigger: seeded, as it always was.
+    await user.click(headerAdd());
+    expect(within(screen.getByRole("dialog")).getByDisplayValue("like")).toBeInTheDocument();
+
+    // Escape is a close Radix performed, so its wrapper runs and empties the
+    // draft. Nothing re-fills it on the way back in.
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await user.click(panelAdd());
+    expect(within(screen.getByRole("dialog")).getByDisplayValue("like")).toBeInTheDocument();
+  });
+
+  it("clears an abandoned draft when the way out was Cancel, not just the built-in close", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[]} onItems={vi.fn()} />);
+
+    await user.click(panelAdd());
+    await user.type(titleInput(), "abandoned");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await user.click(panelAdd());
+    expect(titleInput()).toHaveValue("");
+    // And the defaults are back, rather than the abandoned draft's leftovers.
+    expect(within(screen.getByRole("dialog")).getByDisplayValue("like")).toBeInTheDocument();
   });
 });

@@ -3,7 +3,7 @@
 // can mount the same dialog the empty-state panel mounts. Both entry points
 // must seed `field_defaults` identically or a manifest default would apply
 // invisibly on one route and visibly on the other.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +24,33 @@ export function AddEntryDialog({ node, entity, items, onAdd, open, onOpenChange,
   const suggestions = node.suggestions?.[titleField] || [];
   const meta = buildFieldMeta(node, entity);
 
-  const [draft, setDraft] = useState({ ...fieldDefaults });
+  const [draft, setDraft] = useState({});
+
+  // Seeding is driven by the `open` PROP, not by `onOpenChange`, and that is
+  // load-bearing rather than a stylistic choice.
+  //
+  // Radix's controllable-state hook calls `onChange` only from its own
+  // internal setter, so a controlled `open` that moved from OUTSIDE Radix is
+  // never reported. Two such moves exist today: ListRenderer's empty-state
+  // panel opens this dialog by setting its own state (Radix's trigger is not
+  // involved), and the Cancel button below calls the `onOpenChange` PROP
+  // directly. Hanging the draft off `onOpenChange` therefore missed both --
+  // reopening from the panel showed no field_defaults at all, and Cancel left
+  // the abandoned draft sitting in the fields for the next open. The `open`
+  // prop is the one signal every route has to pass through.
+  //
+  // `fieldDefaults` is a fresh object literal on every render, so putting it
+  // in the dependency list would setDraft on every render, forever. A ref
+  // reads the current defaults without claiming to react to them; `open` is
+  // the only real trigger.
+  const fieldDefaultsRef = useRef(fieldDefaults);
+  fieldDefaultsRef.current = fieldDefaults;
+  useEffect(() => {
+    // Preselect manifest defaults (e.g. stance: like) so the controls show the
+    // real initial state instead of applying it invisibly; drop everything on
+    // close so an abandoned draft never greets the next open.
+    setDraft(open ? { ...fieldDefaultsRef.current } : {});
+  }, [open]);
 
   const existingTitles = new Set(items.map((i) => (i[titleField] || "").toLowerCase()));
   // Same case-insensitive comparison addItem uses to reject a collision --
@@ -38,30 +64,27 @@ export function AddEntryDialog({ node, entity, items, onAdd, open, onOpenChange,
 
   const submit = () => { onAdd(draft); onOpenChange(false); setDraft({}); };
 
+  // A container name takes "Add to" -- the list is the destination, not the
+  // thing being added. An entity name is already the singular noun, so it
+  // takes a bare "Add". `Add Likes & Dislikes` was the old string.
+  //
+  // The description follows the SAME branch rather than always naming a list:
+  // an entity-only node has no list name to offer, and "Add one entry to this
+  // list." under a heading reading "Add mental tab" named the same dialog two
+  // different ways.
+  const entityNoun = (node.entity ?? "item").replace(/_/g, " ");
+  const heading = node.title ? `Add to ${node.title}` : `Add ${entityNoun}`;
+  const description =
+    node.description ??
+    (node.title ? `Add one entry to ${node.title}.` : `Add one ${entityNoun}.`);
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        onOpenChange(o);
-        // Preselect manifest defaults (e.g. stance: like) so the controls show
-        // the real initial state instead of applying it invisibly.
-        setDraft(o ? { ...fieldDefaults } : {});
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {/* A container name takes "Add to" -- the list is the destination, not the
-                thing being added. An entity name is already the singular noun, so it
-                takes a bare "Add". `Add Likes & Dislikes` was the old string. */}
-            {node.title
-              ? `Add to ${node.title}`
-              : `Add ${(node.entity ?? "item").replace(/_/g, " ")}`}
-          </DialogTitle>
-          <DialogDescription>
-            {node.description ?? `Add one entry to ${node.title ?? "this list"}.`}
-          </DialogDescription>
+          <DialogTitle>{heading}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">

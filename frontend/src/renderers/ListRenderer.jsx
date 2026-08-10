@@ -132,9 +132,11 @@ export default function ListRenderer({
   // thing to act on.
   const addLabel = (node.entity ?? node.title ?? "item").replace(/_/g, " ");
   // Opens the dialog from outside Radix's trigger, for the empty-state panel
-  // below. AddEntryDialog seeds its own draft from `fieldDefaults` on open,
-  // so both entry points -- this one and the header's DialogTrigger -- seed
-  // identically by construction rather than by two call sites agreeing.
+  // below. AddEntryDialog seeds its own draft from `fieldDefaults` off the
+  // `open` prop -- deliberately, because a change made here is invisible to
+  // Radix's onOpenChange (see the comment on that effect) -- so both entry
+  // points, this one and the header's DialogTrigger, seed identically by
+  // construction rather than by two call sites agreeing.
   const openAdd = () => setAddOpen(true);
   const meta = buildFieldMeta(node, entity);
 
@@ -202,7 +204,19 @@ export default function ListRenderer({
       open={addOpen}
       onOpenChange={setAddOpen}
       trigger={
-        <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs">
+        // Visibly a bare "Add" -- beside the heading that names the list, that
+        // is all it needs to say, and a longer label would crowd the row. To a
+        // screen reader it says what it adds: a section with several list nodes
+        // renders several of these triggers, and "Add", "Add", "Add" read out
+        // of the heading's context distinguishes none of them. Same `addLabel`
+        // the empty panel's button spells out visibly, so the two never name
+        // the same action differently.
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 gap-1 px-2 text-xs"
+          aria-label={`Add ${addLabel}`}
+        >
           <Plus className="h-3.5 w-3.5" />Add
         </Button>
       }
