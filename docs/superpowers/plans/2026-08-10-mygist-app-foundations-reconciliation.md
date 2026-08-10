@@ -313,26 +313,39 @@ Expected: the four rebound tones show the new variable names with `groundOpacity
 
 - [ ] **Step 4: Sweep instance-level opacity overrides across all nine pages**
 
-Emit **nine parallel `use_figma` calls in a single message**, one per page ID (`0:1`, `1:2`, `1:3`, `1:4`, `1:5`, `1:6`, `1:7`, `1:8`, `1:9`), each with `PAGE` substituted:
+Emit **nine parallel `use_figma` calls in a single message**, one per page ID (`0:1`, `1:2`, `1:3`, `1:4`, `1:5`, `1:6`, `1:7`, `1:8`, `1:9`), each with `PAGE` substituted.
+
+**The predicate is scoped to Badge instances on purpose.** A blanket "normalise every fractional opacity" sweep would strip the deliberate 50% paint opacity off `Switch Off Disabled` and off the Button disabled variants — a regression, not a repair. Only instances of the `Badge` set `58:23` are touched, and only their ground and label paints.
 
 ```js
 const page = await figma.getNodeByIdAsync('PAGE');
 await figma.setCurrentPageAsync(page);
+
+const BADGE_SET = '58:23';
+const normalise = (node) => {
+  if (!Array.isArray(node.fills) || !node.fills.length) return false;
+  const needs = node.fills.some((p) => p.opacity !== undefined && p.opacity > 0 && p.opacity < 1);
+  if (!needs) return false;
+  const f = node.fills.map((p) => JSON.parse(JSON.stringify(p)));
+  f.forEach((p) => { if (p.opacity > 0 && p.opacity < 1) p.opacity = 1; });
+  node.fills = f;
+  return true;
+};
+
 const fixed = [];
-for (const n of page.findAll((n) => 'fills' in n)) {
-  if (!Array.isArray(n.fills)) continue;
-  const needs = n.fills.some((p) => p.opacity !== undefined && p.opacity > 0 && p.opacity < 1);
-  if (!needs) continue;
-  const f = n.fills.map((p) => JSON.parse(JSON.stringify(p)));
-  let touched = false;
-  f.forEach((p) => { if (p.opacity > 0 && p.opacity < 1 && p.boundVariables?.color) { p.opacity = 1; touched = true; } });
-  if (touched) { n.fills = f; fixed.push({ id: n.id, name: n.name, parent: n.parent?.name }); }
+for (const inst of page.findAll((n) => n.type === 'INSTANCE')) {
+  const main = await inst.getMainComponentAsync();
+  // A variant's parent is its COMPONENT_SET; that is what identifies a Badge.
+  if (!main || !main.parent || main.parent.id !== BADGE_SET) continue;
+  if (normalise(inst)) fixed.push({ id: inst.id, part: 'ground', variant: main.name });
+  const label = inst.findOne((n) => n.type === 'TEXT');
+  if (label && normalise(label)) fixed.push({ id: label.id, part: 'label', variant: main.name });
 }
 figma.currentPage.setExplicitVariableModeForCollection('VariableCollectionId:4:2', '4:0');
 return { page: page.name, fixed, count: fixed.length };
 ```
 
-**Read the returned lists before accepting them.** Disabled-state variants legitimately carry a 50% paint opacity (`Switch Off Disabled`, the Button disabled states). If any appear in `fixed`, that is a regression — restore them to `0.5` in a follow-up call and narrow the predicate to badge grounds only.
+**Then confirm the sweep did not reach beyond badges.** Run one read-only check on page `1:3` verifying that `Switch Off Disabled` and every `State=Disabled` Button variant still carry a paint opacity of `0.5`. If any reads `1`, that is collateral damage — restore it before continuing.
 
 - [ ] **Step 5: Screenshot every badge tone to confirm the pills read as pills**
 
