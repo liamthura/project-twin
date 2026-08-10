@@ -97,13 +97,22 @@ jobs:
           npm run fixtures
           git diff --exit-code src/__fixtures__/packs.json
 
-      - name: Install Playwright browser
-        working-directory: frontend
-        run: npx playwright install --with-deps chromium
-
+      # `--project unit`, not bare `npm test`. Bare also runs the `storybook`
+      # browser project, which needed an `npx playwright install --with-deps
+      # chromium` step here -- a browser download plus apt system deps, to
+      # smoke-render two stories (`Populated`, `Empty`) of SectionRenderer, a
+      # component with 180 unit tests in this same suite. Removed 2026-08-10 on
+      # the owner's ruling: nothing browser-based is enforced on a PR now, and
+      # that is the accepted trade.
+      #
+      # The storybook project is NOT deleted -- it still runs locally via bare
+      # `npm test`, and `npm run storybook` remains the component catalogue. If
+      # a browser-only behaviour ever needs enforcing (scroll-spy is the obvious
+      # candidate; jsdom cannot verify it), restore the install step above this
+      # one and drop the flag.
       - name: Test
         working-directory: frontend
-        run: npm test
+        run: npm test -- --project unit
 
       # The single-container merge makes a broken frontend build block the
       # whole image, and therefore any backend fix. This catches it here
