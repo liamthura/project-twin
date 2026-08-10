@@ -509,8 +509,8 @@ export default function ListRenderer({
                   <Button variant="ghost" size="icon"
                     className={`h-7 w-7 shrink-0 ${
                       idx === pinnedIdx
-                        ? "text-primary hover:text-primary"
-                        : "text-muted-foreground hover:text-primary"
+                        ? "text-link hover:text-link"
+                        : "text-muted-foreground hover:text-link"
                     }`}
                     aria-label={
                       idx === pinnedIdx

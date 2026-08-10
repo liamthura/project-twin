@@ -24,6 +24,10 @@ export default {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
         },
+        // Interactive text. Separate from primary because a colour used as a
+        // fill wants to be darker (so its label passes) while the same colour
+        // used as text wants to be lighter (so it passes on the page).
+        link: "hsl(var(--link))",
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
@@ -50,6 +54,18 @@ export default {
         },
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
+        // Brand layer, marketing page only. See globals.css: ground-inverse
+        // and on-inverse deliberately do not invert between modes.
+        "ground-inverse": "hsl(var(--ground-inverse))",
+        "on-inverse": "hsl(var(--on-inverse))",
+        clay: {
+          DEFAULT: "hsl(var(--clay))",
+          tint: "hsl(var(--tint-clay))",
+        },
+        verdigris: {
+          DEFAULT: "hsl(var(--verdigris))",
+          tint: "hsl(var(--tint-verdigris))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -59,6 +75,12 @@ export default {
       fontFamily: {
         sans: ["Geist", "system-ui", "sans-serif"],
         mono: ["Geist Mono", "monospace"],
+        // Display face, marketing page only, and only at 40px and above. The
+        // floor is a role boundary rather than a legibility limit: a specimen
+        // at 28px showed the notches still read perfectly well. Display and
+        // body stay visibly separate, and the face stays an event.
+        // Loaded from Google Fonts in index.html, variable 200-700.
+        display: ["Stack Sans Notch", "Geist", "system-ui", "sans-serif"],
       },
       keyframes: {
         "accordion-down": {

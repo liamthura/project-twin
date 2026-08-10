@@ -5,7 +5,7 @@ Revises: 0004_proposals
 Create Date: 2026-07-31
 
 Codes that admit someone to a closed test. Minted by hand from
-`scripts/invite.py`; the rule that decides whether one admits lives in the auth
+`scripts/access.py`; the rule that decides whether one admits lives in the auth
 service (auth/src/invite.js), and only ever reads what this creates.
 
 Alembic owns this table for the same reason it owns the better_auth schema: one

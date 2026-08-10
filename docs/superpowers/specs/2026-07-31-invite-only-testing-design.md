@@ -297,24 +297,96 @@ than through `npx shadcn add`, which would want an `init` that rewrites
 
 ## Minting
 
-`backend/scripts/invite.py`, beside `seed_better_auth.py` and run the same way —
+`backend/scripts/access.py`, beside `seed_better_auth.py` and run the same way —
 in the container, where `DATABASE_URL` already is.
 
+**This was `invite.py` until the waitlist arrived.** The waitlist had no tooling
+at all, so reading the queue meant raw SQL — and the operation that matters,
+"send this person a code", spans both halves and belonged to neither. The two
+are one script now, with `list` renamed to `codes` so the noun is never
+ambiguous.
+
 ```
-$ python scripts/invite.py mint --label "sarah (course)"
+$ python scripts/access.py mint --label "sarah (course)"
   7F2K-QX91   1 use   no expiry
 
-$ python scripts/invite.py mint --label "reddit thread" --uses 10 --expires 30d
+$ python scripts/access.py mint --label "reddit thread" --uses 10 --expires 30d
   3B8M-KP44   10 uses   expires 2026-08-30
 
-$ python scripts/invite.py list
+$ python scripts/access.py codes
   CODE       LABEL            USED   EXPIRES      STATUS
   7F2K-QX91  sarah (course)   1/1    —            spent
   3B8M-KP44  reddit thread    4/10   2026-08-30   active
 
-$ python scripts/invite.py revoke 3B8M-KP44
+$ python scripts/access.py revoke 3B8M-KP44
   3B8M-KP44 revoked. 4 accounts already created with it are unaffected.
 ```
+
+## Working the waitlist
+
+```
+$ python scripts/access.py waitlist
+  EMAIL                                  JOINED       INVITED
+  maya@example.com                       2026-08-09   —
+
+  1 waiting.
+
+$ python scripts/access.py admit maya@example.com --expires 30d
+  maya@example.com
+  QF4T-8N2K   1 use   2026-09-09
+
+  0 still waiting.
+```
+
+`admit` mints and stamps in one command, which is the whole reason the two
+halves share a script: run separately, you send a code and forget the stamp, and
+the list quietly disagrees with the codes.
+
+## Sending the invite
+
+```
+$ python scripts/access.py admit maya@example.com --send --url https://mygist.example.com
+  EMAIL             CODE       USES  EXPIRES
+  maya@example.com  QF4T-8N2K  1     2026-09-09
+
+  https://mygist.example.com/?invite=QF4T-8N2K
+```
+
+The link is `?invite=CODE`, a query parameter rather than a hash, because
+`WelcomeAuth` reads it from `window.location.search` and a hash never reaches
+the server anyway. It skips the code-entry screen entirely.
+
+The origin comes from `--url`, `PUBLIC_URL` or `BETTER_AUTH_URL`, in that order.
+`BETTER_AUTH_URL` is in the list because it already means "the public origin the
+browser uses" — if it is wrong here it is wrong everywhere. **The app container
+sets none of the three today**, so pass `--url` or add one.
+
+Mail goes through Resend on `RESEND_API_KEY` and `EMAIL_FROM`, the same two
+variables the auth service reads. **With either unset it prints the message
+rather than sending it** — the same choice `auth/src/email.js` makes, and for
+its stated reason: the flow can be walked end to end before anyone has a Resend
+account, and a silent no-op would be worse than either sending or failing,
+because you would think the mail went. Those variables are on the auth
+container, not the app one, so real sending needs them added there.
+
+Two orderings that are not arbitrary. `--send` without an origin fails **before
+minting**, because that is pure user error and failing early costs nothing —
+whereas a code minted for an email that cannot be composed is a code nobody will
+use and a row stamped for no reason. The send itself happens **last**, after the
+mint and the stamp, so a failed send leaves a real code and a stamped row that
+re-running replaces.
+
+The email carries the code as well as the link. Mail clients mangle links, and
+people read on phones.
+
+The code is minted **before** the row is stamped. If the stamp fails you have a
+spare code and a row that still says waiting, which running the command again
+fixes. The other order marks someone invited who never received anything, and
+nothing in the system would ever show it.
+
+Running `admit` twice mints a second code — the first email bounced, it happens
+— but never moves `invited_at`, because that column answers "when did we first
+tell them" and the answer does not change because you ran a command twice.
 
 Revoking closes a code to new sign-ups and does nothing to accounts already
 created with it — stated in the output, because the opposite is a reasonable

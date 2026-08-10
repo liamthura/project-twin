@@ -68,3 +68,30 @@ if (typeof document !== "undefined" && !document.elementFromPoint) {
   // the real API gives for exactly that.
   document.elementFromPoint = () => null;
 }
+
+// A third jsdom gap, from the marketing page's section entrances: Magic UI's
+// blur-fade uses motion's `useInView`, which constructs an IntersectionObserver
+// on mount. jsdom does no layout and does not implement it.
+//
+// The stub reports the element as intersecting straight away, which is the
+// state that matters for a test: content behind a scroll-triggered entrance is
+// present and assertable rather than waiting for a scroll that never happens in
+// jsdom. A stub that never fires would hide the whole page from every query.
+if (typeof globalThis.IntersectionObserver === "undefined") {
+  globalThis.IntersectionObserver = class {
+    constructor(callback) {
+      this._callback = callback;
+    }
+    observe(target) {
+      this._callback(
+        [{ isIntersecting: true, intersectionRatio: 1, target }],
+        this,
+      );
+    }
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  };
+}

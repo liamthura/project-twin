@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Stack Sans Notch, the marketing page's display face, is loaded from Google
+ * Fonts alongside Geist -- see the <link> in index.html. It is requested as
+ * `wght@200..700`, its full variable range.
+ *
+ * That range matters. A subrange such as `wght@400..700` is rejected by the
+ * css2 API with a 400, which is easy to misread as the family not existing at
+ * all. It does exist: fonts.google.com/specimen/Stack+Sans+Notch.
+ */
+
 @layer base {
   :root {
     --background: 60 9% 98%;
@@ -12,10 +21,11 @@
     --popover-foreground: 24 10% 10%;
     --primary: 228 69% 55%;
     --primary-foreground: 0 0% 100%;
+    --link: 228 69% 55%;
     --secondary: 60 5% 96%;
     --secondary-foreground: 24 10% 10%;
     --muted: 60 5% 96%;
-    --muted-foreground: 25 5% 45%;
+    --muted-foreground: 25 5% 42%;
     --accent: 223 100% 96%;
     --accent-foreground: 228 69% 55%;
     --destructive: 0 65% 48%;
@@ -26,6 +36,17 @@
     --input: 20 6% 90%;
     --ring: 228 69% 55%;
     --radius: 0.5rem;
+
+    /* Brand layer, beneath the semantic tokens above. Used by the marketing
+       page only; the app reads the semantic names. Ground-inverse and
+       On-inverse do NOT invert -- the dark break section has to stay dark in
+       both modes, or the page's tonal arc runs backwards in dark mode. */
+    --ground-inverse: 24 10% 10%;
+    --on-inverse: 60 5% 96%;
+    --clay: 18 74% 60%;
+    --verdigris: 188 38% 36%;
+    --tint-clay: 18 74% 94%;
+    --tint-verdigris: 188 26% 93%;
   }
 
   .dark {
@@ -35,8 +56,9 @@
     --card-foreground: 60 5% 96%;
     --popover: 60 2% 10%;
     --popover-foreground: 60 5% 96%;
-    --primary: 228 94% 67%;
+    --primary: 228 94% 62%;
     --primary-foreground: 0 0% 100%;
+    --link: 228 94% 68%;
     --secondary: 60 1% 14%;
     --secondary-foreground: 60 5% 96%;
     --muted: 60 1% 14%;
@@ -49,7 +71,14 @@
     --warning: 43 90% 55%;
     --border: 60 2% 16%;
     --input: 60 2% 16%;
-    --ring: 228 94% 67%;
+    --ring: 228 94% 62%;
+
+    --ground-inverse: 24 8% 14%;
+    --on-inverse: 60 5% 96%;
+    --clay: 18 66% 62%;
+    --verdigris: 188 40% 50%;
+    --tint-clay: 18 30% 18%;
+    --tint-verdigris: 188 26% 15%;
   }
 }
 

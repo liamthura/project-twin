@@ -30,11 +30,12 @@
   --color-fd-popover: hsl(0 0% 100%);
   --color-fd-popover-foreground: hsl(24 10% 10%);
   --color-fd-primary: hsl(228 69% 55%);
+  --color-fd-link: hsl(228 69% 55%);
   --color-fd-primary-foreground: hsl(0 0% 100%);
   --color-fd-secondary: hsl(60 5% 96%);
   --color-fd-secondary-foreground: hsl(24 10% 10%);
   --color-fd-muted: hsl(60 5% 96%);
-  --color-fd-muted-foreground: hsl(25 5% 45%);
+  --color-fd-muted-foreground: hsl(25 5% 42%);
   --color-fd-accent: hsl(223 100% 96%);
   --color-fd-accent-foreground: hsl(228 69% 55%);
   --color-fd-border: hsl(20 6% 90%);
@@ -64,7 +65,8 @@
   --color-fd-card-foreground: hsl(60 5% 96%);
   --color-fd-popover: hsl(60 2% 10%);
   --color-fd-popover-foreground: hsl(60 5% 96%);
-  --color-fd-primary: hsl(228 94% 67%);
+  --color-fd-primary: hsl(228 94% 62%);
+  --color-fd-link: hsl(228 94% 68%);
   --color-fd-primary-foreground: hsl(0 0% 100%);
   --color-fd-secondary: hsl(60 1% 14%);
   --color-fd-secondary-foreground: hsl(60 5% 96%);
@@ -73,7 +75,7 @@
   --color-fd-accent: hsl(227 22% 20%);
   --color-fd-accent-foreground: hsl(228 94% 67%);
   --color-fd-border: hsl(60 2% 16%);
-  --color-fd-ring: hsl(228 94% 67%);
+  --color-fd-ring: hsl(228 94% 62%);
   --color-fd-brand: hsl(228 94% 67%);
 
   --color-fd-error: hsl(0 74% 54%);
