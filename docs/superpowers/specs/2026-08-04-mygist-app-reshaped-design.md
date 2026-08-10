@@ -269,10 +269,10 @@ How you like AI to work                            caption-1, faded
 
 CODE STYLE ────────────────────────────            caption-2, mono, faded
 ┌──────────────────────────────┐  ┌──────────────────────────────┐
-│ Preferred languages   empty  │  │ Frameworks            empty  │
+│ Preferred languages   + Add  │  │ Frameworks            + Add  │
 │ Nothing here yet. Add one,   │  │ Nothing here yet. Add one,   │
 │ or let a client propose one.  │  │ or let a client propose one. │
-│ [ Add language ]             │  │ [ Add framework ]            │
+│ [ Add a language ]           │  │ [ Add a framework ]          │
 └──────────────────────────────┘  └──────────────────────────────┘
 
 COMMUNICATION ─────────────────────────
@@ -290,20 +290,25 @@ arbitrary group nesting. A third level renders as a `headline-3` label *inside*
 a card, never as a third tier, so no future manifest can invent a hierarchy the
 design cannot express.
 
-**The fill summary is new and does real work.** Every card header carries a
-right-aligned count. It makes gaps visible without collapsing anything, which
-was the one genuine advantage of the accordion approach, kept without its cost
-of hiding data behind a click.
+**The card header's right slot is decided by whether the node has a
+denominator**, so it is never a judgement call:
 
-Which form the count takes is determined by whether the node has a denominator,
-so it is never a judgement call:
-
-| Node kind | Denominator | Renders as |
+| Node kind | Denominator | Header right slot |
 |---|---|---|
-| `fields` | yes — the manifest fixes the key set | `3 of 3`, `1 of 3` |
-| `list`, `strings` | no — unbounded | `3 set`, `12 set` |
+| `fields` | yes — the manifest fixes the key set | a count: `3 of 3`, `1 of 3` |
+| `list`, `strings` | no — unbounded | a `+ Add` button |
 | `scalar` | n/a | nothing; the control shows its own state |
-| any, when zero | — | `empty` |
+| `fields`, when zero | — | `empty` |
+
+**A count is only meaningful against a denominator.** On a `fields` node the
+count does real work — `6 of 7` says one key is still blank, which makes gaps
+visible without collapsing anything (the one genuine advantage of the accordion
+approach, kept without its cost of hiding data behind a click). On a `list` or
+`strings` node there is nothing to be complete against, so `3 set` only restates
+what the rows below already show, and it occupies the one place in the card where
+the user needs an affordance. That slot now carries `+ Add` instead — revised
+2026-08-10 on the user's instruction, and consistent with the rule above rather
+than an exception to it.
 
 ### Field patterns
 
@@ -1169,3 +1174,68 @@ wrong on our end. Nothing has been lost — try again."
 Re-audited: `02 Components` still only the two `Logo Mark` strokes, `04` and `05`
 zero unbound, zero opacity drift on all three, and every off-token gap remains the
 inherited `6px` field internal.
+
+### Follow-up: `+ Add` in the card header, 2026-08-10
+
+Ruled by the user: *"for sections on the top right instead of displaying the count,
+add a + Add button for easy entry addition on the UI."* The rule is recorded above
+in the header-right-slot table rather than as an exception to it, because the split
+falls out of the spec's own denominator test — every header that read `N set` or
+`empty` became a button, and every header that read `x of y` kept its count.
+
+**25 of 28 headers now carry `+ Add`.** Ghost `Button`, `IconPlus` plus the label
+`Add`, right-aligned by the `Title` child's `FILL` sizing. Three keep their count,
+and all three are `fields` nodes: `Default Communication Style` on both desktop and
+mobile (`3 of 3`) and `Personal Information` (`6 of 7`). Nothing can be added to a
+fixed key set, so a button there would promise an action the data model does not
+have.
+
+**`Button` had a latent defect this exposed.** The set advertised an
+`Icon#139:0` `INSTANCE_SWAP` slot, but the `Icon` child was `visible: false` in all
+16 labelled variants with no boolean bound to it — so the icon could never render
+and the property was decorative. Adding `Show icon#313:0` (`BOOLEAN`, default
+`false`, bound to `Icon.visible` on those 16; the four `Loading` variants have no
+`Icon` child and are correctly unbound) makes the slot work. The default is `false`,
+so all 70 pre-existing `Button` instances across `05`, `06` and `07` were verified
+unchanged.
+
+**The icon does not inherit the label's colour.** Figma has no `currentColor`, and
+`IconPlus`'s vector is bound to `ink` while the Ghost label is bound to `indigo` —
+which rendered a black plus beside indigo text and read as a bug. Each `Add`
+instance therefore rebinds the nested vector's stroke to `indigo` (`4:9`)
+explicitly. **Anyone using `Button`'s icon slot must set the icon colour to match
+the variant's label**; it will not happen on its own.
+
+**One pattern, not two.** The two pre-existing add affordances — the end-of-list
+`Add row` on `Desktop — List expanded` and the confirm button on the
+`Desktop — Chip input` input row — had a typed `+` character in the label rather
+than an icon. Both were normalised to the same icon-plus-`Add` treatment, so the
+file now has one add button, used in three positions.
+
+**Headers grew 22 → 36** to fit a 36px button, which is the component's height and
+was not overridden. Consequence: the three scrolling frames were refitted —
+`Desktop — Preferences` 1774 → **1834**, `Desktop — Profile` 1305 → **1337**,
+`Mobile — Preferences` 2291 → **2403**. The four 1024-tall frames were left alone;
+their content tops out at 611–755, so nothing overflowed.
+
+**Deliberate gaps:**
+
+- **The three empty-state cards now show two add affordances** — `+ Add` in the
+  header and the empty state's own `Add a language` CTA. Kept on purpose: the
+  header button is the standing affordance the user asked for on every section, and
+  the empty-state CTA is required by the six-point checklist above. Collapsible to
+  one if that redundancy grates.
+- **`Desktop — List expanded` likewise has two** — the header button and the
+  end-of-list `Add row`. Both are now visually identical, so it reads as one
+  pattern used twice rather than two competing ones.
+- **The remaining three `FillSummary` counts are still Geist Mono.** Now that they
+  are the only counts left, the mono treatment stands out more, and it is the exact
+  thing the onboarding round called "debug output". Left as-is because the plan's
+  Task 11R brief says not to modify the `FillSummary` component; worth revisiting.
+- **The button is 36px tall, under the 44px mobile touch-target guidance**, same
+  caveat already recorded for `Link`.
+
+Audited after the round: `04` zero unbound paints, zero opacity drift, 27 `Add`
+buttons all labelled `Add`, three `FillSummary` left, all 17 off-token gaps still
+the inherited `6px` field internals. `02 Components` still only the two deliberate
+`Logo Mark` strokes. All pages Light `4:0`.
