@@ -34,11 +34,8 @@ export function Faq() {
                 {group.label}
               </h3>
               <div className="min-w-0 flex-1 divide-y divide-border border-t border-border">
-                {group.items.map((item, index) => (
-                  // The first question in each group ships open, so three
-                  // answers are readable without a click and the disclosure
-                  // pattern is still obvious.
-                  <FaqItem key={item.q} item={item} defaultOpen={index === 0} />
+                {group.items.map((item) => (
+                  <FaqItem key={item.q} item={item} />
                 ))}
               </div>
             </div>
@@ -51,8 +48,22 @@ export function Faq() {
   );
 }
 
-function FaqItem({ item, defaultOpen }) {
-  const [open, setOpen] = useState(defaultOpen);
+/**
+ * One question.
+ *
+ * Every item ships **closed**. An earlier build opened the first of each group
+ * so three answers were readable without a click; the owner asked for all of
+ * them closed, which also makes the three groups scannable as a list of nine
+ * questions rather than as three answers with six headings between them.
+ *
+ * The open/close is a **grid-rows transition**, not `hidden`. `height: auto`
+ * cannot be transitioned, and a fixed max-height has to be guessed -- guess low
+ * and long answers are clipped, guess high and short ones lag behind a
+ * transition timed for a paragraph that is not there. `grid-template-rows`
+ * going 0fr -> 1fr animates to the content's own height with no number in it.
+ */
+function FaqItem({ item }) {
+  const [open, setOpen] = useState(false);
   const id = useId();
 
   return (
@@ -69,17 +80,36 @@ function FaqItem({ item, defaultOpen }) {
           <ChevronDown
             aria-hidden="true"
             className={cn(
-              "mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
+              "mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 motion-reduce:transition-none",
               open && "rotate-180",
             )}
           />
         </button>
       </h4>
-      <div id={id} hidden={!open}>
-        {/* Measure capped so a long answer does not run the full column width. */}
-        <p className="max-w-[680px] pb-6 text-[15px] leading-relaxed text-muted-foreground">
-          {item.a}
-        </p>
+      <div
+        id={id}
+        className={cn(
+          "grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none",
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        {/* The row has to be able to shrink to nothing, hence min-h-0, and the
+            overflow has to be hidden or the answer shows through at 0fr. */}
+        <div className="overflow-hidden">
+          {/* Measure capped so a long answer does not run the full column. */}
+          <p
+            className={cn(
+              "max-w-[680px] pb-6 text-[15px] leading-relaxed text-muted-foreground transition-opacity duration-300 motion-reduce:transition-none",
+              open ? "opacity-100" : "opacity-0",
+            )}
+            // Kept out of the accessibility tree and out of tab order while
+            // collapsed. grid-rows-[0fr] hides it visually, but without this a
+            // screen reader still reads all nine answers straight through.
+            aria-hidden={!open}
+          >
+            {item.a}
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -91,15 +121,20 @@ function FaqItem({ item, defaultOpen }) {
  */
 function ContactCard() {
   return (
-    <div className="mt-14 rounded-xl border border-border bg-card p-8">
-      <h3 className="text-xl font-semibold text-foreground">{FAQ.contact.title}</h3>
-      <p className="mt-1 text-muted-foreground">{FAQ.contact.sub}</p>
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+    // One row, as the prototype draws it: the ask on the left, both ways out on
+    // the right. Stacks only when there is genuinely no room for the row.
+    <div className="mt-14 flex flex-col gap-6 rounded-xl border border-border bg-card px-8 py-6 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h3 className="text-lg font-semibold text-foreground">{FAQ.contact.title}</h3>
+        <p className="mt-0.5 text-sm text-muted-foreground">{FAQ.contact.sub}</p>
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row">
         {FAQ.contact.options.map((option) => (
           <Button
             key={option.label}
             asChild
             variant={option.primary ? "default" : "outline"}
+            className="rounded-full px-5"
           >
             <a href={option.href}>{option.label}</a>
           </Button>

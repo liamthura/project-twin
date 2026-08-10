@@ -13,14 +13,14 @@ import { WaitlistForm } from "./WaitlistForm";
 export function Closing() {
   return (
     <section className="relative overflow-hidden bg-ground-inverse py-24 md:py-32">
-      {/* The indigo gradient sits ON the ink rather than being the ground.
-          Cutting the old "Your data" section removed the page's only dark
-          break; moving the CTA to ink restored it, and this keeps the colour
-          without giving type a gradient to sit on -- it is masked to the
-          bottom, well clear of the headline. */}
+      {/* The indigo gradient sits ON the ink rather than being the ground, and
+          covers the whole section as the prototype draws it -- deep blue at the
+          left falling away to warm dark at the right. Cutting the old "Your
+          data" section removed the page's only dark break; moving the CTA to
+          ink restored it, and this keeps the colour. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-[url('/landing/hero-field-dark.webp')] bg-cover bg-center opacity-50"
+        className="pointer-events-none absolute inset-0 bg-[url('/landing/hero-field-dark.webp')] bg-cover bg-center"
       />
       <Column className="relative">
         <div className="mx-auto flex max-w-[720px] flex-col items-center text-center">

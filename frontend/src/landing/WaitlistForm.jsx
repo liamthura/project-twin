@@ -92,7 +92,18 @@ export function WaitlistForm({ label, tone = "default", align = "start", onSubmi
       className={cn("w-full max-w-md", align === "center" && "mx-auto", className)}
       noValidate
     >
-      <div className="flex flex-col gap-3 sm:flex-row">
+      {/* One pill, not two controls with a gap. The aesthetic direction calls
+          for pill controls on the marketing surface, and the prototype draws
+          the field and its button as a single rounded unit. */}
+      <div
+        className={cn(
+          "flex items-center rounded-full border p-1 shadow-sm transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+          inverse
+            ? "border-on-inverse/15 bg-on-inverse/10 focus-within:ring-offset-ground-inverse"
+            : "border-border bg-card focus-within:ring-offset-background",
+          failed && "border-destructive",
+        )}
+      >
         <label htmlFor={id} className="sr-only">
           Email address
         </label>
@@ -113,12 +124,17 @@ export function WaitlistForm({ label, tone = "default", align = "start", onSubmi
           aria-invalid={failed || undefined}
           aria-describedby={message ? `${id}-message` : undefined}
           className={cn(
-            "h-11 flex-1",
-            inverse &&
-              "border-on-inverse/20 bg-on-inverse/5 text-on-inverse placeholder:text-on-inverse/40",
+            // The pill owns the border and the focus ring, so the input inside
+            // it has neither -- two rings on one control reads as a mistake.
+            "h-10 flex-1 border-0 bg-transparent px-4 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+            inverse && "text-on-inverse placeholder:text-on-inverse/40",
           )}
         />
-        <Button type="submit" size="lg" disabled={state === "submitting"}>
+        <Button
+          type="submit"
+          disabled={state === "submitting"}
+          className="h-10 shrink-0 rounded-full px-5"
+        >
           {state === "submitting" ? "Joining…" : label}
         </Button>
       </div>

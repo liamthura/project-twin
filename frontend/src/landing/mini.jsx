@@ -18,6 +18,7 @@
  * never the owner's own account.
  */
 import { cn } from "@/lib/utils";
+import { Mark } from "./Brand";
 
 /** The panel a mini-UI sits on. Oversized on purpose: it bleeds out of the
  *  tile and gets clipped, which is what the diagonal fade is for. */
@@ -25,7 +26,7 @@ function Surface({ className, children }) {
   return (
     <div
       className={cn(
-        "w-[520px] overflow-hidden rounded-lg border border-border bg-card",
+        "w-[520px] min-h-[280px] overflow-hidden rounded-lg border border-border bg-card",
         className,
       )}
     >
@@ -55,7 +56,7 @@ function Row({ title, sub, right }) {
  */
 export function ScopePayload() {
   return (
-    <div className="w-[520px]">
+    <div className="w-[520px] min-h-[280px]">
       <p className="mb-3 font-mono text-[12px] text-foreground">
         SCOPE: professional
       </p>
@@ -87,7 +88,7 @@ export function SearchResults() {
   ];
 
   return (
-    <div className="w-[520px]">
+    <div className="w-[520px] min-h-[280px]">
       <p className="mb-3 font-mono text-[12px] text-link">
         search_context("how does Maya like replies written")
       </p>
@@ -122,7 +123,7 @@ const SECTIONS = [
 
 export function SectionChips() {
   return (
-    <div className="w-[520px]">
+    <div className="w-[520px] min-h-[280px]">
       <div className="flex flex-wrap gap-2">
         {SECTIONS.map((name) => (
           <span
@@ -258,7 +259,7 @@ const SKILLS = [
 
 export function SkillsList() {
   return (
-    <div className="w-[520px]">
+    <div className="w-[520px] min-h-[280px]">
       <p className="mb-3 font-mono text-[12px] text-muted-foreground">
         skills/
       </p>
@@ -283,7 +284,7 @@ export function SkillsList() {
  */
 export function Terminal() {
   return (
-    <div className="w-[520px] overflow-hidden rounded-lg border border-white/10 bg-[#1C1917]">
+    <div className="w-[520px] min-h-[280px] overflow-hidden rounded-lg border border-white/10 bg-[#1C1917]">
       <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-2.5">
         <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
         <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
@@ -299,70 +300,124 @@ export function Terminal() {
 }
 
 /**
- * The hero mockup: the editor, with Maya's Preferences open.
+ * The hero mockup: the editor, with Maya's **Profile** open.
  *
- * Source: the app itself -- the section rail is the pack list in `position`
- * order (backend/section_packs/*//*manifest.json) and the open section's fields
- * are the four keys in the preferences pack's `defaults`.
+ * Source: the app itself. The rail is the tab strip -- the enabled packs in
+ * `position` order, then Review and Sections, which are tabs rather than packs.
+ * The open section's fields are the profile pack's `defaults` keys, in order:
+ * name, preferred_name, current_role, organisation, location, nationality, bio.
+ * Its subtitle is that manifest's `description`, verbatim.
+ *
+ * Profile rather than Preferences because Profile is the section that explains
+ * what a persona *is* to someone who has never seen one -- a name, a role, a
+ * bio. Preferences shows the same UI saying much less.
  *
  * Unlike the tile visuals this fills its container rather than bleeding, since
- * it sits inside browser chrome in the hero.
+ * it sits inside browser chrome.
  */
+const RAIL = [
+  "Profile", "Goals", "Knowledge", "Preferences", "Projects",
+  "Lifestyle", "Circle", "Learning Log",
+];
+
 export function EditorMock() {
   const fields = [
-    { label: "Tone", value: "Direct. Say the thing, then the reason." },
-    { label: "Detail level", value: "Short paragraphs, no bullet lists unless asked" },
-    { label: "Locale", value: "British English" },
+    ["Name", "Maya Ellis"],
+    ["Preferred name", "Maya"],
+    ["Current role", "Marketing Assistant"],
+    ["Organisation", "Northgate Studio"],
+    ["Location", "Manchester, UK"],
+    ["Nationality", "British"],
   ];
 
   return (
-    <div className="flex min-h-[320px] text-left">
-      <nav className="hidden w-[190px] shrink-0 border-r border-border p-3 sm:block">
-        <ul className="space-y-0.5">
-          {SECTIONS.map((name) => (
-            <li key={name}>
-              <span
-                className={cn(
-                  "block rounded-md px-3 py-1.5 text-[13px]",
-                  name === "Preferences"
-                    ? "bg-accent font-medium text-accent-foreground"
-                    : "text-muted-foreground",
-                )}
-              >
-                {name}
+    <div className="flex h-full flex-col bg-background text-left">
+      {/* App header: the wordmark, then the save state and the account. */}
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <span className="flex items-center gap-2">
+          <Mark className="h-4 w-4 text-primary" />
+          <span className="font-display text-[15px] font-semibold tracking-tight">
+            MyGist
+          </span>
+        </span>
+        <span className="flex items-center gap-3 text-[12px] text-muted-foreground">
+          <span className="hidden items-center gap-2 sm:flex">
+            Auto-save
+            <span className="flex h-4 w-7 items-center rounded-full bg-primary p-0.5">
+              <span className="ml-auto h-3 w-3 rounded-full bg-white" />
+            </span>
+            Saved
+          </span>
+          <span className="rounded-md border border-border px-2 py-1 text-foreground">
+            Maya
+          </span>
+        </span>
+      </div>
+
+      <div className="flex min-h-0 flex-1">
+        <nav className="hidden w-[170px] shrink-0 flex-col border-r border-border p-3 sm:flex">
+          <ul className="space-y-0.5">
+            {RAIL.map((name) => (
+              <li key={name}>
+                <span
+                  className={cn(
+                    "block rounded-md px-3 py-1.5 text-[13px]",
+                    name === "Profile"
+                      ? "bg-accent font-medium text-accent-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {name}
+                </span>
+              </li>
+            ))}
+            <li>
+              <span className="flex items-center justify-between rounded-md px-3 py-1.5 text-[13px] text-muted-foreground">
+                Review
+                {/* The dot the real tab carries when proposals are pending. */}
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
               </span>
             </li>
-          ))}
-        </ul>
-      </nav>
+            <li>
+              <span className="block rounded-md px-3 py-1.5 text-[13px] text-muted-foreground">
+                Sections
+              </span>
+            </li>
+          </ul>
+        </nav>
 
-      <div className="min-w-0 flex-1 p-5 sm:p-6">
-        <p className="text-[13px] text-muted-foreground">Maya Ellis</p>
-        <h3 className="mt-0.5 text-lg font-semibold text-foreground">Preferences</h3>
-        <p className="mt-1 text-[13px] text-muted-foreground">
-          Communication style, code style, likes and dislikes
-        </p>
+        <div className="min-w-0 flex-1 p-5">
+          <div className="rounded-lg border border-border p-5">
+            <h3 className="text-base font-semibold text-foreground">Profile</h3>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              Identity, work, education, contact
+            </p>
 
-        <div className="mt-5 space-y-3">
-          {fields.map((field) => (
-            <div key={field.label}>
-              <p className="text-[12px] text-muted-foreground">{field.label}</p>
-              <div className="mt-1 rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground">
-                {field.value}
+            <p className="mt-4 text-[13px] font-semibold text-foreground">
+              Personal Information
+            </p>
+
+            <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+              {fields.map(([label, value]) => (
+                <div key={label}>
+                  <p className="text-[11px] text-muted-foreground">{label}</p>
+                  <div className="mt-1 rounded-md border border-border px-3 py-1.5 text-[13px] text-foreground">
+                    {value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3">
+              <p className="text-[11px] text-muted-foreground">Bio</p>
+              <div className="mt-1 rounded-md border border-border px-3 py-2 text-[12px] leading-relaxed text-foreground">
+                Marketing assistant, six months out of an English and Media degree. I
+                write most of the words that go out: newsletter, socials, the odd case
+                study. I run three assistants a day and got tired of explaining my tone
+                rules to each one.
               </div>
             </div>
-          ))}
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-2">
-          {["Python", "TypeScript", "SQL"].map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full border border-border px-3 py-1 text-[12px] text-muted-foreground"
-            >
-              {tag}
-            </span>
-          ))}
+          </div>
         </div>
       </div>
     </div>

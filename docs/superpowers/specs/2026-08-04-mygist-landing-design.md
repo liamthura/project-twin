@@ -484,9 +484,15 @@ Nine questions, three topic groups, built against the
 
 Two-column at 1440: the topic label sits in a 280px left column, questions fill
 the 864px right. At 390 the label stacks above its questions. Each question is a
-`FAQ item` instance with `state=collapsed | expanded`; the **first question in
-each group ships expanded**, so three answers are readable without a click and
-the disclosure pattern is still obvious. Answer measure is capped at 680px.
+`FAQ item` instance with `state=collapsed | expanded`. Answer measure is capped
+at 680px.
+
+**Every question ships closed.** The Figma build opens the first of each group,
+on the reasoning that three readable answers prove the disclosure works. The
+owner asked for all nine closed, and it is the better call: closed, the section
+reads as a scannable list of nine questions; half-open, it reads as three
+answers with six headings scattered between them. The prototype is now the thing
+that is out of step here, not the code.
 
 **Every answer is lifted from the repository, not written fresh.** Seven come
 from `docs-site/content/docs/use/faq.mdx`, which is the canonical FAQ and was

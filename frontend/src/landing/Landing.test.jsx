@@ -30,38 +30,53 @@ beforeAll(() => {
 });
 
 describe("Landing: the FAQ disclosure", () => {
-  it("opens the first question in each group and leaves the rest closed", () => {
+  it("ships every question closed", () => {
     render(<Landing />);
 
     for (const group of FAQ.groups) {
-      group.items.forEach((item, index) => {
-        const toggle = screen.getByRole("button", { name: item.q });
-        expect(toggle).toHaveAttribute("aria-expanded", index === 0 ? "true" : "false");
-      });
+      for (const item of group.items) {
+        expect(screen.getByRole("button", { name: item.q })).toHaveAttribute(
+          "aria-expanded",
+          "false",
+        );
+      }
     }
   });
 
-  it("shows three answers on arrival, so the section is useful without a click", () => {
+  it("keeps collapsed answers out of the accessibility tree", () => {
+    // grid-rows-[0fr] hides an answer visually. Without aria-hidden a screen
+    // reader still reads all nine straight through, which is the opposite of
+    // what a disclosure is for.
     render(<Landing />);
-    for (const group of FAQ.groups) {
-      expect(screen.getByText(group.items[0].a)).toBeVisible();
-    }
+    const answer = screen.getByText(FAQ.groups[0].items[0].a);
+    expect(answer).toHaveAttribute("aria-hidden", "true");
   });
 
   it("reveals an answer when its question is activated", async () => {
     const user = userEvent.setup();
     render(<Landing />);
 
-    const closed = FAQ.groups[0].items[1];
-    expect(screen.getByText(closed.a)).not.toBeVisible();
+    const item = FAQ.groups[0].items[0];
+    await user.click(screen.getByRole("button", { name: item.q }));
 
-    await user.click(screen.getByRole("button", { name: closed.q }));
-
-    expect(screen.getByText(closed.a)).toBeVisible();
-    expect(screen.getByRole("button", { name: closed.q })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: item.q })).toHaveAttribute(
       "aria-expanded",
       "true",
     );
+    expect(screen.getByText(item.a)).not.toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("closes again on a second activation", async () => {
+    const user = userEvent.setup();
+    render(<Landing />);
+
+    const item = FAQ.groups[1].items[0];
+    const toggle = screen.getByRole("button", { name: item.q });
+    await user.click(toggle);
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText(item.a)).toHaveAttribute("aria-hidden", "true");
   });
 });
 
