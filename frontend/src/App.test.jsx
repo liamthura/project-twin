@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import packsFixture from "@/__fixtures__/packs.json";
 import circleData from "@/__fixtures__/data/circle.json";
@@ -180,6 +180,10 @@ describe("App: circle and learning_log render through the renderer kit", () => {
   });
 
   it("saveAll flows circle and learning_log through ...packData now that neither is a bespoke editor", async () => {
+    // The test above leaves the hash on #/learning_log, and this one edits a
+    // profile field to have something to save -- so it has to say which section
+    // it starts in rather than inheriting one.
+    window.location.hash = "#/profile";
     mockApi({ packs: packsFixture });
     const user = userEvent.setup();
     render(<App />);
@@ -189,14 +193,18 @@ describe("App: circle and learning_log render through the renderer kit", () => {
     // Auto-save is on by default, which leaves the header chip reading "Saved"
     // with no action. The preference moved out of the header in slice 1, so
     // reaching it means opening Connection Settings -- and turning it off does
-    // NOT itself save (only the ON transition flushes), so this reveals the
-    // header's Save now without saveAll having fired yet.
+    // NOT itself save (only the ON transition flushes).
     await user.click(screen.getByRole("button", { name: "Account" }));
     await user.click(screen.getByRole("switch", { name: "Auto-save" }));
     // Radix marks the rest of the page aria-hidden while a dialog is open, so
     // the header is genuinely unreachable until this closes -- which is correct
     // behaviour, and means the test has to close it like a user would.
     await user.keyboard("{Escape}");
+    // Then change something. Save now appears in the "unsaved" state only, and
+    // as of slice 2 that state means changes are genuinely pending rather than
+    // just "autosave is off" -- so with nothing edited there is nothing to save
+    // and no button to press.
+    await user.type(screen.getByLabelText("Name"), "Maya");
     await user.click(await screen.findByRole("button", { name: /save now/i }));
 
     await waitFor(() => {
@@ -287,5 +295,124 @@ describe("App: clicking a sub-item goes there", () => {
     await waitFor(() => expect(window.location.hash).toBe("#/learning_log"));
     expect(scrollIntoView).not.toHaveBeenCalled();
     scrollIntoView.mockRestore();
+  });
+});
+
+// Save feedback, slice 2. The per-flush "Saved" toast is gone: it fired on every
+// debounced write, so editing three fields in a row stacked three toasts for
+// something the reader never doubted. What replaced it is a tick on the card
+// that changed (SectionRenderer's own tests cover that) and a header chip that
+// reports what is actually unsaved rather than which preference is set.
+describe("App: save feedback", () => {
+  beforeEach(() => {
+    window.location.hash = "";
+  });
+
+  const chip = () => document.querySelector("[data-save-state]");
+
+  it("says nothing when an autosave flush succeeds", async () => {
+    // Real timers, and a wait long enough to clear the 1500ms autosave debounce.
+    // Fake timers would be tidier but userEvent awaits promises the fake clock
+    // also owns, and a test that hangs under a faked clock leaves it faked for
+    // every test after it.
+    mockApi({ packs: packsFixture });
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
+
+    await user.type(screen.getByLabelText("Name"), "M");
+    await waitFor(
+      () =>
+        expect(
+          api.mock.calls.some(([e, o]) => e === "/files/profile" && o?.method === "PUT")
+        ).toBe(true),
+      { timeout: 3000 }
+    );
+
+    // The write went out and no toast was raised about it.
+    //
+    // Two traps in one assertion. It is scoped to the toast viewport because the
+    // header chip legitimately reads "Saved", so an unscoped query finds the chip
+    // and passes either way. And it looks for that exact word rather than an
+    // empty viewport, because shadcn's use-toast keeps its state in MODULE
+    // scope: a toast raised by an earlier test in this file is still standing
+    // here ("All files saved", from the saveAll test), and RTL's cleanup cannot
+    // reach state that never belonged to a component.
+    const toasts = document.querySelector("ol");
+    expect(toasts).not.toBeNull();
+    expect(within(toasts).queryByText("Saved")).not.toBeInTheDocument();
+  });
+
+  it("still interrupts when a save fails", async () => {
+    mockApi({ packs: packsFixture });
+    api.mockImplementation((endpoint, opts) => {
+      if (endpoint === "/files/profile" && opts?.method === "PUT") {
+        return Promise.reject(new Error("disk full"));
+      }
+      if (endpoint === "/all") return Promise.resolve({ data: ALL_DATA });
+      if (endpoint === "/settings")
+        return Promise.resolve({ disabled_sections: [], packs: packsFixture });
+      if (endpoint === "/proposals/count")
+        return Promise.resolve({ entity: 0, note: 0, total: 0 });
+      return Promise.resolve({});
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
+
+    await user.type(screen.getByLabelText("Name"), "M");
+    // 3s, not findBy's default 1s: the autosave debounce is 1500ms, so a
+    // shorter wait would fail before the request had even been made.
+    expect(await screen.findByText("Failed to save", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByText("disk full")).toBeInTheDocument();
+  });
+
+  it("reads Saved with autosave off until something is actually changed", async () => {
+    // It used to read "Unsaved" the moment the preference went off, before the
+    // reader had touched anything, and to keep reading it after a successful
+    // Save now. The chip reports a fact now, not a preference.
+    mockApi({ packs: packsFixture });
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
+
+    await user.click(screen.getByRole("button", { name: "Account" }));
+    await user.click(screen.getByRole("switch", { name: "Auto-save" }));
+    await user.keyboard("{Escape}");
+
+    expect(chip()).toHaveAttribute("data-save-state", "saved");
+    expect(screen.queryByRole("button", { name: /save now/i })).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Name"), "M");
+    expect(chip()).toHaveAttribute("data-save-state", "unsaved");
+
+    await user.click(screen.getByRole("button", { name: /save now/i }));
+    await waitFor(() => expect(chip()).toHaveAttribute("data-save-state", "saved"));
+  });
+
+  it("keeps the chip honest when the save it offered fails", async () => {
+    // Clearing the flag on the attempt rather than on success would leave the
+    // page reading "Saved" over changes that never reached the server.
+    mockApi({ packs: packsFixture });
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
+
+    await user.click(screen.getByRole("button", { name: "Account" }));
+    await user.click(screen.getByRole("switch", { name: "Auto-save" }));
+    await user.keyboard("{Escape}");
+    await user.type(screen.getByLabelText("Name"), "M");
+
+    api.mockImplementation((endpoint, opts) => {
+      if (endpoint === "/all" && opts?.method === "PUT") return Promise.reject(new Error("nope"));
+      if (endpoint === "/all") return Promise.resolve({ data: ALL_DATA });
+      if (endpoint === "/settings")
+        return Promise.resolve({ disabled_sections: [], packs: packsFixture });
+      return Promise.resolve({});
+    });
+    await user.click(screen.getByRole("button", { name: /save now/i }));
+
+    expect(await screen.findByText("Failed to save")).toBeInTheDocument();
+    expect(chip()).toHaveAttribute("data-save-state", "unsaved");
   });
 });

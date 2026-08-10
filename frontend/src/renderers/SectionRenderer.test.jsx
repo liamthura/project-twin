@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { act, render, screen, fireEvent, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import SectionRenderer from "@/renderers/SectionRenderer";
 import packs from "@/__fixtures__/packs.json";
 import goalsData from "@/__fixtures__/data/goals.json";
@@ -2758,5 +2760,100 @@ describe("the fields count in a card header", () => {
     render(<SectionRenderer pack={empty} data={{}} onChange={vi.fn()} />);
     // Not "0 of 0", and not "Nothing yet" either: there is nothing to fill.
     expect(summaryOf("Default style")).toBeNull();
+  });
+});
+
+// The per-card save tick, which replaced a "Saved" toast per autosave flush.
+// Editing three fields in a row used to stack three toasts for something the
+// reader never doubted; toasts are for things that happened away from their
+// attention. A failure still interrupts.
+describe("the save tick", () => {
+  const tick = () => document.querySelector("[data-save-tick]");
+  const cardOf = (title) => document.querySelector(`[data-ui-node="${title}"]`);
+
+  const pack = {
+    key: "ticked",
+    title: "Ticked",
+    description: "",
+    entities: {},
+    ui: {
+      sections: [
+        { kind: "strings", path: ["a"], title: "First" },
+        { kind: "strings", path: ["b"], title: "Second" },
+      ],
+    },
+  };
+
+  function TickHarness({ pack: p = pack, initial = { a: [], b: [] } }) {
+    const [data, setData] = useState(initial);
+    const [savedAt, setSavedAt] = useState(null);
+    return (
+      <>
+        <button onClick={() => setSavedAt(new Date())}>flush</button>
+        <SectionRenderer pack={p} data={data} onChange={setData} savedAt={savedAt} />
+      </>
+    );
+  }
+
+  it("lands on the card whose node was edited, and on no other", async () => {
+    const user = userEvent.setup();
+    render(<TickHarness />);
+
+    await user.type(within(cardOf("Second")).getByRole("textbox"), "x{Enter}");
+    await user.click(screen.getByText("flush"));
+
+    expect(cardOf("Second").querySelector("[data-save-tick]")).not.toBeNull();
+    expect(cardOf("First").querySelector("[data-save-tick]")).toBeNull();
+  });
+
+  it("moves rather than multiplying when the next edit is elsewhere", async () => {
+    const user = userEvent.setup();
+    render(<TickHarness />);
+
+    await user.type(within(cardOf("Second")).getByRole("textbox"), "x{Enter}");
+    await user.click(screen.getByText("flush"));
+    await user.type(within(cardOf("First")).getByRole("textbox"), "y{Enter}");
+    await user.click(screen.getByText("flush"));
+
+    expect(document.querySelectorAll("[data-save-tick]")).toHaveLength(1);
+    expect(cardOf("First").querySelector("[data-save-tick]")).not.toBeNull();
+  });
+
+  it("shows nothing when a save lands with no edit behind it", () => {
+    // Switching section remounts this component with App's existing lastSaved
+    // already set. A tick then would claim a save the reader did not cause.
+    render(<SectionRenderer pack={pack} data={{ a: [], b: [] }} onChange={vi.fn()} savedAt={new Date()} />);
+    expect(tick()).toBeNull();
+  });
+
+  it("holds, then fades, then goes", async () => {
+    // 200ms in, 1.2s hold, 200ms out. The hold is a JS timer because the
+    // reduced-motion block forces animation-duration to 1ms on everything -- a
+    // keyframed hold would be erased for exactly the users least able to catch
+    // a flash.
+    vi.useFakeTimers();
+    try {
+      // fireEvent, not userEvent: userEvent awaits promises that vitest's fake
+      // clock also owns, so `type` never settles here and the test times out
+      // before reaching an assertion. The edit is one keystroke and a commit,
+      // which fireEvent expresses exactly.
+      render(<TickHarness />);
+      const input = within(cardOf("First")).getByRole("textbox");
+      fireEvent.change(input, { target: { value: "x" } });
+      // The chip input commits on ArrayInput's own add button. Not Enter: that
+      // handler is bound to onKeyPress, which fireEvent.keyDown does not reach.
+      fireEvent.click(within(cardOf("First")).getByRole("button"));
+      fireEvent.click(screen.getByText("flush"));
+
+      expect(tick().className).toContain("animate-save-tick-in");
+      act(() => vi.advanceTimersByTime(1399));
+      expect(tick().className).not.toContain("opacity-0");
+      act(() => vi.advanceTimersByTime(2));
+      expect(tick().className).toContain("opacity-0");
+      act(() => vi.advanceTimersByTime(200));
+      expect(tick()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

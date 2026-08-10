@@ -119,6 +119,11 @@ export default function App() {
   const [error, setError] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
   const [isAutosaveEnabled, setIsAutosaveEnabled] = useState(true);
+  // Only meaningful with autosave OFF, which is the one state where a change
+  // sits in the page with nothing coming to collect it. It is what the header
+  // chip reads, and it is cleared only by a save that actually succeeded -- so a
+  // failed write leaves the chip honest and Save now still on offer.
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showConnectionSettings, setShowConnectionSettings] = useState(false);
 
   // Theme: "light" | "dark" | "system" (system follows the OS live)
@@ -443,7 +448,13 @@ export default function App() {
         body: JSON.stringify({ data }),
       });
       setLastSaved(new Date());
-      toast({ title: "Saved", variant: "success" });
+      setHasUnsavedChanges(false);
+      // No success toast. This fires on every debounced flush, so editing three
+      // fields in a row stacked three toasts for something the reader never
+      // doubted -- and toasts are for things that happened away from their
+      // attention. The card that changed shows a tick instead (`savedAt` below),
+      // and the header chip carries the state for the whole page. A FAILURE
+      // still toasts: that genuinely needs interrupting.
     } catch (err) {
       toast({
         title: "Failed to save",
@@ -460,6 +471,10 @@ export default function App() {
   const handlePackChange = (key) => (newData) => {
     setPackData((prev) => ({ ...prev, [key]: newData }));
     if (isAutosaveEnabled) debouncedSave(key, newData);
+    // With autosave on, the flush is already on its way and the chip would
+    // flicker "Unsaved" for 1.5s per keystroke with a Save now button coming and
+    // going inside it.
+    else setHasUnsavedChanges(true);
   };
 
   const saveAll = async () => {
@@ -470,6 +485,9 @@ export default function App() {
         body: JSON.stringify(packData),
       });
       setLastSaved(new Date());
+      setHasUnsavedChanges(false);
+      // This one keeps its toast: it answers a button the user just pressed,
+      // which is the opposite case from a background flush.
       toast({ title: "All files saved", variant: "success" });
     } catch (err) {
       toast({
@@ -652,9 +670,14 @@ export default function App() {
   const sectionTitles = Object.fromEntries(packs.map((p) => [p.key, p.title]));
 
   // The header's one chip, from the two booleans that used to feed three prose
-  // states plus a separate button. Autosave off means changes are genuinely
-  // pending; with it on there is nothing for the user to do either way.
-  const saveState = isSaving ? "saving" : isAutosaveEnabled ? "saved" : "unsaved";
+  // states plus a separate button.
+  //
+  // It used to read `isAutosaveEnabled ? "saved" : "unsaved"`, which meant that
+  // with autosave off the chip said "Unsaved" forever -- including immediately
+  // after a successful Save now, and before the reader had changed anything at
+  // all. What is actually unsaved is tracked instead, so the chip reports a fact
+  // rather than a preference.
+  const saveState = isSaving ? "saving" : hasUnsavedChanges ? "unsaved" : "saved";
 
   const shellProps = {
     packs: dynamicPacks,
@@ -700,6 +723,9 @@ export default function App() {
                 data={packData[activePack.key]}
                 onChange={handlePackChange(activePack.key)}
                 onShowConfirmation={showConfirmation}
+                // Every successful write moves this, so the card the reader was
+                // editing ticks once -- autosave flush or an explicit Save now.
+                savedAt={lastSaved}
               />
             )}
 
