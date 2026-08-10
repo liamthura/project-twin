@@ -38,7 +38,7 @@ a library's default.
 
 | Question | Decision |
 |---|---|
-| Theme | MyGist tokens fed into Reshaped's `ThemeDefinition`, not Reshaped's `slate` |
+| Theme | MyGist tokens fed into Reshaped's `ThemeDefinition`, not Reshaped's `slate`. **Superseded 2026-08-10:** Reshaped is not adopted, so there is no `ThemeDefinition`; the token layer in `frontend/src/globals.css` is the theme. No code consequence — the tokens are the same either way |
 | Deliverable | Spec plus Figma prototype; code migration planned separately |
 | Section navigation | Two-level rail with live scroll-spy, one card per subsection |
 | Review | Weighted by effort — dense rows for Inbox, full cards for Observations |
@@ -387,8 +387,10 @@ a destructive toast, because a failure genuinely needs interrupting.
 
 ### Structure
 
-The two plain `Button`s become **Reshaped `Tabs` carrying counts** —
-`Inbox 3` · `Observations 2`.
+The two plain `Button`s become **`Tabs` carrying counts** —
+`Inbox 3` · `Observations 2`. (Corrected 2026-08-10: shadcn `Tabs`, the
+component the app already has at `frontend/src/components/ui/tabs.jsx`.
+Reshaped is not adopted.)
 
 **Inbox rows are one line.** Verb, entity, primary value, approve, reject,
 expand.
@@ -576,7 +578,11 @@ itself is never deleted — it is a view over fields that already exist, so
 - **AuthShell** stays a centred 400px card on `backgroundPage`. Sign in, sign up
   and forgot become three states of one card with inline validation on blur
   through `FormControl`'s error slot.
-- **OTP moves to Reshaped `PinField`**, removing the `input-otp` dependency.
+- ~~**OTP moves to Reshaped `PinField`**, removing the `input-otp` dependency.~~
+  **Cancelled 2026-08-10.** Reshaped is not adopted, so there is no `PinField`
+  and **`input-otp` stays.** Note that `frontend/src/test/setup.js` carries three
+  jsdom workarounds specifically for it (`ResizeObserver`, `elementFromPoint`,
+  and a caret-timer drain) — those stay too.
 - **InviteGate** — one field, one explanation, no chrome. The field is a
   segmented `InviteCodeField`, not a plain text input: four cells, a
   prerendered dash, four cells. See iteration round 2 below.
@@ -1080,6 +1086,8 @@ from its own hint line).
   swapping one for the other changes position and nothing else.
 - `Show icon#294:0` (BOOLEAN, default `false`) and `Icon#294:7` (INSTANCE_SWAP),
   representing Reshaped's `icon` prop. No link in the file uses it yet.
+  (2026-08-10: a Figma-only note. Reshaped is not adopted, so the prop name is
+  historical; the properties on the Figma component are unaffected.)
 
 **Where each variant is used, and why not just underline everything.** Reshaped
 recommends `underline` "to visually differentiate it from the rest of the text" —
