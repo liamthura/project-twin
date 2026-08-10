@@ -111,6 +111,74 @@ export function removeAt(obj, path) {
  * key; if none matches and the pack has exactly one entity, fall back to
  * it; otherwise the section is skipped (no entity to bind it to).
  */
+/**
+ * A band id: URL-safe, readable, and derived only here.
+ *
+ * Apostrophes are removed rather than replaced, so "When I'm feeling" gives
+ * `when-im-feeling` and not the three-word-looking `when-i-m-feeling`.
+ * Everything else non-alphanumeric collapses to a single hyphen, which is what
+ * folds `&`, em dashes and runs of punctuation into one separator. Diacritics
+ * are stripped from their base letter rather than dropping the letter itself.
+ *
+ * `index` is only the fallback for a title that slugifies to nothing -- a
+ * heading of pure punctuation. It is never the identity: a sibling index would
+ * point silently at the wrong band after any manifest reorder, where a slug
+ * fails loudly. See the umbrella spec's routing contract.
+ */
+export function slugify(title, index) {
+  const slug = String(title ?? "")
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || `band-${index}`;
+}
+
+/**
+ * The rail's sub-items for one pack: its TOP-LEVEL children, whatever their
+ * kind, in manifest order, untitled ones omitted.
+ *
+ * Not "groups". `group` nodes carry `path: []`, and the prototype's rail under
+ * Preferences lists three groups plus a top-level `list` (Likes & Dislikes). A
+ * group renders as an eyebrow band with its cards beneath it; a top-level
+ * list/strings/fields node is its own band. Never descends -- a nested title is
+ * a heading inside a card, not a rail destination.
+ *
+ * Manifest-derived rather than registered by the bands themselves, and that is
+ * the load-bearing choice: `packs` arrives from /settings before any content
+ * mounts, so a cold deep link to #/preferences/communication can render a
+ * complete, correctly-marked rail immediately. A registration-based contract is
+ * empty until the content is on screen, which is exactly the deep-link case.
+ *
+ * Pure, like the rest of this file. The observing lives in useScrollSpy.
+ */
+export function outline(pack) {
+  const { sections } = normalizeUi(pack);
+  const seen = new Map();
+  const bands = [];
+  sections.forEach((node, index) => {
+    if (!node?.title) return;
+    const base = slugify(node.title, index);
+    // First occurrence keeps the bare slug; later ones take -2, -3. Iterating in
+    // order is what makes it deterministic: the same manifest always yields the
+    // same ids.
+    const nth = (seen.get(base) || 0) + 1;
+    seen.set(base, nth);
+    bands.push({
+      id: nth === 1 ? base : `${base}-${nth}`,
+      label: node.title,
+      kind: node.kind,
+      // Position among ALL top-level children, not among the titled ones, so
+      // giving an untitled sibling a title later does not renumber anyone. For
+      // ordering and diagnostics only -- never identity.
+      index,
+    });
+  });
+  return bands;
+}
+
 export function normalizeUi(pack) {
   const ui = pack?.ui;
   if (!ui) return { sections: [] };

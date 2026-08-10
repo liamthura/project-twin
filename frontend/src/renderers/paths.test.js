@@ -6,7 +6,7 @@
 // actual test time against ~700ms of environment setup. If this file ever needs
 // a DOM, the honest fix is to move that test to a file that renders something.
 import { describe, it, expect } from "vitest";
-import { getAt, setAt, removeAt, normalizeUi } from "./paths";
+import { getAt, setAt, removeAt, normalizeUi, slugify, outline } from "./paths";
 
 describe("getAt", () => {
   it("reads a nested value", () => {
@@ -140,5 +140,118 @@ describe("normalizeUi", () => {
 
   it("returns no sections for a pack without a ui block", () => {
     expect(normalizeUi({ entities: {} }).sections).toEqual([]);
+  });
+});
+
+describe("slugify", () => {
+  it("lowercases and hyphenates", () => {
+    expect(slugify("Code Style", 0)).toBe("code-style");
+  });
+  it("drops ampersands rather than transliterating them", () => {
+    expect(slugify("Contact & Links", 0)).toBe("contact-links");
+  });
+  it("strips apostrophes instead of turning them into separators", () => {
+    // "when-i-m-feeling" is what a naive non-alphanumeric replace produces, and
+    // it reads as three words where there are two.
+    expect(slugify("When I'm feeling...", 0)).toBe("when-im-feeling");
+    expect(slugify("When I’m feeling", 0)).toBe("when-im-feeling");
+  });
+  it("collapses an em dash and its spaces to one hyphen", () => {
+    expect(slugify("Sleep — weekdays", 0)).toBe("sleep-weekdays");
+  });
+  it("strips diacritics rather than dropping the letter", () => {
+    expect(slugify("Café Notes", 0)).toBe("cafe-notes");
+  });
+  it("falls back to the index when nothing slug-worthy survives", () => {
+    expect(slugify("...", 3)).toBe("band-3");
+    expect(slugify("", 0)).toBe("band-0");
+    expect(slugify(undefined, 7)).toBe("band-7");
+  });
+});
+
+describe("outline", () => {
+  it("returns one entry per titled top-level child, whatever its kind", () => {
+    const pack = {
+      ui: {
+        sections: [
+          {
+            kind: "group",
+            path: [],
+            title: "Code Style",
+            sections: [{ kind: "strings", path: ["a"] }],
+          },
+          { kind: "list", path: ["likes_dislikes"], title: "Likes & Dislikes" },
+        ],
+      },
+    };
+    expect(outline(pack)).toEqual([
+      { id: "code-style", label: "Code Style", kind: "group", index: 0 },
+      { id: "likes-dislikes", label: "Likes & Dislikes", kind: "list", index: 1 },
+    ]);
+  });
+
+  it("omits untitled children, and keeps the unfiltered index on the rest", () => {
+    // The index is the position among ALL top-level children, so giving the
+    // first one a title later does not renumber this one.
+    const pack = {
+      ui: {
+        sections: [
+          { kind: "list", path: ["entries"] },
+          { kind: "list", path: ["other"], title: "Other" },
+        ],
+      },
+    };
+    expect(outline(pack)).toEqual([
+      { id: "other", label: "Other", kind: "list", index: 1 },
+    ]);
+  });
+
+  it("returns nothing for a section whose only child is untitled", () => {
+    // learning_log's shape: the Card's own header already names it, so the rail
+    // item correctly has no children.
+    expect(outline({ ui: { sections: [{ kind: "list", path: ["entries"] }] } })).toEqual([]);
+  });
+
+  it("never descends into a group -- a card heading is not a rail destination", () => {
+    const pack = {
+      ui: {
+        sections: [
+          {
+            kind: "group",
+            path: [],
+            title: "G",
+            sections: [{ kind: "list", path: ["x"], title: "Inner" }],
+          },
+        ],
+      },
+    };
+    expect(outline(pack).map((b) => b.id)).toEqual(["g"]);
+  });
+
+  it("suffixes a duplicate title deterministically, by order", () => {
+    const pack = {
+      ui: {
+        sections: [
+          { kind: "list", path: ["a"], title: "Notes" },
+          { kind: "list", path: ["b"], title: "Notes" },
+          { kind: "list", path: ["c"], title: "Notes" },
+        ],
+      },
+    };
+    expect(outline(pack).map((b) => b.id)).toEqual(["notes", "notes-2", "notes-3"]);
+  });
+
+  it("returns nothing for a pack with no ui block", () => {
+    expect(outline({})).toEqual([]);
+  });
+
+  it("reads through normalizeUi, so a legacy flat-map pack works too", () => {
+    const pack = {
+      entities: { goal: { list: "goals" } },
+      ui: { goals: { title_field: "title" } },
+    };
+    // The legacy branch synthesises nodes with no `title`, so there are no
+    // bands -- which matches how those packs render: one untitled main list.
+    expect(outline(pack)).toEqual([]);
   });
 });
