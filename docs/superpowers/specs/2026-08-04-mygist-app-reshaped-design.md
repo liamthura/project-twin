@@ -1453,3 +1453,46 @@ The original question, kept for the reasoning:
 > state only), because the alternative is inventing two more semantic tokens
 > for one usage each. **This needs the owner's ruling and is not implemented by
 > this plan.**
+
+### Follow-up: how the code reads `04 Section editor`, 2026-08-10
+
+Recorded while implementing migration slice 2
+(`docs/superpowers/plans/2026-08-10-section-editor.md`), which built the section
+editor's structure in the shipped app. Four points where the file needed
+interpreting rather than copying — two rules it does not state, and two places
+the code deliberately departs from it.
+
+**An eyebrow band is a `group` node, and only a group.** The umbrella spec's
+anchor contract says a top-level `list`/`strings`/`fields` "renders as its own
+band", which reads as an eyebrow label. The file says otherwise: Profile's
+Personal Information, Education, Work Experience and Languages, and Preferences'
+Likes & Dislikes, are all bare cards. Both readings are right once "band" is
+split in two — a top-level leaf **is** a rail destination and carries the scroll
+anchor, it simply has no label. The code follows the file.
+
+**When cards go two-across, which the spec never says.** Derived from all four
+groups on the page: `CODE STYLE` (3 × `strings`, `109:101`) wraps 2+1,
+`CONTACT & LINKS` (`114:442`) and `LEARNING STYLE` (`110:278`) pair, and
+`COMMUNICATION` (`287:618`) — the only group holding a `fields` node — is full
+width throughout. So the rule is: **a group's cards go two-across unless the
+group holds a `fields` child**, which carries its own two-column field grid and
+would collapse to one column in half a row. Ungrouped cards are always full
+width. The obvious alternative — grid always, `fields` spans the row — pairs
+`When I'm feeling...` with `Response Format`, which the file stacks.
+
+**Divergence: a leaf that follows a group starts its own run.** The file's
+spacing pass grouped the content column into frames of gap 16 separated by 32,
+and two of those frames trail a leaf card under the previous group's eyebrow —
+`Languages` under `CONTACT & LINKS` (`287:621`) and `Likes & Dislikes` under
+`LEARNING STYLE` (`287:619`). That reads as membership the manifest does not
+have and the rail does not show, so the code puts 32 there instead of 16. Worth
+fixing in the file when it is next touched.
+
+**Divergence: node descriptions are kept, though no card in the file has one.**
+Eleven nodes across `profile`, `preferences` and `lifestyle` declare a
+`description`, and four of those are groups. The prototype's card header is title
+plus right-hand slot with no line for one. Dropping them in code would delete
+real manifest copy and re-introduce a bug already fixed once — that copy used to
+render nowhere at all for `fields` and `list` nodes — so a card carries it as a
+`caption-1` line under its header, and a band under its rule. The file has no
+component for either yet.
