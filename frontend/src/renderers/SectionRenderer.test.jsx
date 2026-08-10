@@ -14,7 +14,7 @@ import preferencesData from "@/__fixtures__/data/preferences.json";
 import profileData from "@/__fixtures__/data/profile.json";
 import { renderSection } from "@/test/harness";
 import { SEGMENTED_MAX } from "@/components/controls";
-import { normalizeUi } from "@/renderers/paths";
+import { normalizeUi, outline } from "@/renderers/paths";
 
 const goalsPack = packs.find((p) => p.key === "goals");
 const mediaPack = packs.find((p) => p.key === "media");
@@ -2433,5 +2433,55 @@ describe("the Add trigger and the entry count", () => {
 
     expect(within(nodeEl).queryByRole("group", { name: "Filters" })).not.toBeInTheDocument();
     expect(within(nodeEl).getByText(/2 entries/)).toBeInTheDocument();
+  });
+});
+
+// The scroll-spy foothold, landed here in slice 1 so the rail merges with real
+// anchors under it. Slice 2 restructures what sits INSIDE these wrappers (one
+// card per subsection, under eyebrow bands); the contract the rail reads is
+// stamped now, and does not change when that happens.
+describe("scroll-spy anchors", () => {
+  it("stamps every titled top-level node with its outline id, in order", () => {
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+    const ids = [...document.querySelectorAll("[data-band]")].map((el) => el.dataset.band);
+    // Asserted against outline() rather than a hand-written list: two
+    // derivations of the same ids is the one thing this contract cannot afford.
+    expect(ids).toEqual(outline(preferencesPack).map((b) => b.id));
+    expect(ids).toEqual(["code-style", "communication", "learning-style", "likes-dislikes"]);
+  });
+
+  it("clears the sticky header, so clicking a rail item does not hide the heading under it", () => {
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+    expect(document.querySelector("[data-band]").className).toContain("scroll-mt-[60px]");
+  });
+
+  it("keeps the wrapper's own spacing class rather than replacing it", () => {
+    // The band attribute rides on the existing wrapper. Overwriting className
+    // instead of extending it would strip space-y-4 and silently reflow every
+    // grouped section in the app.
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+    expect(document.querySelector('[data-band="code-style"]').className).toContain("space-y-4");
+  });
+
+  it("stamps nothing on a section whose only node is untitled", () => {
+    render(<SectionRenderer pack={learningLogPack} data={learningLogData} onChange={vi.fn()} />);
+    expect(document.querySelectorAll("[data-band]")).toHaveLength(0);
+  });
+
+  it("does not stamp a nested title -- a card heading is not a rail destination", () => {
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+    const ids = [...document.querySelectorAll("[data-band]")].map((el) => el.dataset.band);
+    // Response Format is a `strings` node INSIDE the Communication group.
+    expect(ids).not.toContain("response-format");
+  });
+
+  it("stamps a node of every kind, not only groups", () => {
+    // profile's top level is fields, list, list, group, list -- so this fails if
+    // the stamp were attached to the group branch alone.
+    render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
+    const ids = [...document.querySelectorAll("[data-band]")].map((el) => el.dataset.band);
+    expect(ids).toEqual(outline(profilePack).map((b) => b.id));
+    expect(ids).toContain("education");
+    expect(ids).toContain("contact-links");
   });
 });

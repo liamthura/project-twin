@@ -58,6 +58,25 @@
     --verdigris: 188 38% 36%;
     --tint-clay: 18 74% 94%;
     --tint-verdigris: 188 26% 93%;
+
+    /* Motion. Four durations and four easings -- the whole scale, defined once
+       so no component invents a fifth value. Not in `.dark`: motion does not
+       change with the colour mode.
+
+       The design's named motions asked for 160ms and 240ms too, neither on the
+       scale and both exactly 40ms from two tokens, so "nearest" had no answer.
+       The rule that resolves it: an off-scale duration snaps to the SHORTER
+       token if it is an exit, the LONGER if it is an entrance. Stating the rule
+       rather than only its results is what stops the next component
+       hardcoding 160 again. */
+    --duration-fast: 120ms;
+    --duration-medium: 200ms;
+    --duration-slow: 280ms;
+    --duration-scroll: 400ms;
+    --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+    --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
   }
 
   .dark {
@@ -214,5 +233,40 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   .tab-strip-fade[data-at-start="true"][data-at-end="true"] {
     mask-image: none;
     -webkit-mask-image: none;
+  }
+}
+
+/* Reduced motion, collapsed centrally rather than opted into per component --
+   a component cannot forget what it never had to remember.
+
+   Durations go to zero; opacity is the exception, capped at 100ms, because a
+   fade carries meaning (something arrived, something left) that an instant swap
+   loses. Anything wanting that exception marks itself data-motion="fade".
+   Smooth scroll becomes a jump, per the design's own rule.
+   
+   animation-duration is 1ms rather than 0s deliberately: at 0s some engines
+   never fire animationend, and anything sequencing off that event would hang
+   instead of finishing instantly. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-medium: 0ms;
+    --duration-slow: 0ms;
+    --duration-scroll: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  [data-motion="fade"],
+  [data-motion="fade"]::before,
+  [data-motion="fade"]::after {
+    transition-duration: 100ms !important;
   }
 }

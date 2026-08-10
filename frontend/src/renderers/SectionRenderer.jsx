@@ -26,12 +26,21 @@
 import { useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InfoButton } from "@/components/ui/info-button";
-import { getAt, setAt, normalizeUi } from "./paths";
+import { getAt, setAt, normalizeUi, outline } from "./paths";
 import { renderNode } from "./renderNode";
 import { HeaderActionSlotContext } from "./headerActionSlot";
 
 export default function SectionRenderer({ pack, data, onChange, onShowConfirmation }) {
   const { sections } = normalizeUi(pack);
+
+  // The rail's scroll-spy anchors, keyed by the node's index among the section's
+  // top-level children -- which is what renderSectionNode's `key` is at depth 0.
+  //
+  // Read from outline() rather than recomputed here on purpose. The rail renders
+  // its sub-items from the same function, and two derivations of the same id is
+  // the one thing this contract cannot afford: they would agree until a title
+  // gained an apostrophe. See the umbrella spec's anchor contract.
+  const bandById = new Map(outline(pack).map((b) => [b.index, b.id]));
 
   // The DOM element each list node's header action portals into, keyed by that
   // node's own React key. Kept in state rather than a ref because the element
@@ -92,6 +101,15 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
   // section's path resolves against the section root exactly like a top-level
   // one's does.
   function renderSectionNode(node, key, depth) {
+    // Depth 0 only: a nested title renders as a heading inside a card, never as
+    // a rail destination, so it gets no anchor. `scroll-mt` clears the 60px
+    // sticky header -- without it a click lands with the heading underneath it.
+    //
+    // Spread onto both branches below, and the className is CONCATENATED with
+    // each wrapper's own spacing rather than replacing it. Replacing would strip
+    // space-y-4 / space-y-3 and reflow every section in the app.
+    const band = depth === 0 ? bandById.get(Number(key)) : undefined;
+
     if (node.kind === "group") {
       if (!Array.isArray(node.sections) || node.sections.length === 0) {
         console.error(
@@ -105,7 +123,12 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
       // the same rule a rejected node gets below.
       if (rendered.length === 0) return null;
       return (
-        <div key={key} data-ui-node={node.title} className="space-y-4">
+        <div
+          key={key}
+          data-ui-node={node.title}
+          data-band={band}
+          className={`space-y-4${band ? " scroll-mt-[60px]" : ""}`}
+        >
           <NodeHeading node={node} depth={depth} />
           <div className="space-y-4 border-l pl-4">{rendered}</div>
         </div>
@@ -129,7 +152,12 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
     // gained a wrapper for `description`; this survives markup changes because
     // it names the node rather than describing where it sits.
     return (
-      <div key={key} data-ui-node={node.title} className="space-y-3">
+      <div
+        key={key}
+        data-ui-node={node.title}
+        data-band={band}
+        className={`space-y-3${band ? " scroll-mt-[60px]" : ""}`}
+      >
         {node.title && (
           <NodeHeading
             node={node}

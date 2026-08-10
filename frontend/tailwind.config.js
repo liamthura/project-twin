@@ -111,6 +111,22 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         "caret-blink": "caret-blink 1.25s ease-out infinite",
       },
+      // Motion, as `duration-medium` / `ease-standard` classes. Pointed at the
+      // custom properties rather than literal values so the reduced-motion
+      // block in globals.css can zero them in one place -- a literal here would
+      // survive that media query and keep animating.
+      transitionDuration: {
+        fast: "var(--duration-fast)",
+        medium: "var(--duration-medium)",
+        slow: "var(--duration-slow)",
+        scroll: "var(--duration-scroll)",
+      },
+      transitionTimingFunction: {
+        decelerate: "var(--ease-decelerate)",
+        accelerate: "var(--ease-accelerate)",
+        standard: "var(--ease-standard)",
+        emphasized: "var(--ease-emphasized)",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],
