@@ -26,6 +26,7 @@ have to relitigate it.
 | # | Question | Ruling |
 |---|---|---|
 | 1 | The Switch's off track, now that `--input` is a control-boundary token | Off becomes `border-input bg-muted-foreground/25`, hover `/40` |
+| 1b | The off/on track pair, which the above left at 2.38 in Dark | The **on** track moves: `bg-link` not `bg-primary`, clearing 3.09 |
 | 2 | The landing page's FAQ outline button, whose border darkened with the app's | Accepted as-is; `1.4.11` applies on the marketing page too |
 | 3 | Figma's `Button` `Variant=Neutral`, still binding `border` at 1.26 | Rebind 4 states to `input`; leave `State=Disabled` on `border` |
 | 4 | Icon strokes reading `indigo` where text reads `link` | Sweep the overrides, not the main component (see below) |
@@ -83,19 +84,42 @@ Measured, and recorded because two of the three numbers are uncomfortable:
 |---|---|---|---|
 | boundary `input` / `card` | 3.16 | 3.11 | passes 1.4.11 — this is the fix |
 | off track / `card` | 1.39 | 1.59 | the track is deliberately quiet |
-| off track / on track | 3.98 | **2.38** | below 3:1 in Dark |
+| off track / on track | 3.98 | 3.09 | passes, once the on track moved — see below |
 | knob (white) / off track | **1.39** | 10.97 | near-invisible in Light |
+| knob (white) / on track | 5.55 | 3.54 | passes on both |
 
 The first and last rows read 1.39 in Light for the same reason rather than by
 coincidence: the knob is white and so is `card`, so "track against the card"
 and "knob against the track" are the same measurement there.
 
-The last two are accepted, not overlooked:
+**The off/on pair was accepted at 2.38 and then ruled on, 2026-08-10.** The
+first version of this change fixed the boundary and the fill and left the two
+tracks 2.38 apart in Dark, on the argument that a switch conveys state by knob
+**position** rather than colour. Shown the alternatives, the owner ruled the on
+track should move instead — the same call, and for the same reason, as ruling 1
+on `--input`: fix the token, do not carry the exemption.
 
-- **Dark's 2.38 between off and on** is below the 3:1 that 1.4.11 asks of
-  states. It is accepted because a switch does not convey state by colour: the
-  knob's **position** is the primary cue, and position is not a colour signal.
-  The track's tone reinforces it and is not the sole carrier.
+**The on track binds `link`, not `primary`.** In Light the two hold the same
+value (`228 69% 55%`), so nothing changes there; in Dark `link` is lighter (68%
+vs 62%) and the pair clears at **3.09**. `indigo` is untouched, so every Primary
+button is unaffected.
+
+That is not the token misuse it first appears to be. `link` and `primary` were
+split because a fill carrying a **label** wants to be darker so the label passes,
+while the same colour as text wants to be lighter. This track carries no label —
+the knob is a shape, not text — so the reason for the split does not reach it.
+
+Two alternatives were measured and rejected, both of which pass the state pair
+while breaking something else:
+
+| Dark option | off vs on | off vs card | Why not |
+|---|---|---|---|
+| darken the off track to `/10` | 3.20 | **1.18** | the track nearly vanishes on the card — the exact complaint that put `bg-input` there originally |
+| lighten the off track to `/55` | **1.25** | 3.01 | the two states become near-identical in weight |
+| **move the on track to `link`** | **3.09** | 1.59 | chosen: nothing else has to give |
+
+The remaining number is accepted, not overlooked:
+
 - **Light's 1.39 between the white knob and a near-white track** means the knob
   reads by its shadow and by the new `border-input` ring around the track, not
   by fill contrast. `switch.jsx` already gives the knob a shadow for exactly
@@ -269,10 +293,10 @@ the script:
 - New pairs, at minimum: the Switch's boundary and its off/on tracks, the
   outline button's edge on `card` and on `paper`, and the suggestion chips.
 
-`KNOWN_FAILURES` stays as it is — an empty, reasoned exemption list — and the
-Dark off/on track figure of 2.38 is recorded there **only if** the extended
-script reports it as a failure, with the knob-position reasoning above as its
-stated reason. It is not added pre-emptively.
+`KNOWN_FAILURES` ends this round **empty**. The Dark off/on figure was entered
+there when it measured 2.38, and removed again when the owner ruled the on track
+should move instead — which is the list working as intended: an exemption is a
+holding position pending a decision, not a resting place.
 
 ## Out of scope
 
@@ -314,7 +338,8 @@ not available locally.
 | Risk | Mitigation |
 |---|---|
 | The Switch's Light-mode knob relies on shadow and ring, not fill contrast | Measured and recorded above; the knob's shadow already exists for this reason, and the new `border-input` ring is added by the same change |
-| Off/on track contrast is 2.38 in Dark | Accepted: knob position carries the state, not colour. Recorded rather than hidden, and the extended calculator will keep reporting it |
+| ~~Off/on track contrast is 2.38 in Dark~~ | **Resolved** by moving the on track to `link` (3.09). The two rejected alternatives, and why each broke something else, are tabled above |
+| `link` is nominally the text-role token and is now a fill | The split's stated reason — a fill carrying a label wants to be darker — does not reach a track with no label on it. Recorded in `switch.jsx` so the next reader does not "fix" it back |
 | Rebinding the icon main component instead of the overrides | Explicitly scoped to 8 override paints on `75:51`–`75:54`; `220:30` must keep binding `ink` |
 | The sort control contradicts shipped prototype copy | The frame and both spec passages are rewritten in the same round, not left to drift |
 | Extending the calculator surfaces further pre-existing failures | Expected, and the point. Anything it finds is reported, ruled on, or entered in `KNOWN_FAILURES` with a reason — never silenced |

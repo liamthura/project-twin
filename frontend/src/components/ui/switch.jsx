@@ -19,11 +19,24 @@ import { FOCUS_RING } from "@/components/controls";
 // control, so its extent needs 3:1 (3.16 Light / 3.11 Dark). Before this it
 // bound `border` at 1.26 and the dark fill was masking the failure.
 //
-// Two measurements are accepted rather than overlooked, both recorded in
-// docs/superpowers/specs/2026-08-10-app-redesign-phase-2-design.md: off/on
-// track is 2.38 in Dark, and the white thumb is 1.39 against a Light track.
-// A switch conveys state by thumb POSITION, not colour -- the ring above and
-// the thumb's shadow carry it, which is what the shadow is for.
+// The ON track binds `link`, not `primary`. In Light the two tokens hold the
+// SAME value (228 69% 55%), so this changes nothing there; in Dark `link` is
+// lighter (68% vs 62%), which takes the off/on pair from 2.38 -- under the 3:1
+// that 1.4.11 asks of states -- to 3.09.
+//
+// That is not the token abuse it looks like. `link` and `primary` were split
+// because a fill carrying a LABEL wants to be darker so the label passes, while
+// the same colour as text wants to be lighter. This track carries no label --
+// the thumb is a shape, not text -- so the reason for the split does not reach
+// it, and the lighter of the two is simply the better fill here. `indigo` is
+// untouched, so every Primary button is unaffected.
+//
+// One measurement is accepted rather than overlooked, recorded in
+// docs/superpowers/specs/2026-08-10-app-redesign-phase-2-design.md: the white
+// thumb is 1.39 against a Light track. A switch conveys state by thumb
+// POSITION, not colour -- the ring above and the thumb's shadow carry it, which
+// is what the shadow is for. (On the ON track the thumb reads at 5.55 Light /
+// 3.54 Dark.)
 //
 // Focus uses the shared FOCUS_RING so keyboard users get exactly what every
 // other control gives them, and it stays a real `role="switch"` button, so it
@@ -39,7 +52,7 @@ export function Switch({ checked, onCheckedChange, className, ...props }) {
         "tap-target relative inline-flex h-6 w-11 shrink-0 items-center rounded-full",
         "border transition-colors duration-200",
         checked
-          ? "border-primary bg-primary"
+          ? "border-link bg-link"
           : "border-input bg-muted-foreground/25 hover:bg-muted-foreground/40",
         FOCUS_RING,
         className

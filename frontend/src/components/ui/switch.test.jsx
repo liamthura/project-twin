@@ -42,12 +42,16 @@ describe("Switch track tokens", () => {
     expect(trackOf()).toContain("hover:bg-muted-foreground/40");
   });
 
-  it("leaves the on state filled with primary", () => {
+  it("fills the on track from link, which is what clears the state pair in Dark", () => {
     render(<Switch checked onCheckedChange={vi.fn()} />);
     const cls = trackOf();
 
-    expect(cls).toContain("bg-primary");
-    expect(cls).toContain("border-primary");
+    // `link`, not `primary`. Identical to primary in Light (228 69% 55%), and
+    // lighter in Dark (68% vs 62%) -- which takes off-vs-on from 2.38 to 3.09.
+    // Ruled 2026-08-10; `indigo` is untouched, so Primary buttons are too.
+    expect(cls).toContain("bg-link");
+    expect(cls).toContain("border-link");
+    expect(cls).not.toContain("bg-primary");
     expect(cls).not.toContain("bg-muted-foreground/25");
   });
 

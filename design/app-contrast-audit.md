@@ -16,9 +16,10 @@ Run: `node design/app-contrast.mjs`
 
 Four of six badge tones failed on the first run, one Primary button state
 failed, and the rail's active row failed twice — each fixed at the token level,
-the same method the landing audit established. The input field boundary failed
-and was ruled on separately (see below), as was the Switch's off/on track,
-which is the one pair still carried as a known, accepted failure.
+the same method the landing audit established. The input field boundary and the
+Switch's off/on track each failed and each was ruled on separately (see below).
+**Nothing is exempt: `KNOWN_FAILURES` is empty, and every pair below passes on
+its own merits.**
 
 Pairs now carry a **role**, because the absence of one is what let a token
 change break a control this table could not see: `text`, `boundary`, `fill` and
@@ -48,13 +49,14 @@ or teach the reader that the column is decorative.
 | ink / clay-tint | delegate offer heading | text | 4.5 | 15.08 | 12.69 |
 | input border / card | field, outline button, chip, switch track | boundary | 3 | 3.16 | 3.11 |
 | input border / paper | the same edges, on the page ground | boundary | 3 | 3.03 | 3.35 |
-| switch off / switch on | Switch off vs on track | state | 3 | 3.98 | 2.38 KNOWN |
+| switch off / switch on | Switch off vs on track | state | 3 | 3.98 | 3.09 |
+| switch thumb / on track | white thumb on the on track | boundary | 3 | 5.55 | 3.54 |
 | switch off / card | off track on a card -- watched, not required | fill | -- | 1.39 | 1.59 |
 | switch off / muted | off track on a muted card | fill | -- | 1.38 | 1.60 |
 | switch thumb / off track | white thumb; reads by shadow and ring | fill | -- | 1.39 | 10.97 |
 | on-inverse / ground-inverse | landing dark break section | text | 4.5 | 16.03 | 14.27 |
 
-All pairs pass (or are known, accepted, and tracked).
+All pairs pass.
 
 ## Resolved: the input field boundary
 
@@ -62,9 +64,7 @@ All pairs pass (or are known, accepted, and tracked).
 is now `20 6% 57%` Light and `60 2% 40%` Dark: in each mode, the *minimum*
 lightness that clears 3:1 against both `card` and `paper`. Measured 3.16/3.03
 Light and 3.11/3.35 Dark. The pair passes on its own merits, and its
-`KNOWN_FAILURES` entry was removed rather than weakened. (That list is not empty
-today — the Switch's off/on track pair joined it on 2026-08-10, for a different
-and unrelated reason.)
+`KNOWN_FAILURES` entry was removed rather than weakened.
 
 **`border` deliberately did not move with it.** The two tokens held the same
 value for as long as they did because nobody had separated their jobs; they now
@@ -158,11 +158,40 @@ token used two ways is reported twice, and the ground set includes the landing
 page's `ground-inverse`. A `need` of `--` means reported but not enforced, for
 numbers worth watching that no success criterion governs.
 
-The Switch's off/on track pair measures **2.38 in Dark** and is entered in
-`KNOWN_FAILURES` with its reasoning: a switch conveys state by thumb
-**position**, not colour, and closing that gap would mean either a heavier off
-state — the defect just fixed — or moving `indigo`, which every Primary button
-reads.
+### Resolved: the Switch's off/on track
+
+Fixing the fill and the boundary left the two tracks **2.38** apart in Dark,
+under the 3:1 that 1.4.11 asks of states. That was briefly entered in
+`KNOWN_FAILURES` on the argument that a switch conveys state by thumb
+**position** rather than colour. **Ruled 2026-08-10: the token moves instead** —
+the same call as `--input`, and the exemption came straight back out.
+
+**The on track binds `link`, not `primary`.** Identical in Light (`228 69% 55%`
+for both), lighter in Dark (68% vs 62%), so the pair clears at **3.09** and
+Light is untouched. `indigo` never moved, so Primary buttons are unaffected.
+
+`link` is nominally the text-role token, and using it as a fill is defensible
+here specifically: the split exists because a fill carrying a **label** wants to
+be darker so the label passes, and this track carries no label — the knob is a
+shape. Recorded in `switch.jsx` so nobody "corrects" it back.
+
+Two alternatives were measured and rejected, both of which pass the state pair
+while breaking something else:
+
+| Dark option | off vs on | off vs card | Why not |
+|---|---|---|---|
+| darken the off track to `/10` | 3.20 | **1.18** | the track nearly vanishes on the card — the complaint that put `bg-input` there originally |
+| lighten the off track to `/55` | **1.25** | 3.01 | the two states become near-identical in weight |
+| **move the on track to `link`** | **3.09** | 1.59 | chosen: nothing else has to give |
+
+The prototype's `Switch` diverged further than the code did and was brought into
+line: `State=On` and `State=On Disabled` (`32:11`, `32:13`) moved from `indigo`
+to `link`, and `State=Off` (`32:10`) — which filled flat `muted` and carried **no
+stroke at all**, so nothing identified the control's extent — now fills
+`muted-fg` at 25% with an `input`-bound 1px ring. Both `On` variants moved
+because this is the on state's colour identity rather than a contrast fix, so the
+"leave Disabled alone" rule that governed the field and button boundaries does
+not apply. `State=Off Disabled` keeps its `border` fill.
 
 ## What was wrong, and why
 

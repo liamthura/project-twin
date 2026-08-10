@@ -114,7 +114,10 @@ const PAIRS = [
   // The Switch, which is why this script grew a role column. Its state is
   // carried by THUMB POSITION, not by colour; the two rows below are the
   // colour that reinforces it.
-  ['switch off / switch on', 'switch-off', 'indigo', 3.0, 'state', 'Switch off vs on track'],
+  // The ON track binds `link`, not `indigo`. Identical in Light, lighter in
+  // Dark, which is the whole reason this pair clears 3:1 -- see switch.jsx.
+  ['switch off / switch on', 'switch-off', 'link', 3.0, 'state', 'Switch off vs on track'],
+  ['switch thumb / on track', 'on-primary', 'link', 3.0, 'boundary', 'white thumb on the on track'],
   ['switch off / card',      'switch-off', 'card', null, 'fill', 'off track on a card -- watched, not required'],
   ['switch off / muted',     'switch-off-on-muted', 'muted', null, 'fill', 'off track on a muted card'],
   ['switch thumb / off track','on-primary', 'switch-off', null, 'fill', 'white thumb; reads by shadow and ring'],
@@ -141,15 +144,14 @@ const KNOWN_FAILURES = new Map([
   // --border did NOT move with it -- a decorative divider is exempt, a control
   // boundary is not, and the two tokens now differ in value because they differ
   // in job.
-  ['switch off / switch on',
-    'Dark measures 2.38 between the off and on tracks. Accepted, and not ' +
-    'fixed by darkening either: a switch conveys its state by THUMB POSITION, ' +
-    'which is not a colour signal, reinforced by the 3.16/3.11 boundary ring ' +
-    'the same change added. Light clears at 3.98. Making the two tracks 3:1 ' +
-    'apart in Dark would mean either a heavier off state -- the exact defect ' +
-    'this round fixed -- or moving `indigo`, which every Primary button reads. ' +
-    'Ruled 2026-08-10; see the Switch table in ' +
-    'docs/superpowers/specs/2026-08-10-app-redesign-phase-2-design.md.'],
+  // Empty again, and worth keeping that way.
+  //
+  // It briefly held `switch off / switch on`, which measured 2.38 in Dark. The
+  // owner ruled the on track should move rather than the exemption stand: it
+  // binds `link` instead of `indigo`, identical in Light and lighter in Dark,
+  // and the pair now clears at 3.09 on its own merits. Darkening the off track
+  // would have passed the same pair while dropping it to 1.18 against the card
+  // -- trading this defect for the older one it replaced.
 ]);
 
 let failed = 0;
