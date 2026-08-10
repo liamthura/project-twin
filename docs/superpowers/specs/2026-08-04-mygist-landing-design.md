@@ -869,3 +869,38 @@ Worth keeping as a rule rather than an anecdote: a 400 from that API means the
 *request* was rejected, not that the family is absent. The bare
 `family=Stack+Sans+Notch` with no axis is the cheapest way to tell the two
 apart, and it returns 200.
+
+### Matching the prototype
+
+The first code build diverged from the Figma frame badly enough to be called
+"nothing like the prototype", and the causes are worth naming because none was
+a judgement call — each was something the spec settled and the build ignored.
+
+**The hero and the closing CTA are centred.** Both were built left-aligned.
+That single difference changes the shape of the page more than anything else on
+this list.
+
+**The step numerals are `01 / 02 / 03`**, zero-padded, set in the display face
+at its 40px floor. Built as `1 / 2 / 3`.
+
+**The mockup sits in Magic UI's `safari` frame**, inset inside the content
+column rather than filling it, so the gradient pool reads around it. Built as a
+bare three-dot bar at full column width.
+
+The registry components the spec named are now actually used, adapted rather
+than copied:
+
+| Component | Adaptation |
+|---|---|
+| `safari` | Takes **children**, not `imageSrc` — the mockup is live markup. Chrome recoloured from its own cool grey to `border` / `card` / `muted`. Defaults to simple mode: the full Safari toolbar is eight glyphs of path data that say nothing about MyGist. |
+| `blur-fade` | JSX rather than TSX, and honours `prefers-reduced-motion` — the registry version animates regardless, which would break the reduced-motion frame. |
+
+**The gradient field is masked to a soft ellipse behind the mockup.** As a plain
+rectangle it cut a hard line across the waitlist field, and put the field's
+placeholder on top of gradient artwork — the one thing the system rule forbids.
+
+One consequence worth knowing: `blur-fade` starts content at `opacity: 0` and
+reveals it on intersection, so **section content is invisible until JS runs**.
+The tests report reduced motion to get the plain-div path, which is scoped to
+`Landing.test.jsx` — a global stub overrode the per-file `matchMedia` stubs
+other suites install and broke 29 tests across six files.

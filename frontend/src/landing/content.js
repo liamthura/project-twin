@@ -23,13 +23,20 @@ export const HERO = {
   signIn: { prefix: "Already have a code?", label: "Sign in." },
 };
 
-/** Clients named in the README as speaking MCP. Chips, in the hero. */
+/**
+ * Clients named in the README as speaking MCP. Chips, in the hero.
+ *
+ * `mark` says whether a logo file exists in public/landing/logos/. Simple Icons
+ * does not carry OpenAI (pulled over a trademark request) or Hermes, and
+ * worldvectorlogo -- the source the owner asked for -- returns 403 to every
+ * automated request. Those two are name-only rather than an invented glyph.
+ */
 export const CLIENTS = [
-  { name: "Claude", slug: "claude" },
-  { name: "Codex", slug: "codex" },
-  { name: "Raycast", slug: "raycast" },
-  { name: "Notion AI", slug: "notion" },
-  { name: "Hermes", slug: "hermes" },
+  { name: "Claude", slug: "claude", mark: true },
+  { name: "Codex", slug: "codex", mark: false },
+  { name: "Raycast", slug: "raycast", mark: true },
+  { name: "Notion AI", slug: "notion", mark: true },
+  { name: "Hermes", slug: "hermes", mark: false },
 ];
 
 export const STEPS = {

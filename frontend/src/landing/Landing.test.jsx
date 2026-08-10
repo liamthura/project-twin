@@ -4,10 +4,29 @@ import userEvent from "@testing-library/user-event";
 import Landing from "./Landing";
 import { FAQ, FOOTER } from "./content";
 
+// Reduced motion, deliberately, and only in this file.
+//
+// The section entrances start at opacity 0 and animate in. jsdom runs no
+// animation frames, so without this every assertion about content inside a
+// section fails toBeVisible() on an element that is present and correct.
+// Reporting reduced motion takes blur-fade's plain-div path -- which is the
+// branch these tests should exercise anyway, since they assert on content
+// rather than on whether a transition played.
+//
+// Scoped here rather than added to src/test/setup.js: a global stub overrides
+// the per-file ones other suites already install, and doing that broke 29
+// tests across six files that depend on their own matchMedia answers.
 beforeAll(() => {
-  window.matchMedia =
-    window.matchMedia ||
-    (() => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
+  window.matchMedia = (query) => ({
+    matches: /prefers-reduced-motion/.test(query),
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  });
 });
 
 describe("Landing: the FAQ disclosure", () => {

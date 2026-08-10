@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { BlurFade } from "@/components/ui/blur-fade";
 
 /**
  * The one content column.
@@ -78,10 +79,19 @@ const GROUNDS = {
   inverse: "bg-ground-inverse",
 };
 
-export function Section({ ground = "paper", className, children, ...props }) {
+/**
+ * `animate` wraps the section's contents in Magic UI's blur-fade, which is the
+ * entrance the spec calls for on sections 2 to 5. It fires once on scroll-in
+ * and stops -- nothing here loops, drifts or pulses -- and the component drops
+ * to a plain div under `prefers-reduced-motion`.
+ *
+ * Figma cannot express this: its Trigger union has no scroll equivalent, so on
+ * the prototype the entrance exists only as written specification.
+ */
+export function Section({ ground = "paper", animate = true, className, children, ...props }) {
   return (
     <section className={cn(GROUNDS[ground], "py-20 md:py-28", className)} {...props}>
-      {children}
+      {animate ? <BlurFade inView>{children}</BlurFade> : children}
     </section>
   );
 }

@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
  * the list, so this cannot report "already joined" and must not try: doing so
  * would turn the form into a membership oracle.
  */
-export function WaitlistForm({ label, tone = "default", onSubmit, className }) {
+export function WaitlistForm({ label, tone = "default", align = "start", onSubmit, className }) {
   const id = useId();
   const [email, setEmail] = useState("");
   const [state, setState] = useState("idle");
@@ -87,7 +87,11 @@ export function WaitlistForm({ label, tone = "default", onSubmit, className }) {
   const failed = state === "invalid" || state === "error";
 
   return (
-    <form onSubmit={submit} className={cn("w-full max-w-md", className)} noValidate>
+    <form
+      onSubmit={submit}
+      className={cn("w-full max-w-md", align === "center" && "mx-auto", className)}
+      noValidate
+    >
       <div className="flex flex-col gap-3 sm:flex-row">
         <label htmlFor={id} className="sr-only">
           Email address
