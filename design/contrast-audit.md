@@ -81,6 +81,36 @@ It is moot now. Tile titles bind to `link`, not `indigo`, so the pair in use is
 `link` on `card` — 5.55 light, 4.93 dark, passing at 4.5 with no judgement call
 required. `indigo` is fills only.
 
+## Reached by an app ruling, 2026-08-10
+
+**`--input` and `--border` no longer share a value, and this page has a control
+that reads the first one.** The app's contrast round ruled that a form field's
+edge is not a decorative divider and moved `--input` to the minimum lightness
+that clears 3:1 — `20 6% 57%` Light, `60 2% 40%` Dark — while `--border` stayed
+where it was. Anything on this page written on the assumption that the two are
+interchangeable is now wrong.
+
+One landing control is affected: the FAQ contact card's non-primary CTA
+(`Faq.jsx:136`) renders as `variant="outline"`, which binds `border-input`. Its
+edge is now visibly darker than the `border-border` hairline of the
+`ContactCard` around it.
+
+**Ruled: accepted.** That button is a real control, so WCAG 1.4.11 applies to it
+here exactly as it does in the app — pinning it back to `border-border` would
+reintroduce the same 1.26 failure the app's ruling rejected, one page across.
+The edge measures **3.16** against `card`.
+
+**The waitlist form is not affected**, though it is the consumer that looks most
+at risk: `WaitlistForm` renders the shared `Input`, but passes `border-0`
+(`WaitlistForm.jsx:129`) because the surrounding pill owns both the border and
+the focus ring. Checked rather than assumed.
+
+The full reasoning, and the app-side defect found alongside this one, are in
+`design/app-contrast-audit.md` and
+`docs/superpowers/specs/2026-08-10-app-redesign-phase-2-design.md`.
+`design/app-contrast.mjs` now carries this page's `ground-inverse` surface, so a
+token shared between the two pages cannot again be checked on only one of them.
+
 ## Not measured
 
 Gradient artwork carries no text. Type over gradient sits on a solid or scrimmed

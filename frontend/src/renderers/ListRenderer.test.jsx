@@ -1859,3 +1859,118 @@ describe("the Add dialog's draft across repeated opens", () => {
     expect(within(screen.getByRole("dialog")).getByDisplayValue("like")).toBeInTheDocument();
   });
 });
+
+// A reader-facing display order, ruled 2026-08-10. Date fields only: the
+// control is offered when `display_formats` marks one of the node's
+// `display_fields` as datetime/date, which today is exactly one shipped node
+// (learning_log/entries).
+describe("sort control", () => {
+  const sortNode = {
+    kind: "list",
+    path: ["entries"],
+    title_field: "topic",
+    detail_fields: ["details"],
+    display_fields: ["timestamp"],
+    display_formats: { timestamp: "datetime" },
+    sort: { field: "timestamp", dir: "desc" },
+  };
+  // Stored deliberately out of order, so a passing assertion cannot be an
+  // accident of the array's own sequence. Titles are Greek rather than
+  // "Newest"/"Oldest" on purpose: those words are the CONTROL's own labels,
+  // and a row named after one would be matched by any query looking for it.
+  const entries = [
+    { topic: "Beta", timestamp: "2026-02-01T12:00:00Z" },
+    { topic: "Gamma", timestamp: "2026-03-01T12:00:00Z" },
+    { topic: "Undated" },
+    { topic: "Alpha", timestamp: "2026-01-01T12:00:00Z" },
+  ];
+
+  // getAllByText returns matches in document order, which is what makes this
+  // an order assertion rather than a presence one.
+  const shownOrder = () =>
+    screen.getAllByText(/^(Alpha|Beta|Gamma|Undated)$/).map((el) => el.textContent);
+
+  const control = () => screen.getByRole("combobox", { name: "Sort" });
+  const chooseOrder = async (user, name) => {
+    await user.click(control());
+    await user.click(screen.getByRole("option", { name }));
+  };
+
+  it("offers the control, defaulting to the order the section declares", () => {
+    render(<ListRenderer node={sortNode} items={entries} onItems={vi.fn()} />);
+
+    // dir: "desc" is newest-first, so the control opens agreeing with the rows
+    // rather than announcing an order the list does not have.
+    expect(control()).toHaveTextContent("Newest");
+    expect(shownOrder()).toEqual(["Gamma", "Beta", "Alpha", "Undated"]);
+  });
+
+  it("is absent for a node with no date field", () => {
+    render(<ListRenderer node={node} entity={entity} items={[scandinavian]} onItems={vi.fn()} />);
+
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+  });
+
+  it("is absent when the only date-formatted key is not a display field", () => {
+    // This is `knowledge`'s `created_at` shape. That manifest records that its
+    // two write paths disagree -- one local time labelled UTC, one real UTC --
+    // so ordering by it would be wrong by the offset for half the entries.
+    // Sourcing the rule from display_fields is what keeps it out.
+    const hidden = {
+      ...sortNode,
+      display_fields: [],
+      display_formats: { created_at: "datetime" },
+      sort: undefined,
+    };
+    render(<ListRenderer node={hidden} items={entries} onItems={vi.fn()} />);
+
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+  });
+
+  it("reverses the display order when switched to Oldest", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={sortNode} items={entries} onItems={vi.fn()} />);
+
+    await chooseOrder(user, "Oldest");
+
+    // Undated stays last in BOTH directions -- an undated row is unknown, not
+    // oldest, and dropping it off the top of a desc list would hide it.
+    expect(shownOrder()).toEqual(["Alpha", "Beta", "Gamma", "Undated"]);
+  });
+
+  it("never writes: changing the order is display state only", async () => {
+    const user = userEvent.setup();
+    const onItems = vi.fn();
+    render(<ListRenderer node={sortNode} items={entries} onItems={onItems} />);
+
+    await chooseOrder(user, "Oldest");
+
+    // The schema calls `sort` "display order only ... the stored array is
+    // never reordered", and an entity's actions are add|update|remove.
+    expect(onItems).not.toHaveBeenCalled();
+  });
+
+  it("keeps an expanded row expanded, and on the same row, across a sort change", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={sortNode} items={entries} onItems={vi.fn()} />);
+
+    // Alpha is the oldest, so it sits third under the declared order and first
+    // once reversed -- a display-position bug would strand the expansion.
+    await user.click(screen.getByText("Alpha"));
+    // Two controls, not one: the title field leads the expanded row and
+    // `details` follows it. This node is not `searchable`, so nothing outside
+    // the open row contributes a text input.
+    const EXPANDED_CONTROLS = 2;
+    expect(screen.getAllByRole("textbox")).toHaveLength(EXPANDED_CONTROLS);
+
+    await chooseOrder(user, "Oldest");
+
+    // Still exactly one expanded row, and still Alpha's. This holds because
+    // buildOrder sorts STORED indexes and `expanded` is keyed the same way --
+    // the invariant that made this feature a one-line change.
+    const alphaRow = screen.getByText("Alpha").closest("div.border-b");
+    expect(within(alphaRow).getAllByRole("textbox")).toHaveLength(EXPANDED_CONTROLS);
+    // Nothing else opened: the count on screen still matches the one row.
+    expect(screen.getAllByRole("textbox")).toHaveLength(EXPANDED_CONTROLS);
+  });
+});

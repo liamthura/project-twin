@@ -1306,7 +1306,22 @@ never writing. Five shipped nodes use it; this frame draws
   the list, and a bare `4 entries` otherwise. This is the same filter feedback the
   search/no-results state depends on.
 
-#### `Desktop — Sort` — order the user cannot change
+#### `Desktop — Sort` — superseded 2026-08-10: the order IS the user's now
+
+**The owner ruled that the sort control gets built** ("just the date sort for
+now (newest / oldest)"), which makes this frame's original premise false. The
+frame gained a `Sort` control and its caption was rewritten; the passage below
+is kept because the schema constraints it records are still exactly right, and
+they are what kept the built control display-only.
+
+What changed: the control offers `Newest` / `Oldest` on a date-formatted display
+field, defaults to the section's declared direction — so this node still opens
+newest-first — and writes nothing. What did not change: the stored array is
+never reordered, hand-reordering remains impossible, and a row whose date is
+missing or blank still sorts last in both directions. See
+`docs/superpowers/specs/2026-08-10-app-redesign-phase-2-design.md`.
+
+#### The original entry — order the user cannot change
 
 `learning_log/entries`, newest first, with `timestamp` shown as a `display_field`
 formatted `datetime`. Two things the schema forces and the frame shows:
@@ -1389,7 +1404,11 @@ Mobile Preferences ×2, and the four new frames.
 - **The `other` → `custom_*` conditional.** `goals.type` includes `other`, and
   choosing it reveals a `custom_type` input (the code deletes `custom_type` when
   the value moves away from `other`). No frame draws it.
-- **A user-facing sort control.** See above — real but new.
+- **A user-facing sort control.** ~~See above — real but new.~~ **Built
+  2026-08-10**, on the owner's ruling: `Newest` / `Oldest` on a date-formatted
+  display field, which today is `learning_log/entries` alone. It cost one line
+  in `ListRenderer.jsx` because `buildOrder` sorts stored indexes rather than
+  the array, and `expanded` is keyed the same way.
 - **No mobile frame for filters or sort.**
 
 ### Ruled: clay and verdigris are sanctioned in-app, 2026-08-10

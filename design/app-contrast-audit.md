@@ -14,32 +14,45 @@ Run: `node design/app-contrast.mjs`
 
 ## Result
 
-All pairs pass or are known, accepted, and tracked. Four of six badge tones
-failed on the first run, one Primary button state failed, and the rail's
-active row failed twice — each fixed at the token level, the same method the
-landing audit established. One pair — the input field boundary — fails and is
-**not** fixed here; see "Known, accepted failure" below for why.
+Four of six badge tones failed on the first run, one Primary button state
+failed, and the rail's active row failed twice — each fixed at the token level,
+the same method the landing audit established. The input field boundary failed
+and was ruled on separately (see below), as was the Switch's off/on track,
+which is the one pair still carried as a known, accepted failure.
 
-| Pair | Context | Need | Light | Dark |
-|---|---|---|---|---|
-| ink / paper | body and headings | 4.5 | 16.74 | 17.18 |
-| ink / card | text in cards | 4.5 | 17.49 | 15.97 |
-| muted-fg / paper | sub copy | 4.5 | 5.08 | 7.44 |
-| muted-fg / card | helper text, counts | 4.5 | 5.31 | 6.91 |
-| muted-fg / muted | segmented control, inactive | 4.5 | 4.87 | 6.17 |
-| link / paper | Ghost buttons, text links | 4.5 | 5.31 | 5.29 |
-| link / card | Tabs active, RailSubItem current | 4.5 | 5.55 | 4.91 |
-| link / indigo-tint | RailItem active row | 4.5 | 4.87 | 4.80 |
-| on-primary / indigo | Primary button label | 4.5 | 5.55 | 4.62 |
-| ink / muted | Badge Neutral | 4.5 | 16.03 | 14.24 |
-| indigo-ink / indigo-tint | Badge Primary | 4.5 | 4.87 | 8.53 |
-| success-ink / success-tint | Badge Positive | 4.5 | 5.21 | 10.96 |
-| destructive-ink / destructive-tint | Badge Critical | 4.5 | 5.91 | 9.13 |
-| warning-ink / warning-tint | Badge Warning | 4.5 | 6.84 | 11.58 |
-| verdigris / verdigris-tint | Badge Live | 4.5 | 4.55 | 4.95 |
-| muted-fg / clay-tint | delegate offer sub copy | 4.5 | 4.58 | 5.50 |
-| ink / clay-tint | delegate offer heading | 4.5 | 15.08 | 12.69 |
-| input border / card | text field boundary (WCAG 1.4.11) | 3.0 | 1.26 KNOWN | 1.21 KNOWN |
+Pairs now carry a **role**, because the absence of one is what let a token
+change break a control this table could not see: `text`, `boundary`, `fill` and
+`state` say which layer is being measured, so a token used two ways is reported
+twice. A `need` of `--` means reported but not enforced — no success criterion
+governs it, and inventing a threshold would either fail the build for no reason
+or teach the reader that the column is decorative.
+
+| Pair | Context | Role | Need | Light | Dark |
+|---|---|---|---|---|---|
+| ink / paper | body and headings | text | 4.5 | 16.74 | 17.18 |
+| ink / card | text in cards | text | 4.5 | 17.49 | 15.97 |
+| muted-fg / paper | sub copy | text | 4.5 | 5.08 | 7.44 |
+| muted-fg / card | helper text, counts | text | 4.5 | 5.31 | 6.91 |
+| muted-fg / muted | segmented control, inactive | text | 4.5 | 4.87 | 6.17 |
+| link / paper | Ghost buttons, text links | text | 4.5 | 5.31 | 5.29 |
+| link / card | Tabs active, RailSubItem current | text | 4.5 | 5.55 | 4.91 |
+| link / indigo-tint | RailItem active row | text | 4.5 | 4.87 | 4.80 |
+| on-primary / indigo | Primary button label | text | 4.5 | 5.55 | 4.62 |
+| ink / muted | Badge Neutral | text | 4.5 | 16.03 | 14.24 |
+| indigo-ink / indigo-tint | Badge Primary | text | 4.5 | 4.87 | 8.53 |
+| success-ink / success-tint | Badge Positive | text | 4.5 | 5.21 | 10.96 |
+| destructive-ink / destructive-tint | Badge Critical | text | 4.5 | 5.91 | 9.13 |
+| warning-ink / warning-tint | Badge Warning | text | 4.5 | 6.84 | 11.58 |
+| verdigris / verdigris-tint | Badge Live | text | 4.5 | 4.55 | 4.95 |
+| muted-fg / clay-tint | delegate offer sub copy | text | 4.5 | 4.58 | 5.50 |
+| ink / clay-tint | delegate offer heading | text | 4.5 | 15.08 | 12.69 |
+| input border / card | field, outline button, chip, switch track | boundary | 3 | 3.16 | 3.11 |
+| input border / paper | the same edges, on the page ground | boundary | 3 | 3.03 | 3.35 |
+| switch off / switch on | Switch off vs on track | state | 3 | 3.98 | 2.38 KNOWN |
+| switch off / card | off track on a card -- watched, not required | fill | -- | 1.39 | 1.59 |
+| switch off / muted | off track on a muted card | fill | -- | 1.38 | 1.60 |
+| switch thumb / off track | white thumb; reads by shadow and ring | fill | -- | 1.39 | 10.97 |
+| on-inverse / ground-inverse | landing dark break section | text | 4.5 | 16.03 | 14.27 |
 
 All pairs pass (or are known, accepted, and tracked).
 
@@ -48,8 +61,10 @@ All pairs pass (or are known, accepted, and tracked).
 **Ruled 2026-08-10 — the token moved, the exemption did not stand.** `--input`
 is now `20 6% 57%` Light and `60 2% 40%` Dark: in each mode, the *minimum*
 lightness that clears 3:1 against both `card` and `paper`. Measured 3.16/3.03
-Light and 3.11/3.35 Dark. `design/app-contrast.mjs`'s `KNOWN_FAILURES` list is
-now empty, and the pair passes on its own merits.
+Light and 3.11/3.35 Dark. The pair passes on its own merits, and its
+`KNOWN_FAILURES` entry was removed rather than weakened. (That list is not empty
+today — the Switch's off/on track pair joined it on 2026-08-10, for a different
+and unrelated reason.)
 
 **`border` deliberately did not move with it.** The two tokens held the same
 value for as long as they did because nobody had separated their jobs; they now
@@ -102,15 +117,52 @@ firmer hairline. The tradeoff was real in both directions, and the ruling went
 to the criterion: a field whose extent you cannot see is precisely what 1.4.11
 exists to prevent.
 
-### Still open: the Neutral button's edge
+### Resolved: the Neutral button's edge
 
-`Button`'s `Variant=Neutral` fills with `card` and sits on `card` surfaces, so
-its border is the only thing that identifies it as a control — the same
-argument that moved `--input`. Its stroke is still bound to `border`, measuring
-the same failing ~1.26. It was left alone because the ruling covered form
-fields, and a button is a distinct judgement: the label inside it is arguably
-identification enough, which is a defensible reading of 1.4.11 that a text
-field's empty box cannot claim. **Not fixed, not exempt — undecided.**
+**Ruled 2026-08-10 — the prototype was the thing out of step, not the app.**
+This was recorded here as undecided, on the reading that a button's label might
+be identification enough where a text field's empty box is not. Reading the code
+settled it: `button.jsx:13` binds `border-input`, not `border-border`, so the
+shipping `outline` button moved with `--input` and already measures **3.16**
+against `card` and **3.03** against `background`. The decision had in effect
+been taken years ago by shadcn's own convention, and the only thing still
+failing was the Figma prototype.
+
+Four `Button` `Variant=Neutral` variants were rebound from `border` to `input`
+(`VariableID:348:59`): `56:10` Default, `56:12` Hover, `56:14` Pressed and
+`56:18` Loading. `56:16` Disabled was deliberately left on `border`, the same
+rule the 48 field strokes followed — 1.4.11 exempts inactive components.
+
+### Found while closing that: two consumers nothing had measured
+
+Ruling 1 was verified against the pair it was made for and reported "All pairs
+pass", which was true and incomplete. `--input` has **nine consumers** in
+`frontend/src`, and this table could only ever see one of them, as a border,
+against `card`.
+
+- **`switch.jsx:28` used `bg-input` as the track FILL**, justified in its own
+  comment as "the token every field border already uses" — an assumption the
+  ruling invalidated. The off track went 90% → 57% lightness Light and 16% →
+  40% Dark, so **Off came to outweigh On**, inverting the one thing a switch
+  communicates. The same line bound the switch's own boundary to `border` at
+  1.26, a pre-existing 1.4.11 failure the dark fill had been masking. Both
+  layers moved: off is now `border-input bg-muted-foreground/25`, hover `/40`.
+- **`Faq.jsx:136` on the landing page** renders its non-primary CTA as
+  `variant="outline"`, so that edge darkened too, inside a card whose own
+  hairline did not. Accepted — a control is a control on a marketing page — and
+  recorded in `design/contrast-audit.md`.
+
+`design/app-contrast.mjs` was extended so this class of miss is visible next
+time: pairs now carry a **role** (`text`, `boundary`, `fill`, `state`) so a
+token used two ways is reported twice, and the ground set includes the landing
+page's `ground-inverse`. A `need` of `--` means reported but not enforced, for
+numbers worth watching that no success criterion governs.
+
+The Switch's off/on track pair measures **2.38 in Dark** and is entered in
+`KNOWN_FAILURES` with its reasoning: a switch conveys state by thumb
+**position**, not colour, and closing that gap would mean either a heavier off
+state — the defect just fixed — or moving `indigo`, which every Primary button
+reads.
 
 ## What was wrong, and why
 
@@ -152,13 +204,18 @@ The ground had to move: `indigo-tint` Dark went from a pale, low-contrast tint
 to `rgb(28,26,45)`, after which `link`/`indigo-tint` clears at 4.80 (and 4.87
 in Light, which needed no change).
 
-**Known and accepted:** icon vector strokes in `02 Components` were left bound
-to `indigo` rather than rebound to `link` alongside the text nodes Task 3
-moved. The two tokens are identical in Light and only marginally different in
-Dark, and icon strokes sit at the 3.0 large-text/component threshold under
-either token, so the practical risk is nil — but the file is not internally
-consistent on this point, and it should be swept the next time either token's
-value changes.
+**Swept 2026-08-10, and not where this note implied.** Icon vector strokes in
+`02 Components` had been left bound to `indigo` rather than `link`, alongside
+the text nodes Task 3 moved. The obvious fix — rebind the icon component — would
+have been wrong: `IconProfile` (`220:30`) binds both its vectors to **`ink`**,
+correctly, and changing it would have recoloured every icon in the file,
+inactive rail rows included.
+
+The eight `indigo` readings were **instance-level override paints** on four
+`RailItem` active-state variants — `75:51`, `75:52`, `75:53`, `75:54` — i.e. the
+active rail row's icon, which should read `link` alongside its own label. Those
+eight paints were rebound; `220:30` was not touched. Verified by read-back: no
+vector on `02 Components` binds `indigo`.
 
 ## Not measured
 
@@ -169,8 +226,9 @@ artwork, which the app does not use — that's a landing-page-only surface (see
 `border`/`card` (hairline dividers) was in an earlier draft of this script at
 a 3.0 threshold and measured 1.26 Light / 1.21 Dark — a clear fail, but not a
 token defect: `border` is a decorative separator, exempt from WCAG 1.4.11 (see
-"Known, accepted failure" above, which covers this token's other use — the
-input field boundary — where the same exemption does *not* apply). Including
+"Resolved: the input field boundary" above, which covers the use this token
+*used* to share with `--input` — a field's edge — where the same exemption does
+not apply, and which is why the two no longer hold the same value). Including
 the divider pair under an enforced threshold was a scope bug in the
 calculator, not a colour problem; it has been removed from
 `design/app-contrast.mjs` rather than weakened to a passing threshold.
