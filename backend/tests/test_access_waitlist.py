@@ -44,7 +44,10 @@ def test_waitlist_lists_who_is_waiting(waiting):
 def test_waitlist_says_so_when_nobody_is_waiting():
     result = run_cli("waitlist")
     assert result.returncode == 0
-    assert "nobody waiting" in result.stdout
+    assert "Nobody waiting" in result.stdout
+    # An empty list is the most likely moment for someone to wonder where the
+    # addresses were supposed to come from, so the empty state answers it.
+    assert "landing page" in result.stdout
 
 
 def test_admit_mints_a_code_and_stamps_the_row(waiting):
@@ -122,3 +125,55 @@ def test_output_is_not_buried_in_pool_shutdown_noise(waiting):
     closed, which would bury the code you just minted."""
     result = run_cli("admit", waiting)
     assert "couldn't stop thread" not in result.stderr
+
+
+# --- finding your way around ------------------------------------------------
+
+
+def test_bare_invocation_explains_itself_without_a_database():
+    """argparse's own answer to a missing subcommand is "invalid choice", which
+    tells someone who typed the script name hoping to be told what it does
+    precisely nothing. And it must not need DATABASE_URL, because not knowing
+    what the script is and not having the variable set are the same moment."""
+    env = {k: v for k, v in os.environ.items() if k != "DATABASE_URL"}
+    result = subprocess.run(
+        [sys.executable, str(BACKEND / "scripts" / "access.py")],
+        capture_output=True, text=True, env=env, cwd=str(BACKEND),
+    )
+
+    assert result.returncode == 0
+    assert "WAITLIST" in result.stdout
+    assert "CODES" in result.stdout
+    assert "access.py admit" in result.stdout
+
+
+def test_help_is_a_command_as_well_as_a_flag():
+    result = run_cli("help")
+    assert result.returncode == 0
+    assert "WAITLIST" in result.stdout
+
+
+def test_listings_end_with_what_to_do_next(waiting):
+    run_cli("mint", "--label", "somebody")
+
+    assert "access.py admit" in run_cli("waitlist").stdout
+    assert "access.py revoke" in run_cli("codes").stdout
+
+
+def test_empty_listings_say_how_to_fill_them(waiting):
+    """The empty state is the moment someone most needs the next command, and
+    the moment a bare table gives them the least."""
+    assert "access.py mint" in run_cli("codes").stdout
+
+    run_cli("drop", waiting)
+    assert "landing page" in run_cli("waitlist").stdout
+
+
+def test_columns_are_sized_to_the_content_not_truncated():
+    """A long address must survive intact. The fixed 38-column version cut it
+    at 37 characters, which is a silent corruption of the one field you need
+    in order to email the person."""
+    long_address = "maya.ellis.marketing.assistant@northgate-studio.example.com"
+    waitlist_store.join(long_address)
+
+    assert long_address in run_cli("waitlist").stdout

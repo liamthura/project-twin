@@ -80,6 +80,74 @@ def normalise_code(code: str) -> str:
     return normalised
 
 
+# ------------------------------------------------------------------ printing
+def table(headers: list[str], rows: list[list[str]]) -> None:
+    """Columns sized to their contents, not to a guess.
+
+    The old fixed widths truncated a 38-character address to 37 and padded a
+    short one by twenty spaces. Both are the same mistake: the column knows how
+    wide it needs to be, so let it work it out.
+    """
+    widths = [
+        max(len(headers[i]), *(len(row[i]) for row in rows)) for i in range(len(headers))
+    ]
+    line = "  " + "  ".join(h.ljust(widths[i]) for i, h in enumerate(headers))
+    print(line.rstrip())
+    for row in rows:
+        print(("  " + "  ".join(c.ljust(widths[i]) for i, c in enumerate(row))).rstrip())
+
+
+def hint(*lines: str) -> None:
+    """What to do next.
+
+    Every command that shows a list ends with one. Someone reading a waitlist
+    wants to invite somebody off it, and making them go back to --help to find
+    out how is a small tax charged every single time.
+
+    Lines shaped `label: command` are aligned on the colon, by measuring rather
+    than by padding them by hand -- the hand-padded version was already crooked
+    the first time it printed, because "Show invited too:" is a character wider
+    than the two lines above it.
+    """
+    print()
+    labelled = [line.split(":", 1) for line in lines if ":" in line]
+    width = max((len(label) for label, _ in labelled), default=0)
+    for line in lines:
+        if ":" in line:
+            label, rest = line.split(":", 1)
+            print(f"  {(label + ':').ljust(width + 1)} {rest.strip()}")
+        else:
+            print(f"  {line}")
+
+
+def overview() -> None:
+    """What `access.py` on its own prints.
+
+    argparse's own error for a missing subcommand is "invalid choice", which
+    tells someone who typed the script name hoping to be told what it does
+    exactly nothing. This is what they were asking for.
+    """
+    print(__doc__.strip().split("\n")[0])
+    print()
+    print("  WAITLIST")
+    print("    waitlist [--all]            who is waiting, oldest first")
+    print("    admit EMAIL [--expires 30d] mint a code and stamp them invited")
+    print("    drop EMAIL                  remove an address")
+    print()
+    print("  CODES")
+    print("    codes [--all]               invite codes and their state")
+    print('    mint --label "who"          a code with no waitlist row')
+    print("    revoke CODE                 close a code to new sign-ups")
+    print()
+    print("  EXAMPLES")
+    print("    access.py waitlist")
+    print("    access.py admit sarah@example.com --expires 30d")
+    print('    access.py mint --label "reddit thread" --uses 10 --expires 30d')
+    print()
+    print("  Run where DATABASE_URL reaches the database -- in the container.")
+    print("  access.py <command> --help explains one command.")
+
+
 # ------------------------------------------------------------------- invites
 def create_code(label: str, uses: int, expires: str | None) -> str:
     if uses < 1:
@@ -129,16 +197,35 @@ def list_codes(show_all: bool) -> None:
 
     rows = [r for r in rows if show_all or status_of(r) == "active"]
     if not rows:
-        where = "" if show_all else " active"
-        print(f"  no{where} codes. Mint one with:  access.py mint --label ...")
+        print("  No active codes." if not show_all else "  No codes at all.")
+        hint('Mint one:  access.py mint --label "who it is for"')
         return
 
-    print(f"  {'CODE':<11} {'LABEL':<24} {'USED':<7} {'EXPIRES':<12} STATUS")
-    for row in rows:
-        used = f"{row['uses']}/{row['max_uses']}"
-        expires = row["expires_at"].strftime("%Y-%m-%d") if row["expires_at"] else "—"
-        label = row["label"][:23]
-        print(f"  {row['code']:<11} {label:<24} {used:<7} {expires:<12} {status_of(row)}")
+    table(
+        ["CODE", "LABEL", "USED", "EXPIRES", "STATUS"],
+        [
+            [
+                row["code"],
+                row["label"],
+                f"{row['uses']}/{row['max_uses']}",
+                row["expires_at"].strftime("%Y-%m-%d") if row["expires_at"] else "—",
+                status_of(row),
+            ]
+            for row in rows
+        ],
+    )
+
+    if show_all:
+        hint(
+            "active = usable   spent = all uses taken",
+            "expired = past its date   revoked = closed by hand",
+            "Revoke one: access.py revoke <code>",
+        )
+    else:
+        hint(
+            "Revoke one: access.py revoke <code>",
+            "Include the rest: access.py codes --all",
+        )
 
 
 def revoke(code: str) -> None:
@@ -179,17 +266,29 @@ def revoke(code: str) -> None:
 def show_waitlist(show_all: bool) -> None:
     rows = waitlist_store.listing(include_invited=show_all)
     if not rows:
-        print("  nobody waiting." if not show_all else "  the waitlist is empty.")
+        print("  Nobody waiting." if not show_all else "  The waitlist is empty.")
+        hint("The form on the landing page adds people here.")
         return
 
-    print(f"  {'EMAIL':<38} {'JOINED':<12} INVITED")
-    for row in rows:
-        joined = row["created_at"].strftime("%Y-%m-%d")
-        invited = row["invited_at"].strftime("%Y-%m-%d") if row["invited_at"] else "—"
-        print(f"  {row['email'][:37]:<38} {joined:<12} {invited}")
+    table(
+        ["EMAIL", "JOINED", "INVITED"],
+        [
+            [
+                row["email"],
+                row["created_at"].strftime("%Y-%m-%d"),
+                row["invited_at"].strftime("%Y-%m-%d") if row["invited_at"] else "—",
+            ]
+            for row in rows
+        ],
+    )
 
     pending = waitlist_store.pending_count()
     print(f"\n  {pending} waiting.")
+    hint(
+        "Send one a code: access.py admit <email> --expires 30d",
+        "Remove one: access.py drop <email>",
+        *([] if show_all else ["Show invited too: access.py waitlist --all"]),
+    )
 
 
 def admit(email: str, uses: int, expires: str | None) -> None:
@@ -213,9 +312,15 @@ def admit(email: str, uses: int, expires: str | None) -> None:
 
     expires_at = parse_expiry(expires) if expires else None
     when = expires_at.strftime("%Y-%m-%d") if expires_at else "no expiry"
-    print(f"  {email}")
-    print(f"  {code}   {uses} use{'' if uses == 1 else 's'}   {when}")
+    table(
+        ["EMAIL", "CODE", "USES", "EXPIRES"],
+        [[email, code, str(uses), when]],
+    )
     print(f"\n  {waitlist_store.pending_count()} still waiting.")
+    hint(
+        "Send them the code with the sign-up link.",
+        "Nothing has emailed them -- that part is still you.",
+    )
 
 
 def drop(email: str) -> None:
@@ -226,8 +331,23 @@ def drop(email: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    sub = parser.add_subparsers(dest="command", required=True)
+    parser = argparse.ArgumentParser(
+        description=__doc__.split("\n")[0],
+        epilog=(
+            "examples:\n"
+            "  access.py waitlist\n"
+            "  access.py admit sarah@example.com --expires 30d\n"
+            '  access.py mint --label "reddit thread" --uses 10 --expires 30d\n'
+            "\nRun where DATABASE_URL reaches the database -- in the container."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    # Not required: a bare `access.py` prints the overview instead of argparse's
+    # "invalid choice", which tells someone who typed the name hoping to be told
+    # what it does precisely nothing.
+    sub = parser.add_subparsers(dest="command")
+
+    sub.add_parser("help", help="what all of this does")
 
     p_waitlist = sub.add_parser("waitlist", help="who is waiting")
     p_waitlist.add_argument(
@@ -261,6 +381,13 @@ def main() -> None:
     p_revoke.add_argument("code")
 
     args = parser.parse_args()
+
+    # No database connection for these two, so they work in a checkout with no
+    # DATABASE_URL set -- which is exactly when someone is trying to find out
+    # what the script is.
+    if args.command in (None, "help"):
+        overview()
+        return
 
     try:
         if args.command == "waitlist":
