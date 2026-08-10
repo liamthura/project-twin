@@ -2857,3 +2857,59 @@ describe("the save tick", () => {
     }
   });
 });
+
+// The anchor contract, re-proved against the structure that now carries it.
+// Slice 1 stamped `data-band` on the depth-0 wrapper when that wrapper was a
+// heading block inside one big Card; slice 2 replaced every one of those
+// wrappers. The contract itself did not change, which is exactly the kind of
+// claim worth a test rather than a comment.
+describe("scroll-spy anchors, after the restructure", () => {
+  const anchors = () => [...document.querySelectorAll("[data-band]")];
+  const ids = () => anchors().map((el) => el.dataset.band);
+
+  for (const [name, pack, data] of [
+    ["profile", profilePack, profileData],
+    ["preferences", preferencesPack, preferencesData],
+    ["lifestyle", lifestylePack, lifestyleData],
+    ["knowledge", knowledgePack, knowledgeData],
+  ]) {
+    it(`stamps ${name} with exactly the ids the rail lists, in order`, () => {
+      // Against outline() rather than a hand-written list: the rail renders its
+      // sub-items from that function, and two derivations of the same ids is the
+      // one thing this contract cannot afford.
+      render(<SectionRenderer pack={pack} data={data} onChange={vi.fn()} />);
+      expect(ids()).toEqual(outline(pack).map((b) => b.id));
+    });
+  }
+
+  it("puts a group's anchor on the wrapper that holds its label, not on its cards", () => {
+    // Scrolling to a group has to land ON the eyebrow. An anchor on the grid
+    // instead would leave the label above the viewport, which reads as landing
+    // in the middle of a group.
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+
+    const anchor = document.querySelector('[data-band="code-style"]');
+    expect(anchor.querySelector("[data-eyebrow-rule]")).not.toBeNull();
+    expect(anchor.querySelectorAll("[data-subsection-card]").length).toBeGreaterThan(1);
+  });
+
+  it("puts a leaf's anchor on its own card", () => {
+    render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
+    const anchor = document.querySelector('[data-band="education"]');
+    expect(anchor.hasAttribute("data-subsection-card")).toBe(true);
+  });
+
+  it("stamps nothing inside a card -- a grouped child is not a rail destination", () => {
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+    for (const card of document.querySelectorAll("[data-subsection-card]")) {
+      // A card may BE an anchor (a top-level leaf); it may not CONTAIN one.
+      expect(card.querySelectorAll("[data-band]")).toHaveLength(0);
+    }
+  });
+
+  it("clears the sticky header from every anchor, whichever kind it is", () => {
+    render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
+    expect(anchors().length).toBeGreaterThan(0);
+    for (const el of anchors()) expect(el.className).toContain("scroll-mt-[60px]");
+  });
+});

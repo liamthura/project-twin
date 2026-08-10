@@ -281,6 +281,28 @@ describe("App: clicking a sub-item goes there", () => {
     scrollIntoView.mockRestore();
   });
 
+  it("scrolls to a group's band, which is a different element from a leaf's", async () => {
+    // The existing cases above use `education`, a top-level leaf whose anchor is
+    // its own card. A group's anchor is the wrapper holding its eyebrow label and
+    // all of its cards -- a different element produced by a different branch, and
+    // the one that would be missed if only leaves were covered.
+    mockApi({ packs: packsFixture });
+    const user = userEvent.setup();
+    const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView");
+    render(<App />);
+
+    await waitFor(() => expect(railItem(/Contact & Links/)).toBeTruthy());
+    await user.click(railItem(/Contact & Links/));
+
+    await waitFor(() => {
+      const target = document.querySelector('[data-band="contact-links"]');
+      expect(target).not.toBeNull();
+      expect(target.hasAttribute("data-subsection-card")).toBe(false);
+      expect(scrollIntoView.mock.instances).toContain(target);
+    });
+    scrollIntoView.mockRestore();
+  });
+
   it("does not scroll when only a section was chosen", async () => {
     // A section click means "start at the top", which is where the page already
     // is after a section change. Scrolling to nothing in particular would fight
