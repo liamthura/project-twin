@@ -12,6 +12,7 @@ import contextlib
 import copy
 import hashlib
 import json
+import mimetypes
 import os
 import re
 import secrets
@@ -44,6 +45,20 @@ import proposals_store
 import scopes
 import sections
 import settings_store
+import waitlist_store
+
+# StaticFiles types a response from `mimetypes.guess_type`, and Python 3.11's
+# built-in table has no `.webp`. The runtime image is slim enough to have no
+# /etc/mime.types to fall back on either, so the landing page's gradients went
+# out as `text/plain; charset=utf-8` -- and this app sends
+# X-Content-Type-Options: nosniff, so a browser refuses to render them at all.
+# Invisible artwork, 200 OK, nothing in any log.
+#
+# Registered here rather than fixed in the Dockerfile (by installing a mime
+# database) so it holds wherever this runs, including a bare `uvicorn main:app`
+# on a developer's machine. `vite dev` sets the type itself, which is why this
+# never showed up until the image was run.
+mimetypes.add_type("image/webp", ".webp")
 from persona_store import VALID_FILES
 
 # Aliases keep every existing route body -- read_json_file(file_type) /
@@ -218,6 +233,9 @@ async def auth_middleware(request: Request, call_next):
         # Read before anyone has a credential, because it decides which sign-in
         # screen to show. Carries no user data.
         "/api/instance",
+        # Left by someone who has no account and is asking for one. Requiring a
+        # credential here would mean only existing users could join a waitlist.
+        "/api/waitlist",
         # OAuth discovery. Read before the client has any credential at all --
         # that is the entire point of them.
         "/.well-known/oauth-protected-resource",
@@ -503,6 +521,30 @@ async def instance():
     is shown.
     """
     return {"invite_only": invite_only()}
+
+
+class WaitlistRequest(BaseModel):
+    email: str
+
+
+@app.post("/api/waitlist")
+async def join_waitlist(body: WaitlistRequest):
+    """Leave an address while the instance is invite-only.
+
+    Public, because the person has no account -- that is what they are asking
+    for. It is therefore the one write a stranger can reach, so it validates
+    its own input rather than trusting an authenticated caller.
+
+    The response does not distinguish a new address from one already on the
+    list. Both get the same 200 and the same body. Saying "you are already on
+    the list" would confirm an address to whoever typed it, which turns the
+    form into a membership oracle for the price of one request.
+    """
+    try:
+        waitlist_store.join(body.email)
+    except waitlist_store.InvalidEmailError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"ok": True}
 
 
 @app.post("/api/auth/register", deprecated=True)
@@ -1021,6 +1063,22 @@ def register_static_routes(app: FastAPI, static_dir: Path) -> bool:
         return FileResponse(
             static_dir / "index.html", headers={"Cache-Control": "no-cache"}
         )
+
+    # Marketing-page artwork: the gradient edge strip and hero field.
+    #
+    # A mount rather than a route per file, unlike favicon.svg and logo.svg
+    # below. Those two are a closed set; this is a directory that grows, and
+    # the per-file alternative means remembering to add a route every time
+    # something is added to it -- which is exactly how the first four of these
+    # came to 404 in a built image while working perfectly under `vite dev`,
+    # whose dev server serves the whole of public/ and so hides the problem.
+    #
+    # Plain StaticFiles, not ImmutableStaticFiles: these filenames are stable
+    # rather than content-hashed, so immutable caching would pin a gradient
+    # that had since been regenerated. ETag revalidation is the right trade.
+    landing_dir = static_dir / "landing"
+    if landing_dir.is_dir():
+        app.mount("/landing", StaticFiles(directory=landing_dir), name="landing")
 
     @app.get("/favicon.svg", include_in_schema=False)
     async def favicon() -> Response:

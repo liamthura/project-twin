@@ -33,9 +33,15 @@ import {
   normaliseInvite,
 } from "@/lib/session.js";
 
-// input-otp filters keystrokes against this. Restricting it to the mintable
-// alphabet means a typed `O` or `I` is simply not accepted, rather than
-// accepted and then rejected by the server as a code that never existed.
+// Handed to input-otp, which filters keystrokes against it -- but `*` matches
+// the empty string and the expression is used unanchored, so in practice this
+// admits everything. `normaliseInvite` in onChange is what actually drops a
+// typed `O` or `I`, and it covers paste and the invite link too, which a
+// keystroke filter never would.
+//
+// Left unanchored deliberately. `^[...]$` would make the filter real and would
+// then reject the first lowercase keystroke, breaking the promise printed under
+// the field that case does not matter.
 const PATTERN = `[${INVITE_ALPHABET}]*`;
 
 export function InviteGate({ initialCode, onAccepted, onBack }) {
@@ -102,6 +108,16 @@ export function InviteGate({ initialCode, onAccepted, onBack }) {
             id="invite-code"
             maxLength={INVITE_LENGTH}
             pattern={PATTERN}
+            // input-otp defaults this to "numeric", which is right for the
+            // one-time codes it was written for and wrong here: two thirds of
+            // the invite alphabet is letters, so a phone raises the number pad
+            // and the code cannot be typed at all. Invisible on a desktop,
+            // where every keyboard has everything.
+            inputMode="text"
+            // The alphabet is uppercase, and normaliseInvite would fix the case
+            // anyway -- but a keyboard that shows the case it will produce is
+            // less unnerving than one whose letters arrive changed.
+            autoCapitalize="characters"
             value={code}
             onChange={(value) => {
               setCode(normaliseInvite(value));

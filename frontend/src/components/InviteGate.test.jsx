@@ -62,6 +62,19 @@ describe("entering a code", () => {
     await waitFor(() => expect(onAccepted).toHaveBeenCalledWith("7F2K-QX91"));
   });
 
+  it("uppercases as you go, not just on the way out", async () => {
+    // The alphabet is uppercase, so a code typed in lowercase has to LOOK
+    // accepted while it is being typed. Sibling test above covers the value
+    // handed on; this covers the eight slots someone is actually watching.
+    const user = userEvent.setup();
+    open();
+
+    // Seven, so this lands before the auto-submit on the eighth.
+    await user.type(codeField(), "7f2kqx9");
+
+    expect(codeField()).toHaveValue("7F2KQX9");
+  });
+
   it("refuses characters that can never appear in a code", async () => {
     // I, L, O and U are excluded because they are misread for 1, 1, 0 and each
     // other. Filtering the keystroke is kinder than accepting it and having the
@@ -73,6 +86,15 @@ describe("entering a code", () => {
 
     expect(codeField()).toHaveValue("");
     expect(checkInvite).not.toHaveBeenCalled();
+  });
+
+  it("asks for a keyboard that has letters on it", async () => {
+    // input-otp defaults inputMode to "numeric", which on a phone raises the
+    // number pad -- and two thirds of the invite alphabet is letters, so the
+    // code simply cannot be typed. Nothing about this is visible on a desktop.
+    open();
+
+    expect(codeField()).toHaveAttribute("inputmode", "text");
   });
 
   it("submits on its own once the last slot is filled", async () => {

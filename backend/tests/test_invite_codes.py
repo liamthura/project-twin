@@ -29,7 +29,7 @@ sys.path.insert(0, str(BACKEND))
 
 import db  # noqa: E402
 import main  # noqa: E402
-from scripts.invite import ALPHABET, generate_code, parse_expiry  # noqa: E402
+from scripts.access import ALPHABET, generate_code, parse_expiry  # noqa: E402
 
 
 @pytest.fixture
@@ -222,7 +222,7 @@ def test_an_unreadable_expiry_is_refused_rather_than_guessed():
 
 def run_cli(*args):
     return subprocess.run(
-        [sys.executable, str(BACKEND / "scripts" / "invite.py"), *args],
+        [sys.executable, str(BACKEND / "scripts" / "access.py"), *args],
         capture_output=True,
         text=True,
         env={**os.environ, "DATABASE_URL": os.environ["DATABASE_URL"]},
@@ -230,12 +230,12 @@ def run_cli(*args):
     )
 
 
-def test_mint_then_list_shows_the_code(tmp_path):
+def test_mint_then_codes_shows_the_code(tmp_path):
     minted = run_cli("mint", "--label", "sarah (course)")
     assert minted.returncode == 0
     code = minted.stdout.split()[0]
 
-    listed = run_cli("list")
+    listed = run_cli("codes")
     assert code in listed.stdout
     assert "sarah (course)" in listed.stdout
     assert "active" in listed.stdout
@@ -248,8 +248,8 @@ def test_revoke_closes_it_and_says_what_that_does_not_do():
 
     assert revoked.returncode == 0
     assert code in revoked.stdout
-    assert run_cli("list").stdout.count(code) == 0
-    assert code in run_cli("list", "--all").stdout
+    assert run_cli("codes").stdout.count(code) == 0
+    assert code in run_cli("codes", "--all").stdout
 
 
 def test_revoking_an_unknown_code_fails_loudly():
