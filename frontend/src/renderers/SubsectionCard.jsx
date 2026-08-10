@@ -15,8 +15,24 @@ import { Check } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { InfoButton } from "@/components/ui/info-button";
+import { cn } from "@/lib/utils";
 
-export function SubsectionCard({ title, info, depth = 0, action, count, tick, children }) {
+export function SubsectionCard({
+  title,
+  info,
+  description,
+  depth = 0,
+  action,
+  count,
+  tick,
+  className,
+  children,
+  // The scroll-spy anchor rides on the card for a top-level leaf, so
+  // `data-band` / `data-ui-node` are spread from the caller rather than being
+  // props this component knows about. Keeps the anchor contract in one place --
+  // SectionRenderer, reading outline().
+  ...rest
+}) {
   // The same depth rule the old NodeHeading used, so the visual tier cap does
   // not flatten the document outline with it: page title h2, top-level node h3,
   // grouped child h4.
@@ -24,7 +40,11 @@ export function SubsectionCard({ title, info, depth = 0, action, count, tick, ch
   const hasRight = Boolean(tick || count || action);
 
   return (
-    <Card data-subsection-card className="rounded-xl p-4 shadow-none">
+    <Card
+      data-subsection-card
+      className={cn("rounded-xl p-4 shadow-none", className)}
+      {...rest}
+    >
       <div data-card-header className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <Heading className="truncate text-base font-semibold text-foreground">{title}</Heading>
@@ -44,6 +64,11 @@ export function SubsectionCard({ title, info, depth = 0, action, count, tick, ch
           </div>
         )}
       </div>
+      {/* A node's own `description`. The prototype's cards have no line for one
+          -- but eleven nodes across the manifests declare one, and the copy
+          used to render nowhere at all for `fields` and `list` nodes, which was
+          a bug worth fixing rather than repeating. */}
+      {description && <p className="mt-1 text-[13px] text-muted-foreground">{description}</p>}
       <div data-card-content className="mt-3">
         {children}
       </div>
