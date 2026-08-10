@@ -77,6 +77,12 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // radius-xl, the subsection card. Tailwind's own default xl is 0.75rem,
+        // which happens to equal the 12px the prototype measures -- so without
+        // this line the card would look right and stop looking right the moment
+        // --radius moved. The scale is concentric (a 12 card holds 8 rows holds
+        // 6 inputs), which only holds if all four derive from the same value.
+        xl: "calc(var(--radius) + 4px)",
       },
       fontFamily: {
         sans: ["Geist", "system-ui", "sans-serif"],

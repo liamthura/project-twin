@@ -187,6 +187,29 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   display: none;
 }
 
+/* The per-card save tick: a check scaling 0.8 to 1 with a fade, then held and
+   faded out by a JS timer in SectionRenderer. The design spec asks for 160ms,
+   which is off the scale and is an entrance, so the snap rule takes the longer
+   token (200ms, `medium`).
+
+   Entrance only. The hold and the exit deliberately live outside this keyframe:
+   the reduced-motion block below forces animation-duration to 1ms on
+   everything, which would erase a keyframed 1.2s hold entirely, while the
+   exit's data-motion="fade" survives there at 100ms. */
+@keyframes save-tick-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-save-tick-in {
+  animation: save-tick-in var(--duration-medium) var(--ease-decelerate);
+}
+
 /* Reduced motion, collapsed centrally rather than opted into per component --
    a component cannot forget what it never had to remember.
 
