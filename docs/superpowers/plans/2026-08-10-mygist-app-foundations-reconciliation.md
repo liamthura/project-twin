@@ -179,9 +179,12 @@ Re-run Step 1's script. Expected: `muted-fg` Light `rgb(113,106,102)`, `indigo` 
 
 - [ ] **Step 5: Commit**
 
+Tasks 1–3 change Figma only, so there is nothing to stage. `--allow-empty` records the
+milestone in history, which is this repo's established practice for design-only work
+(see `git log` for the `chore: … built in Figma Ti7FlZLYOvX3goyvfypJBk` commits).
+
 ```bash
-git add -A
-git commit -m "design: split link from indigo, add on-primary, correct two stale token values
+git commit --allow-empty -m "design: split link from indigo, add on-primary, correct two stale token values
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
@@ -354,8 +357,7 @@ Use `get_screenshot` on `58:23`. Expected: six pills, each with a pale ground an
 - [ ] **Step 6: Commit**
 
 ```bash
-git add -A
-git commit -m "design: badge tones get designed tints instead of a 12% wash of themselves
+git commit --allow-empty -m "design: badge tones get designed tints instead of a 12% wash of themselves
 
 Four of six tones failed AA -- Warning at 2.52. Grounds are now the same
 tint/ink pairs the app's own chip classes use, at opacity 1, which also
@@ -475,8 +477,7 @@ Use `get_screenshot` on `75:55` (RailItem, active row on the darkened tint), `56
 - [ ] **Step 6: Commit**
 
 ```bash
-git add -A
-git commit -m "design: interactive text binds to link, Primary labels to on-primary
+git commit --allow-empty -m "design: interactive text binds to link, Primary labels to on-primary
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
