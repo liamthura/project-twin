@@ -40,7 +40,13 @@ export function useScrollSpy(ids, { rootMargin = "-60px 0px -60% 0px" } = {}) {
       (entries) => {
         for (const entry of entries) {
           const id = entry.target.dataset.band;
-          if (entry.isIntersecting) visible.set(id, entry.boundingClientRect.top);
+          // `?? 0` rather than a bare read: an entry without a
+          // boundingClientRect carries no ordering information, and treating
+          // that as position zero degrades to "first reported wins" instead of
+          // throwing. A real browser always supplies one -- the global test stub
+          // in test/setup.js does not, and dereferencing it there took App's
+          // whole render down.
+          if (entry.isIntersecting) visible.set(id, entry.boundingClientRect?.top ?? 0);
           else visible.delete(id);
         }
         // Nothing on screen: hold the previous answer rather than blanking the

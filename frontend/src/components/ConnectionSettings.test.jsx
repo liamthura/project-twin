@@ -134,3 +134,52 @@ describe("minting a token with a narrowed scope", () => {
     expect(requestedScopes).not.toContain("persona:write");
   });
 });
+
+// The autosave preference, evicted from the header in slice 1. It lands in this
+// panel rather than a new Account tab, because slice 5 rebuilds this dialog with
+// Account / Server / Token tabs and inventing one here would prejudge that.
+describe("the auto-save preference", () => {
+  const renderWith = (props) =>
+    render(
+      <ConnectionSettings
+        isOpen={true}
+        onClose={() => {}}
+        onConnectionChange={() => {}}
+        {...props}
+      />
+    );
+
+  it("shows the switch on, when saving as you type is enabled", () => {
+    renderWith({ isAutosaveEnabled: true, onAutosaveChange: () => {} });
+    expect(screen.getByRole("switch", { name: "Auto-save" })).toBeChecked();
+  });
+
+  it("shows the switch off, when it is not", () => {
+    renderWith({ isAutosaveEnabled: false, onAutosaveChange: () => {} });
+    expect(screen.getByRole("switch", { name: "Auto-save" })).not.toBeChecked();
+  });
+
+  it("reports a change upward rather than holding the state itself", () => {
+    // App owns it -- a dialog that is closed most of the time must not be the
+    // source of truth for how the app saves.
+    const onAutosaveChange = vi.fn();
+    renderWith({ isAutosaveEnabled: true, onAutosaveChange });
+    fireEvent.click(screen.getByRole("switch", { name: "Auto-save" }));
+    expect(onAutosaveChange).toHaveBeenCalledWith(false);
+  });
+
+  it("says what happens rather than naming the mechanism", () => {
+    // "Auto-save" alone does not tell you what the alternative is. The copy has
+    // to mention the button that appears when you turn this off.
+    renderWith({ isAutosaveEnabled: true, onAutosaveChange: () => {} });
+    expect(screen.getByText(/Save as you type/i)).toBeInTheDocument();
+    expect(screen.getByText(/Save now button/i)).toBeInTheDocument();
+  });
+
+  it("defaults to on when App has not passed the prop yet", () => {
+    // Every other call site in the tests renders without it; a default of
+    // `false` there would silently claim autosave is off.
+    render(<ConnectionSettings isOpen={true} onClose={() => {}} onConnectionChange={() => {}} />);
+    expect(screen.getByRole("switch", { name: "Auto-save" })).toBeChecked();
+  });
+});

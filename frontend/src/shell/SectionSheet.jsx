@@ -121,7 +121,11 @@ export function SectionSheet({
                 "Review",
                 REVIEW_ICON,
                 pendingCount > 0 ? (
-                  <Badge variant="secondary" className="ml-auto shrink-0 px-1.5 tabular-nums">
+                  <Badge
+                    variant="secondary"
+                    aria-label={`${pendingCount} waiting`}
+                    className="ml-auto shrink-0 px-1.5 tabular-nums"
+                  >
                     {pendingCount}
                   </Badge>
                 ) : null

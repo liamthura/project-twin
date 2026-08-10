@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 
 import { useScrollSpy } from "./useScrollSpy";
 import { mockIntersectionObserver } from "@/test/harness";
@@ -110,6 +110,23 @@ describe("useScrollSpy", () => {
     const observer = io.latest();
     unmount();
     expect(observer.disconnected).toBe(true);
+  });
+
+  it("survives an entry with no boundingClientRect", () => {
+    // The GLOBAL stub in test/setup.js reports { isIntersecting, intersectionRatio,
+    // target } and no rect. Dereferencing it there threw from inside the
+    // observer callback and took App's entire render down -- every App test
+    // failed with "Cannot read properties of undefined (reading 'top')" and no
+    // hint that scroll-spy was the cause.
+    render(<Probe ids={IDS} />);
+    const observer = io.latest();
+    act(() => {
+      observer.callback(
+        [...observer.targets].map((target) => ({ target, isIntersecting: true })),
+        observer
+      );
+    });
+    expect(current()).not.toBe("none");
   });
 
   it("does not rebuild its observer when the ids are re-derived unchanged", () => {

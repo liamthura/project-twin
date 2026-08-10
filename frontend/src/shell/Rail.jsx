@@ -134,7 +134,15 @@ export function Rail({
             // The number, not a dot. pendingCount is already fetched; spending
             // it on decoration and then explaining it in sr-only text was the
             // old shape.
-            <Badge variant="secondary" className="ml-auto shrink-0 px-1.5 tabular-nums">
+            <Badge
+              variant="secondary"
+              // The number is the visible affordance; the label is what a screen
+              // reader gets, because a bare "3" beside "Review" does not say
+              // three of what. The old dot carried that sentence in sr-only
+              // text, and the intent outlives the dot.
+              aria-label={`${pendingCount} waiting`}
+              className="ml-auto shrink-0 px-1.5 tabular-nums"
+            >
               {pendingCount}
             </Badge>
           ) : null

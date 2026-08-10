@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import packsFixture from "@/__fixtures__/packs.json";
 import circleData from "@/__fixtures__/data/circle.json";
@@ -78,38 +78,48 @@ function mockApi({ packs, disabledSections = [], pendingCount = 0 }) {
   });
 }
 
-describe("App: the Review tab says when something is waiting", () => {
-  function reviewTab() {
-    return screen.getAllByRole("tab").find((t) => t.textContent.includes("Review"));
-  }
+// The rail replaced the tab strip in slice 1, so these read buttons inside the
+// navigation landmark rather than role="tab". The behaviours are unchanged --
+// what is asserted is the same set of facts, through the shell that exists now.
+//
+// Scoped to the rail deliberately: the mobile SectionSheet is in the DOM too
+// (jsdom applies no CSS, so `md:hidden` hides nothing here), and an unscoped
+// query would match its trigger as well.
+const rail = () => screen.getByRole("navigation", { name: "Sections" });
+const railItem = (name) => within(rail()).getByRole("button", { name });
+const railItems = () => within(rail()).getAllByRole("button");
 
-  it("marks the Review tab when proposals are pending", async () => {
+describe("App: the rail says when something is waiting", () => {
+  it("shows the pending count as a number on Review", async () => {
     mockApi({ packs: packsFixture, pendingCount: 3 });
     render(<App />);
     await waitFor(() =>
-      expect(reviewTab().querySelector("[data-pending-dot]")).toBeTruthy(),
+      expect(within(railItem(/Review/)).getByText("3")).toBeInTheDocument()
     );
   });
 
-  it("leaves it unmarked when the queue is empty", async () => {
+  it("shows no count at all when the queue is empty", async () => {
     mockApi({ packs: packsFixture, pendingCount: 0 });
     render(<App />);
-    await waitFor(() => expect(reviewTab()).toBeTruthy());
-    expect(reviewTab().querySelector("[data-pending-dot]")).toBeNull();
+    await waitFor(() => expect(railItem(/Review/)).toBeTruthy());
+    expect(within(railItem(/Review/)).queryByText("0")).not.toBeInTheDocument();
   });
 
-  it("says out loud what the dot means, for anyone not looking at it", async () => {
+  it("says out loud what the number means, for anyone not looking at it", async () => {
+    // "3" beside "Review" does not say three of what. The old shape was a
+    // decorative dot plus sr-only text; the number is now the visible part and
+    // the sentence is its label.
     mockApi({ packs: packsFixture, pendingCount: 2 });
     render(<App />);
-    // A bare coloured circle is invisible to a screen reader.
     await waitFor(() =>
-      expect(reviewTab().textContent).toMatch(/2 waiting/i),
+      expect(railItem(/Review/).textContent).toMatch(/2/)
     );
+    expect(within(railItem(/Review/)).getByLabelText(/2 waiting/i)).toBeInTheDocument();
   });
 
   it("counts without marking anything seen", async () => {
-    // The dot polls from every tab. Listing marks rows seen, which is what
-    // protects them from eviction -- so the dot must never use that route.
+    // The count polls from every section. Listing marks rows seen, which is what
+    // protects them from eviction -- so it must never use that route.
     mockApi({ packs: packsFixture, pendingCount: 1 });
     render(<App />);
     await waitFor(() => expect(api).toHaveBeenCalledWith("/proposals/count"));
@@ -123,44 +133,40 @@ describe("App: circle and learning_log render through the renderer kit", () => {
     mockApi({ packs: packsFixture });
     render(<App />);
 
-    const tabs = await screen.findAllByRole("tab");
-    const names = tabs.map((t) => t.textContent);
-    const prefIdx = names.indexOf("Preferences");
-    const circleIdx = names.indexOf("Circle");
-    const learningIdx = names.indexOf("Learning Log");
+    await waitFor(() => expect(railItem(/Learning Log/)).toBeTruthy());
+    const names = railItems().map((b) => b.textContent);
+    const prefIdx = names.findIndex((n) => n.includes("Preferences"));
+    const circleIdx = names.findIndex((n) => n.includes("Circle"));
+    const learningIdx = names.findIndex((n) => n.includes("Learning Log"));
 
-    // Both now come from the dynamicPacks loop, which is rendered after the
-    // Preferences trigger; manifest position (circle 60, learning_log 70)
-    // decides their relative order within that loop.
     expect(prefIdx).toBeGreaterThan(-1);
     expect(circleIdx).toBeGreaterThan(prefIdx);
     expect(learningIdx).toBeGreaterThan(circleIdx);
 
-    // PACK_ICONS falling back to the generic Package icon for either key
-    // would still pass every other assertion in this file -- only the
-    // rendered icon class distinguishes "kept its icon" from "fell back".
-    expect(tabs[circleIdx].querySelector(".lucide-users")).toBeInTheDocument();
-    expect(tabs[circleIdx].querySelector(".lucide-package")).not.toBeInTheDocument();
-    expect(tabs[learningIdx].querySelector(".lucide-book-open")).toBeInTheDocument();
-    expect(tabs[learningIdx].querySelector(".lucide-package")).not.toBeInTheDocument();
+    // packIcon falling back to the generic Package icon for either key would
+    // still pass every other assertion here -- only the rendered icon class
+    // distinguishes "kept its icon" from "fell back".
+    expect(railItems()[circleIdx].querySelector(".lucide-users")).toBeInTheDocument();
+    expect(railItems()[circleIdx].querySelector(".lucide-package")).not.toBeInTheDocument();
+    expect(railItems()[learningIdx].querySelector(".lucide-book-open")).toBeInTheDocument();
+    expect(railItems()[learningIdx].querySelector(".lucide-package")).not.toBeInTheDocument();
   });
 
-  it("opens the Learning Log content under its new tab value (learning_log, not learning)", async () => {
+  it("opens the Learning Log content, and puts it in the address bar", async () => {
     mockApi({ packs: packsFixture });
     const user = userEvent.setup();
     render(<App />);
 
-    const learningTab = await screen.findByRole("tab", { name: /learning log/i });
-    await user.click(learningTab);
+    await waitFor(() => expect(railItem(/Learning Log/)).toBeTruthy());
+    await user.click(railItem(/Learning Log/));
 
-    // dynamicPacks renders both the trigger and the content with value={p.key}
-    // ("learning_log"). If the two ever disagreed -- e.g. a leftover
-    // value="learning" on one side -- clicking the trigger would never
-    // reveal this content, and Radix would just show nothing selected.
     expect(await screen.findByText("React Server Components")).toBeInTheDocument();
+    // A deliberate move, so it pushes -- and the key in the URL is the pack key
+    // (learning_log), not a display name.
+    expect(window.location.hash).toBe("#/learning_log");
   });
 
-  it("hides the Circle tab when disabled via p.enabled, not the deleted disabledSections guard", async () => {
+  it("hides the Circle item when disabled via p.enabled, not the deleted disabledSections guard", async () => {
     const packs = packsFixture.map((p) =>
       p.key === "circle" ? { ...p, enabled: false } : p
     );
@@ -169,8 +175,8 @@ describe("App: circle and learning_log render through the renderer kit", () => {
 
     // Wait for settings to actually load before asserting an absence --
     // otherwise this would trivially pass while packs is still [].
-    await screen.findByRole("tab", { name: /learning log/i });
-    expect(screen.queryByRole("tab", { name: /^circle$/i })).not.toBeInTheDocument();
+    await waitFor(() => expect(railItem(/Learning Log/)).toBeTruthy());
+    expect(within(rail()).queryByRole("button", { name: /^Circle$/ })).not.toBeInTheDocument();
   });
 
   it("saveAll flows circle and learning_log through ...packData now that neither is a bespoke editor", async () => {
@@ -178,13 +184,20 @@ describe("App: circle and learning_log render through the renderer kit", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole("tab", { name: /^circle$/i });
+    await waitFor(() => expect(railItem(/Learning Log/)).toBeTruthy());
 
-    // Auto-save is on by default, which hides the manual "Save changes"
-    // button. Turning it off does NOT itself save (App.jsx only saves on the
-    // ON transition), so this reveals the button without saveAll firing yet.
+    // Auto-save is on by default, which leaves the header chip reading "Saved"
+    // with no action. The preference moved out of the header in slice 1, so
+    // reaching it means opening Connection Settings -- and turning it off does
+    // NOT itself save (only the ON transition flushes), so this reveals the
+    // header's Save now without saveAll having fired yet.
+    await user.click(screen.getByRole("button", { name: "Account" }));
     await user.click(screen.getByRole("switch", { name: "Auto-save" }));
-    await user.click(screen.getByRole("button", { name: /save changes/i }));
+    // Radix marks the rest of the page aria-hidden while a dialog is open, so
+    // the header is genuinely unreachable until this closes -- which is correct
+    // behaviour, and means the test has to close it like a user would.
+    await user.keyboard("{Escape}");
+    await user.click(await screen.findByRole("button", { name: /save now/i }));
 
     await waitFor(() => {
       const putAll = api.mock.calls.find(

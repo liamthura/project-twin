@@ -74,7 +74,16 @@ function formatDate(iso) {
   return d.toISOString().slice(0, 10);
 }
 
-export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
+export function ConnectionSettings({
+  isOpen,
+  onClose,
+  onConnectionChange,
+  // Owned by App -- the same state the header's switch used to drive. Passed in
+  // rather than held here so a dialog that is closed most of the time is not the
+  // source of truth for how the app saves.
+  isAutosaveEnabled = true,
+  onAutosaveChange = () => {},
+}) {
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState("connection");
@@ -525,6 +534,33 @@ export function ConnectionSettings({ isOpen, onClose, onConnectionChange }) {
                 the detached-mode case: a token there carries no email and the
                 reset flow it feeds does not exist. */}
             {isSignedIn && <EmailSettings />}
+
+            {/* Auto-save, evicted from the header in slice 1. It is a
+                once-per-lifetime preference and it was competing with content
+                for the most valuable strip on the page.
+
+                It lands in this panel rather than a new Account tab: slice 5
+                rebuilds this dialog with Account / Server / Token tabs, and
+                inventing one here would prejudge that structure. The copy says
+                what happens rather than naming a mechanism -- "auto-save" alone
+                does not tell you the alternative is a button in the header. */}
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <div className="min-w-0 space-y-1">
+                <Label htmlFor="autosave-preference" className="text-sm font-medium">
+                  Save as you type
+                </Label>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Changes are saved automatically. Turn this off and the header
+                  keeps a Save now button instead.
+                </p>
+              </div>
+              <Switch
+                id="autosave-preference"
+                checked={isAutosaveEnabled}
+                onCheckedChange={onAutosaveChange}
+                aria-label="Auto-save"
+              />
+            </div>
 
             {/* Connection type */}
             <div className="space-y-2">
