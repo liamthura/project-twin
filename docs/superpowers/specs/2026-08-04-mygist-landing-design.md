@@ -494,7 +494,20 @@ reads as a scannable list of nine questions; half-open, it reads as three
 answers with six headings scattered between them. The prototype is now the thing
 that is out of step here, not the code.
 
-**Every answer is lifted from the repository, not written fresh.** Seven come
+**One answer deliberately departs from the canonical FAQ.** "Where does my data
+actually live?" ended with *"On the hosted instance it is mine, and you should
+trust it accordingly"* — the docs' own phrasing, and honest, but it asks a
+visitor to make a judgement they have no basis for two questions above a signup
+form. It now ends *"it sits on my server, and you can export all of it whenever
+you want"*, which keeps the admission and replaces the vague instruction with
+something the reader can act on. `GET /api/export` backs the claim.
+
+`docs-site/content/docs/use/faq.mdx` keeps its wording: there it is generic
+("if someone else hosts your instance"), addressed to people already running or
+using an instance rather than deciding whether to. This is a paraphrase, not a
+drift — do not "fix" it back.
+
+**Every other answer is lifted from the repository, not written fresh.** Seven come
 from `docs-site/content/docs/use/faq.mdx`, which is the canonical FAQ and was
 already grouped by topic. The rest come from `README.md` (which clients, running
 it yourself) and `frontend/src/components/Consent.jsx` (what an assistant may
