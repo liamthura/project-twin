@@ -75,12 +75,11 @@ export default {
       fontFamily: {
         sans: ["Geist", "system-ui", "sans-serif"],
         mono: ["Geist Mono", "monospace"],
-        // Display face, marketing page only, and only at 40px and above --
-        // below that the notches stop being a signal and it just reads as a
-        // slightly-off Geist. NO WEBFONT IS LOADED YET: the design was set in
-        // Stack Sans Notch inside Figma and the licensed file is not in the
-        // repo, so this currently falls through to Geist everywhere. See
-        // docs/superpowers/specs/2026-08-04-mygist-landing-design.md.
+        // Display face, marketing page only, and only at 40px and above. The
+        // floor is a role boundary rather than a legibility limit: a specimen
+        // at 28px showed the notches still read perfectly well. Display and
+        // body stay visibly separate, and the face stays an event.
+        // Loaded from Google Fonts in index.html, variable 200-700.
         display: ["Stack Sans Notch", "Geist", "system-ui", "sans-serif"],
       },
       keyframes: {
