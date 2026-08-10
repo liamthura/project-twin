@@ -313,9 +313,15 @@ holding position pending a decision, not a resting place.
 
 ## Testing
 
-Unit tests only, via `npm test -- --project unit` from `frontend/`. Never bare
+Unit tests only, via `npm test -- --project unit` from `frontend/`. ~~Never bare
 `npm test`: that runs a Storybook browser project needing Playwright, which is
-not available locally.
+not available locally.~~
+
+**Superseded 2026-08-10, by measurement.** Playwright chromium *is* installed
+(`~/Library/Caches/ms-playwright`), the `storybook` project passes its 2 tests in
+~2.2s, and bare `npm test` passes 31 files / 661 tests in 13.4s. The constraint
+was real when written and is not real now. `--project unit` remains the fast
+loop at 10.6s; bare `npm test` is the honest pre-merge check.
 
 - **Switch:** off carries `border-input` and `bg-muted-foreground/25`; hover
   carries `/40`; the on state is unchanged.

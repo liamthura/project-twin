@@ -1,3 +1,8 @@
+// @vitest-environment node
+//
+// fieldMeta.js derives control choices from a pack spec. It imports two modules
+// that live in component files, but only for their exported constants -- no
+// component is rendered here, so jsdom is dead weight. See paths.test.js.
 import { describe, expect, it } from "vitest";
 
 import { buildFieldMeta } from "./fieldMeta";

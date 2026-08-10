@@ -1,3 +1,10 @@
+// @vitest-environment node
+//
+// paths.js documents itself as "no React import, no DOM access, no side
+// effects", and it imports nothing. Building a jsdom environment for it costs
+// roughly 900ms of the suite's time and buys nothing -- measured at 14ms of
+// actual test time against ~700ms of environment setup. If this file ever needs
+// a DOM, the honest fix is to move that test to a file that renders something.
 import { describe, it, expect } from "vitest";
 import { getAt, setAt, removeAt, normalizeUi } from "./paths";
 

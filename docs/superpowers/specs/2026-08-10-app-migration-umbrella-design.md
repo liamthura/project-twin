@@ -340,8 +340,16 @@ roughly double the section-editor slice).
 
 Nothing automated compares the app to the prototype, and this spec does not
 build that. Storybook is configured but has **one** story file
-(`frontend/src/renderers/SectionRenderer.stories.jsx`), and its vitest project
-needs a Playwright browser that is not installed locally.
+(`frontend/src/renderers/SectionRenderer.stories.jsx`) holding **two** stories,
+`Populated` and `Empty` — for `SectionRenderer`, the component that already has
+180 unit tests.
+
+**Correction, measured 2026-08-10.** Every prior spec says this project cannot
+run because Playwright is unavailable locally. That is no longer true: chromium
+is present in `~/Library/Caches/ms-playwright`, `npm test -- --project storybook`
+passes 2 tests in ~2.2s, and bare `npm test` passes **31 files / 661 tests in
+13.4s**. The rule "never run bare `npm test`" is retired — it costs about 3
+seconds over `--project unit` and covers two more tests.
 
 So fidelity is verified by a checklist, per slice:
 
@@ -412,9 +420,22 @@ copy.
 
 The right-hand column is what the fidelity checklist and the preview are for.
 
-Test command is `npm test -- --project unit` from `frontend/`. Never bare
-`npm test`: it also runs the `storybook` project, which needs a Playwright
-browser that is not available locally.
+Test command is `npm test -- --project unit` from `frontend/` for the fast loop
+(10.6s). Bare `npm test` also works and is the honest pre-merge check — 661
+tests in 13.4s, including the two Storybook stories. See the correction under
+Verification: the old "Playwright is unavailable locally" constraint no longer
+holds.
+
+**Three files run without jsdom** (`paths.test.js`, `listPipeline.test.js`,
+`fieldMeta.test.js`), via a `// @vitest-environment node` docblock. Their
+subjects import nothing or import only constants, and a jsdom environment cost
+~700ms each against 4–19ms of actual test time. Measured effect on the whole
+suite: environment setup 20.9s → 18.6s summed, CPU 50.2s → 48.9s. Wall clock on
+8 cores is unchanged within noise; the saving lands on a 2-core CI runner, where
+CPU is the binding constraint. **A file that renders anything must not carry that
+docblock** — and the two `session` test files deliberately do not, because the
+password-reset path they exercise calls `resetCallbackUrl()`, which reads
+`window.location.origin`.
 
 ## Out of scope
 
