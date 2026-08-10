@@ -63,6 +63,19 @@ services:
       # The PUBLIC origin the browser uses, not this container's address:
       # Better Auth builds its cookies and redirects from it.
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:1120}
+      # Additional origins Better Auth will accept, comma-separated.
+      #
+      # It trusts ONLY BETTER_AUTH_URL's origin by default, and to it
+      # `localhost:1120` and `127.0.0.1:1120` are two different origins. So a
+      # preview served on any other port -- scripts/local-preview.sh defaults to
+      # 8100 -- is refused with 403 INVALID_ORIGIN while every service reports
+      # healthy, which reads as "the backend is down" rather than "wrong host".
+      #
+      # Empty by default: a deployment that sets nothing behaves exactly as it
+      # did before this line existed. local-preview.sh sets it for the port it
+      # is about to serve, and leaves BETTER_AUTH_URL alone so the uvicorn
+      # workflow on :1120 keeps its own cookies and redirects.
+      - BETTER_AUTH_TRUSTED_ORIGINS=${BETTER_AUTH_TRUSTED_ORIGINS:-}
       # Local development only. Generate a real one for anything else:
       #   openssl rand -base64 32
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-dev-only-secret-at-least-32-characters-xx}

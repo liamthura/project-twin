@@ -39,6 +39,58 @@ fi
 echo "Building $branch ($commit) ..."
 docker build -q --build-arg APP_COMMIT="$commit" -t "$IMAGE" . >/dev/null
 
+# Teach the auth service to accept this preview's origin.
+#
+# Better Auth validates the browser's Origin header -- the proxy forwards it
+# untouched -- against BETTER_AUTH_URL's origin, and nothing else unless it is
+# told otherwise. The compose default is :1120, for the uvicorn workflow, so
+# sign-in from a preview on any other port returns 403 INVALID_ORIGIN even
+# though the proxy, the auth service and the database are all healthy.
+#
+# BETTER_AUTH_URL is deliberately NOT changed: it is what Better Auth builds
+# cookies and redirects from, and repointing it here would break the :1120
+# workflow instead. Both spellings of the host are listed because `localhost`
+# and `127.0.0.1` are different origins, and a browser will use whichever one
+# is in the address bar.
+TRUSTED="${BETTER_AUTH_TRUSTED_ORIGINS:+${BETTER_AUTH_TRUSTED_ORIGINS},}"
+TRUSTED="${TRUSTED}http://localhost:${PORT},http://127.0.0.1:${PORT}"
+TRUSTED="${TRUSTED},http://localhost:1120,http://127.0.0.1:1120"
+
+# Only touch the auth service if it does not already trust this origin.
+#
+# Recreating it is not free: BETTER_AUTH_SECRET encrypts the JWKS private key
+# held in the database, so coming back with a DIFFERENT secret leaves Better
+# Auth unable to decrypt its own key -- /auth/token answers 500, the SPA never
+# gets a JWT, and the entire API answers 401 to a user who just signed in
+# successfully. Leaving a working container alone is the safest thing this
+# script can do.
+want_origin="http://localhost:${PORT}"
+current_trusted="$(docker exec mygist-auth printenv BETTER_AUTH_TRUSTED_ORIGINS 2>/dev/null || true)"
+
+if [[ ",${current_trusted}," == *",${want_origin},"* ]]; then
+  echo "Auth service already trusts ${want_origin}, leaving it alone."
+else
+  # Compose reads `.env` from ITS OWN directory (backend/), so a secret kept in
+  # auth/.env is invisible to it. Resolve that file against the MAIN checkout:
+  # it is gitignored, so it does not exist inside a linked worktree.
+  repo_main="$(cd "$(git rev-parse --git-common-dir)/.." && pwd)"
+  if [[ -z "${BETTER_AUTH_SECRET:-}" && -f "$repo_main/auth/.env" ]]; then
+    BETTER_AUTH_SECRET="$(sed -n 's/^BETTER_AUTH_SECRET=//p' "$repo_main/auth/.env" | head -1)"
+  fi
+
+  if [[ -z "${BETTER_AUTH_SECRET:-}" ]]; then
+    echo "  no BETTER_AUTH_SECRET found (checked the environment and"
+    echo "  $repo_main/auth/.env). Recreating the auth service with the compose"
+    echo "  default would break JWKS decryption if its key was encrypted with a"
+    echo "  different one. Export the secret and re-run, or sign in on :1120."
+    exit 1
+  fi
+
+  echo "Trusting origins on :${PORT} ..."
+  BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" BETTER_AUTH_TRUSTED_ORIGINS="$TRUSTED" \
+    docker compose -f backend/docker-compose.yml up -d auth >/dev/null 2>&1
+fi
+
 docker rm -f "$NAME" >/dev/null 2>&1 || true
 
 echo "Starting container ..."
@@ -47,6 +99,22 @@ docker run -d --name "$NAME" --network "$NETWORK" \
   -e DATABASE_URL="$DB_URL" \
   -e EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER:-voyage}" \
   -e VOYAGE_API_KEY="${VOYAGE_API_KEY:-}" \
+  `# Without this, auth_proxy.register() returns False and every /auth/* route` \
+  `# 404s -- indistinguishable from a dead backend. The auth service is not` \
+  `# published to the host on purpose, so this container reaching it over the` \
+  `# compose network is the only path that works.` \
+  -e AUTH_SERVICE_URL="${AUTH_SERVICE_URL:-http://auth:3001}" \
+  `# Sign-in alone is not enough to use the app: the SPA exchanges its session` \
+  `# for a JWT at /auth/token, and jwt_auth.py needs a key to verify it with.` \
+  `# Without these two the whole REST API answers 401 to a freshly signed-in` \
+  `# user -- which looks like a broken login rather than missing config.` \
+  `#` \
+  `# The issuer is Better Auth's EFFECTIVE base -- BETTER_AUTH_URL plus its` \
+  `# basePath -- not the preview's own origin, and it is what lands in the` \
+  `# token's iss/aud claims. JWKS is fetched over the compose network because` \
+  `# the auth service has no host-published port.` \
+  -e AUTH_JWKS_URL="${AUTH_JWKS_URL:-http://auth:3001/auth/jwks}" \
+  -e AUTH_ISSUER="${AUTH_ISSUER:-${BETTER_AUTH_URL:-http://localhost:1120}/auth}" \
   "$IMAGE" >/dev/null
 
 # The entrypoint runs `alembic upgrade head` before uvicorn, so the port is
