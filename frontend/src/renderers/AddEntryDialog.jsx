@@ -116,6 +116,9 @@ export function AddEntryDialog({ node, entity, items, onAdd, open, onOpenChange,
           ))}
         </div>
         <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button onClick={submit} disabled={!draft[titleField] || titleCollides}>
             Add
           </Button>

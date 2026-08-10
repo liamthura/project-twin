@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { AddEntryDialog } from "./AddEntryDialog";
 
 const node = {
@@ -35,5 +36,18 @@ describe("AddEntryDialog accessibility", () => {
         onAdd={vi.fn()} open onOpenChange={vi.fn()} />
     );
     expect(screen.getByRole("heading", { name: "Add mental tab" })).toBeInTheDocument();
+  });
+
+  it("offers a labelled way out, and closes without adding anything", async () => {
+    const onAdd = vi.fn();
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <AddEntryDialog node={node} entity={undefined} items={[]}
+        onAdd={onAdd} open onOpenChange={onOpenChange} />
+    );
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(onAdd).not.toHaveBeenCalled();
   });
 });
