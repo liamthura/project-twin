@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfoButton } from "@/components/ui/info-button";
 import { VALUE_META, FOCUS_RING, ValueIcon, EnumControl } from "@/components/controls";
@@ -25,6 +24,7 @@ import { buildFieldMeta, needsFullRow as fieldNeedsFullRow } from "./fieldMeta";
 import { buildOrder, filterVisible, applyFacets } from "./listPipeline";
 import { getAt } from "./paths";
 import { useListItems } from "./useListItems";
+import { AddEntryDialog } from "./AddEntryDialog";
 // Circular by construction: renderNode imports ListRenderer to dispatch a
 // "list" node, and ListRenderer imports renderNode to dispatch a node's
 // `children` against one of its own items.
@@ -82,7 +82,6 @@ export default function ListRenderer({
 }) {
   const [expanded, setExpanded] = useState({});
   const [addOpen, setAddOpen] = useState(false);
-  const [draft, setDraft] = useState({});
   const [query, setQuery] = useState("");
   // Facet state lives here, not in listPipeline: it's per-field UI selection,
   // not derived data. Keyed by storage key; a field absent from this map (or
@@ -95,11 +94,6 @@ export default function ListRenderer({
   const detailFields = node.detail_fields || [];
   const suggestions = node.suggestions?.[titleField] || [];
   const existingTitles = new Set(items.map((i) => (i[titleField] || "").toLowerCase()));
-  // Same case-insensitive comparison addItem itself uses to reject a
-  // collision -- computed here too so the dialog can surface it instead of
-  // letting addItem silently no-op and close on a title the user already has.
-  const titleCollides =
-    !!draft[titleField] && existingTitles.has(draft[titleField].toLowerCase());
   // A node may lift ONE row out of the list and render it above, as the
   // section's answer to a question the list as a whole cannot answer --
   // "which of these is your design language". The lifted row is excluded from
@@ -130,14 +124,11 @@ export default function ListRenderer({
   // a populated list and says nothing on an empty screen where it is the only
   // thing to act on.
   const addLabel = (node.entity ?? node.title ?? "item").replace(/_/g, " ");
-  // Opening the dialog and seeding the draft, extracted because the empty
-  // state opens the same dialog from outside Radix's trigger. Both paths must
-  // seed identically or a manifest default would apply invisibly on one route
-  // and visibly on the other.
-  const openAdd = () => {
-    setAddOpen(true);
-    setDraft({ ...fieldDefaults });
-  };
+  // Opens the dialog from outside Radix's trigger, for the empty-state panel
+  // below. AddEntryDialog seeds its own draft from `fieldDefaults` on open,
+  // so both entry points -- this one and the header's DialogTrigger -- seed
+  // identically by construction rather than by two call sites agreeing.
+  const openAdd = () => setAddOpen(true);
   const meta = buildFieldMeta(node, entity);
 
   // See needsFullRow in fieldMeta.js -- shared so this list's edit form and a
@@ -200,86 +191,19 @@ export default function ListRenderer({
             {items.length === 1 ? "entry" : "entries"}
           </div>
         </div>
-        <Dialog
+        <AddEntryDialog
+          node={node}
+          entity={entity}
+          items={items}
+          onAdd={addItem}
           open={addOpen}
-          onOpenChange={(o) => {
-            setAddOpen(o);
-            // Preselect manifest defaults (e.g. stance: like) so the controls
-            // show the real initial state instead of applying it invisibly.
-            setDraft(o ? { ...fieldDefaults } : {});
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button size="sm" variant="outline"><Plus className="mr-1 h-4 w-4" />Add</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                Add {(node.title ?? node.entity ?? "item").replace(/_/g, " ")}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs capitalize">{titleField}</Label>
-                <Input
-                  value={draft[titleField] || ""}
-                  onChange={(e) => setDraft({ ...draft, [titleField]: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && draft[titleField] && !titleCollides) {
-                      addItem(draft);
-                      setAddOpen(false);
-                      setDraft({});
-                    }
-                  }}
-                  autoFocus
-                />
-                {titleCollides && (
-                  <p className="text-xs text-destructive">
-                    "{draft[titleField]}" already exists.
-                  </p>
-                )}
-                {suggestions.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {suggestions
-                      .filter((s) => !existingTitles.has(s.toLowerCase()))
-                      .slice(0, 8)
-                      .map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => setDraft({ ...draft, [titleField]: s })}
-                          className={`rounded-full border border-input bg-background px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-muted/50 ${FOCUS_RING}`}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                  </div>
-                )}
-              </div>
-              {editFields.filter((f) => f !== titleField).map((f) => (
-                <div key={f} className="space-y-1.5">
-                  <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
-                  <ScalarField
-                    field={f}
-                    value={draft[f]}
-                    meta={meta}
-                    customValue={draft[`custom_${f}`]}
-                    onChange={(v) => {
-                      const next = { ...draft, [f]: v };
-                      if (v !== "other") delete next[`custom_${f}`];
-                      setDraft(next);
-                    }}
-                    onCustomChange={(v) => setDraft({ ...draft, [`custom_${f}`]: v })}
-                  />
-                </div>
-              ))}
-            </div>
-            <DialogFooter>
-              <Button onClick={() => { addItem(draft); setAddOpen(false); setDraft({}); }}
-                disabled={!draft[titleField] || titleCollides}>Add</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          onOpenChange={setAddOpen}
+          trigger={
+            <Button size="sm" variant="outline">
+              <Plus className="mr-1 h-4 w-4" />Add
+            </Button>
+          }
+        />
       </div>
 
       {/* Keep the box mounted whenever a query is active, even if it filtered
