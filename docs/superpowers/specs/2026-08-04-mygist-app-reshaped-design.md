@@ -298,7 +298,12 @@ denominator**, so it is never a judgement call:
 | `fields` | yes — the manifest fixes the key set | a count: `3 of 3`, `1 of 3` |
 | `list`, `strings` | no — unbounded | a `+ Add` button |
 | `scalar` | n/a | nothing; the control shows its own state |
-| `fields`, when zero | — | `empty` |
+| `fields`, when zero | — | `Nothing yet` |
+
+The count is set in **Geist Regular, not Geist Mono**. Mono is reserved for strings
+that really are machine output — the build hash, the eyebrow band labels. A count
+is a sentence fragment, and rendering it in tracked mono is what made the old
+onboarding summaries read as debug output.
 
 **A count is only meaningful against a denominator.** On a `fields` node the
 count does real work — `6 of 7` says one key is still blank, which makes gaps
@@ -1239,3 +1244,124 @@ Audited after the round: `04` zero unbound paints, zero opacity drift, 27 `Add`
 buttons all labelled `Add`, three `FillSummary` left, all 17 off-token gaps still
 the inherited `6px` field internals. `02 Components` still only the two deliberate
 `Logo Mark` strokes. All pages Light `4:0`.
+
+### Follow-up: adding entries, filtering and sort order, 2026-08-10
+
+Three rulings: drop the mono counts, "consider screens for sorting", and design
+"entry addition modals". Before drawing anything I read `backend/section_packs/
+meta_schema.json` and `frontend/src/renderers/ListRenderer.jsx`, which changed the
+brief substantially — **both features already exist**, with contracts the design has
+to follow rather than invent.
+
+#### What the data model actually permits
+
+| Capability | Declared as | User-operable? |
+|---|---|---|
+| Sort | `sort: {field, dir}` on a `list` node | **No** — manifest-declared |
+| Filter | `facets: [storage keys with enum values]` | **Yes** |
+| Search | `searchable: true` | Yes |
+| Reorder by hand | — | **Impossible** |
+
+The schema's own words on `sort`: *"Display order only. Rows are sorted by this
+storage key; the stored array is never reordered."* And an entity's `actions` enum
+is exactly `add | update | remove`. **So drag-to-reorder is not a design choice
+that was skipped — there is no write that could persist it.** Only one shipped
+node declares a sort at all: `learning_log/entries`, `{timestamp, desc}`.
+
+That is why the sorting work below is two screens about *filtering* and *declared
+order*, not a drag-handle list. A user-facing **sort control** would be new, but
+cheap and frontend-only, since sorting never writes — offered, not built.
+
+#### `Desktop — Filters active` — the real filtering capability
+
+`facets` renders one control per enum storage key above the list, display-only,
+never writing. Five shipped nodes use it; this frame draws
+`preferences/likes_dislikes`, whose facet is `stance`.
+
+- The control is fed an extra leading **`All`** pseudo-option, so the reset is
+  always visible rather than relying on clicking the active value again.
+- The count becomes **`2 of 4 entries`** whenever a query or a facet is narrowing
+  the list, and a bare `4 entries` otherwise. This is the same filter feedback the
+  search/no-results state depends on.
+
+#### `Desktop — Sort` — order the user cannot change
+
+`learning_log/entries`, newest first, with `timestamp` shown as a `display_field`
+formatted `datetime`. Two things the schema forces and the frame shows:
+
+- The order is stated, not offered: *"Newest first — this order is set by the
+  section, not by you."* No control, because there is none.
+- **`Kerning basics` has no date and sorts last**, matching the rule that items
+  whose key is missing or empty sort last *regardless of direction*.
+
+#### The Add dialog
+
+`ListRenderer.jsx` already has one, and the schema references it directly (`pinned`
+says its field *"never renders as an editable control or appears in the Add
+dialog"*). The frames follow the implementation:
+
+- Fields are `title_field` + `editFields`, where `editFields` = `badges ∪
+  detail_fields` minus the pinned field. Not the entity's whole `optional` list.
+- `field_defaults` are **preselected and visible** — `likes_dislikes` defaults
+  `stance: like`, so the dialog opens with `Like` already chosen. The comment in
+  `openAdd` is explicit that a default must never apply invisibly.
+- `Add` is **disabled** until the title field has a value, which is why the opening
+  state of `Desktop — Add entry` shows a disabled primary button.
+- `Desktop — Add entry (duplicate)` is the one error the code implements:
+  `titleCollides` puts the field in `State=Error` and prints
+  `"walls of text" already exists.` — `Add` stays disabled.
+- `Mobile — Add entry` at 390 shows the **dropdown** fallback (below).
+
+#### Small enums keep the icon switch picker
+
+Ruled by the user: *"for some radio/dropdown options like stance, status with less
+than 3-4 options, the icon switch style picker from current original design should
+survive."* This is `EnumControl`, and it branches:
+
+| Condition | Control |
+|---|---|
+| `options.length ≤ 4` **and** viewport ≥ `sm` | segmented picker, one icon per value |
+| more than 4 options **or** narrow viewport | dropdown |
+
+`SEGMENTED_MAX` is 4. The branch is deliberately a JS branch, not two rendered
+controls with `sm:hidden`, so only one lands in the accessibility tree. This is
+why **desktop Stance is the segmented picker and mobile Stance is a `Select`** —
+the same field, two frames, one documented rule. It also means the user's standing
+preference for dropdowns on mobile is already what the code does.
+
+Each value carries its own icon and tone from `VALUE_META`: `like` → thumbs-up,
+plain foreground; `dislike` → thumbs-down, **amber**. New components `IconThumbsUp`
+(`328:59`) and `IconThumbsDown` (`328:61`).
+
+**`Badge` gained `Tone=Warning`** (`4:16` at 0.12, matching the other tinted tones)
+and **10 `dislike` badges moved off `Tone=Critical`**. Red says *destructive*, and
+disliking something is not destructive — the original design tints it amber
+(`bg-amber-50 text-amber-800`). Frames touched: Preferences ×2, List expanded ×2,
+Mobile Preferences ×2, and the four new frames.
+
+#### Divergences from the shipped code, chosen deliberately
+
+- **Dialog title.** The code renders `Add {node.title}`, which on this node prints
+  `Add Likes & Dislikes`. The frames say **`Add to Likes & Dislikes`**. The code's
+  string is a copy defect worth fixing there.
+- **`Cancel` exists in the frames, not in the code.** `DialogFooter` holds only
+  `Add`; dismissal relies on Esc, the overlay, or Radix's close control. The
+  frames follow the Promote dialog's footer instead.
+- **Where the count sits.** The code's list toolbar puts the count top-left and
+  `Add` top-right of the list. These frames keep `+ Add` in the card header and put
+  the count beside the facet control, so filter feedback sits next to the filter.
+- **The segmented track uses 4px padding and gaps, not the code's `p-[3px]`** — 3
+  is off the token scale and the 1px is invisible.
+
+#### Not built, stated rather than hidden
+
+- **`suggestions` chips.** The Add dialog renders up to 8 clickable title
+  suggestions, excluding ones already used — but only **`aesthetics/styles`**
+  declares any (12 style names). `likes_dislikes` has none, so no frame here shows
+  them. An `Add style` frame would also have to prove the pinned `primary` field is
+  absent from the dialog.
+- **The `other` → `custom_*` conditional.** `goals.type` includes `other`, and
+  choosing it reveals a `custom_type` input (the code deletes `custom_type` when
+  the value moves away from `other`). No frame draws it.
+- **A user-facing sort control.** See above — real but new.
+- **No mobile frame for filters or sort.**
