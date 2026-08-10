@@ -2334,3 +2334,87 @@ describe("section headings and info placement", () => {
     expect(screen.queryByRole("button", { name: /Add Skills & Domains/ })).not.toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Where the Add trigger sits, and where the count sits
+//
+// Two placements the design review asked for: the Add action moves out of the
+// list body and up into the header row that NAMES the list, and the count
+// moves down beside the filter whose effect it reports.
+//
+// The Add action is not built here even though the header is. Adding an item
+// runs through useListItems.addItem, which needs ListRenderer's own `expanded`
+// and `query` state to keep three invariants (see useListItems.js) -- so the
+// trigger stays in ListRenderer and is portalled into a slot SectionRenderer
+// places in the header. These tests pin the outcome (which row the button is
+// in), never the mechanism, so the portal could be replaced by anything that
+// lands the button in the same row.
+// ---------------------------------------------------------------------------
+describe("the Add trigger and the entry count", () => {
+  // NodeHeading lays its row out as {title + info} | {action}, so the row is
+  // the heading's grandparent: <div row><div>{h}{i}</div>{action}</div>.
+  const headingRowOf = (nodeEl) =>
+    nodeEl.querySelector("h3, h4").closest("div").parentElement;
+
+  it("puts a titled list node's Add trigger in that node's own heading row, not in the list body", () => {
+    renderSection({ pack: preferencesPack, initial: preferencesData });
+    const nodeEl = uiNode("Likes & Dislikes");
+
+    expect(
+      within(headingRowOf(nodeEl)).getByRole("button", { name: "Add" })
+    ).toBeInTheDocument();
+    // Exactly one: it MOVED, rather than gaining a second copy in the body.
+    expect(within(nodeEl).getAllByRole("button", { name: "Add" })).toHaveLength(1);
+  });
+
+  it("puts an untitled node's Add trigger in the Card's own header row, the only heading it has", () => {
+    // Same reason the untitled node's "i" already sits there: a node with no
+    // title of its own is the section's main list, so the heading that
+    // describes it is the Card's.
+    renderSection({ pack: goalsPack, initial: goalsData });
+
+    const cardTitle = screen.getByRole("heading", { name: /Goals/ });
+    const headerRow = cardTitle.parentElement.parentElement;
+    expect(headerRow).toContainElement(screen.getByRole("button", { name: "Add" }));
+    // The row is the header's, not the whole Card's -- otherwise this would
+    // pass with the button still sitting down in the list body.
+    expect(headerRow).not.toContainElement(screen.getByText("Ship MyGist v3"));
+    expect(screen.getAllByRole("button", { name: "Add" })).toHaveLength(1);
+  });
+
+  it("does not let a child list inside an expanded row hijack its parent's header slot", async () => {
+    // A child list is dispatched through the same seam from inside a row, so
+    // it sees the same header slot its parent claimed. Both portalling into it
+    // would put two Adds in the header and leave the child with none.
+    const { user } = renderSection({ pack: projectsPack, initial: projectsData });
+    await user.click(screen.getByText("MyGist"));
+
+    expect(
+      within(uiNode("References")).getByRole("button", { name: "Add" })
+    ).toBeInTheDocument();
+    expect(
+      within(headingRowOf(uiNode("Projects"))).getAllByRole("button", { name: "Add" })
+    ).toHaveLength(1);
+  });
+
+  it("shows the entry count beside the filter row rather than above the list", () => {
+    renderSection({ pack: preferencesPack, initial: preferencesData });
+    const nodeEl = uiNode("Likes & Dislikes");
+
+    const count = within(nodeEl).getByText(/\d+ entr(y|ies)/);
+    // Same row as the filters, so the count reads as feedback on them.
+    expect(count.parentElement).toContainElement(
+      within(nodeEl).getByRole("group", { name: "Filters" })
+    );
+  });
+
+  it("still shows the count for a list with no filters and no search box", () => {
+    // It is the only thing telling the reader how long the list is, so it is
+    // not conditional on there being a filter to sit beside.
+    renderSection({ pack: preferencesPack, initial: preferencesData });
+    const nodeEl = uiNode("When I'm feeling...");
+
+    expect(within(nodeEl).queryByRole("group", { name: "Filters" })).not.toBeInTheDocument();
+    expect(within(nodeEl).getByText(/2 entries/)).toBeInTheDocument();
+  });
+});

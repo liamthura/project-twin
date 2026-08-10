@@ -11,6 +11,7 @@
 //     entity's, for sections whose manifest field names are not their
 //     storage keys (unused by today's packs, needed by waves 3-6)
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Plus, Trash2, ChevronDown, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ import { buildOrder, filterVisible, applyFacets } from "./listPipeline";
 import { getAt } from "./paths";
 import { useListItems } from "./useListItems";
 import { AddEntryDialog } from "./AddEntryDialog";
+import { HeaderActionSlotContext, useHeaderActionSlot } from "./headerActionSlot";
 // Circular by construction: renderNode imports ListRenderer to dispatch a
 // "list" node, and ListRenderer imports renderNode to dispatch a node's
 // `children` against one of its own items.
@@ -82,6 +84,11 @@ export default function ListRenderer({
 }) {
   const [expanded, setExpanded] = useState({});
   const [addOpen, setAddOpen] = useState(false);
+  // Where this list's `+ Add` belongs: the header row of the section node that
+  // names it, if one published a slot. The add itself cannot move up there --
+  // `addItem` needs the `expanded` and `query` state above -- so the trigger
+  // is portalled into the slot instead. See headerActionSlot.jsx.
+  const headerSlot = useHeaderActionSlot();
   const [query, setQuery] = useState("");
   // Facet state lives here, not in listPipeline: it's per-field UI selection,
   // not derived data. Keyed by storage key; a field absent from this map (or
@@ -182,29 +189,40 @@ export default function ListRenderer({
   // count as active.
   const facetsActive = (node.facets || []).some((f) => facetValues[f] !== undefined);
 
+  // The one Add dialog this list has, trigger included. Built here rather than
+  // in the section header because `addItem` (and the three invariants
+  // useListItems holds for it) lives here -- only the trigger's DOM position
+  // moves, via the portal below.
+  const addDialog = (
+    <AddEntryDialog
+      node={node}
+      entity={entity}
+      items={items}
+      onAdd={addItem}
+      open={addOpen}
+      onOpenChange={setAddOpen}
+      trigger={
+        <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs">
+          <Plus className="h-3.5 w-3.5" />Add
+        </Button>
+      }
+    />
+  );
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1">
-          <div className="text-sm text-muted-foreground">
-            {q || facetsActive ? `${visible.length} of ${items.length}` : items.length}{" "}
-            {items.length === 1 ? "entry" : "entries"}
-          </div>
-        </div>
-        <AddEntryDialog
-          node={node}
-          entity={entity}
-          items={items}
-          onAdd={addItem}
-          open={addOpen}
-          onOpenChange={setAddOpen}
-          trigger={
-            <Button size="sm" variant="outline">
-              <Plus className="mr-1 h-4 w-4" />Add
-            </Button>
-          }
-        />
-      </div>
+      {/* The trigger renders in the header row that NAMES this list, which is
+          a DOM node SectionRenderer owns -- so it gets there by portal rather
+          than by moving the add logic up to meet it.
+          When there is no slot, it renders inline, at the top of the list
+          body, exactly where it used to be. That is not dead code: a nested
+          child list gets no slot (its parent claimed the section header), and
+          ListRenderer is rendered on its own throughout its test file. */}
+      {headerSlot ? (
+        createPortal(addDialog, headerSlot)
+      ) : (
+        <div className="flex items-center justify-end">{addDialog}</div>
+      )}
 
       {/* Keep the box mounted whenever a query is active, even if it filtered
           every row out of existence -- otherwise deleting the last match(es)
@@ -223,46 +241,59 @@ export default function ListRenderer({
         />
       )}
 
-      {/* Facets: display-only row filters, drawn above the list. Each entry
-          in node.facets names an enum storage key; `facetOptions` above
-          resolves that field's option set. A field with no resolvable
-          options is skipped -- a control with zero real values to pick would
-          only ever be able to show "All". Every EnumControl here is fed an
-          extra leading "All" pseudo-option so the reset affordance is always
-          visible rather than relying on the click-the-active-value-again
-          toggle EnumControl uses elsewhere; the mapping back to `undefined`
-          (== no filter on this field) happens in the onChange below, never
-          stored, never threaded through onItems. */}
-      {(node.facets || []).length > 0 && (
-        <div role="group" aria-label="Filters" className="flex flex-wrap gap-x-4 gap-y-2">
-          {node.facets.map((f) => {
-            const options = facetOptions(f);
-            if (!options || options.length === 0) return null;
-            return (
-              <div
-                key={f}
-                role="group"
-                aria-label={`Filter by ${f.replace(/_/g, " ")}`}
-                className="flex items-center gap-1.5"
-              >
-                <span className="text-xs font-medium capitalize text-muted-foreground">
-                  {f.replace(/_/g, " ")}
-                </span>
-                <EnumControl
-                  options={["All", ...options]}
-                  value={facetValues[f] ?? "All"}
-                  onChange={(v) =>
-                    setFacetValues((prev) => ({
-                      ...prev,
-                      [f]: v === "All" || v === undefined ? undefined : v,
-                    }))
-                  }
-                />
-              </div>
-            );
-          })}
+      {/* The count sits WITH the filters rather than in a toolbar above them:
+          it is feedback on what they did ("2 of 7"), and a row away from the
+          controls that change it there was nothing to connect the two.
+          Rendered even for a node with neither facets nor search, where this
+          row is the count alone -- it is the only thing that tells the reader
+          how long the list is. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="text-sm text-muted-foreground">
+          {q || facetsActive ? `${visible.length} of ${items.length}` : items.length}{" "}
+          {items.length === 1 ? "entry" : "entries"}
         </div>
-      )}
+
+        {/* Facets: display-only row filters, drawn above the list. Each entry
+            in node.facets names an enum storage key; `facetOptions` above
+            resolves that field's option set. A field with no resolvable
+            options is skipped -- a control with zero real values to pick would
+            only ever be able to show "All". Every EnumControl here is fed an
+            extra leading "All" pseudo-option so the reset affordance is always
+            visible rather than relying on the click-the-active-value-again
+            toggle EnumControl uses elsewhere; the mapping back to `undefined`
+            (== no filter on this field) happens in the onChange below, never
+            stored, never threaded through onItems. */}
+        {(node.facets || []).length > 0 && (
+          <div role="group" aria-label="Filters" className="flex flex-wrap gap-x-4 gap-y-2">
+            {node.facets.map((f) => {
+              const options = facetOptions(f);
+              if (!options || options.length === 0) return null;
+              return (
+                <div
+                  key={f}
+                  role="group"
+                  aria-label={`Filter by ${f.replace(/_/g, " ")}`}
+                  className="flex items-center gap-1.5"
+                >
+                  <span className="text-xs font-medium capitalize text-muted-foreground">
+                    {f.replace(/_/g, " ")}
+                  </span>
+                  <EnumControl
+                    options={["All", ...options]}
+                    value={facetValues[f] ?? "All"}
+                    onChange={(v) =>
+                      setFacetValues((prev) => ({
+                        ...prev,
+                        [f]: v === "All" || v === undefined ? undefined : v,
+                      }))
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {suggestions.length > 0 && (
         <div className="space-y-1.5">
@@ -503,6 +534,14 @@ export default function ListRenderer({
                     index (from `visible`), never a display position: `order`
                     and `visible` mean the row on screen is not the row at
                     that array position. */}
+                {/* A child list is a descendant of THIS one, so it would
+                    otherwise read the very header slot this list just claimed
+                    and portal its own Add up there too -- two triggers in the
+                    section header, none beside the child rows. Handing
+                    descendants `null` sends a child list down the inline
+                    branch, which is where a nested Add belongs: its own
+                    heading is a Label inside the row, not a section header. */}
+                <HeaderActionSlotContext.Provider value={null}>
                 {(node.children || []).map((child, ci) => {
                   // Only a well-formed path can be read or written. A child of
                   // an unsupported kind carries no such guarantee, and getAt
@@ -538,6 +577,7 @@ export default function ListRenderer({
                     </div>
                   );
                 })}
+                </HeaderActionSlotContext.Provider>
                 </>
               )}
             </div>

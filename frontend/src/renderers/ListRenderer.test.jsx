@@ -118,6 +118,19 @@ describe("ListRenderer", () => {
     expect(onItems).toHaveBeenCalledWith([]);
   });
 
+  // Every test in this file renders ListRenderer on its own, with no
+  // SectionRenderer above it and therefore no header slot to portal the Add
+  // trigger into. The inline fallback is what keeps them all meaningful --
+  // without it this component would have no way to add an item at all outside
+  // a section card, and the whole add/collision/defaults suite below would be
+  // asserting against a button that isn't there.
+  it("renders its own Add trigger inline when there is no header slot to portal into", () => {
+    render(
+      <ListRenderer node={node} entity={entity} items={[scandinavian]} onItems={() => {}} />
+    );
+    expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
+  });
+
   it("merges entity.field_defaults into a new item added via the dialog", async () => {
     const { user, latest } = renderStateful([scandinavian]);
 
