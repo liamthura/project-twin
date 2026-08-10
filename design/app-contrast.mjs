@@ -4,7 +4,9 @@
 // row, and the tinted pills.
 //
 // Run: node design/app-contrast.mjs
-// Exits non-zero if any pair falls below its threshold, so it can gate CI.
+// Exits non-zero if any UNEXPECTED pair falls below its threshold, so it can
+// gate CI. Pairs listed in KNOWN_FAILURES below are reported as KNOWN, not
+// FAIL, and do not affect the exit code -- see that constant's comment.
 const T = {
   Light: {
     paper: [250,250,249], card: [255,255,255], muted: [245,245,244], ink: [28,25,23],
@@ -16,6 +18,11 @@ const T = {
     'indigo-ink': [61,93,219], 'success-ink': [4,120,87],
     'destructive-ink': [185,28,28], 'warning-ink': [146,64,14],
     'success-tint': [236,253,245], 'destructive-tint': [254,242,242], 'warning-tint': [255,251,235],
+    // --input (globals.css) is the same value as --border. Named separately
+    // here, not because the colour differs, but because the USE differs: a
+    // form field's edge is not a decorative divider (see the input-border pair
+    // in KNOWN_FAILURES below).
+    'input-border': [231,229,228],
   },
   Dark: {
     paper: [18,18,17], card: [26,26,25], muted: [36,36,35], ink: [245,245,244],
@@ -27,6 +34,7 @@ const T = {
     'indigo-ink': [165,180,252], 'success-ink': [110,231,183],
     'destructive-ink': [252,165,165], 'warning-ink': [252,211,77],
     'success-tint': [16,33,29], 'destructive-tint': [43,20,19], 'warning-tint': [43,26,16],
+    'input-border': [42,42,40],
   },
 };
 
@@ -53,18 +61,41 @@ const PAIRS = [
   ['verdigris / verdigris-tint','verdigris','verdigris-tint', 4.5, 'Badge Live'],
   ['muted-fg / clay-tint',   'muted-fg', 'clay-tint', 4.5, 'delegate offer sub copy'],
   ['ink / clay-tint',        'ink', 'clay-tint', 4.5, 'delegate offer heading'],
+  ['input border / card',   'input-border', 'card', 3.0, "text field boundary (WCAG 1.4.11)"],
 ];
 
+// KNOWN_FAILURES is NOT a way to silence a real problem -- it is a small,
+// named, reasoned exemption list for pairs that fail today, on purpose,
+// pending an owner decision that is out of this script's scope. A pair only
+// belongs here if: (1) it genuinely fails the threshold, (2) fixing the token
+// would have a blast radius wider than this file (e.g. every input border in
+// both the shipping app and the prototype), and (3) someone has written down
+// why it isn't being fixed right now. Anyone adding an entry without a real
+// reason string, or reaching for this to make an unrelated failure go away,
+// is misusing it -- the whole point of this calculator is that failures are
+// visible, not that they can be made to disappear.
+const KNOWN_FAILURES = new Map([
+  ['input border / card', 'Pre-existing in the shipping app (--input === --border in globals.css). Not a decorative divider like border/card once was -- a form field edge is UI-component-boundary contrast WCAG 1.4.11 actually requires, and it fails (~1.26 Light). Not fixed here: changing it touches every input border in code and prototype alike. Needs the owner’s ruling; see design/app-contrast-audit.md.'],
+]);
+
 let failed = 0;
+const known = [];
 const rows = PAIRS.map(([name, fg, bg, need, ctx]) => {
   const l = ratio(T.Light[fg], T.Light[bg]);
   const d = ratio(T.Dark[fg], T.Dark[bg]);
-  if (l < need || d < need) failed++;
-  const f = (v) => `${v.toFixed(2)}${v < need ? ' FAIL' : ''}`;
+  const belowThreshold = l < need || d < need;
+  const isKnown = belowThreshold && KNOWN_FAILURES.has(name);
+  if (belowThreshold && !isKnown) failed++;
+  if (isKnown) known.push(name);
+  const f = (v) => `${v.toFixed(2)}${v < need ? (isKnown ? ' KNOWN' : ' FAIL') : ''}`;
   return `| ${name} | ${ctx} | ${need} | ${f(l)} | ${f(d)} |`;
 });
 console.log('| Pair | Context | Need | Light | Dark |');
 console.log('|---|---|---|---|---|');
 console.log(rows.join('\n'));
-if (failed) { console.error(`\n${failed} pair(s) below threshold.`); process.exit(1); }
-console.log('\nAll pairs pass.');
+if (known.length) {
+  console.log('\nKnown, accepted-and-tracked failures (not passing -- see reasons below):');
+  for (const name of known) console.log(`- ${name}: ${KNOWN_FAILURES.get(name)}`);
+}
+if (failed) { console.error(`\n${failed} unexpected pair(s) below threshold.`); process.exit(1); }
+console.log('\nAll pairs pass (or are known, accepted, and tracked -- see above).');

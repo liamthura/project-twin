@@ -14,9 +14,11 @@ Run: `node design/app-contrast.mjs`
 
 ## Result
 
-All pairs pass. Four of six badge tones failed on the first run, one Primary
-button state failed, and the rail's active row failed twice — each fixed at
-the token level, the same method the landing audit established.
+All pairs pass or are known, accepted, and tracked. Four of six badge tones
+failed on the first run, one Primary button state failed, and the rail's
+active row failed twice — each fixed at the token level, the same method the
+landing audit established. One pair — the input field boundary — fails and is
+**not** fixed here; see "Known, accepted failure" below for why.
 
 | Pair | Context | Need | Light | Dark |
 |---|---|---|---|---|
@@ -37,8 +39,42 @@ the token level, the same method the landing audit established.
 | verdigris / verdigris-tint | Badge Live | 4.5 | 4.55 | 4.95 |
 | muted-fg / clay-tint | delegate offer sub copy | 4.5 | 4.58 | 5.50 |
 | ink / clay-tint | delegate offer heading | 4.5 | 15.08 | 12.69 |
+| input border / card | text field boundary (WCAG 1.4.11) | 3.0 | 1.26 KNOWN | 1.21 KNOWN |
 
-All pairs pass.
+All pairs pass (or are known, accepted, and tracked).
+
+## Known, accepted failure: the input field boundary
+
+`border` and `--input` (`frontend/src/globals.css`) hold the same value —
+`20 6% 90%` Light, `60 2% 16%` Dark — but they carry two different jobs, and
+only one of those jobs is exempt from a contrast requirement.
+
+**Hairline dividers are decorative.** A divider line between list rows or
+sections carries no information a user needs to operate the interface; remove
+it and nothing breaks. WCAG 2.1's non-text contrast criterion (1.4.11) does
+not apply to purely decorative separators, which is why `border`/`card` was
+removed from the enforced pairs in `design/app-contrast.mjs` rather than kept
+at a failing 3.0 (see "Not measured" below for that history).
+
+**A text field's boundary is not decorative.** 1.4.11 explicitly requires 3:1
+for "visual information required to identify user interface components and
+states," and the edge of a `TextField`/`Select`/`TextArea` is exactly that —
+without it, the field's extent is invisible against `card`. At the current
+`--input` value this measures **~1.26 Light / 1.21 Dark**, a real failure, not
+a decorative exemption.
+
+This is a **pre-existing condition in the shipping app**, not something this
+plan or this branch introduced — `--input` has held this value since before
+the reconciliation started, and it agrees exactly with the Figma prototype's
+own `border` binding on every form primitive. It is deliberately **not fixed
+by this task**: correcting it would change every input border in both the
+production CSS and the Figma prototype, which is a visible, system-wide
+change well outside a contrast-audit's authority to make unilaterally. It is
+tracked instead — `input border / card` is a permanent entry in
+`design/app-contrast.mjs`'s `PAIRS`, reported as `KNOWN` rather than silently
+passing or silently failing, via the script's `KNOWN_FAILURES` mechanism —
+so it stays visible on every future run until an owner rules on a new
+`--input` value.
 
 ## What was wrong, and why
 
@@ -96,10 +132,9 @@ artwork, which the app does not use — that's a landing-page-only surface (see
 
 `border`/`card` (hairline dividers) was in an earlier draft of this script at
 a 3.0 threshold and measured 1.26 Light / 1.21 Dark — a clear fail, but not a
-token defect. `border` is deliberately a near-invisible hairline (`20 6% 90%`
-light), a decorative separator rather than an interactive component boundary
-or a graphic required to understand content, so WCAG 2.1's non-text contrast
-criterion (1.4.11) does not apply to it. Including it under an enforced
-threshold was a scope bug in the calculator, not a colour problem; it has been
-removed from `design/app-contrast.mjs` rather than weakened to a passing
-threshold.
+token defect: `border` is a decorative separator, exempt from WCAG 1.4.11 (see
+"Known, accepted failure" above, which covers this token's other use — the
+input field boundary — where the same exemption does *not* apply). Including
+the divider pair under an enforced threshold was a scope bug in the
+calculator, not a colour problem; it has been removed from
+`design/app-contrast.mjs` rather than weakened to a passing threshold.
