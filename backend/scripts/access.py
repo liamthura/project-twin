@@ -31,7 +31,9 @@ same reason: the flow can be walked end to end before anyone has a Resend
 account, and a silent no-op would be worse than either sending or failing.
 
 The link needs a public origin, from `--url`, `PUBLIC_URL` or `BETTER_AUTH_URL`.
-The app container sets none of those today, so pass `--url` or add one.
+Production sets `PUBLIC_URL`, so `admit --send` needs no `--url` there. Locally
+none of them is set, so pass `--url` -- which is also how you mint a production
+link from a machine pointed at a local database.
 
 The rule that decides whether a code admits someone lives in the auth service
 (auth/src/invite.js) and is the single implementation of it. Nothing here
@@ -160,7 +162,17 @@ def send_email(to: str, subject: str, text: str) -> bool:
     request = urllib.request.Request(
         RESEND_ENDPOINT,
         data=json.dumps({"from": sender, "to": to, "subject": subject, "text": text}).encode(),
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            # Not decoration. Resend sits behind Cloudflare, which bans urllib's
+            # default `Python-urllib/3.x` signature outright -- every send came
+            # back 403 with a body of `error code: 1010`, refused at the edge
+            # before Resend ever saw the key. Any honest agent string gets
+            # through; auth/src/email.js never hit this only because fetch sends
+            # one of its own.
+            "User-Agent": "mygist-access/1.0",
+        },
         method="POST",
     )
     try:

@@ -239,6 +239,37 @@ def test_send_prints_the_message_when_no_provider_is_configured(waiting):
     assert waitlist_store.pending_count() == 0
 
 
+def test_the_send_request_says_who_it_is(monkeypatch):
+    """Resend sits behind Cloudflare, which bans urllib's default signature
+    outright: a 403 whose whole body is `error code: 1010`, refused at the edge
+    before Resend ever sees the key. So the request has to name itself."""
+    from scripts import access
+
+    monkeypatch.setenv("RESEND_API_KEY", "re_not_a_real_key")
+    monkeypatch.setenv("EMAIL_FROM", "invites@example.com")
+
+    sent = {}
+
+    class Accepted:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def capture(request, timeout=None):
+        sent["request"] = request
+        return Accepted()
+
+    monkeypatch.setattr(access.urllib.request, "urlopen", capture)
+
+    assert access.send_email("maya@example.com", "Your MyGist invite", "hello")
+
+    agent = sent["request"].get_header("User-agent")
+    assert agent, "unset means urllib sends Python-urllib/x.y, which Cloudflare blocks"
+    assert "Python-urllib" not in agent
+
+
 def test_the_invite_email_carries_the_code_as_well_as_the_link():
     """Links get mangled by mail clients and by people reading on a phone,
     so the code has to be typeable out of the same message."""
