@@ -181,12 +181,19 @@ export function outline(pack) {
 }
 
 export function normalizeUi(pack) {
+  // A pack declares its nodes at the top level. `ui.sections` is the shape the
+  // manifests used before format v2 and the shape most of the renderer tests
+  // still construct by hand, so both are read; the wrapper goes in Phase B with
+  // the shim, when there is one shape left to read.
+  const explicit = pack?.sections ?? pack?.ui?.sections;
+  // Every node leaves here in the shape the renderers consume, whichever format
+  // it arrived in. `v1Shape` passes an already-v1 node through untouched, so the
+  // hand-built test packs are unaffected; the line is dead once Phase B teaches
+  // the renderers to read descriptors directly.
+  if (Array.isArray(explicit)) return { sections: explicit.map(v1Shape) };
+
   const ui = pack?.ui;
   if (!ui) return { sections: [] };
-  // Every node leaves here in v1's shape, whichever format the manifest is in.
-  // `v1Shape` passes a v1 node through untouched, so this line is inert until
-  // the packs convert and dead once Phase B teaches the renderers v2 directly.
-  if (Array.isArray(ui.sections)) return { sections: ui.sections.map(v1Shape) };
 
   const entities = pack.entities || {};
   const entityByList = {};

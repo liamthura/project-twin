@@ -14,7 +14,7 @@ Three rules from the spec's list of eleven are NOT here:
   in test_manifest_v2_schema.py. So is "pin only on a bool field", half of rule 7.
   They are not duplicated here; two tests for one rule is two things to update.
 - Rule 11 (`key` equals the directory name) lives in `load_packs`, which is the
-  only caller that knows the directory. Tested in test_ui_schema.py.
+  only caller that knows the directory. Tested in test_section_bindings.py.
 
 Every fixture below is asserted SCHEMA-VALID before the cross-check runs. Without
 that, a fixture with a typo in it passes `pytest.raises(PackError)` on a shape
@@ -81,14 +81,14 @@ def _rejects(manifest, match):
     The first assertion is the point: it stops a malformed fixture from making a
     cross-check test pass for the wrong reason.
     """
-    shape_errors = list(pack_loader._validator_v2().iter_errors(manifest))
+    shape_errors = list(pack_loader._validator().iter_errors(manifest))
     assert not shape_errors, f"fixture is schema-invalid, so it tests nothing: {shape_errors[0].message}"
     with pytest.raises(pack_loader.PackError, match=match):
-        pack_loader.validate_manifest_v2(manifest)
+        pack_loader.validate_manifest(manifest)
 
 
 def _accepts(manifest):
-    pack_loader.validate_manifest_v2(manifest)  # must not raise
+    pack_loader.validate_manifest(manifest)  # must not raise
 
 
 def test_the_baseline_manifest_is_valid():
@@ -446,7 +446,7 @@ def test_the_error_names_the_pack_and_the_node():
     node = _node()
     node["facets"] = ["priority"]
     with pytest.raises(pack_loader.PackError) as exc:
-        pack_loader.validate_manifest_v2(_with_sections(node))
+        pack_loader.validate_manifest(_with_sections(node))
     message = str(exc.value)
     assert "goals" in message  # the pack
     assert "Goals" in message  # the node
@@ -461,4 +461,4 @@ def test_a_shape_error_is_reported_before_a_semantic_one():
     node["badges"] = ["status"]
     node["facets"] = ["priority"]
     with pytest.raises(pack_loader.PackError, match="badges"):
-        pack_loader.validate_manifest_v2(_with_sections(node))
+        pack_loader.validate_manifest(_with_sections(node))

@@ -62,5 +62,27 @@ def test_section_registry_matches_golden():
 
 
 def test_entity_schema_matches_golden():
-    golden = json.loads(FIXTURE.read_text())
-    assert server.ENTITY_SCHEMA == golden["entity_schema"]
+    """Every entity, key for key, against the snapshot taken before Phase 1.
+
+    `required` and `optional` compare as SETS. Format v2 derives them from the
+    field list rather than carrying them as authored arrays, and the field list
+    is ordered for the screen -- form controls first, then the row's chips -- so
+    the arrays come out in a different order for ten entities. Both are unordered
+    to every reader: `server.py` membership-tests them, and `get_schema` hands
+    them to a client as "these are the names". The spec records this as the one
+    accepted difference of the migration, and `test_entity_schema_frozen.py`
+    compares them the same way for the same reason. Everything else is exact.
+    """
+    golden = json.loads(FIXTURE.read_text())["entity_schema"]
+    live = server.ENTITY_SCHEMA
+    assert set(live) == set(golden)
+    for pack, entities in golden.items():
+        assert set(live[pack]) == set(entities), f"{pack}: entity set changed"
+        for name, spec in entities.items():
+            got = live[pack][name]
+            assert set(got) == set(spec), f"{pack}.{name}: key set changed"
+            for key, value in spec.items():
+                if key in ("required", "optional"):
+                    assert set(got[key]) == set(value), f"{pack}.{name}.{key}"
+                else:
+                    assert got[key] == value, f"{pack}.{name}.{key}"

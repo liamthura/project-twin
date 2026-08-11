@@ -652,17 +652,28 @@ _STRINGS_WRITERS = {
 # --- entry point ----------------------------------------------------------
 
 
+# The v1 manifests, frozen at the commit before the cutover overwrote them. The
+# input has to live somewhere once `section_packs` holds the output: the plan
+# requires manifests to stay GENERATED for the rest of its tasks -- change the
+# converter, re-run, commit the result, never hand-edit -- and that is only true
+# while this file exists. Keyed by DIRECTORY, not by `key`, because `_template`
+# ships the key `example`.
+V1_CORPUS = Path(__file__).resolve().parent.parent / "tests/fixtures/manifests_v1.json"
+
+
+def v1_manifests() -> dict:
+    """{directory_name: v1 manifest}. The converter's only input."""
+    return json.loads(V1_CORPUS.read_text())
+
+
 def _main(argv: list) -> int:
     check = "--check" in argv
     changed = []
-    for directory in sorted(p for p in pack_loader.PACKS_DIR.iterdir() if p.is_dir()):
-        path = directory / "manifest.json"
-        v1 = json.loads(path.read_text())
-        if "sections" in v1:
-            continue  # already v2
+    for name, v1 in sorted(v1_manifests().items()):
+        path = pack_loader.PACKS_DIR / name / "manifest.json"
         v2 = json.dumps(convert(v1), indent=2, ensure_ascii=False) + "\n"
-        if v2 != path.read_text():
-            changed.append(directory.name)
+        if not path.exists() or v2 != path.read_text():
+            changed.append(name)
             if not check:
                 path.write_text(v2)
     verb = "would rewrite" if check else "rewrote"

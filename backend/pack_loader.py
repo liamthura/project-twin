@@ -20,11 +20,6 @@ logger = logging.getLogger(__name__)
 
 PACKS_DIR = Path(__file__).parent / "section_packs"
 META_SCHEMA_PATH = PACKS_DIR / "meta_schema.json"
-# Format v2, in flight. Nothing shipped validates against it yet -- it is reached
-# only from validate_manifest_v2, which only the tests call until the cutover
-# replaces META_SCHEMA_PATH with it. See
-# docs/superpowers/plans/2026-08-11-manifest-format-v2.md.
-META_SCHEMA_V2_PATH = PACKS_DIR / "meta_schema.v2.json"
 
 # Mirrors sections.SCOPES keys; asserted equal in tests to prevent drift.
 GLOBAL_SCOPE_NAMES = frozenset({"minimal", "professional", "personal", "learning", "full"})
@@ -35,7 +30,6 @@ class PackError(Exception):
 
 
 _meta_validator = None
-_meta_validator_v2 = None
 
 
 def _validator() -> jsonschema.Draft202012Validator:
@@ -46,43 +40,8 @@ def _validator() -> jsonschema.Draft202012Validator:
     return _meta_validator
 
 
-def _validator_v2() -> jsonschema.Draft202012Validator:
-    global _meta_validator_v2
-    if _meta_validator_v2 is None:
-        schema = json.loads(META_SCHEMA_V2_PATH.read_text())
-        _meta_validator_v2 = jsonschema.Draft202012Validator(schema)
-    return _meta_validator_v2
-
-
 def validate_manifest(manifest: dict) -> None:
-    """Schema + intra-pack cross-reference checks. Raises PackError."""
-    error = best_match(_validator().iter_errors(manifest))
-    # best_match descends into a `oneOf`/`anyOf` branch's own errors instead of
-    # reporting the top-level "not valid under any of the given schemas" --
-    # e.g. a `ui` list node missing `entity` fails both `$defs.ui` branches, so
-    # the plain-first-by-path error used to name `ui` and dump the whole block
-    # without ever saying `entity` is what's missing. This is purely about
-    # which error is reported; it changes nothing about what validates.
-    if error is not None:
-        where = "/".join(str(p) for p in error.path) or "<root>"
-        raise PackError(f"manifest schema violation at {where}: {error.message}")
-
-    defaults = manifest["defaults"]
-    for list_key, _prefix in manifest["id_lists"]:
-        if not isinstance(defaults.get(list_key), list):
-            raise PackError(
-                f"id_lists references '{list_key}' which is not a list in defaults"
-            )
-    for scope in manifest.get("scope_contributions", {}):
-        if scope not in GLOBAL_SCOPE_NAMES:
-            raise PackError(f"unknown scope '{scope}' in scope_contributions")
-
-
-def validate_manifest_v2(manifest: dict) -> None:
-    """Format v2: schema validation. Raises PackError.
-
-    Nothing shipped is in v2 yet, so nothing but the tests calls this. It becomes
-    `validate_manifest` at the cutover, at which point the two collapse into one.
+    """Schema validation plus the semantic cross-checks. Raises PackError.
 
     The semantic rules JSON Schema cannot state live in `_cross_check`, called
     from here AFTER schema validation so a shape error is always reported before
@@ -91,12 +50,13 @@ def validate_manifest_v2(manifest: dict) -> None:
     turned out to be statable structurally and live in the schema instead:
     `values` iff `type: "enum"`, and `element` on the two array types.
     """
-    error = best_match(_validator_v2().iter_errors(manifest))
-    # Same reason as validate_manifest: best_match descends into the branch's own
-    # errors rather than reporting "not valid under any of the given schemas".
-    # The v2 node dispatcher is allOf/if/then on `kind` for the same purpose --
-    # a node whose kind is `list` is measured against the list branch alone, so
-    # the error names the offending key rather than dumping the node four times.
+    error = best_match(_validator().iter_errors(manifest))
+    # best_match descends into a failing branch's own errors rather than reporting
+    # the top-level "not valid under any of the given schemas". The node dispatcher
+    # is allOf/if/then on `kind` for the same purpose -- a node whose kind is
+    # `list` is measured against the list branch alone, so the error names the
+    # offending key rather than dumping the node four times. This is purely about
+    # which error is reported; it changes nothing about what validates.
     if error is not None:
         where = "/".join(str(p) for p in error.path) or "<root>"
         raise PackError(f"manifest schema violation at {where}: {error.message}")
@@ -399,7 +359,10 @@ def load_packs(packs_dir: Path = PACKS_DIR, strict: bool = False) -> dict[str, d
     seen_entities: dict[str, str] = {}
     seen_prefixes: dict[str, str] = {}
     for m in loaded:
-        for entity in m["entities"]:
+        # Derived, not read: a pack's entities are whatever its `sections` declare,
+        # so this is the same set `build_entity_schema` will hand to MCP. Deriving
+        # twice is cheap and keeps `load_packs` a pure function of the files.
+        for entity in derive_entities(m):
             if entity in seen_entities:
                 raise PackError(
                     f"entity '{entity}' defined by both '{seen_entities[entity]}' and '{m['key']}'"
@@ -440,19 +403,18 @@ def _reset_cache() -> None:
 def build_entity_schema(packs: dict[str, dict]) -> dict[str, dict]:
     """{section_key: entities} in pack order — server.ENTITY_SCHEMA shape.
 
-    `$comment` is dropped here rather than left to each reader. ENTITY_SCHEMA is
-    what `get_schema` hands to MCP clients, so an authoring note left in it would
-    be shipped as part of the tool contract — and the meta-schema promises the
-    opposite: `description` is the client-facing text, `$comment` is for the next
-    author. Nothing else is filtered; unknown keys are the pack's business.
+    Every entity is DERIVED from the pack's `sections` by `derive_entities`; no
+    manifest declares one. `tests/test_entity_schema_frozen.py` asserts this
+    still equals the schema that was authored by hand before format v2, entity
+    for entity and key for key, which is the whole safety argument for the
+    change.
+
+    Nothing is filtered here any more. The old version stripped `$comment`,
+    because an authoring note in an authored `entities` block would have been
+    shipped to MCP clients as part of the tool contract; a derived spec is built
+    key by key from field descriptors, so there is nothing to strip.
     """
-    return {
-        key: {
-            entity: {k: v for k, v in spec.items() if k != "$comment"}
-            for entity, spec in m["entities"].items()
-        }
-        for key, m in packs.items()
-    }
+    return {key: derive_entities(m) for key, m in packs.items()}
 
 
 def derive_entities(manifest: dict) -> dict:

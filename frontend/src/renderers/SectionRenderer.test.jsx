@@ -347,21 +347,60 @@ describe("SectionRenderer", () => {
       ["aesthetics", aestheticsPack, aestheticsData, "styles", "name", undefined],
     ];
 
+    // The three shipped nodes no longer omit their title: format v2 states a
+    // field's positions on the field, and a title field with no position would
+    // be a manifest claiming no control renders for it -- which is false, since
+    // the guarantee below always draws one. So the conversion made all three
+    // declare `show: ["form"]`, and these cases now assert the ordinary path.
+    // The guarantee itself is tested against a synthetic node further down,
+    // where the omission can be constructed instead of waited for.
     for (const [label, pack, data, listKey, titleField] of cases) {
-      it(`renders a control for ${label}'s ${titleField}, which detail_fields omits`, async () => {
-        const node = normalizeUi(pack).sections.find(
-          (s) => Array.isArray(s.path) && s.path[0] === listKey
-        );
-        // The premise of this test: if a manifest later adds the title to
-        // detail_fields, this case is no longer testing the renderer.
-        expect(node.detail_fields || []).not.toContain(titleField);
-
+      it(`renders a control for ${label}'s ${titleField}`, async () => {
         const first = data[listKey][0];
         const { user } = renderSection({ pack, initial: data });
         await user.click(screen.getByText(first[titleField]));
         expect(screen.getByDisplayValue(first[titleField])).toBeInTheDocument();
       });
     }
+
+    it("renders a control for a title its own node gives no position", async () => {
+      // The guarantee itself, on a node built to omit the title rather than a
+      // shipped one that happens to. This is what stops the fourth manifest
+      // shipping a row that can be named once and never renamed.
+      const omits = {
+        key: "omits",
+        title: "Omits",
+        description: "A node that gives its title no position",
+        entities: {
+          thing: { actions: ["add", "update", "remove"], required: ["title"],
+                   optional: ["notes"], identifier: "title" },
+        },
+        sections: [
+          {
+            kind: "list",
+            path: ["things"],
+            title: "Things",
+            element: {
+              entity: "thing",
+              identifier: "title",
+              fields: [
+                { name: "title", role: "title", required: true, show: [] },
+                { name: "notes" },
+              ],
+            },
+          },
+        ],
+      };
+      const node = normalizeUi(omits).sections[0];
+      expect(node.detail_fields || []).not.toContain("title");
+
+      const { user } = renderSection({
+        pack: omits,
+        initial: { things: [{ id: "t1", title: "Unnamed thing" }] },
+      });
+      await user.click(screen.getByText("Unnamed thing"));
+      expect(screen.getByDisplayValue("Unnamed thing")).toBeInTheDocument();
+    });
 
     it("round-trips a rename through the body control", async () => {
       const { user, latest } = renderSection({ pack: goalsPack, initial: goalsData });
@@ -2748,7 +2787,7 @@ describe("the fields count in a card header", () => {
     // data object rather than the node's fields would be wrong here first.
     renderSection({ pack: profilePack, initial: profileData });
     const summary = summaryOf("Personal Information");
-    const declared = profilePack.ui.sections[0].fields.length;
+    const declared = profilePack.sections[0].element.fields.length;
     expect(summary.textContent).toMatch(new RegExp(`^\\d+ of ${declared}$`));
   });
 

@@ -4,8 +4,8 @@
   "title": "Media",
   "description": "Favourites and what you're into right now: taste, not a log",
   "core": false,
-  "position": 55,
   "default_enabled": false,
+  "position": 55,
   "defaults": {
     "items": []
   },
@@ -20,74 +20,76 @@
       "items"
     ]
   },
-  "entities": {
-    "media_item": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
+  "sections": [
+    {
+      "kind": "list",
+      "path": [
+        "items"
       ],
-      "required": [
-        "title"
-      ],
-      "optional": [
-        "kind",
-        "status",
-        "reaction",
-        "url",
-        "notes",
-        "tags"
-      ],
-      "valid_values": {
-        "kind": [
-          "book",
-          "article",
-          "podcast",
-          "show",
-          "film",
-          "game",
-          "video",
-          "music"
-        ],
-        "status": [
-          "want",
-          "in_progress",
-          "finished",
-          "dropped"
-        ],
-        "reaction": [
-          "loved",
-          "liked",
-          "disliked"
-        ]
-      },
-      "identifier": "title",
-      "list": "items"
-    }
-  },
-  "ui": {
-    "sections": [
-      {
-        "kind": "list",
-        "path": [
-          "items"
-        ],
+      "element": {
         "entity": "media_item",
-        "title_field": "title",
-        "badges": [
-          "kind",
-          "status",
-          "reaction"
-        ],
-        "detail_fields": [
-          "url",
-          "notes",
-          "tags"
-        ],
-        "array_fields": [
-          "tags"
+        "identifier": "title",
+        "list": "items",
+        "fields": [
+          {
+            "name": "title",
+            "required": true,
+            "role": "title"
+          },
+          {
+            "name": "url"
+          },
+          {
+            "name": "notes"
+          },
+          {
+            "name": "tags",
+            "type": "strings"
+          },
+          {
+            "name": "kind",
+            "type": "enum",
+            "values": [
+              "book",
+              "article",
+              "podcast",
+              "show",
+              "film",
+              "game",
+              "video",
+              "music"
+            ],
+            "show": [
+              "badge"
+            ]
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "values": [
+              "want",
+              "in_progress",
+              "finished",
+              "dropped"
+            ],
+            "show": [
+              "badge"
+            ]
+          },
+          {
+            "name": "reaction",
+            "type": "enum",
+            "values": [
+              "loved",
+              "liked",
+              "disliked"
+            ],
+            "show": [
+              "badge"
+            ]
+          }
         ]
       }
-    ]
-  }
+    }
+  ]
 }

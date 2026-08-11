@@ -20,46 +20,35 @@
       "items"
     ]
   },
-  "entities": {
-    "example_item": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
+  "sections": [
+    {
+      "kind": "list",
+      "path": [
+        "items"
       ],
-      "list": "items",
-      "required": [
-        "name"
-      ],
-      "optional": [
-        "notes",
-        "tags"
-      ],
-      "identifier": "name"
-    }
-  },
-  "ui": {
-    "sections": [
-      {
-        "kind": "list",
-        "path": [
-          "items"
-        ],
+      "element": {
         "entity": "example_item",
-        "title_field": "name",
-        "badges": [],
-        "detail_fields": [
-          "notes",
-          "tags"
-        ],
-        "suggestions": {
-          "name": [
-            "Example 1",
-            "Example 2",
-            "Example 3"
-          ]
-        }
+        "identifier": "name",
+        "list": "items",
+        "fields": [
+          {
+            "name": "name",
+            "required": true,
+            "role": "title",
+            "suggestions": [
+              "Example 1",
+              "Example 2",
+              "Example 3"
+            ]
+          },
+          {
+            "name": "notes"
+          },
+          {
+            "name": "tags"
+          }
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

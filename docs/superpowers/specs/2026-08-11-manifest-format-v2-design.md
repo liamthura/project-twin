@@ -423,7 +423,7 @@ that does not exist today.
 
 ## How we know the UI did not change
 
-- The 810 frontend unit tests pass **untouched**. If one needs editing, the
+- Every frontend unit test that predates Phase A passes **untouched**. If one needs editing, the
   conversion is wrong, not the test. This is the primary gate.
 - `realWorldShapes.test.jsx` renders the real shipped shapes and is the file that
   would catch an invented or dropped field.
@@ -464,7 +464,7 @@ that does not exist today.
 
 ```
 backend:   pytest                       — including the new derivation gate
-frontend:  npm test -- --project unit   — 810 tests, unchanged
+frontend:  npm test -- --project unit   — every pre-existing test, unedited
 census:    rendered fields per pack, before vs after, identical
 preview:   Docker, eyeball Profile / Preferences / Goals
 docs:      CONTRIBUTING-PACKS.md teaches one format, with one worked example

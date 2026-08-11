@@ -7,91 +7,22 @@
     "default_enabled": true,
     "enabled": true,
     "entities": {
-      "email": {
+      "basic_info": {
         "actions": [
-          "add",
-          "update",
-          "remove"
+          "update"
         ],
-        "required": [
-          "address",
-          "purpose"
-        ],
-        "optional": [],
-        "identifier": "address"
-      },
-      "link": {
-        "actions": [
-          "add",
-          "update",
-          "remove"
-        ],
-        "required": [
-          "url",
-          "label"
-        ],
+        "required": [],
         "optional": [
-          "new_label"
-        ],
-        "identifier": "label",
-        "description": "A profile link. `label` identifies the row, so renaming one on update means sending `new_label`.",
-        "$comment": "`update` was absent until wave 7: fixing a typo'd URL meant remove + re-add. See the wave 6 storage-keys reference, follow-up 5."
-      },
-      "language": {
-        "actions": [
-          "add",
-          "update",
-          "remove"
-        ],
-        "required": [
           "name",
-          "fluency"
-        ],
-        "optional": [],
-        "valid_values": {
-          "fluency": [
-            "native",
-            "fluent",
-            "conversational",
-            "basic"
-          ]
-        },
-        "identifier": "name",
-        "$comment": "`required` was [\"name\"] until wave 8 while the branch has always demanded name AND fluency, so a client following get_schema got a rejection it could not predict. Found by the stored-key audit."
-      },
-      "work_experience": {
-        "actions": [
-          "add",
-          "update",
-          "remove"
-        ],
-        "required": [
-          "company",
-          "role",
-          "type",
-          "period"
-        ],
-        "optional": [
+          "preferred_name",
+          "current_role",
+          "organisation",
           "location",
-          "description",
-          "skills",
-          "highlights"
+          "nationality",
+          "bio"
         ],
-        "$comment": "`required` was [\"company\"] until wave 8, while the `add` branch has always demanded role/company/type/period -- so an MCP client following get_schema got a rejection it had no way to predict. `company` alone remains the identifier for update/remove, which is what `identifier` says; `required` describes `add`. Found by the stored-key audit.",
-        "identifier": "company"
-      },
-      "work_highlight": {
-        "actions": [
-          "add",
-          "remove"
-        ],
-        "required": [
-          "company",
-          "highlight"
-        ],
-        "optional": [],
-        "identifier": "highlight",
-        "parent": "company"
+        "identifier": null,
+        "description": "Update-only singleton for top-level profile fields"
       },
       "education": {
         "actions": [
@@ -114,18 +45,18 @@
         ],
         "identifier": "institution"
       },
-      "education_highlight": {
+      "work_highlight": {
         "actions": [
           "add",
           "remove"
         ],
         "required": [
-          "institution",
+          "company",
           "highlight"
         ],
         "optional": [],
         "identifier": "highlight",
-        "parent": "institution"
+        "parent": "company"
       },
       "coursework": {
         "actions": [
@@ -159,23 +90,6 @@
         "parent": "institution",
         "description": "Alias for `coursework` -- same list, same object shape."
       },
-      "basic_info": {
-        "actions": [
-          "update"
-        ],
-        "required": [],
-        "optional": [
-          "name",
-          "preferred_name",
-          "current_role",
-          "organisation",
-          "location",
-          "nationality",
-          "bio"
-        ],
-        "identifier": null,
-        "description": "Update-only singleton for top-level profile fields"
-      },
       "club": {
         "actions": [
           "add",
@@ -192,6 +106,26 @@
         "parent": "institution",
         "description": "A society or extracurricular. Stored as {name, activities_involved}."
       },
+      "work_experience": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "required": [
+          "company",
+          "role",
+          "type",
+          "period"
+        ],
+        "optional": [
+          "location",
+          "description",
+          "skills",
+          "highlights"
+        ],
+        "identifier": "company"
+      },
       "work_skill": {
         "actions": [
           "add",
@@ -207,327 +141,504 @@
         "identifier": "skill",
         "parent": "company",
         "description": "A skill or technology used in a role. Bare strings on the parent row, like work_highlight."
+      },
+      "education_highlight": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "required": [
+          "institution",
+          "highlight"
+        ],
+        "optional": [],
+        "identifier": "highlight",
+        "parent": "institution"
+      },
+      "email": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "required": [
+          "address",
+          "purpose"
+        ],
+        "optional": [],
+        "identifier": "address"
+      },
+      "link": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "required": [
+          "label",
+          "url"
+        ],
+        "optional": [
+          "new_label"
+        ],
+        "identifier": "label",
+        "description": "A profile link. `label` identifies the row, so renaming one on update means sending `new_label`."
+      },
+      "language": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "required": [
+          "name",
+          "fluency"
+        ],
+        "optional": [],
+        "identifier": "name",
+        "valid_values": {
+          "fluency": [
+            "native",
+            "fluent",
+            "conversational",
+            "basic"
+          ]
+        }
       }
     },
-    "ui": {
-      "sections": [
-        {
-          "kind": "fields",
-          "path": [],
+    "sections": [
+      {
+        "kind": "fields",
+        "path": [],
+        "title": "Personal Information",
+        "description": "Your basic identity and current status",
+        "info": {
+          "overview": "This section captures who you are at a glance. It helps AI assistants address you correctly and understand your current context (student, professional, location, etc.).",
+          "tips": [
+            "Name: Your full legal name as it appears on official documents.",
+            "Preferred Name: The name you'd like AI to call you (nickname, first name, etc.).",
+            "Current Role: Your primary occupation or status, e.g. 'Final Year Student', 'Software Engineer', 'Freelance Designer'.",
+            "Organisation: Your school, university, or employer.",
+            "Location: City and country—helps with locale-specific suggestions (holidays, time zones, spelling conventions).",
+            "Nationality: Useful for cultural context and language defaults.",
+            "Bio: A 2–3 sentence summary of who you are, your interests, and what you're working on. Think of it as your elevator pitch."
+          ]
+        },
+        "element": {
           "entity": "basic_info",
-          "title": "Personal Information",
-          "description": "Your basic identity and current status",
+          "description": "Update-only singleton for top-level profile fields",
           "fields": [
-            "name",
-            "preferred_name",
-            "current_role",
-            "organisation",
-            "location",
-            "nationality",
-            "bio"
-          ],
-          "long_text": [
-            "bio"
-          ],
-          "$comment": "path: [] addresses the section ROOT -- these seven keys are stored as top-level scalars on profile.json (server.py:1651). Safe because FieldsRenderer spreads the stored object on every write, so a root write updates keys rather than replacing the section. The one profile entity whose vocabulary was already correct.",
-          "info": {
-            "overview": "This section captures who you are at a glance. It helps AI assistants address you correctly and understand your current context (student, professional, location, etc.).",
-            "tips": [
-              "Name: Your full legal name as it appears on official documents.",
-              "Preferred Name: The name you'd like AI to call you (nickname, first name, etc.).",
-              "Current Role: Your primary occupation or status, e.g. 'Final Year Student', 'Software Engineer', 'Freelance Designer'.",
-              "Organisation: Your school, university, or employer.",
-              "Location: City and country—helps with locale-specific suggestions (holidays, time zones, spelling conventions).",
-              "Nationality: Useful for cultural context and language defaults.",
-              "Bio: A 2–3 sentence summary of who you are, your interests, and what you're working on. Think of it as your elevator pitch."
-            ]
-          },
-          "field_placeholders": {
-            "bio": "A brief description of who you are...",
-            "current_role": "e.g. Designer, Teacher, Student",
-            "location": "City, Country",
-            "name": "Your name",
-            "nationality": "Your nationality",
-            "organisation": "Company, school, or organisation",
-            "preferred_name": "What you'd like to be called"
-          }
-        },
-        {
-          "kind": "list",
-          "path": [
-            "education"
-          ],
-          "entity": "education",
-          "title": "Education",
-          "description": "Your educational background and qualifications",
-          "title_field": "institution",
-          "searchable": true,
-          "badges": [
-            "status"
-          ],
-          "detail_fields": [
-            "institution",
-            "degree_level",
-            "field_of_study",
-            "start_year",
-            "end_year",
-            "status"
-          ],
-          "count_badges": [
-            "coursework",
-            "highlights"
-          ],
-          "enum": {
-            "status": [
-              "current",
-              "completed",
-              "incomplete"
-            ]
-          },
-          "field_defaults": {
-            "status": "current"
-          },
-          "$comment": "Binds the STORED keys. The vocabulary used to declare `degree`, `field` and `period`, none of which any writer produced -- `period` in particular maps to TWO stored keys (start_year, end_year), so no node could ever have bound it. Corrected in wave 6; see the wave 6 storage-keys reference. `clubs` has no MCP write path at all (no entity, no branch) -- the UI is its only writer, as it already was.",
-          "info": {
-            "overview": "Document your educational journey—schools, degrees, and achievements. This helps AI understand your academic background and tailor advice accordingly.",
-            "tips": [
-              "Add one entry per institution or degree (e.g., separate entries for high school and university).",
-              "Institution Name: Full official name of the school or university.",
-              "Degree Level: e.g., 'High School Diploma', 'BSc', 'MSc', 'PhD'.",
-              "Field of Study: Your major, concentration, or programme name.",
-              "Status: Whether you're currently enrolled, have completed, or left incomplete.",
-              "Years: Start and end (or expected end) years.",
-              "Coursework: Key modules or classes you've taken.",
-              "Clubs & Societies: Extracurricular involvement.",
-              "Highlights: Notable achievements like awards, high grades, leadership roles, or recognitions."
-            ]
-          },
-          "children": [
             {
-              "kind": "strings",
-              "path": [
-                "highlights"
-              ],
-              "title": "Highlights",
-              "item_control": "input",
-              "placeholder": "e.g. Graduated with honours, Led the debate team",
-              "$comment": "Bare strings on both writers (server.py:2559 appends the string itself). item_control:\"input\" because these are sentence-like -- the retired editor gave each its own editable row, and chips would mean retyping a whole achievement to fix a typo."
+              "name": "name",
+              "placeholder": "Your name"
             },
             {
-              "kind": "list",
-              "path": [
-                "coursework"
-              ],
-              "entity": "coursework",
-              "title": "Coursework / Modules",
-              "title_field": "name",
-              "detail_fields": [
-                "name",
-                "topics"
-              ],
-              "array_fields": [
-                "topics"
-              ],
-              "count_badges": [
-                "topics"
-              ],
-              "fields_outside_entity": [
-                "name"
-              ],
-              "$comment": "OBJECTS: {name, topics}. The entity's `course` is the INPUT spelling; `name` is what is stored. Until wave 6 execute_modify appended a bare string here while the editor wrote objects, so an AI-added course rendered blank and could never be removed -- `course in coursework` compares a string to a dict. persona_store._normalize coerces legacy strings.",
-              "field_placeholders": {
-                "name": "e.g. Macroeconomics, Data Structures",
-                "topics": "Key topics covered..."
-              }
+              "name": "preferred_name",
+              "placeholder": "What you'd like to be called"
             },
             {
-              "kind": "list",
-              "path": [
-                "clubs"
-              ],
-              "entity": "club",
-              "title": "Clubs & Societies",
-              "title_field": "name",
-              "detail_fields": [
-                "name",
-                "activities_involved"
-              ],
-              "array_fields": [
-                "activities_involved"
-              ],
-              "count_badges": [
-                "activities_involved"
-              ],
-              "$comment": "OBJECTS: {name, activities_involved}. Before wave 6 `clubs` had no entity and no execute_modify branch at all -- the editor was its only writer, so no AI client could read into or out of it. Both added in wave 6.",
-              "field_placeholders": {
-                "activities_involved": "e.g. Committee member, Event organiser",
-                "name": "e.g. Debate Society, Football Club"
-              }
-            }
-          ],
-          "field_placeholders": {
-            "degree_level": "e.g. High School, Bachelor's, Master's, PhD",
-            "end_year": "e.g. 2024 or Expected 2026",
-            "field_of_study": "e.g. Computer Science, Economics, Design",
-            "institution": "School, college, or university",
-            "start_year": "e.g. 2020"
-          }
-        },
-        {
-          "kind": "list",
-          "path": [
-            "work_experience"
-          ],
-          "entity": "work_experience",
-          "title": "Work Experience",
-          "description": "Your professional experience",
-          "title_field": "company",
-          "searchable": true,
-          "badges": [
-            "type"
-          ],
-          "detail_fields": [
-            "company",
-            "role",
-            "type",
-            "period",
-            "location",
-            "description"
-          ],
-          "count_badges": [
-            "skills",
-            "highlights"
-          ],
-          "long_text": [
-            "description"
-          ],
-          "$comment": "`location` and `description` were declared here and written by NOTHING before wave 6 -- not execute_modify, not the editor -- so every value an MCP client sent under them was discarded. Made real in server.py rather than dropped. `period` IS a stored key on this entity, unlike on `education` where the same name was a phantom.",
-          "info": {
-            "overview": "List your professional experiences—jobs, internships, placements, and volunteer work. This helps AI understand your skills and career trajectory.",
-            "tips": [
-              "Add one entry per role. If you held multiple roles at the same company, consider separate entries.",
-              "Role: Your job title or position.",
-              "Company: The organisation you worked for.",
-              "Type: e.g., 'Full-time', 'Part-time', 'Internship', 'Placement', 'Volunteer', 'Freelance'.",
-              "Period: Date range in a readable format, e.g., 'Jan 2023 – Jun 2024' or 'Summer 2022'.",
-              "Highlights: 3–6 bullet points describing what you did and achieved. Focus on outcomes and impact."
-            ]
-          },
-          "children": [
-            {
-              "kind": "strings",
-              "path": [
-                "skills"
-              ],
-              "title": "Skills",
-              "placeholder": "e.g. Project management, Python, Public speaking",
-              "$comment": "Bare strings on the parent row, same shape as `highlights` (server.py work_skill branch). Left as CHIPS rather than item_control:\"input\": these are short, word-like values you add and drop but never revise, and chips show many at a glance -- the opposite of a highlight, which is a sentence where a typo means retyping the lot."
+              "name": "current_role",
+              "placeholder": "e.g. Designer, Teacher, Student"
             },
             {
-              "kind": "strings",
-              "path": [
-                "highlights"
-              ],
-              "title": "Highlights",
-              "item_control": "input",
-              "placeholder": "e.g. Led a team of five, Cut response time by 40%",
-              "$comment": "Bare strings on both writers (server.py:1541). item_control:\"input\" matches the retired editor, which gave each highlight its own editable row -- see the education node."
-            }
-          ],
-          "field_placeholders": {
-            "company": "Company or organisation",
-            "description": "What the role involved...",
-            "location": "e.g. Remote, or a city",
-            "period": "e.g. Jan 2022 - Jun 2023",
-            "role": "e.g. Analyst, Designer, Engineer",
-            "type": "e.g. Full-time, Internship, Freelance"
-          }
-        },
-        {
-          "kind": "group",
-          "title": "Contact & Links",
-          "description": "How to reach you and your online presence",
-          "info": {
-            "overview": "Provide ways to reach you and links to your online profiles. AI can use this to reference your portfolio or suggest networking opportunities.",
-            "tips": [
-              "Emails: Add all relevant email addresses and tag their purpose (Primary, Work, School, etc.).",
-              "Links: Your portfolio, GitHub, LinkedIn or personal site — label each one."
-            ]
-          },
-          "sections": [
-            {
-              "kind": "list",
-              "path": [
-                "contact",
-                "emails"
-              ],
-              "entity": "email",
-              "title": "Emails",
-              "title_field": "address",
-              "badges": [
-                "purpose"
-              ],
-              "detail_fields": [
-                "address",
-                "purpose"
-              ],
-              "$comment": "Stores `purpose`. The vocabulary declared `label`, which nothing wrote, and omitted `purpose` -- which the add branch REQUIRES (server.py:1418), so no MCP client could add an email. Both corrected in wave 6.",
-              "field_placeholders": {
-                "address": "you@example.com",
-                "purpose": "e.g. primary, work, personal"
-              }
+              "name": "organisation",
+              "placeholder": "Company, school, or organisation"
             },
             {
-              "kind": "list",
-              "path": [
-                "contact",
-                "links"
-              ],
-              "entity": "link",
-              "title": "Links",
-              "title_field": "label",
-              "detail_fields": [
-                "label",
-                "url"
-              ],
-              "$comment": "No `update` action on this entity (server.py:1444-1465) -- an MCP client edits a link by removing and re-adding it. The UI edits in place, which is a superset and needs no declaration.",
-              "field_placeholders": {
-                "label": "e.g. Portfolio, LinkedIn",
-                "url": "https://example.com"
-              }
+              "name": "location",
+              "placeholder": "City, Country"
+            },
+            {
+              "name": "nationality",
+              "placeholder": "Your nationality"
+            },
+            {
+              "name": "bio",
+              "type": "longtext",
+              "placeholder": "A brief description of who you are..."
             }
           ]
         },
-        {
-          "kind": "list",
-          "path": [
-            "languages_spoken"
-          ],
-          "entity": "language",
-          "title": "Languages",
-          "description": "Languages you speak and your fluency level",
-          "title_field": "name",
-          "badges": [
-            "fluency"
-          ],
-          "detail_fields": [
-            "name",
-            "fluency"
-          ],
-          "$comment": "Stores `fluency`. The vocabulary declared `proficiency`, the third member of get_field(data, \"fluency\", \"level\", \"proficiency\") -- an input alias that is never persisted. ProfileEditor.jsx documented the divergence in a comment and wrote the correct key; the vocabulary was corrected in wave 6.",
-          "info": {
-            "overview": "Languages you speak and your fluency level. This helps AI communicate with you appropriately and understand your linguistic capabilities.",
-            "tips": [
-              "Add one entry per language.",
-              "Fluency: native, fluent, conversational or basic."
-            ]
+        "$comment": "path: [] addresses the section ROOT -- these seven keys are stored as top-level scalars on profile.json (server.py:1651). Safe because FieldsRenderer spreads the stored object on every write, so a root write updates keys rather than replacing the section. The one profile entity whose vocabulary was already correct."
+      },
+      {
+        "kind": "list",
+        "path": [
+          "education"
+        ],
+        "title": "Education",
+        "description": "Your educational background and qualifications",
+        "info": {
+          "overview": "Document your educational journey—schools, degrees, and achievements. This helps AI understand your academic background and tailor advice accordingly.",
+          "tips": [
+            "Add one entry per institution or degree (e.g., separate entries for high school and university).",
+            "Institution Name: Full official name of the school or university.",
+            "Degree Level: e.g., 'High School Diploma', 'BSc', 'MSc', 'PhD'.",
+            "Field of Study: Your major, concentration, or programme name.",
+            "Status: Whether you're currently enrolled, have completed, or left incomplete.",
+            "Years: Start and end (or expected end) years.",
+            "Coursework: Key modules or classes you've taken.",
+            "Clubs & Societies: Extracurricular involvement.",
+            "Highlights: Notable achievements like awards, high grades, leadership roles, or recognitions."
+          ]
+        },
+        "search": true,
+        "element": {
+          "entity": "education",
+          "identifier": "institution",
+          "fields": [
+            {
+              "name": "institution",
+              "required": true,
+              "role": "title",
+              "placeholder": "School, college, or university"
+            },
+            {
+              "name": "degree_level",
+              "placeholder": "e.g. High School, Bachelor's, Master's, PhD"
+            },
+            {
+              "name": "field_of_study",
+              "placeholder": "e.g. Computer Science, Economics, Design"
+            },
+            {
+              "name": "start_year",
+              "placeholder": "e.g. 2020"
+            },
+            {
+              "name": "end_year",
+              "placeholder": "e.g. 2024 or Expected 2026"
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "values": [
+                "current",
+                "completed",
+                "incomplete"
+              ],
+              "show": [
+                "form",
+                "badge"
+              ],
+              "default": "current",
+              "off_contract": [
+                "values",
+                "default"
+              ]
+            },
+            {
+              "name": "highlights",
+              "type": "strings",
+              "show": [
+                "count"
+              ],
+              "label": "Highlights",
+              "placeholder": "e.g. Graduated with honours, Led the debate team",
+              "control": "input",
+              "element": {
+                "entity": "work_highlight",
+                "identifier": "highlight",
+                "parent": "company"
+              },
+              "$comment": "Bare strings on both writers (server.py:2559 appends the string itself). item_control:\"input\" because these are sentence-like -- the retired editor gave each its own editable row, and chips would mean retyping a whole achievement to fix a typo."
+            },
+            {
+              "name": "coursework",
+              "type": "list",
+              "show": [
+                "count"
+              ],
+              "label": "Coursework / Modules",
+              "element": {
+                "entity": "coursework",
+                "identifier": "name",
+                "actions": [
+                  "add",
+                  "remove"
+                ],
+                "description": "A module or class. Stored as {name, topics}; `course` is the input spelling for `name`.",
+                "parent": "institution",
+                "fields": [
+                  {
+                    "name": "name",
+                    "required": true,
+                    "role": "title",
+                    "placeholder": "e.g. Macroeconomics, Data Structures",
+                    "alias": [
+                      "course"
+                    ]
+                  },
+                  {
+                    "name": "topics",
+                    "type": "strings",
+                    "show": [
+                      "form",
+                      "count"
+                    ],
+                    "placeholder": "Key topics covered..."
+                  }
+                ],
+                "variants": [
+                  {
+                    "entity": "coursework_topic",
+                    "description": "Alias for `coursework` -- same list, same object shape."
+                  }
+                ]
+              },
+              "$comment": "OBJECTS: {name, topics}. The entity's `course` is the INPUT spelling; `name` is what is stored. Until wave 6 execute_modify appended a bare string here while the editor wrote objects, so an AI-added course rendered blank and could never be removed -- `course in coursework` compares a string to a dict. persona_store._normalize coerces legacy strings."
+            },
+            {
+              "name": "clubs",
+              "type": "list",
+              "show": [],
+              "label": "Clubs & Societies",
+              "element": {
+                "entity": "club",
+                "identifier": "name",
+                "actions": [
+                  "add",
+                  "remove"
+                ],
+                "description": "A society or extracurricular. Stored as {name, activities_involved}.",
+                "parent": "institution",
+                "fields": [
+                  {
+                    "name": "name",
+                    "required": true,
+                    "role": "title",
+                    "placeholder": "e.g. Debate Society, Football Club"
+                  },
+                  {
+                    "name": "activities_involved",
+                    "type": "strings",
+                    "show": [
+                      "form",
+                      "count"
+                    ],
+                    "placeholder": "e.g. Committee member, Event organiser"
+                  }
+                ]
+              },
+              "$comment": "OBJECTS: {name, activities_involved}. Before wave 6 `clubs` had no entity and no execute_modify branch at all -- the editor was its only writer, so no AI client could read into or out of it. Both added in wave 6."
+            }
+          ]
+        },
+        "$comment": "Binds the STORED keys. The vocabulary used to declare `degree`, `field` and `period`, none of which any writer produced -- `period` in particular maps to TWO stored keys (start_year, end_year), so no node could ever have bound it. Corrected in wave 6; see the wave 6 storage-keys reference. `clubs` has no MCP write path at all (no entity, no branch) -- the UI is its only writer, as it already was."
+      },
+      {
+        "kind": "list",
+        "path": [
+          "work_experience"
+        ],
+        "title": "Work Experience",
+        "description": "Your professional experience",
+        "info": {
+          "overview": "List your professional experiences—jobs, internships, placements, and volunteer work. This helps AI understand your skills and career trajectory.",
+          "tips": [
+            "Add one entry per role. If you held multiple roles at the same company, consider separate entries.",
+            "Role: Your job title or position.",
+            "Company: The organisation you worked for.",
+            "Type: e.g., 'Full-time', 'Part-time', 'Internship', 'Placement', 'Volunteer', 'Freelance'.",
+            "Period: Date range in a readable format, e.g., 'Jan 2023 – Jun 2024' or 'Summer 2022'.",
+            "Highlights: 3–6 bullet points describing what you did and achieved. Focus on outcomes and impact."
+          ]
+        },
+        "search": true,
+        "element": {
+          "entity": "work_experience",
+          "identifier": "company",
+          "fields": [
+            {
+              "name": "company",
+              "required": true,
+              "role": "title",
+              "placeholder": "Company or organisation"
+            },
+            {
+              "name": "role",
+              "required": true,
+              "placeholder": "e.g. Analyst, Designer, Engineer"
+            },
+            {
+              "name": "type",
+              "required": true,
+              "show": [
+                "form",
+                "badge"
+              ],
+              "placeholder": "e.g. Full-time, Internship, Freelance"
+            },
+            {
+              "name": "period",
+              "required": true,
+              "placeholder": "e.g. Jan 2022 - Jun 2023"
+            },
+            {
+              "name": "location",
+              "placeholder": "e.g. Remote, or a city"
+            },
+            {
+              "name": "description",
+              "type": "longtext",
+              "placeholder": "What the role involved..."
+            },
+            {
+              "name": "skills",
+              "type": "strings",
+              "show": [
+                "count"
+              ],
+              "label": "Skills",
+              "placeholder": "e.g. Project management, Python, Public speaking",
+              "element": {
+                "entity": "work_skill",
+                "identifier": "skill",
+                "description": "A skill or technology used in a role. Bare strings on the parent row, like work_highlight.",
+                "parent": "company",
+                "bulk": true
+              },
+              "$comment": "Bare strings on the parent row, same shape as `highlights` (server.py work_skill branch). Left as CHIPS rather than item_control:\"input\": these are short, word-like values you add and drop but never revise, and chips show many at a glance -- the opposite of a highlight, which is a sentence where a typo means retyping the lot."
+            },
+            {
+              "name": "highlights",
+              "type": "strings",
+              "show": [
+                "count"
+              ],
+              "label": "Highlights",
+              "placeholder": "e.g. Led a team of five, Cut response time by 40%",
+              "control": "input",
+              "element": {
+                "entity": "education_highlight",
+                "identifier": "highlight",
+                "parent": "institution"
+              },
+              "$comment": "Bare strings on both writers (server.py:1541). item_control:\"input\" matches the retired editor, which gave each highlight its own editable row -- see the education node."
+            }
+          ]
+        },
+        "$comment": "`location` and `description` were declared here and written by NOTHING before wave 6 -- not execute_modify, not the editor -- so every value an MCP client sent under them was discarded. Made real in server.py rather than dropped. `period` IS a stored key on this entity, unlike on `education` where the same name was a phantom. On the entity: `required` was [\"company\"] until wave 8, while the `add` branch has always demanded role/company/type/period -- so an MCP client following get_schema got a rejection it had no way to predict. `company` alone remains the identifier for update/remove, which is what `identifier` says; `required` describes `add`. Found by the stored-key audit."
+      },
+      {
+        "kind": "group",
+        "title": "Contact & Links",
+        "description": "How to reach you and your online presence",
+        "info": {
+          "overview": "Provide ways to reach you and links to your online profiles. AI can use this to reference your portfolio or suggest networking opportunities.",
+          "tips": [
+            "Emails: Add all relevant email addresses and tag their purpose (Primary, Work, School, etc.).",
+            "Links: Your portfolio, GitHub, LinkedIn or personal site — label each one."
+          ]
+        },
+        "sections": [
+          {
+            "kind": "list",
+            "path": [
+              "contact",
+              "emails"
+            ],
+            "title": "Emails",
+            "element": {
+              "entity": "email",
+              "identifier": "address",
+              "fields": [
+                {
+                  "name": "address",
+                  "required": true,
+                  "role": "title",
+                  "placeholder": "you@example.com"
+                },
+                {
+                  "name": "purpose",
+                  "required": true,
+                  "show": [
+                    "form",
+                    "badge"
+                  ],
+                  "placeholder": "e.g. primary, work, personal"
+                }
+              ]
+            },
+            "$comment": "Stores `purpose`. The vocabulary declared `label`, which nothing wrote, and omitted `purpose` -- which the add branch REQUIRES (server.py:1418), so no MCP client could add an email. Both corrected in wave 6."
           },
-          "field_placeholders": {
-            "name": "e.g. English, Spanish"
+          {
+            "kind": "list",
+            "path": [
+              "contact",
+              "links"
+            ],
+            "title": "Links",
+            "element": {
+              "entity": "link",
+              "identifier": "label",
+              "description": "A profile link. `label` identifies the row, so renaming one on update means sending `new_label`.",
+              "fields": [
+                {
+                  "name": "label",
+                  "required": true,
+                  "role": "title",
+                  "placeholder": "e.g. Portfolio, LinkedIn"
+                },
+                {
+                  "name": "url",
+                  "required": true,
+                  "placeholder": "https://example.com"
+                },
+                {
+                  "name": "new_label",
+                  "write_only": true
+                }
+              ]
+            },
+            "$comment": "No `update` action on this entity (server.py:1444-1465) -- an MCP client edits a link by removing and re-adding it. The UI edits in place, which is a superset and needs no declaration. On the entity: `update` was absent until wave 7: fixing a typo'd URL meant remove + re-add. See the wave 6 storage-keys reference, follow-up 5."
           }
-        }
-      ]
-    }
+        ]
+      },
+      {
+        "kind": "list",
+        "path": [
+          "languages_spoken"
+        ],
+        "title": "Languages",
+        "description": "Languages you speak and your fluency level",
+        "info": {
+          "overview": "Languages you speak and your fluency level. This helps AI communicate with you appropriately and understand your linguistic capabilities.",
+          "tips": [
+            "Add one entry per language.",
+            "Fluency: native, fluent, conversational or basic."
+          ]
+        },
+        "element": {
+          "entity": "language",
+          "identifier": "name",
+          "fields": [
+            {
+              "name": "name",
+              "required": true,
+              "role": "title",
+              "placeholder": "e.g. English, Spanish"
+            },
+            {
+              "name": "fluency",
+              "type": "enum",
+              "values": [
+                "native",
+                "fluent",
+                "conversational",
+                "basic"
+              ],
+              "required": true,
+              "show": [
+                "form",
+                "badge"
+              ]
+            }
+          ]
+        },
+        "$comment": "Stores `fluency`. The vocabulary declared `proficiency`, the third member of get_field(data, \"fluency\", \"level\", \"proficiency\") -- an input alias that is never persisted. ProfileEditor.jsx documented the divergence in a comment and wrote the correct key; the vocabulary was corrected in wave 6. On the entity: `required` was [\"name\"] until wave 8 while the branch has always demanded name AND fluency, so a client following get_schema got a rejection it could not predict. Found by the stored-key audit."
+      }
+    ]
   },
   {
     "key": "goals",
@@ -547,13 +658,14 @@
           "title"
         ],
         "optional": [
-          "type",
-          "custom_type",
-          "status",
           "target_date",
           "why",
-          "notes"
+          "notes",
+          "type",
+          "status",
+          "custom_type"
         ],
+        "identifier": "title",
         "valid_values": {
           "type": [
             "career",
@@ -570,34 +682,68 @@
             "paused",
             "dropped"
           ]
-        },
-        "identifier": "title"
+        }
       }
     },
-    "ui": {
-      "sections": [
-        {
-          "kind": "list",
-          "path": [
-            "goals"
-          ],
+    "sections": [
+      {
+        "kind": "list",
+        "path": [
+          "goals"
+        ],
+        "element": {
           "entity": "goal",
-          "title_field": "title",
-          "badges": [
-            "type",
-            "status"
-          ],
-          "detail_fields": [
-            "target_date",
-            "why",
-            "notes"
-          ],
-          "date_fields": [
-            "target_date"
+          "identifier": "title",
+          "fields": [
+            {
+              "name": "title",
+              "required": true,
+              "role": "title"
+            },
+            {
+              "name": "target_date",
+              "type": "date"
+            },
+            {
+              "name": "why"
+            },
+            {
+              "name": "notes"
+            },
+            {
+              "name": "type",
+              "type": "enum",
+              "values": [
+                "career",
+                "learning",
+                "personal",
+                "health",
+                "financial",
+                "creative",
+                "other"
+              ],
+              "allow_custom": true,
+              "show": [
+                "badge"
+              ]
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "values": [
+                "active",
+                "achieved",
+                "paused",
+                "dropped"
+              ],
+              "show": [
+                "badge"
+              ]
+            }
           ]
         }
-      ]
-    }
+      }
+    ]
   },
   {
     "key": "knowledge",
@@ -621,6 +767,7 @@
           "notes",
           "references"
         ],
+        "identifier": "name",
         "valid_values": {
           "level": [
             "beginner",
@@ -629,8 +776,7 @@
             "advanced",
             "expert"
           ]
-        },
-        "identifier": "name"
+        }
       },
       "domain_reference": {
         "actions": [
@@ -649,24 +795,6 @@
         "identifier": "ref_name",
         "parent": "domain_name"
       },
-      "knowledge": {
-        "actions": [
-          "add",
-          "update",
-          "remove"
-        ],
-        "required": [
-          "name"
-        ],
-        "optional": [
-          "category",
-          "level",
-          "notes",
-          "references"
-        ],
-        "description": "Generic knowledge entry with category support",
-        "identifier": "name"
-      },
       "mental_tab": {
         "actions": [
           "add",
@@ -678,19 +806,19 @@
         ],
         "optional": [
           "notes",
+          "references",
           "tags",
-          "status",
-          "references"
+          "status"
         ],
+        "identifier": "title",
+        "description": "Saved topics and bookmarks to revisit later — a shelf, not an inbox",
         "valid_values": {
           "status": [
             "open",
             "closed",
             "archived"
           ]
-        },
-        "identifier": "title",
-        "description": "Saved topics and bookmarks to revisit later — a shelf, not an inbox"
+        }
       },
       "mental_tab_reference": {
         "actions": [
@@ -708,162 +836,233 @@
         ],
         "identifier": "ref_name",
         "parent": "title"
+      },
+      "knowledge": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "required": [
+          "name"
+        ],
+        "optional": [
+          "category",
+          "level",
+          "notes",
+          "references"
+        ],
+        "description": "Generic knowledge entry with category support",
+        "identifier": "name"
       }
     },
-    "ui": {
-      "sections": [
-        {
-          "kind": "list",
-          "path": [
-            "domains"
-          ],
-          "entity": "domain",
-          "title": "Skills & Domains",
-          "title_field": "name",
-          "$comment": "Two entities write into this ONE list, with different shapes. `domain` add (server.py) writes {id,name,level,notes,references} and never a date; the `knowledge` entity, whose `category` defaults to \"domains\", writes {name,level,notes,references,added_date} with NO id, and its update writes last_updated. So `domains` legitimately holds entries with and without added_date/last_updated, and id only appears because persona_store._assign_ids backfills it on the next save. Both shapes must round-trip untouched: added_date and last_updated are bound read-only via display_fields and NEVER as detail_fields, and nothing here rebuilds an item from a whitelist.",
-          "badges": [
-            "level"
-          ],
-          "detail_fields": [
-            "name",
-            "level",
-            "notes"
-          ],
-          "long_text": [
-            "notes"
-          ],
-          "facets": [
-            "level"
-          ],
-          "count_badges": [
-            "references"
-          ],
-          "display_fields": [
-            "added_date",
-            "last_updated"
-          ],
-          "searchable": true,
-          "info": {
-            "overview": "This section tracks your technical and professional skills. It helps AI understand what you know, how well you know it, and in what context you've applied it.",
-            "tips": [
-              "Skill Name: Be specific—use 'Python' not 'Programming', or 'React' not just 'Frontend'.",
-              "Proficiency Levels explained:",
-              "  • Beginner: Just started learning, basic understanding.",
-              "  • Learning: Actively studying, can do simple tasks.",
-              "  • Intermediate: Comfortable with common use cases, some hands-on experience.",
-              "  • Advanced: Deep knowledge, can solve complex problems independently.",
-              "  • Expert: Mastery level, can teach others and handle edge cases.",
-              "Notes: Add context about where and how you've used the skill—projects, tools, or specific experience.",
-              "References: Optional links to tutorials, documentation, or learning resources you've found helpful."
-            ]
-          },
-          "children": [
-            {
-              "kind": "list",
-              "path": [
-                "references"
-              ],
-              "entity": "domain_reference",
-              "title": "References",
-              "title_field": "name",
-              "detail_fields": [
-                "name",
-                "url",
-                "notes"
-              ],
-              "fields_outside_entity": [
-                "name"
-              ],
-              "field_placeholders": {
-                "name": "Reference name",
-                "notes": "Notes",
-                "url": "URL"
-              }
-            }
-          ],
-          "field_placeholders": {
-            "name": "e.g. Photography, Marketing, Python",
-            "notes": "Add context, projects, or experience..."
-          }
+    "sections": [
+      {
+        "kind": "list",
+        "path": [
+          "domains"
+        ],
+        "title": "Skills & Domains",
+        "info": {
+          "overview": "This section tracks your technical and professional skills. It helps AI understand what you know, how well you know it, and in what context you've applied it.",
+          "tips": [
+            "Skill Name: Be specific—use 'Python' not 'Programming', or 'React' not just 'Frontend'.",
+            "Proficiency Levels explained:",
+            "  • Beginner: Just started learning, basic understanding.",
+            "  • Learning: Actively studying, can do simple tasks.",
+            "  • Intermediate: Comfortable with common use cases, some hands-on experience.",
+            "  • Advanced: Deep knowledge, can solve complex problems independently.",
+            "  • Expert: Mastery level, can teach others and handle edge cases.",
+            "Notes: Add context about where and how you've used the skill—projects, tools, or specific experience.",
+            "References: Optional links to tutorials, documentation, or learning resources you've found helpful."
+          ]
         },
-        {
-          "kind": "list",
-          "path": [
-            "mental_tabs"
-          ],
-          "entity": "mental_tab",
-          "title": "Mental Tabs",
-          "title_field": "title",
-          "$comment": "title_field is `title` and nothing else. FIELD_ALIASES[\"mental_tab\"] is [name, mental_tab, topic, title, subject] -- four MCP input spellings and one stored key -- and server.py writes only `title`. `topic` is the legacy key of the pair: still READ as a fallback in four places (add-dedupe, update lookup, remove lookup, and mental_tab_reference's parent lookup) and written by nothing since. It is deliberately absent from every binding below, because a control bound to it would write a key no renderer reads back. Old blobs carrying `topic` with no `title` are repaired on load by persona_store._normalize, which backfills `title` from `topic` without clobbering an existing one and without dropping `topic` -- see that function for why the repair belongs there and not here. A `topic` this node never names still survives every edit, because updateItem spreads the stored item rather than rebuilding it. `created_at` is machine-written (server.py on add, and the bespoke editor client-side); field_defaults keeps the client-side write alive under the generic renderer. It is deliberately NOT a display_field: the two write paths disagree (datetime.now().isoformat()+\"Z\" is local time labelled UTC, new Date().toISOString() is real UTC), so any rendering of it would be wrong by the local offset for whichever half of the entries came from the other path.",
-          "badges": [
-            "status"
-          ],
-          "detail_fields": [
-            "title",
-            "notes",
-            "tags"
-          ],
-          "array_fields": [
-            "tags"
-          ],
-          "long_text": [
-            "notes"
-          ],
-          "facets": [
-            "status"
-          ],
-          "count_badges": [
-            "references",
-            "tags"
-          ],
-          "field_defaults": {
-            "created_at": "@now"
-          },
-          "searchable": true,
-          "info": {
-            "overview": "Mental Tabs are your personal knowledge snippets—random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
-            "tips": [
-              "Title: A short, memorable name for the tab.",
-              "Status: Open (still live), Closed (dealt with), Archived (kept for reference).",
-              "Notes: A brief description or context explaining what this tab is about.",
-              "Tags: Keywords to help you (and AI) find this tab later.",
-              "References: Add items with a name, optional URL, and notes.",
-              "Use Mental Tabs for: favourite restaurants, book recommendations, gift ideas, recipes, travel tips, etc.",
-              "Think of it as your personal wiki that AI can reference when helping you."
-            ]
-          },
-          "children": [
+        "search": true,
+        "facets": [
+          "level"
+        ],
+        "element": {
+          "entity": "domain",
+          "identifier": "name",
+          "fields": [
             {
-              "kind": "list",
-              "path": [
-                "references"
+              "name": "name",
+              "required": true,
+              "role": "title",
+              "placeholder": "e.g. Photography, Marketing, Python"
+            },
+            {
+              "name": "level",
+              "type": "enum",
+              "values": [
+                "beginner",
+                "learning",
+                "intermediate",
+                "advanced",
+                "expert"
               ],
-              "entity": "mental_tab_reference",
-              "title": "References",
-              "title_field": "name",
-              "detail_fields": [
-                "name",
-                "url",
-                "notes"
+              "show": [
+                "form",
+                "badge"
+              ]
+            },
+            {
+              "name": "notes",
+              "type": "longtext",
+              "placeholder": "Add context, projects, or experience..."
+            },
+            {
+              "name": "references",
+              "type": "list",
+              "show": [
+                "count"
               ],
-              "fields_outside_entity": [
-                "name"
-              ],
-              "field_placeholders": {
-                "name": "Reference name",
-                "notes": "Notes",
-                "url": "URL"
+              "label": "References",
+              "element": {
+                "entity": "domain_reference",
+                "identifier": "name",
+                "parent": "domain_name",
+                "fields": [
+                  {
+                    "name": "name",
+                    "required": true,
+                    "role": "title",
+                    "placeholder": "Reference name",
+                    "alias": [
+                      "ref_name"
+                    ]
+                  },
+                  {
+                    "name": "url",
+                    "placeholder": "URL"
+                  },
+                  {
+                    "name": "notes",
+                    "placeholder": "Notes"
+                  }
+                ]
               }
+            },
+            {
+              "name": "added_date",
+              "show": [
+                "row"
+              ],
+              "ui_only": true
+            },
+            {
+              "name": "last_updated",
+              "show": [
+                "row"
+              ],
+              "ui_only": true
             }
-          ],
-          "field_placeholders": {
-            "notes": "Your notes, code snippets, reminders...",
-            "tags": "Add tag...",
-            "title": "e.g. Git commands, Recipe ideas"
-          }
-        }
-      ]
-    }
+          ]
+        },
+        "$comment": "Two entities write into this ONE list, with different shapes. `domain` add (server.py) writes {id,name,level,notes,references} and never a date; the `knowledge` entity, whose `category` defaults to \"domains\", writes {name,level,notes,references,added_date} with NO id, and its update writes last_updated. So `domains` legitimately holds entries with and without added_date/last_updated, and id only appears because persona_store._assign_ids backfills it on the next save. Both shapes must round-trip untouched: added_date and last_updated are bound read-only via display_fields and NEVER as detail_fields, and nothing here rebuilds an item from a whitelist."
+      },
+      {
+        "kind": "list",
+        "path": [
+          "mental_tabs"
+        ],
+        "title": "Mental Tabs",
+        "info": {
+          "overview": "Mental Tabs are your personal knowledge snippets—random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
+          "tips": [
+            "Title: A short, memorable name for the tab.",
+            "Status: Open (still live), Closed (dealt with), Archived (kept for reference).",
+            "Notes: A brief description or context explaining what this tab is about.",
+            "Tags: Keywords to help you (and AI) find this tab later.",
+            "References: Add items with a name, optional URL, and notes.",
+            "Use Mental Tabs for: favourite restaurants, book recommendations, gift ideas, recipes, travel tips, etc.",
+            "Think of it as your personal wiki that AI can reference when helping you."
+          ]
+        },
+        "search": true,
+        "facets": [
+          "status"
+        ],
+        "element": {
+          "entity": "mental_tab",
+          "identifier": "title",
+          "description": "Saved topics and bookmarks to revisit later — a shelf, not an inbox",
+          "fields": [
+            {
+              "name": "title",
+              "required": true,
+              "role": "title",
+              "placeholder": "e.g. Git commands, Recipe ideas"
+            },
+            {
+              "name": "notes",
+              "type": "longtext",
+              "placeholder": "Your notes, code snippets, reminders..."
+            },
+            {
+              "name": "references",
+              "type": "list",
+              "show": [
+                "count"
+              ],
+              "label": "References",
+              "element": {
+                "entity": "mental_tab_reference",
+                "identifier": "name",
+                "parent": "title",
+                "fields": [
+                  {
+                    "name": "name",
+                    "required": true,
+                    "role": "title",
+                    "placeholder": "Reference name",
+                    "alias": [
+                      "ref_name"
+                    ]
+                  },
+                  {
+                    "name": "url",
+                    "placeholder": "URL"
+                  },
+                  {
+                    "name": "notes",
+                    "placeholder": "Notes"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "tags",
+              "type": "strings",
+              "show": [
+                "form",
+                "count"
+              ],
+              "placeholder": "Add tag..."
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "values": [
+                "open",
+                "closed",
+                "archived"
+              ],
+              "show": [
+                "badge"
+              ]
+            },
+            {
+              "name": "created_at",
+              "show": [],
+              "default": "@now",
+              "ui_only": true
+            }
+          ]
+        },
+        "$comment": "title_field is `title` and nothing else. FIELD_ALIASES[\"mental_tab\"] is [name, mental_tab, topic, title, subject] -- four MCP input spellings and one stored key -- and server.py writes only `title`. `topic` is the legacy key of the pair: still READ as a fallback in four places (add-dedupe, update lookup, remove lookup, and mental_tab_reference's parent lookup) and written by nothing since. It is deliberately absent from every binding below, because a control bound to it would write a key no renderer reads back. Old blobs carrying `topic` with no `title` are repaired on load by persona_store._normalize, which backfills `title` from `topic` without clobbering an existing one and without dropping `topic` -- see that function for why the repair belongs there and not here. A `topic` this node never names still survives every edit, because updateItem spreads the stored item rather than rebuilding it. `created_at` is machine-written (server.py on add, and the bespoke editor client-side); field_defaults keeps the client-side write alive under the generic renderer. It is deliberately NOT a display_field: the two write paths disagree (datetime.now().isoformat()+\"Z\" is local time labelled UTC, new Date().toISOString() is real UTC), so any rendering of it would be wrong by the local offset for whichever half of the entries came from the other path."
+      }
+    ]
   },
   {
     "key": "preferences",
@@ -873,66 +1072,6 @@
     "default_enabled": true,
     "enabled": true,
     "entities": {
-      "like": {
-        "actions": [
-          "add",
-          "update",
-          "remove"
-        ],
-        "required": [
-          "item"
-        ],
-        "optional": [
-          "stance"
-        ],
-        "valid_values": {
-          "stance": [
-            "like",
-            "dislike"
-          ]
-        },
-        "identifier": "item",
-        "list": "likes_dislikes",
-        "description": "Something you like; stored in the shared likes_dislikes list with stance=like unless you send stance explicitly"
-      },
-      "dislike": {
-        "actions": [
-          "add",
-          "update",
-          "remove"
-        ],
-        "required": [
-          "item"
-        ],
-        "optional": [
-          "stance"
-        ],
-        "valid_values": {
-          "stance": [
-            "like",
-            "dislike"
-          ]
-        },
-        "identifier": "item",
-        "list": "likes_dislikes",
-        "description": "Something you dislike; stored in the shared likes_dislikes list with stance=dislike unless you send stance explicitly"
-      },
-      "preference": {
-        "actions": [
-          "add",
-          "update",
-          "remove"
-        ],
-        "required": [
-          "key"
-        ],
-        "optional": [
-          "category",
-          "value"
-        ],
-        "description": "Generic key-value preference with category support",
-        "identifier": "key"
-      },
       "communication_default": {
         "actions": [
           "update"
@@ -940,8 +1079,8 @@
         "required": [],
         "optional": [
           "tone",
-          "detail_level",
-          "locale"
+          "locale",
+          "detail_level"
         ],
         "identifier": null,
         "description": "Update-only singleton for default communication style"
@@ -972,210 +1111,300 @@
         "optional": [],
         "identifier": "item",
         "description": "One statement about how you want answers shaped. Bare strings, like lifestyle's energy_peaks."
+      },
+      "like": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "required": [
+          "item"
+        ],
+        "optional": [
+          "stance"
+        ],
+        "identifier": "item",
+        "description": "Something you like; stored in the shared likes_dislikes list with stance=like unless you send stance explicitly",
+        "valid_values": {
+          "stance": [
+            "like",
+            "dislike"
+          ]
+        },
+        "list": "likes_dislikes"
+      },
+      "dislike": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "required": [
+          "item"
+        ],
+        "optional": [
+          "stance"
+        ],
+        "identifier": "item",
+        "description": "Something you dislike; stored in the shared likes_dislikes list with stance=dislike unless you send stance explicitly",
+        "valid_values": {
+          "stance": [
+            "like",
+            "dislike"
+          ]
+        },
+        "list": "likes_dislikes"
+      },
+      "preference": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "required": [
+          "key"
+        ],
+        "optional": [
+          "category",
+          "value"
+        ],
+        "description": "Generic key-value preference with category support",
+        "identifier": "key"
       }
     },
-    "ui": {
-      "sections": [
-        {
-          "kind": "group",
-          "title": "Code Style",
-          "description": "Your preferred programming languages, frameworks, and tools",
-          "info": {
-            "overview": "Your preferred programming languages, frameworks, and tools. AI uses these to pick idioms and examples that match how you actually work.",
-            "tips": [
-              "Languages: what you reach for by default, not everything you have ever used.",
-              "Frameworks: the ones you want code examples written against.",
-              "Tools: editors, runtimes and services worth assuming you have."
-            ]
-          },
-          "sections": [
-            {
-              "kind": "strings",
-              "path": [
-                "code_style",
-                "preferred_languages"
-              ],
-              "title": "Preferred Languages",
-              "placeholder": "e.g. Python, TypeScript...",
-              "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
-            },
-            {
-              "kind": "strings",
-              "path": [
-                "code_style",
-                "frameworks"
-              ],
-              "title": "Frameworks",
-              "placeholder": "e.g. FastAPI, Next.js...",
-              "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
-            },
-            {
-              "kind": "strings",
-              "path": [
-                "code_style",
-                "tools"
-              ],
-              "title": "Tools",
-              "placeholder": "e.g. VS Code, Docker...",
-              "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
-            }
+    "sections": [
+      {
+        "kind": "group",
+        "title": "Code Style",
+        "description": "Your preferred programming languages, frameworks, and tools",
+        "info": {
+          "overview": "Your preferred programming languages, frameworks, and tools. AI uses these to pick idioms and examples that match how you actually work.",
+          "tips": [
+            "Languages: what you reach for by default, not everything you have ever used.",
+            "Frameworks: the ones you want code examples written against.",
+            "Tools: editors, runtimes and services worth assuming you have."
           ]
         },
-        {
-          "kind": "group",
-          "title": "Communication",
-          "description": "How you prefer AI responses to be formatted",
-          "info": {
-            "overview": "How you prefer AI responses to be formatted. This is the baseline; mood overrides below adjust it situationally.",
-            "tips": [
-              "Tone: how it should sound — e.g. friendly but professional.",
-              "Detail Level: how much to say and how to structure it.",
-              "Locale: spelling and conventions, e.g. British English."
-            ]
+        "sections": [
+          {
+            "kind": "strings",
+            "path": [
+              "code_style",
+              "preferred_languages"
+            ],
+            "title": "Preferred Languages",
+            "placeholder": "e.g. Python, TypeScript...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
           },
-          "sections": [
-            {
-              "kind": "fields",
-              "path": [
-                "communication",
-                "default"
-              ],
-              "entity": "communication_default",
-              "title": "Default Communication Style",
-              "description": "Always active. How you prefer AI responses to be written.",
-              "fields": [
-                "tone",
-                "locale",
-                "detail_level"
-              ],
-              "long_text": [
-                "detail_level"
-              ],
-              "$comment": "An update-only singleton (identifier: null). All three keys are written literally, not through get_field -- server.py:2211-2219.",
-              "field_placeholders": {
-                "detail_level": "e.g. comprehensive with examples, step-by-step breakdowns when explaining code...",
-                "locale": "e.g. British English",
-                "tone": "e.g. friendly but professional"
-              }
-            },
-            {
-              "kind": "list",
-              "path": [
-                "communication",
-                "mood_overrides"
-              ],
-              "entity": "mood_override",
-              "title": "When I'm feeling...",
-              "description": "Override the defaults based on your mood or context",
-              "title_field": "mood",
-              "badges": [
-                "tone"
-              ],
-              "detail_fields": [
-                "mood",
-                "tone",
-                "detail_level"
-              ],
-              "long_text": [
-                "detail_level"
-              ],
-              "$comment": "Stores `mood`. The retired editor wrote this name under `when_feeling`, which no execute_modify branch has ever read -- every MCP lookup resolves on o.get(\"mood\") -- so UI-written overrides were unreachable over MCP and AI-written ones rendered as \"Untitled mood\". persona_store._normalize backfills when_feeling -> mood with a collision guard. `locale`, which the old editor also wrote here, is NOT stored for an override (server.py:2245-2249) and is deliberately not bound.",
-              "field_placeholders": {
-                "detail_level": "e.g. brief and to the point, skip the explanations...",
-                "mood": "e.g. stressed, tired, excited, creative",
-                "tone": "e.g. gentle, encouraging"
-              }
-            },
-            {
-              "kind": "strings",
-              "path": [
-                "response_format"
-              ],
-              "title": "Response Format",
-              "description": "How you want answers shaped",
-              "item_control": "input",
-              "placeholder": "e.g. code blocks for anything over three lines",
-              "$comment": "Bare strings. Was five fixed booleans until wave 6 -- a boolean can only answer yes or no to an idea someone else chose, and real preferences are more specific than that. persona_store._normalize converts the old shape, keeping the TRUE keys as text; a list of wants cannot express \"explicitly off\", and a false boolean already read the same as absent."
-            }
-          ]
-        },
-        {
-          "kind": "group",
-          "title": "Learning Style",
-          "description": "How you learn best, and how you like work approached",
-          "info": {
-            "overview": "How you learn best, so explanations arrive in a shape that works for you.",
-            "tips": [
-              "Preferred: the formats that land — worked examples, diagrams, analogies.",
-              "Avoid: what reliably loses you — walls of text, unexplained jargon."
-            ]
+          {
+            "kind": "strings",
+            "path": [
+              "code_style",
+              "frameworks"
+            ],
+            "title": "Frameworks",
+            "placeholder": "e.g. FastAPI, Next.js...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
           },
-          "sections": [
-            {
-              "kind": "strings",
-              "path": [
-                "learning_style",
-                "preferred"
-              ],
-              "title": "Preferred Methods",
-              "placeholder": "e.g. hands-on examples...",
-              "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
-            },
-            {
-              "kind": "strings",
-              "path": [
-                "learning_style",
-                "avoid"
-              ],
-              "title": "Things to Avoid",
-              "placeholder": "e.g. walls of text...",
-              "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
-            }
-          ]
-        },
-        {
-          "kind": "list",
-          "path": [
-            "likes_dislikes"
-          ],
-          "entity": "like",
-          "title": "Likes & Dislikes",
-          "description": "Things you want every AI to know you like or avoid",
-          "title_field": "item",
-          "badges": [
-            "stance"
-          ],
-          "detail_fields": [
-            "item",
-            "stance"
-          ],
-          "enum": {
-            "stance": [
-              "like",
-              "dislike"
-            ]
-          },
-          "field_defaults": {
-            "stance": "like"
-          },
-          "facets": [
-            "stance"
-          ],
-          "$comment": "One list shared by the `like` and `dislike` entities, discriminated by `stance`. `stance` used to be in NEITHER entity's required nor optional -- invisible to get_schema though it is the key that decides which entity a row IS -- and was declared here via fields_outside_entity instead. Wave 7 put it on both entities, where it belongs, so that declaration is gone and the node's `stance` binding is now checked against the vocabulary like any other field. See reference doc 2.3 and wave 5 follow-up 4.",
-          "info": {
-            "overview": "Standing likes and dislikes every AI should know about, whatever the topic.",
-            "tips": [
-              "Keep each one short and concrete — \"unsolicited sales tone\" beats \"bad writing\".",
-              "Stance decides which way it reads: like or dislike.",
-              "Both stances live in one list, so flipping a row's stance is a single click."
-            ]
-          },
-          "field_placeholders": {
-            "item": "e.g. unsolicited sales tone, jargon..."
+          {
+            "kind": "strings",
+            "path": [
+              "code_style",
+              "tools"
+            ],
+            "title": "Tools",
+            "placeholder": "e.g. VS Code, Docker...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
           }
-        }
-      ]
-    }
+        ]
+      },
+      {
+        "kind": "group",
+        "title": "Communication",
+        "description": "How you prefer AI responses to be formatted",
+        "info": {
+          "overview": "How you prefer AI responses to be formatted. This is the baseline; mood overrides below adjust it situationally.",
+          "tips": [
+            "Tone: how it should sound — e.g. friendly but professional.",
+            "Detail Level: how much to say and how to structure it.",
+            "Locale: spelling and conventions, e.g. British English."
+          ]
+        },
+        "sections": [
+          {
+            "kind": "fields",
+            "path": [
+              "communication",
+              "default"
+            ],
+            "title": "Default Communication Style",
+            "description": "Always active. How you prefer AI responses to be written.",
+            "element": {
+              "entity": "communication_default",
+              "description": "Update-only singleton for default communication style",
+              "fields": [
+                {
+                  "name": "tone",
+                  "placeholder": "e.g. friendly but professional"
+                },
+                {
+                  "name": "locale",
+                  "placeholder": "e.g. British English"
+                },
+                {
+                  "name": "detail_level",
+                  "type": "longtext",
+                  "placeholder": "e.g. comprehensive with examples, step-by-step breakdowns when explaining code..."
+                }
+              ]
+            },
+            "$comment": "An update-only singleton (identifier: null). All three keys are written literally, not through get_field -- server.py:2211-2219."
+          },
+          {
+            "kind": "list",
+            "path": [
+              "communication",
+              "mood_overrides"
+            ],
+            "title": "When I'm feeling...",
+            "description": "Override the defaults based on your mood or context",
+            "element": {
+              "entity": "mood_override",
+              "identifier": "mood",
+              "fields": [
+                {
+                  "name": "mood",
+                  "required": true,
+                  "role": "title",
+                  "placeholder": "e.g. stressed, tired, excited, creative"
+                },
+                {
+                  "name": "tone",
+                  "show": [
+                    "form",
+                    "badge"
+                  ],
+                  "placeholder": "e.g. gentle, encouraging"
+                },
+                {
+                  "name": "detail_level",
+                  "type": "longtext",
+                  "placeholder": "e.g. brief and to the point, skip the explanations..."
+                }
+              ]
+            },
+            "$comment": "Stores `mood`. The retired editor wrote this name under `when_feeling`, which no execute_modify branch has ever read -- every MCP lookup resolves on o.get(\"mood\") -- so UI-written overrides were unreachable over MCP and AI-written ones rendered as \"Untitled mood\". persona_store._normalize backfills when_feeling -> mood with a collision guard. `locale`, which the old editor also wrote here, is NOT stored for an override (server.py:2245-2249) and is deliberately not bound."
+          },
+          {
+            "kind": "strings",
+            "path": [
+              "response_format"
+            ],
+            "title": "Response Format",
+            "description": "How you want answers shaped",
+            "control": "input",
+            "placeholder": "e.g. code blocks for anything over three lines",
+            "element": {
+              "entity": "response_format",
+              "identifier": "item",
+              "description": "One statement about how you want answers shaped. Bare strings, like lifestyle's energy_peaks."
+            },
+            "$comment": "Bare strings. Was five fixed booleans until wave 6 -- a boolean can only answer yes or no to an idea someone else chose, and real preferences are more specific than that. persona_store._normalize converts the old shape, keeping the TRUE keys as text; a list of wants cannot express \"explicitly off\", and a false boolean already read the same as absent."
+          }
+        ]
+      },
+      {
+        "kind": "group",
+        "title": "Learning Style",
+        "description": "How you learn best, and how you like work approached",
+        "info": {
+          "overview": "How you learn best, so explanations arrive in a shape that works for you.",
+          "tips": [
+            "Preferred: the formats that land — worked examples, diagrams, analogies.",
+            "Avoid: what reliably loses you — walls of text, unexplained jargon."
+          ]
+        },
+        "sections": [
+          {
+            "kind": "strings",
+            "path": [
+              "learning_style",
+              "preferred"
+            ],
+            "title": "Preferred Methods",
+            "placeholder": "e.g. hands-on examples...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          },
+          {
+            "kind": "strings",
+            "path": [
+              "learning_style",
+              "avoid"
+            ],
+            "title": "Things to Avoid",
+            "placeholder": "e.g. walls of text...",
+            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          }
+        ]
+      },
+      {
+        "kind": "list",
+        "path": [
+          "likes_dislikes"
+        ],
+        "title": "Likes & Dislikes",
+        "description": "Things you want every AI to know you like or avoid",
+        "info": {
+          "overview": "Standing likes and dislikes every AI should know about, whatever the topic.",
+          "tips": [
+            "Keep each one short and concrete — \"unsolicited sales tone\" beats \"bad writing\".",
+            "Stance decides which way it reads: like or dislike.",
+            "Both stances live in one list, so flipping a row's stance is a single click."
+          ]
+        },
+        "facets": [
+          "stance"
+        ],
+        "element": {
+          "entity": "like",
+          "identifier": "item",
+          "description": "Something you like; stored in the shared likes_dislikes list with stance=like unless you send stance explicitly",
+          "list": "likes_dislikes",
+          "fields": [
+            {
+              "name": "item",
+              "required": true,
+              "role": "title",
+              "placeholder": "e.g. unsolicited sales tone, jargon..."
+            },
+            {
+              "name": "stance",
+              "type": "enum",
+              "values": [
+                "like",
+                "dislike"
+              ],
+              "show": [
+                "form",
+                "badge"
+              ],
+              "default": "like",
+              "off_contract": [
+                "default"
+              ]
+            }
+          ],
+          "variants": [
+            {
+              "entity": "dislike",
+              "description": "Something you dislike; stored in the shared likes_dislikes list with stance=dislike unless you send stance explicitly"
+            }
+          ]
+        },
+        "$comment": "One list shared by the `like` and `dislike` entities, discriminated by `stance`. `stance` used to be in NEITHER entity's required nor optional -- invisible to get_schema though it is the key that decides which entity a row IS -- and was declared here via fields_outside_entity instead. Wave 7 put it on both entities, where it belongs, so that declaration is gone and the node's `stance` binding is now checked against the vocabulary like any other field. See reference doc 2.3 and wave 5 follow-up 4."
+      }
+    ]
   },
   {
     "key": "projects",
@@ -1185,6 +1414,20 @@
     "default_enabled": true,
     "enabled": true,
     "entities": {
+      "top_of_mind": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "required": [
+          "item"
+        ],
+        "optional": [
+          "note"
+        ],
+        "identifier": "item",
+        "description": "Inbox for fleeting ideas and current thoughts — expect entries to be pruned"
+      },
       "project": {
         "actions": [
           "add",
@@ -1196,12 +1439,13 @@
           "description"
         ],
         "optional": [
-          "status",
-          "tags",
           "notes",
+          "references",
+          "tags",
           "highlights",
-          "references"
+          "status"
         ],
+        "identifier": "name",
         "valid_values": {
           "status": [
             "active",
@@ -1210,22 +1454,7 @@
             "archived",
             "idea"
           ]
-        },
-        "identifier": "name",
-        "$comment": "`required` was [\"name\"] until wave 8 while the branch has always demanded name AND description. `name` alone remains the identifier for update/remove; `required` describes `add`. Found by the stored-key audit."
-      },
-      "project_tag": {
-        "actions": [
-          "add",
-          "remove"
-        ],
-        "required": [
-          "project_name",
-          "tag"
-        ],
-        "optional": [],
-        "identifier": "tag",
-        "parent": "project_name"
+        }
       },
       "project_reference": {
         "actions": [
@@ -1244,6 +1473,19 @@
         "identifier": "ref_name",
         "parent": "project_name"
       },
+      "project_tag": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "required": [
+          "project_name",
+          "tag"
+        ],
+        "optional": [],
+        "identifier": "tag",
+        "parent": "project_name"
+      },
       "project_highlight": {
         "actions": [
           "add",
@@ -1256,138 +1498,179 @@
         "optional": [],
         "identifier": "highlight",
         "parent": "project_name"
-      },
-      "top_of_mind": {
-        "actions": [
-          "add",
-          "remove"
-        ],
-        "required": [
-          "item"
-        ],
-        "optional": [
-          "note"
-        ],
-        "identifier": "item",
-        "description": "Inbox for fleeting ideas and current thoughts — expect entries to be pruned"
       }
     },
-    "ui": {
-      "sections": [
-        {
-          "kind": "list",
-          "path": [
-            "top_of_mind"
-          ],
-          "entity": "top_of_mind",
-          "title": "Top of Mind",
-          "title_field": "idea",
-          "detail_fields": [
-            "idea",
-            "note"
-          ],
-          "fields_outside_entity": [
-            "idea"
-          ],
-          "searchable": true,
-          "info": {
-            "overview": "Capture quick ideas, thoughts, or things you want to explore. Think of it as a scratchpad for inspiration before it becomes a full project.",
-            "tips": [
-              "Idea: A short phrase or sentence describing what you're thinking about.",
-              "Note: Optional context — why this idea excites you, potential next steps, or related thoughts.",
-              "Use this for: half-baked concepts, 'what if' questions, problems you want to solve, things to research later.",
-              "When an idea matures, you can promote it to a full project with more details."
-            ]
-          },
-          "field_placeholders": {
-            "idea": "Project idea or thing you want to build...",
-            "note": "Add a note (optional)..."
-          }
+    "sections": [
+      {
+        "kind": "list",
+        "path": [
+          "top_of_mind"
+        ],
+        "title": "Top of Mind",
+        "info": {
+          "overview": "Capture quick ideas, thoughts, or things you want to explore. Think of it as a scratchpad for inspiration before it becomes a full project.",
+          "tips": [
+            "Idea: A short phrase or sentence describing what you're thinking about.",
+            "Note: Optional context — why this idea excites you, potential next steps, or related thoughts.",
+            "Use this for: half-baked concepts, 'what if' questions, problems you want to solve, things to research later.",
+            "When an idea matures, you can promote it to a full project with more details."
+          ]
         },
-        {
-          "kind": "list",
-          "path": [
-            "projects"
+        "search": true,
+        "element": {
+          "entity": "top_of_mind",
+          "identifier": "idea",
+          "actions": [
+            "add",
+            "remove"
           ],
-          "entity": "project",
-          "title": "Projects",
-          "title_field": "name",
-          "badges": [
-            "status"
-          ],
-          "detail_fields": [
-            "name",
-            "description",
-            "notes",
-            "tags",
-            "highlights"
-          ],
-          "array_fields": [
-            "tags",
-            "highlights"
-          ],
-          "long_text": [
-            "description",
-            "notes"
-          ],
-          "facets": [
-            "status"
-          ],
-          "count_badges": [
-            "references",
-            "tags",
-            "highlights"
-          ],
-          "display_fields": [
-            "added_date"
-          ],
-          "searchable": true,
-          "info": {
-            "overview": "Track your active work, side projects, and completed endeavors. This helps AI understand what you're building and can reference past experience.",
-            "tips": [
-              "Name: Clear, descriptive title for the project.",
-              "Status: Idea (still in ideation/research), Active (currently working on it), Paused (temporarily on hold), Completed (finished and shipped), Archived (no longer relevant but kept for reference).",
-              "Description: What the project is about and your goals.",
-              "Tags: Keywords for easy filtering and AI context.",
-              "References: Links to repos, docs, designs, or related resources.",
-              "Highlights: Wins and milestones worth remembering.",
-              "Notes: Progress updates, blockers, or lessons learned."
-            ]
-          },
-          "children": [
+          "description": "Inbox for fleeting ideas and current thoughts — expect entries to be pruned",
+          "fields": [
             {
-              "kind": "list",
-              "path": [
-                "references"
-              ],
-              "entity": "project_reference",
-              "title": "References",
-              "title_field": "name",
-              "detail_fields": [
-                "name",
-                "url",
-                "notes"
-              ],
-              "fields_outside_entity": [
-                "name"
-              ],
-              "field_placeholders": {
-                "name": "Reference name",
-                "notes": "Notes about this resource (optional)...",
-                "url": "URL (optional)"
-              }
+              "name": "idea",
+              "required": true,
+              "role": "title",
+              "placeholder": "Project idea or thing you want to build...",
+              "alias": [
+                "item"
+              ]
+            },
+            {
+              "name": "note",
+              "placeholder": "Add a note (optional)..."
             }
-          ],
-          "field_placeholders": {
-            "description": "Brief description...",
-            "highlights": "e.g. Cut load time by 40%, Shipped the beta",
-            "name": "e.g. Personal website, Mobile app",
-            "notes": "Additional notes, blockers, or context...",
-            "tags": "Add tag..."
-          }
+          ]
         }
-      ]
-    }
+      },
+      {
+        "kind": "list",
+        "path": [
+          "projects"
+        ],
+        "title": "Projects",
+        "info": {
+          "overview": "Track your active work, side projects, and completed endeavors. This helps AI understand what you're building and can reference past experience.",
+          "tips": [
+            "Name: Clear, descriptive title for the project.",
+            "Status: Idea (still in ideation/research), Active (currently working on it), Paused (temporarily on hold), Completed (finished and shipped), Archived (no longer relevant but kept for reference).",
+            "Description: What the project is about and your goals.",
+            "Tags: Keywords for easy filtering and AI context.",
+            "References: Links to repos, docs, designs, or related resources.",
+            "Highlights: Wins and milestones worth remembering.",
+            "Notes: Progress updates, blockers, or lessons learned."
+          ]
+        },
+        "search": true,
+        "facets": [
+          "status"
+        ],
+        "element": {
+          "entity": "project",
+          "identifier": "name",
+          "fields": [
+            {
+              "name": "name",
+              "required": true,
+              "role": "title",
+              "placeholder": "e.g. Personal website, Mobile app"
+            },
+            {
+              "name": "description",
+              "type": "longtext",
+              "required": true,
+              "placeholder": "Brief description..."
+            },
+            {
+              "name": "notes",
+              "type": "longtext",
+              "placeholder": "Additional notes, blockers, or context..."
+            },
+            {
+              "name": "references",
+              "type": "list",
+              "show": [
+                "count"
+              ],
+              "label": "References",
+              "element": {
+                "entity": "project_reference",
+                "identifier": "name",
+                "parent": "project_name",
+                "fields": [
+                  {
+                    "name": "name",
+                    "required": true,
+                    "role": "title",
+                    "placeholder": "Reference name",
+                    "alias": [
+                      "ref_name"
+                    ]
+                  },
+                  {
+                    "name": "url",
+                    "placeholder": "URL (optional)"
+                  },
+                  {
+                    "name": "notes",
+                    "placeholder": "Notes about this resource (optional)..."
+                  }
+                ]
+              }
+            },
+            {
+              "name": "tags",
+              "type": "strings",
+              "show": [
+                "form",
+                "count"
+              ],
+              "placeholder": "Add tag...",
+              "element": {
+                "entity": "project_tag",
+                "identifier": "tag",
+                "parent": "project_name"
+              }
+            },
+            {
+              "name": "highlights",
+              "type": "strings",
+              "show": [
+                "form",
+                "count"
+              ],
+              "placeholder": "e.g. Cut load time by 40%, Shipped the beta",
+              "element": {
+                "entity": "project_highlight",
+                "identifier": "highlight",
+                "parent": "project_name"
+              }
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "values": [
+                "active",
+                "paused",
+                "completed",
+                "archived",
+                "idea"
+              ],
+              "show": [
+                "badge"
+              ]
+            },
+            {
+              "name": "added_date",
+              "show": [
+                "row"
+              ],
+              "ui_only": true
+            }
+          ]
+        },
+        "$comment": "On the entity: `required` was [\"name\"] until wave 8 while the branch has always demanded name AND description. `name` alone remains the identifier for update/remove; `required` describes `add`. Found by the stored-key audit."
+      }
+    ]
   },
   {
     "key": "lifestyle",
@@ -1407,12 +1690,13 @@
           "name"
         ],
         "optional": [
-          "skill_level",
-          "status",
           "notes",
           "specifics",
-          "references"
+          "references",
+          "skill_level",
+          "status"
         ],
+        "identifier": "name",
         "valid_values": {
           "skill_level": [
             "beginner",
@@ -1426,8 +1710,20 @@
             "inactive",
             "paused"
           ]
-        },
-        "identifier": "name"
+        }
+      },
+      "hobby_specific": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "required": [
+          "hobby_name",
+          "specific"
+        ],
+        "optional": [],
+        "identifier": "specific",
+        "parent": "hobby_name"
       },
       "hobby_reference": {
         "actions": [
@@ -1446,19 +1742,6 @@
         "identifier": "ref_name",
         "parent": "hobby_name"
       },
-      "hobby_specific": {
-        "actions": [
-          "add",
-          "remove"
-        ],
-        "required": [
-          "hobby_name",
-          "specific"
-        ],
-        "optional": [],
-        "identifier": "specific",
-        "parent": "hobby_name"
-      },
       "interest": {
         "actions": [
           "add",
@@ -1469,18 +1752,18 @@
           "name"
         ],
         "optional": [
-          "kind",
-          "notes"
+          "notes",
+          "kind"
         ],
+        "identifier": "name",
+        "description": "Things you're into: kind=passion for what you love doing/following, kind=curiosity for what you want to explore",
         "valid_values": {
           "kind": [
             "passion",
             "curiosity"
           ]
         },
-        "identifier": "name",
-        "list": "interests",
-        "description": "Things you're into: kind=passion for what you love doing/following, kind=curiosity for what you want to explore"
+        "list": "interests"
       },
       "personality_trait": {
         "actions": [
@@ -1515,13 +1798,13 @@
           "bedtime",
           "wakeup"
         ],
+        "identifier": "day_type",
         "valid_values": {
           "day_type": [
             "weekday",
             "weekend"
           ]
-        },
-        "identifier": "day_type"
+        }
       },
       "energy_peak": {
         "actions": [
@@ -1544,229 +1827,332 @@
         ],
         "optional": [],
         "identifier": "trigger",
-        "description": "A situation or pattern that tends to increase your stress. Stored as a bare string in wellness.stress_triggers.",
-        "$comment": "Added in wave 7. The key had a UI node and a seeded default but no entity and no execute_modify branch, so the UI was its only writer. See the wave 5 storage-keys reference, follow-up 2."
+        "description": "A situation or pattern that tends to increase your stress. Stored as a bare string in wellness.stress_triggers."
       }
     },
-    "ui": {
-      "sections": [
-        {
-          "kind": "list",
-          "path": [
-            "hobbies"
-          ],
+    "sections": [
+      {
+        "kind": "list",
+        "path": [
+          "hobbies"
+        ],
+        "title": "Hobbies & Activities",
+        "info": {
+          "overview": "Track activities you enjoy outside of work. This helps AI understand your lifestyle and can suggest relevant recommendations.",
+          "tips": [
+            "Name: The hobby or activity.",
+            "Skill Level: Beginner, Learning, Intermediate, Advanced, or Expert.",
+            "Status: Active (currently doing), Paused (on hold), or Inactive (stopped).",
+            "Specifics: Sub-areas or variations you focus on.",
+            "Notes: Your experience, goals, or what you enjoy most.",
+            "References: Links to gear, communities, or learning resources."
+          ]
+        },
+        "search": true,
+        "facets": [
+          "skill_level"
+        ],
+        "element": {
           "entity": "hobby",
-          "title": "Hobbies & Activities",
-          "title_field": "name",
-          "searchable": true,
-          "facets": [
-            "skill_level"
-          ],
-          "count_badges": [
-            "specifics",
-            "references"
-          ],
-          "badges": [
-            "skill_level",
-            "status"
-          ],
-          "detail_fields": [
-            "name",
-            "notes",
-            "specifics"
-          ],
-          "array_fields": [
-            "specifics"
-          ],
-          "field_defaults": {
-            "status": "active"
-          },
-          "$comment": "`status` binds the full three-value enum the entity declares. Until 2026-07-29 execute_modify collapsed \"paused\" to \"inactive\" on write, so a user's \"paused\" survived only until the next AI edit; see docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md 1.1.1. `references` is a child list whose rows store `name`, NOT the `ref_name` the entity declares as its identifier -- server.py:2133.",
-          "info": {
-            "overview": "Track activities you enjoy outside of work. This helps AI understand your lifestyle and can suggest relevant recommendations.",
-            "tips": [
-              "Name: The hobby or activity.",
-              "Skill Level: Beginner, Learning, Intermediate, Advanced, or Expert.",
-              "Status: Active (currently doing), Paused (on hold), or Inactive (stopped).",
-              "Specifics: Sub-areas or variations you focus on.",
-              "Notes: Your experience, goals, or what you enjoy most.",
-              "References: Links to gear, communities, or learning resources."
-            ]
-          },
-          "children": [
+          "identifier": "name",
+          "fields": [
             {
-              "kind": "list",
-              "path": [
-                "references"
+              "name": "name",
+              "required": true,
+              "role": "title",
+              "placeholder": "Hobby name"
+            },
+            {
+              "name": "notes",
+              "placeholder": "Additional notes about this hobby..."
+            },
+            {
+              "name": "specifics",
+              "type": "strings",
+              "show": [
+                "form",
+                "count"
               ],
-              "entity": "hobby_reference",
-              "title": "References & URLs",
-              "title_field": "name",
-              "detail_fields": [
-                "name",
-                "url",
-                "notes"
-              ],
-              "fields_outside_entity": [
-                "name"
-              ],
-              "$comment": "Stores `name`. The entity declares `ref_name` as its identifier, which is an MCP input alias only -- server.py:2133 writes {\"name\": ref_name or \"\"}.",
-              "field_placeholders": {
-                "name": "Reference name",
-                "notes": "Notes about this reference (optional)...",
-                "url": "URL (optional)"
+              "placeholder": "Add specifics...",
+              "element": {
+                "entity": "hobby_specific",
+                "identifier": "specific",
+                "parent": "hobby_name"
               }
+            },
+            {
+              "name": "references",
+              "type": "list",
+              "show": [
+                "count"
+              ],
+              "label": "References & URLs",
+              "element": {
+                "entity": "hobby_reference",
+                "identifier": "name",
+                "parent": "hobby_name",
+                "fields": [
+                  {
+                    "name": "name",
+                    "required": true,
+                    "role": "title",
+                    "placeholder": "Reference name",
+                    "alias": [
+                      "ref_name"
+                    ]
+                  },
+                  {
+                    "name": "url",
+                    "placeholder": "URL (optional)"
+                  },
+                  {
+                    "name": "notes",
+                    "placeholder": "Notes about this reference (optional)..."
+                  }
+                ]
+              },
+              "$comment": "Stores `name`. The entity declares `ref_name` as its identifier, which is an MCP input alias only -- server.py:2133 writes {\"name\": ref_name or \"\"}."
+            },
+            {
+              "name": "skill_level",
+              "type": "enum",
+              "values": [
+                "beginner",
+                "learning",
+                "intermediate",
+                "advanced",
+                "expert"
+              ],
+              "show": [
+                "badge"
+              ]
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "values": [
+                "active",
+                "inactive",
+                "paused"
+              ],
+              "show": [
+                "badge"
+              ],
+              "default": "active",
+              "off_contract": [
+                "default"
+              ]
             }
-          ],
-          "field_placeholders": {
-            "name": "Hobby name",
-            "notes": "Additional notes about this hobby...",
-            "specifics": "Add specifics..."
-          }
+          ]
         },
-        {
-          "kind": "list",
-          "path": [
-            "interests"
-          ],
+        "$comment": "`status` binds the full three-value enum the entity declares. Until 2026-07-29 execute_modify collapsed \"paused\" to \"inactive\" on write, so a user's \"paused\" survived only until the next AI edit; see docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md 1.1.1. `references` is a child list whose rows store `name`, NOT the `ref_name` the entity declares as its identifier -- server.py:2133."
+      },
+      {
+        "kind": "list",
+        "path": [
+          "interests"
+        ],
+        "title": "Interests",
+        "info": {
+          "overview": "Things you're into, tagged as a passion (what you love doing or following) or a curiosity (what you want to explore). AI uses this to understand your motivations and tailor suggestions.",
+          "tips": [
+            "Passion: something you care deeply about that drives you — sustainability, design, storytelling, education, technology.",
+            "Curiosity: something you want to explore or learn more about but haven't dived into yet — quantum computing, fermentation, urban planning, linguistics.",
+            "No pressure on curiosities—these can be fleeting interests or serious research areas."
+          ]
+        },
+        "element": {
           "entity": "interest",
-          "title": "Interests",
-          "title_field": "name",
-          "badges": [
-            "kind"
-          ],
-          "detail_fields": [
-            "name",
-            "notes"
-          ],
-          "field_defaults": {
-            "kind": "passion"
-          },
-          "info": {
-            "overview": "Things you're into, tagged as a passion (what you love doing or following) or a curiosity (what you want to explore). AI uses this to understand your motivations and tailor suggestions.",
-            "tips": [
-              "Passion: something you care deeply about that drives you — sustainability, design, storytelling, education, technology.",
-              "Curiosity: something you want to explore or learn more about but haven't dived into yet — quantum computing, fermentation, urban planning, linguistics.",
-              "No pressure on curiosities—these can be fleeting interests or serious research areas."
-            ]
-          },
-          "field_placeholders": {
-            "name": "Interest name",
-            "notes": "e.g. Reading Substacks, Photography"
-          }
-        },
-        {
-          "kind": "strings",
-          "path": [
-            "personality_traits"
-          ],
-          "title": "Personality Traits",
-          "placeholder": "e.g. Creative, Analytical...",
-          "$comment": "Bare strings: lifestyle[\"personality_traits\"] is a list of strings, not objects -- server.py:1772 appends `item` directly. The entity's `trait` is an input field name, never a stored key (CANONICAL_STORED_KEY[\"trait\"] is None), so this node binds no entity and names no fields.",
-          "info": {
-            "overview": "Characteristics that define how you think, work, and interact. Helps AI understand your style and adapt its responses.",
-            "tips": [
-              "Add adjectives or short phrases that describe you.",
-              "Examples: analytical, creative, detail-oriented, big-picture thinker, empathetic.",
-              "Be honest—both strengths and areas you're working on."
-            ]
-          }
-        },
-        {
-          "kind": "strings",
-          "path": [
-            "values"
-          ],
-          "title": "Values",
-          "placeholder": "e.g. Integrity, Growth...",
-          "$comment": "Bare strings, same shape as personality_traits -- server.py:1793. CANONICAL_STORED_KEY[\"value\"] is None.",
-          "info": {
-            "overview": "Core principles that guide your decisions and priorities. What matters most to you in life and work.",
-            "tips": [
-              "Add words or short phrases representing your values.",
-              "Examples: integrity, growth, family, creativity, impact, balance.",
-              "These help AI align suggestions with what truly matters to you."
-            ]
-          }
-        },
-        {
-          "kind": "group",
-          "title": "Wellness",
-          "description": "Sleep patterns, energy levels, and stress factors",
-          "info": {
-            "overview": "Track your health patterns and energy rhythms. This helps AI understand when you're at your best and what affects your wellbeing.",
-            "tips": [
-              "Sleep Schedule: When you typically go to bed and wake up (separate for weekdays vs weekends if different).",
-              "Energy Peaks: Times of day when you feel most focused and productive.",
-              "Stress Triggers: Situations, environments, or patterns that tend to increase your stress.",
-              "This info helps AI suggest optimal times for tasks and avoid recommending things during low-energy periods."
-            ]
-          },
-          "sections": [
+          "identifier": "name",
+          "description": "Things you're into: kind=passion for what you love doing/following, kind=curiosity for what you want to explore",
+          "list": "interests",
+          "fields": [
             {
-              "kind": "fields",
-              "path": [
-                "wellness",
-                "sleep",
-                "weekday"
-              ],
-              "entity": "sleep",
-              "title": "Sleep — weekdays",
-              "fields": [
-                "bedtime",
-                "wakeup"
-              ],
-              "time_fields": [
-                "bedtime",
-                "wakeup"
-              ],
-              "$comment": "The entity's `day_type` is a ROUTER selecting which sub-object to write (server.py:2295), never itself stored, so it is deliberately not bound. The two day keys are fixed; server.py:2292 rejects any other."
+              "name": "name",
+              "required": true,
+              "role": "title",
+              "placeholder": "Interest name"
             },
             {
-              "kind": "fields",
-              "path": [
-                "wellness",
-                "sleep",
-                "weekend"
-              ],
-              "entity": "sleep",
-              "title": "Sleep — weekends",
-              "fields": [
-                "bedtime",
-                "wakeup"
-              ],
-              "time_fields": [
-                "bedtime",
-                "wakeup"
-              ],
-              "$comment": "See the weekday node. Same entity, different fixed sub-object."
+              "name": "notes",
+              "placeholder": "e.g. Reading Substacks, Photography"
             },
             {
-              "kind": "strings",
-              "path": [
-                "wellness",
-                "energy_peaks"
+              "name": "kind",
+              "type": "enum",
+              "values": [
+                "passion",
+                "curiosity"
               ],
-              "title": "Energy Peaks",
-              "description": "Times of day when you feel most focused and productive",
-              "placeholder": "e.g. Early morning (6-9am), Late night (10pm-1am)...",
-              "$comment": "Bare strings -- server.py:2314 appends `item` directly."
-            },
-            {
-              "kind": "strings",
-              "path": [
-                "wellness",
-                "stress_triggers"
+              "show": [
+                "badge"
               ],
-              "title": "Stress Triggers",
-              "description": "Situations or patterns that tend to increase your stress",
-              "placeholder": "e.g. Tight deadlines, Open-plan noise...",
-              "$comment": "Bare strings. persona_store._normalize seeds it as []. The UI was its only writer until wave 7 added the stress_trigger entity and its execute_modify branch; both writers append to this same list now."
+              "default": "passion",
+              "off_contract": [
+                "default"
+              ]
             }
           ]
         }
-      ]
-    }
+      },
+      {
+        "kind": "strings",
+        "path": [
+          "personality_traits"
+        ],
+        "title": "Personality Traits",
+        "info": {
+          "overview": "Characteristics that define how you think, work, and interact. Helps AI understand your style and adapt its responses.",
+          "tips": [
+            "Add adjectives or short phrases that describe you.",
+            "Examples: analytical, creative, detail-oriented, big-picture thinker, empathetic.",
+            "Be honest—both strengths and areas you're working on."
+          ]
+        },
+        "placeholder": "e.g. Creative, Analytical...",
+        "element": {
+          "entity": "personality_trait",
+          "identifier": "trait"
+        },
+        "$comment": "Bare strings: lifestyle[\"personality_traits\"] is a list of strings, not objects -- server.py:1772 appends `item` directly. The entity's `trait` is an input field name, never a stored key (CANONICAL_STORED_KEY[\"trait\"] is None), so this node binds no entity and names no fields."
+      },
+      {
+        "kind": "strings",
+        "path": [
+          "values"
+        ],
+        "title": "Values",
+        "info": {
+          "overview": "Core principles that guide your decisions and priorities. What matters most to you in life and work.",
+          "tips": [
+            "Add words or short phrases representing your values.",
+            "Examples: integrity, growth, family, creativity, impact, balance.",
+            "These help AI align suggestions with what truly matters to you."
+          ]
+        },
+        "placeholder": "e.g. Integrity, Growth...",
+        "element": {
+          "entity": "value",
+          "identifier": "value"
+        },
+        "$comment": "Bare strings, same shape as personality_traits -- server.py:1793. CANONICAL_STORED_KEY[\"value\"] is None."
+      },
+      {
+        "kind": "group",
+        "title": "Wellness",
+        "description": "Sleep patterns, energy levels, and stress factors",
+        "info": {
+          "overview": "Track your health patterns and energy rhythms. This helps AI understand when you're at your best and what affects your wellbeing.",
+          "tips": [
+            "Sleep Schedule: When you typically go to bed and wake up (separate for weekdays vs weekends if different).",
+            "Energy Peaks: Times of day when you feel most focused and productive.",
+            "Stress Triggers: Situations, environments, or patterns that tend to increase your stress.",
+            "This info helps AI suggest optimal times for tasks and avoid recommending things during low-energy periods."
+          ]
+        },
+        "sections": [
+          {
+            "kind": "fields",
+            "path": [
+              "wellness",
+              "sleep",
+              "weekday"
+            ],
+            "title": "Sleep — weekdays",
+            "element": {
+              "entity": "sleep",
+              "identifier": "day_type",
+              "fields": [
+                {
+                  "name": "bedtime",
+                  "type": "time"
+                },
+                {
+                  "name": "wakeup",
+                  "type": "time"
+                },
+                {
+                  "name": "day_type",
+                  "write_only": true,
+                  "type": "enum",
+                  "values": [
+                    "weekday",
+                    "weekend"
+                  ],
+                  "required": true
+                }
+              ]
+            },
+            "$comment": "The entity's `day_type` is a ROUTER selecting which sub-object to write (server.py:2295), never itself stored, so it is deliberately not bound. The two day keys are fixed; server.py:2292 rejects any other."
+          },
+          {
+            "kind": "fields",
+            "path": [
+              "wellness",
+              "sleep",
+              "weekend"
+            ],
+            "title": "Sleep — weekends",
+            "element": {
+              "entity": "sleep",
+              "identifier": "day_type",
+              "fields": [
+                {
+                  "name": "bedtime",
+                  "type": "time"
+                },
+                {
+                  "name": "wakeup",
+                  "type": "time"
+                },
+                {
+                  "name": "day_type",
+                  "write_only": true,
+                  "type": "enum",
+                  "values": [
+                    "weekday",
+                    "weekend"
+                  ],
+                  "required": true
+                }
+              ]
+            },
+            "$comment": "See the weekday node. Same entity, different fixed sub-object."
+          },
+          {
+            "kind": "strings",
+            "path": [
+              "wellness",
+              "energy_peaks"
+            ],
+            "title": "Energy Peaks",
+            "description": "Times of day when you feel most focused and productive",
+            "placeholder": "e.g. Early morning (6-9am), Late night (10pm-1am)...",
+            "element": {
+              "entity": "energy_peak",
+              "identifier": "peak"
+            },
+            "$comment": "Bare strings -- server.py:2314 appends `item` directly."
+          },
+          {
+            "kind": "strings",
+            "path": [
+              "wellness",
+              "stress_triggers"
+            ],
+            "title": "Stress Triggers",
+            "description": "Situations or patterns that tend to increase your stress",
+            "placeholder": "e.g. Tight deadlines, Open-plan noise...",
+            "element": {
+              "entity": "stress_trigger",
+              "identifier": "trigger",
+              "description": "A situation or pattern that tends to increase your stress. Stored as a bare string in wellness.stress_triggers."
+            },
+            "$comment": "Bare strings. persona_store._normalize seeds it as []. The UI was its only writer until wave 7 added the stress_trigger entity and its execute_modify branch; both writers append to this same list now."
+          }
+        ]
+      }
+    ]
   },
   {
     "key": "media",
@@ -1786,13 +2172,14 @@
           "title"
         ],
         "optional": [
-          "kind",
-          "status",
-          "reaction",
           "url",
           "notes",
-          "tags"
+          "tags",
+          "kind",
+          "status",
+          "reaction"
         ],
+        "identifier": "title",
         "valid_values": {
           "kind": [
             "book",
@@ -1816,35 +2203,81 @@
             "disliked"
           ]
         },
-        "identifier": "title",
         "list": "items"
       }
     },
-    "ui": {
-      "sections": [
-        {
-          "kind": "list",
-          "path": [
-            "items"
-          ],
+    "sections": [
+      {
+        "kind": "list",
+        "path": [
+          "items"
+        ],
+        "element": {
           "entity": "media_item",
-          "title_field": "title",
-          "badges": [
-            "kind",
-            "status",
-            "reaction"
-          ],
-          "detail_fields": [
-            "url",
-            "notes",
-            "tags"
-          ],
-          "array_fields": [
-            "tags"
+          "identifier": "title",
+          "list": "items",
+          "fields": [
+            {
+              "name": "title",
+              "required": true,
+              "role": "title"
+            },
+            {
+              "name": "url"
+            },
+            {
+              "name": "notes"
+            },
+            {
+              "name": "tags",
+              "type": "strings"
+            },
+            {
+              "name": "kind",
+              "type": "enum",
+              "values": [
+                "book",
+                "article",
+                "podcast",
+                "show",
+                "film",
+                "game",
+                "video",
+                "music"
+              ],
+              "show": [
+                "badge"
+              ]
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "values": [
+                "want",
+                "in_progress",
+                "finished",
+                "dropped"
+              ],
+              "show": [
+                "badge"
+              ]
+            },
+            {
+              "name": "reaction",
+              "type": "enum",
+              "values": [
+                "loved",
+                "liked",
+                "disliked"
+              ],
+              "show": [
+                "badge"
+              ]
+            }
           ]
         }
-      ]
-    }
+      }
+    ]
   },
   {
     "key": "aesthetics",
@@ -1864,12 +2297,13 @@
           "name"
         ],
         "optional": [
+          "notes",
+          "references",
           "domain",
           "stance",
-          "primary",
-          "notes",
-          "references"
+          "primary"
         ],
+        "identifier": "name",
         "valid_values": {
           "domain": [
             "ui",
@@ -1888,66 +2322,106 @@
             "avoid"
           ]
         },
+        "field_defaults": {
+          "stance": "like"
+        },
         "exclusive_fields": [
           "primary"
         ],
-        "identifier": "name",
-        "list": "styles",
-        "field_defaults": {
-          "stance": "like"
-        }
+        "list": "styles"
       }
     },
-    "ui": {
-      "sections": [
-        {
-          "kind": "list",
-          "path": [
-            "styles"
-          ],
+    "sections": [
+      {
+        "kind": "list",
+        "path": [
+          "styles"
+        ],
+        "title": "Styles",
+        "element": {
           "entity": "aesthetic",
-          "title_field": "name",
-          "badges": [
-            "domain",
-            "stance"
-          ],
-          "detail_fields": [
-            "notes",
-            "references"
-          ],
-          "array_fields": [
-            "references"
-          ],
-          "suggestions": {
-            "name": [
-              "Minimalist",
-              "Maximalist",
-              "Brutalist",
-              "Pastel",
-              "Monochrome",
-              "Retro-futurism",
-              "Art deco",
-              "Scandinavian",
-              "Y2K",
-              "Editorial",
-              "Hand-drawn",
-              "Glassmorphism"
-            ]
-          },
-          "count_badges": [
-            "references"
-          ],
-          "$comment": "`primary` marks the one entry that IS the user's design language, as opposed to a style they merely like. It is the only entry that rides into the `minimal` scope, so an AI client gets the governing aesthetic at conversation start without the whole list. Rendered via `pinned` rather than as a field control -- a labelled switch in a detail grid is a poor way to say \"this one is THE one\" -- and kept to a single holder by the entity's `exclusive_fields`, which both the renderer and execute_modify honour.",
-          "title": "Styles",
-          "pinned": {
-            "field": "primary",
-            "title": "Primary aesthetic",
-            "empty": "No primary set yet. Star a style below to make it your design language.",
-            "noun": "primary"
-          }
-        }
-      ]
-    }
+          "identifier": "name",
+          "list": "styles",
+          "fields": [
+            {
+              "name": "name",
+              "required": true,
+              "role": "title",
+              "suggestions": [
+                "Minimalist",
+                "Maximalist",
+                "Brutalist",
+                "Pastel",
+                "Monochrome",
+                "Retro-futurism",
+                "Art deco",
+                "Scandinavian",
+                "Y2K",
+                "Editorial",
+                "Hand-drawn",
+                "Glassmorphism"
+              ]
+            },
+            {
+              "name": "notes"
+            },
+            {
+              "name": "references",
+              "type": "strings",
+              "show": [
+                "form",
+                "count"
+              ]
+            },
+            {
+              "name": "domain",
+              "type": "enum",
+              "values": [
+                "ui",
+                "graphic",
+                "typography",
+                "color",
+                "illustration",
+                "photography",
+                "fashion",
+                "interior",
+                "general"
+              ],
+              "show": [
+                "badge"
+              ]
+            },
+            {
+              "name": "stance",
+              "type": "enum",
+              "values": [
+                "love",
+                "like",
+                "avoid"
+              ],
+              "show": [
+                "badge"
+              ],
+              "default": "like"
+            },
+            {
+              "name": "primary",
+              "show": [
+                "pin"
+              ],
+              "exclusive": true,
+              "pin": {
+                "title": "Primary aesthetic",
+                "empty": "No primary set yet. Star a style below to make it your design language.",
+                "noun": "primary"
+              },
+              "type": "bool"
+            }
+          ]
+        },
+        "$comment": "`primary` marks the one entry that IS the user's design language, as opposed to a style they merely like. It is the only entry that rides into the `minimal` scope, so an AI client gets the governing aesthetic at conversation start without the whole list. Rendered via `pinned` rather than as a field control -- a labelled switch in a detail grid is a poor way to say \"this one is THE one\" -- and kept to a single holder by the entity's `exclusive_fields`, which both the renderer and execute_modify honour."
+      }
+    ]
   },
   {
     "key": "circle",
@@ -1971,50 +2445,54 @@
           "traits",
           "notes"
         ],
-        "identifier": "name",
-        "$comment": "`contact` was listed here until wave 8, next to notes and traits, as though it were a storable field for someone's contact details. It is not: it is an INPUT SPELLING for `name` (FIELD_ALIASES[\"connection\"]), so a value sent under it either named the connection or was discarded. Aliases are input vocabulary, not stored keys, and do not belong in `optional`. Found by the stored-key audit."
+        "identifier": "name"
       }
     },
-    "ui": {
-      "sections": [
-        {
-          "kind": "list",
-          "path": [
-            "connections"
-          ],
+    "sections": [
+      {
+        "kind": "list",
+        "path": [
+          "connections"
+        ],
+        "info": {
+          "overview": "Track the important people in your life and your relationships with them. This helps AI understand your social context and tailor suggestions accordingly.",
+          "tips": [
+            "Name: The person's full name or preferred name.",
+            "Relationship: How you know them - e.g., 'Friend from university', 'Colleague at Google', 'Mentor', 'Family member'.",
+            "Traits: Key characteristics or tags that describe them - personality, interests, expertise, etc.",
+            "Notes: Context about your relationship, shared experiences, important details to remember."
+          ]
+        },
+        "search": true,
+        "element": {
           "entity": "connection",
-          "title_field": "name",
-          "detail_fields": [
-            "name",
-            "relationship",
-            "traits",
-            "notes"
-          ],
-          "array_fields": [
-            "traits"
-          ],
-          "long_text": [
-            "notes"
-          ],
-          "searchable": true,
-          "info": {
-            "overview": "Track the important people in your life and your relationships with them. This helps AI understand your social context and tailor suggestions accordingly.",
-            "tips": [
-              "Name: The person's full name or preferred name.",
-              "Relationship: How you know them - e.g., 'Friend from university', 'Colleague at Google', 'Mentor', 'Family member'.",
-              "Traits: Key characteristics or tags that describe them - personality, interests, expertise, etc.",
-              "Notes: Context about your relationship, shared experiences, important details to remember."
-            ]
-          },
-          "field_placeholders": {
-            "name": "Person's name",
-            "notes": "Context about your relationship, shared experiences, important details...",
-            "relationship": "e.g. Friend, Colleague, Mentor",
-            "traits": "Add trait..."
-          }
-        }
-      ]
-    }
+          "identifier": "name",
+          "fields": [
+            {
+              "name": "name",
+              "required": true,
+              "role": "title",
+              "placeholder": "Person's name"
+            },
+            {
+              "name": "relationship",
+              "placeholder": "e.g. Friend, Colleague, Mentor"
+            },
+            {
+              "name": "traits",
+              "type": "strings",
+              "placeholder": "Add trait..."
+            },
+            {
+              "name": "notes",
+              "type": "longtext",
+              "placeholder": "Context about your relationship, shared experiences, important details..."
+            }
+          ]
+        },
+        "$comment": "On the entity: `contact` was listed here until wave 8, next to notes and traits, as though it were a storable field for someone's contact details. It is not: it is an INPUT SPELLING for `name` (FIELD_ALIASES[\"connection\"]), so a value sent under it either named the connection or was discarded. Aliases are input vocabulary, not stored keys, and do not belong in `optional`. Found by the stored-key audit."
+      }
+    ]
   },
   {
     "key": "learning_log",
@@ -2037,84 +2515,101 @@
         "optional": [
           "source",
           "tags",
-          "conversation_metadata",
           "key_decisions",
           "followup_items",
-          "new_topic",
-          "related_entries"
+          "conversation_metadata",
+          "related_entries",
+          "new_topic"
         ],
         "identifier": "topic"
       }
     },
-    "ui": {
-      "sections": [
-        {
-          "kind": "list",
-          "path": [
-            "entries"
-          ],
+    "sections": [
+      {
+        "kind": "list",
+        "path": [
+          "entries"
+        ],
+        "search": true,
+        "sort": {
+          "field": "timestamp",
+          "dir": "desc"
+        },
+        "element": {
           "entity": "learning_entry",
-          "title_field": "topic",
-          "badges": [
-            "source"
-          ],
-          "detail_fields": [
-            "topic",
-            "details",
-            "source",
-            "tags"
-          ],
-          "array_fields": [
-            "tags"
-          ],
-          "long_text": [
-            "details"
-          ],
-          "field_defaults": {
-            "source": "manual",
-            "timestamp": "@now"
-          },
-          "sort": {
-            "field": "timestamp",
-            "dir": "desc"
-          },
-          "searchable": true,
-          "display_fields": [
-            "timestamp"
-          ],
-          "display_formats": {
-            "timestamp": "datetime"
-          },
-          "field_placeholders": {
-            "details": "What you learned or discussed...",
-            "source": "e.g. conversation, article, course",
-            "tags": "e.g. design, languages",
-            "topic": "e.g. Spanish subjunctive, React hooks"
-          },
-          "children": [
+          "identifier": "topic",
+          "fields": [
             {
-              "kind": "strings",
-              "path": [
-                "key_decisions"
+              "name": "topic",
+              "required": true,
+              "role": "title",
+              "placeholder": "e.g. Spanish subjunctive, React hooks"
+            },
+            {
+              "name": "details",
+              "type": "longtext",
+              "required": true,
+              "placeholder": "What you learned or discussed..."
+            },
+            {
+              "name": "source",
+              "show": [
+                "form",
+                "badge"
               ],
-              "title": "Key Decisions",
-              "item_control": "input",
+              "placeholder": "e.g. conversation, article, course",
+              "default": "manual",
+              "off_contract": [
+                "default"
+              ]
+            },
+            {
+              "name": "tags",
+              "type": "strings",
+              "placeholder": "e.g. design, languages"
+            },
+            {
+              "name": "key_decisions",
+              "type": "strings",
+              "show": [],
+              "label": "Key Decisions",
               "placeholder": "e.g. Chose Postgres over SQLite for the vector index",
+              "control": "input",
               "$comment": "Bare strings on the parent row (server.py learning entry update). item_control:\"input\" for the same reason profile's work `highlights` uses it: these are SENTENCES, and a chip control makes fixing a typo mean deleting and retyping the whole line. They were chips until wave 12."
             },
             {
-              "kind": "strings",
-              "path": [
-                "followup_items"
-              ],
-              "title": "Follow-up Items",
-              "item_control": "input",
+              "name": "followup_items",
+              "type": "strings",
+              "show": [],
+              "label": "Follow-up Items",
               "placeholder": "e.g. Read the migration guide before the next sprint",
+              "control": "input",
               "$comment": "See the key_decisions node above -- same shape, same reasoning."
+            },
+            {
+              "name": "timestamp",
+              "show": [
+                "row"
+              ],
+              "default": "@now",
+              "format": "datetime",
+              "ui_only": true
+            },
+            {
+              "name": "conversation_metadata",
+              "write_only": true
+            },
+            {
+              "name": "related_entries",
+              "write_only": true
+            },
+            {
+              "name": "new_topic",
+              "write_only": true
             }
           ]
         }
-      ]
-    }
+      }
+    ]
   }
 ]

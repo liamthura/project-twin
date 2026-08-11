@@ -31,208 +31,175 @@
       "top_of_mind"
     ]
   },
-  "entities": {
-    "project": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
+  "sections": [
+    {
+      "kind": "list",
+      "path": [
+        "top_of_mind"
       ],
-      "required": [
-        "name",
-        "description"
-      ],
-      "optional": [
-        "status",
-        "tags",
-        "notes",
-        "highlights",
-        "references"
-      ],
-      "valid_values": {
-        "status": [
-          "active",
-          "paused",
-          "completed",
-          "archived",
-          "idea"
+      "title": "Top of Mind",
+      "info": {
+        "overview": "Capture quick ideas, thoughts, or things you want to explore. Think of it as a scratchpad for inspiration before it becomes a full project.",
+        "tips": [
+          "Idea: A short phrase or sentence describing what you're thinking about.",
+          "Note: Optional context — why this idea excites you, potential next steps, or related thoughts.",
+          "Use this for: half-baked concepts, 'what if' questions, problems you want to solve, things to research later.",
+          "When an idea matures, you can promote it to a full project with more details."
         ]
       },
-      "identifier": "name",
-      "$comment": "`required` was [\"name\"] until wave 8 while the branch has always demanded name AND description. `name` alone remains the identifier for update/remove; `required` describes `add`. Found by the stored-key audit."
-    },
-    "project_tag": {
-      "actions": [
-        "add",
-        "remove"
-      ],
-      "required": [
-        "project_name",
-        "tag"
-      ],
-      "optional": [],
-      "identifier": "tag",
-      "parent": "project_name"
-    },
-    "project_reference": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
-      ],
-      "required": [
-        "project_name",
-        "ref_name"
-      ],
-      "optional": [
-        "url",
-        "notes"
-      ],
-      "identifier": "ref_name",
-      "parent": "project_name"
-    },
-    "project_highlight": {
-      "actions": [
-        "add",
-        "remove"
-      ],
-      "required": [
-        "project_name",
-        "highlight"
-      ],
-      "optional": [],
-      "identifier": "highlight",
-      "parent": "project_name"
-    },
-    "top_of_mind": {
-      "actions": [
-        "add",
-        "remove"
-      ],
-      "required": [
-        "item"
-      ],
-      "optional": [
-        "note"
-      ],
-      "identifier": "item",
-      "description": "Inbox for fleeting ideas and current thoughts — expect entries to be pruned"
-    }
-  },
-  "ui": {
-    "sections": [
-      {
-        "kind": "list",
-        "path": [
-          "top_of_mind"
-        ],
+      "search": true,
+      "element": {
         "entity": "top_of_mind",
-        "title": "Top of Mind",
-        "title_field": "idea",
-        "detail_fields": [
-          "idea",
-          "note"
+        "identifier": "idea",
+        "actions": [
+          "add",
+          "remove"
         ],
-        "fields_outside_entity": [
-          "idea"
-        ],
-        "searchable": true,
-        "info": {
-          "overview": "Capture quick ideas, thoughts, or things you want to explore. Think of it as a scratchpad for inspiration before it becomes a full project.",
-          "tips": [
-            "Idea: A short phrase or sentence describing what you're thinking about.",
-            "Note: Optional context — why this idea excites you, potential next steps, or related thoughts.",
-            "Use this for: half-baked concepts, 'what if' questions, problems you want to solve, things to research later.",
-            "When an idea matures, you can promote it to a full project with more details."
-          ]
-        },
-        "field_placeholders": {
-          "idea": "Project idea or thing you want to build...",
-          "note": "Add a note (optional)..."
-        }
-      },
-      {
-        "kind": "list",
-        "path": [
-          "projects"
-        ],
-        "entity": "project",
-        "title": "Projects",
-        "title_field": "name",
-        "badges": [
-          "status"
-        ],
-        "detail_fields": [
-          "name",
-          "description",
-          "notes",
-          "tags",
-          "highlights"
-        ],
-        "array_fields": [
-          "tags",
-          "highlights"
-        ],
-        "long_text": [
-          "description",
-          "notes"
-        ],
-        "facets": [
-          "status"
-        ],
-        "count_badges": [
-          "references",
-          "tags",
-          "highlights"
-        ],
-        "display_fields": [
-          "added_date"
-        ],
-        "searchable": true,
-        "info": {
-          "overview": "Track your active work, side projects, and completed endeavors. This helps AI understand what you're building and can reference past experience.",
-          "tips": [
-            "Name: Clear, descriptive title for the project.",
-            "Status: Idea (still in ideation/research), Active (currently working on it), Paused (temporarily on hold), Completed (finished and shipped), Archived (no longer relevant but kept for reference).",
-            "Description: What the project is about and your goals.",
-            "Tags: Keywords for easy filtering and AI context.",
-            "References: Links to repos, docs, designs, or related resources.",
-            "Highlights: Wins and milestones worth remembering.",
-            "Notes: Progress updates, blockers, or lessons learned."
-          ]
-        },
-        "children": [
+        "description": "Inbox for fleeting ideas and current thoughts — expect entries to be pruned",
+        "fields": [
           {
-            "kind": "list",
-            "path": [
-              "references"
-            ],
-            "entity": "project_reference",
-            "title": "References",
-            "title_field": "name",
-            "detail_fields": [
-              "name",
-              "url",
-              "notes"
-            ],
-            "fields_outside_entity": [
-              "name"
-            ],
-            "field_placeholders": {
-              "name": "Reference name",
-              "notes": "Notes about this resource (optional)...",
-              "url": "URL (optional)"
-            }
+            "name": "idea",
+            "required": true,
+            "role": "title",
+            "placeholder": "Project idea or thing you want to build...",
+            "alias": [
+              "item"
+            ]
+          },
+          {
+            "name": "note",
+            "placeholder": "Add a note (optional)..."
           }
-        ],
-        "field_placeholders": {
-          "description": "Brief description...",
-          "highlights": "e.g. Cut load time by 40%, Shipped the beta",
-          "name": "e.g. Personal website, Mobile app",
-          "notes": "Additional notes, blockers, or context...",
-          "tags": "Add tag..."
-        }
+        ]
       }
-    ]
-  }
+    },
+    {
+      "kind": "list",
+      "path": [
+        "projects"
+      ],
+      "title": "Projects",
+      "info": {
+        "overview": "Track your active work, side projects, and completed endeavors. This helps AI understand what you're building and can reference past experience.",
+        "tips": [
+          "Name: Clear, descriptive title for the project.",
+          "Status: Idea (still in ideation/research), Active (currently working on it), Paused (temporarily on hold), Completed (finished and shipped), Archived (no longer relevant but kept for reference).",
+          "Description: What the project is about and your goals.",
+          "Tags: Keywords for easy filtering and AI context.",
+          "References: Links to repos, docs, designs, or related resources.",
+          "Highlights: Wins and milestones worth remembering.",
+          "Notes: Progress updates, blockers, or lessons learned."
+        ]
+      },
+      "search": true,
+      "facets": [
+        "status"
+      ],
+      "element": {
+        "entity": "project",
+        "identifier": "name",
+        "fields": [
+          {
+            "name": "name",
+            "required": true,
+            "role": "title",
+            "placeholder": "e.g. Personal website, Mobile app"
+          },
+          {
+            "name": "description",
+            "type": "longtext",
+            "required": true,
+            "placeholder": "Brief description..."
+          },
+          {
+            "name": "notes",
+            "type": "longtext",
+            "placeholder": "Additional notes, blockers, or context..."
+          },
+          {
+            "name": "references",
+            "type": "list",
+            "show": [
+              "count"
+            ],
+            "label": "References",
+            "element": {
+              "entity": "project_reference",
+              "identifier": "name",
+              "parent": "project_name",
+              "fields": [
+                {
+                  "name": "name",
+                  "required": true,
+                  "role": "title",
+                  "placeholder": "Reference name",
+                  "alias": [
+                    "ref_name"
+                  ]
+                },
+                {
+                  "name": "url",
+                  "placeholder": "URL (optional)"
+                },
+                {
+                  "name": "notes",
+                  "placeholder": "Notes about this resource (optional)..."
+                }
+              ]
+            }
+          },
+          {
+            "name": "tags",
+            "type": "strings",
+            "show": [
+              "form",
+              "count"
+            ],
+            "placeholder": "Add tag...",
+            "element": {
+              "entity": "project_tag",
+              "identifier": "tag",
+              "parent": "project_name"
+            }
+          },
+          {
+            "name": "highlights",
+            "type": "strings",
+            "show": [
+              "form",
+              "count"
+            ],
+            "placeholder": "e.g. Cut load time by 40%, Shipped the beta",
+            "element": {
+              "entity": "project_highlight",
+              "identifier": "highlight",
+              "parent": "project_name"
+            }
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "values": [
+              "active",
+              "paused",
+              "completed",
+              "archived",
+              "idea"
+            ],
+            "show": [
+              "badge"
+            ]
+          },
+          {
+            "name": "added_date",
+            "show": [
+              "row"
+            ],
+            "ui_only": true
+          }
+        ]
+      },
+      "$comment": "On the entity: `required` was [\"name\"] until wave 8 while the branch has always demanded name AND description. `name` alone remains the identifier for update/remove; `required` describes `add`. Found by the stored-key audit."
+    }
+  ]
 }

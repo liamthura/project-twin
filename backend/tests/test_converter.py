@@ -2,6 +2,10 @@
 schema authored today. That is the entire safety argument, so it is asserted per
 pack, before a single manifest is committed in the new shape.
 
+Its input is `fixtures/manifests_v1.json` -- the manifests as they were before the
+cutover -- because `section_packs` now holds the OUTPUT. Reading the packs
+directory here instead would compare the converter to itself.
+
 `_template` is excluded from the contract gate: its `key` is `example`, and
 `load_packs` skips any directory starting with `_`, so it has no frozen entry and
 ships no entity to anyone. It is still required to convert, validate and be
@@ -11,23 +15,17 @@ import json
 from pathlib import Path
 
 import pack_loader
-from tools.manifest_v1_to_v2 import convert
+from tools.manifest_v1_to_v2 import convert, v1_manifests
 
-PACKS = Path(pack_loader.PACKS_DIR)
 FROZEN = json.loads((Path(__file__).parent / "fixtures" / "entity_schema_v1.json").read_text())
 ORDERLESS = ("required", "optional")
 
 
 def _v1_manifests():
-    for d in sorted(p for p in PACKS.iterdir() if p.is_dir()):
-        yield json.loads((d / "manifest.json").read_text())
+    return v1_manifests().values()
 
 
 def _derive(v2, key):
-    # `derive_entities`, not `build_entity_schema`: the latter still reads the
-    # authored `entities` block and is not swapped over until Task 6. The gate
-    # cannot wait for that -- it is what proves the swap safe -- so Task 4 owns
-    # both halves of the claim, the converter and the derivation.
     return pack_loader.derive_entities(v2)
 
 
@@ -86,7 +84,7 @@ def test_conversion_is_idempotent_and_deterministic():
 
 def test_output_validates_against_the_v2_schema():
     for v1 in _v1_manifests():
-        pack_loader.validate_manifest_v2(convert(v1))  # raises on failure
+        pack_loader.validate_manifest(convert(v1))  # raises on failure
 
 
 def test_no_field_is_invented_from_the_entity_vocabulary_alone():
@@ -136,7 +134,7 @@ def test_the_rendered_field_census_is_unchanged():
 
 
 def _census_cannot_see(field):
-    """Three kinds of field the frozen census could not have recorded, by
+    """Four kinds of field the frozen census could not have recorded, by
     construction -- so their absence from it proves nothing.
 
     1. `write_only`: never rendered, so never in a census of rendered fields.
@@ -153,7 +151,8 @@ def _census_cannot_see(field):
        array is named by its stored key, which appears nowhere in the census.
 
     The frontend covers what is left of case 4: Phase A regenerates packs.json from
-    the converted manifests and 810 tests render the real shapes unchanged.
+    the converted manifests and the whole unit suite renders the real shapes
+    unchanged.
     """
     return (
         field.get("write_only")

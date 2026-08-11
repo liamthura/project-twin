@@ -19,16 +19,14 @@ Run from `backend/`:  PYTHONPATH=. python3 tools/emit_shim_fixtures.py
 import json
 from pathlib import Path
 
-import pack_loader
-from tools.manifest_v1_to_v2 import convert
+from tools.manifest_v1_to_v2 import convert, v1_manifests
 
 OUT = Path(__file__).resolve().parents[2] / "frontend/src/__fixtures__/shim-parity.json"
 
 
 def main():
     packs = {}
-    for d in sorted(p for p in Path(pack_loader.PACKS_DIR).iterdir() if p.is_dir()):
-        manifest = json.loads((d / "manifest.json").read_text())
+    for manifest in v1_manifests().values():
         packs[manifest["key"]] = {
             "v1": manifest["ui"]["sections"],
             "entities": manifest["entities"],

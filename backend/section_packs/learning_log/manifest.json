@@ -19,97 +19,91 @@
       "entries"
     ]
   },
-  "entities": {
-    "learning_entry": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
+  "sections": [
+    {
+      "kind": "list",
+      "path": [
+        "entries"
       ],
-      "required": [
-        "topic",
-        "details"
-      ],
-      "optional": [
-        "source",
-        "tags",
-        "conversation_metadata",
-        "key_decisions",
-        "followup_items",
-        "new_topic",
-        "related_entries"
-      ],
-      "identifier": "topic"
-    }
-  },
-  "ui": {
-    "sections": [
-      {
-        "kind": "list",
-        "path": [
-          "entries"
-        ],
+      "search": true,
+      "sort": {
+        "field": "timestamp",
+        "dir": "desc"
+      },
+      "element": {
         "entity": "learning_entry",
-        "title_field": "topic",
-        "badges": [
-          "source"
-        ],
-        "detail_fields": [
-          "topic",
-          "details",
-          "source",
-          "tags"
-        ],
-        "array_fields": [
-          "tags"
-        ],
-        "long_text": [
-          "details"
-        ],
-        "field_defaults": {
-          "source": "manual",
-          "timestamp": "@now"
-        },
-        "sort": {
-          "field": "timestamp",
-          "dir": "desc"
-        },
-        "searchable": true,
-        "display_fields": [
-          "timestamp"
-        ],
-        "display_formats": {
-          "timestamp": "datetime"
-        },
-        "field_placeholders": {
-          "details": "What you learned or discussed...",
-          "source": "e.g. conversation, article, course",
-          "tags": "e.g. design, languages",
-          "topic": "e.g. Spanish subjunctive, React hooks"
-        },
-        "children": [
+        "identifier": "topic",
+        "fields": [
           {
-            "kind": "strings",
-            "path": [
-              "key_decisions"
+            "name": "topic",
+            "required": true,
+            "role": "title",
+            "placeholder": "e.g. Spanish subjunctive, React hooks"
+          },
+          {
+            "name": "details",
+            "type": "longtext",
+            "required": true,
+            "placeholder": "What you learned or discussed..."
+          },
+          {
+            "name": "source",
+            "show": [
+              "form",
+              "badge"
             ],
-            "title": "Key Decisions",
-            "item_control": "input",
+            "placeholder": "e.g. conversation, article, course",
+            "default": "manual",
+            "off_contract": [
+              "default"
+            ]
+          },
+          {
+            "name": "tags",
+            "type": "strings",
+            "placeholder": "e.g. design, languages"
+          },
+          {
+            "name": "key_decisions",
+            "type": "strings",
+            "show": [],
+            "label": "Key Decisions",
             "placeholder": "e.g. Chose Postgres over SQLite for the vector index",
+            "control": "input",
             "$comment": "Bare strings on the parent row (server.py learning entry update). item_control:\"input\" for the same reason profile's work `highlights` uses it: these are SENTENCES, and a chip control makes fixing a typo mean deleting and retyping the whole line. They were chips until wave 12."
           },
           {
-            "kind": "strings",
-            "path": [
-              "followup_items"
-            ],
-            "title": "Follow-up Items",
-            "item_control": "input",
+            "name": "followup_items",
+            "type": "strings",
+            "show": [],
+            "label": "Follow-up Items",
             "placeholder": "e.g. Read the migration guide before the next sprint",
+            "control": "input",
             "$comment": "See the key_decisions node above -- same shape, same reasoning."
+          },
+          {
+            "name": "timestamp",
+            "show": [
+              "row"
+            ],
+            "default": "@now",
+            "format": "datetime",
+            "ui_only": true
+          },
+          {
+            "name": "conversation_metadata",
+            "write_only": true
+          },
+          {
+            "name": "related_entries",
+            "write_only": true
+          },
+          {
+            "name": "new_topic",
+            "write_only": true
           }
         ]
       }
-    ]
-  }
+    }
+  ]
 }

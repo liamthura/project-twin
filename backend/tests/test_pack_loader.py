@@ -12,15 +12,27 @@ MINIMAL = {
     "position": 99,
     "defaults": {"items": []},
     "id_lists": [["items", "demo"]],
-    "entities": {
-        "demo_item": {
-            "actions": ["add", "remove"],
-            "required": ["name"],
-            "optional": ["notes"],
-            "identifier": "name",
+    "sections": [
+        {
+            "kind": "list",
+            "path": ["items"],
+            "element": {
+                "entity": "demo_item",
+                "identifier": "name",
+                "actions": ["add", "remove"],
+                "fields": [
+                    {"name": "name", "role": "title", "required": True},
+                    {"name": "notes"},
+                ],
+            },
         }
-    },
+    ],
 }
+
+
+def _element(m):
+    """The one element of a MINIMAL-shaped manifest, where the entity now lives."""
+    return m["sections"][0]["element"]
 
 
 def test_validate_accepts_minimal_manifest():
@@ -36,7 +48,7 @@ def test_validate_rejects_missing_required_field():
 
 def test_validate_rejects_unknown_action():
     bad = copy.deepcopy(MINIMAL)
-    bad["entities"]["demo_item"]["actions"] = ["add", "obliterate"]
+    _element(bad)["actions"] = ["add", "obliterate"]
     with pytest.raises(pack_loader.PackError):
         pack_loader.validate_manifest(bad)
 
@@ -54,14 +66,7 @@ import json as _json
 def _write_pack(root, key, mutate=None, dirname=None):
     m = copy.deepcopy(MINIMAL)
     m["key"] = key
-    m["entities"] = {
-        f"{key}_item": {
-            "actions": ["add", "remove"],
-            "required": ["name"],
-            "optional": [],
-            "identifier": "name",
-        }
-    }
+    _element(m)["entity"] = f"{key}_item"
     m["id_lists"] = [["items", key]]
     if mutate:
         mutate(m)
@@ -113,8 +118,7 @@ def test_strict_raises_on_invalid_manifest(tmp_path):
 
 def test_strict_raises_on_schema_violation(tmp_path):
     """The exact shape of both hidden bugs: a key the meta-schema rejects."""
-    _write_pack(tmp_path, "good",
-                mutate=lambda m: m["entities"]["good_item"].update({"nonsense": 1}))
+    _write_pack(tmp_path, "good", mutate=lambda m: _element(m).update({"nonsense": 1}))
     with pytest.raises(pack_loader.PackError, match="good"):
         pack_loader.load_packs(tmp_path, strict=True)
 
@@ -169,8 +173,7 @@ def test_load_packs_skips_key_dir_mismatch(tmp_path, caplog):
 
 def test_load_packs_raises_on_entity_collision(tmp_path):
     _write_pack(tmp_path, "one")
-    _write_pack(tmp_path, "two",
-                mutate=lambda m: m["entities"].update({"one_item": m["entities"]["two_item"]}))
+    _write_pack(tmp_path, "two", mutate=lambda m: _element(m).update(entity="one_item"))
     with pytest.raises(pack_loader.PackError, match="one_item"):
         pack_loader.load_packs(tmp_path)
 

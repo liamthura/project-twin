@@ -71,14 +71,20 @@ ALWAYS_ON_SECTIONS = frozenset(k for k, m in _MANIFESTS.items() if m["core"])
 DEFAULT_ENABLED = {key: m.get("default_enabled", True) for key, m in _MANIFESTS.items()}
 
 # Display metadata for the Sections manager UI (pack order preserved).
+#
+# `entities` is the DERIVED contract, and shipping it here is easy to mistake for
+# duplication of what MCP gets. It is not: `/api/settings` is the frontend's only
+# source for it, and `ProposalsPanel.promotionTargets` reads it to work out which
+# entities a single line of text could become. Drop it and the Review surface
+# silently offers nothing to promote, with no backend test to notice.
 PACK_META = {
     key: {
         "title": m["title"],
         "description": m["description"],
         "core": m["core"],
         "default_enabled": m.get("default_enabled", True),
-        "ui": m.get("ui", {}),
-        "entities": m["entities"],
+        "sections": m["sections"],
+        "entities": pack_loader.derive_entities(m),
     }
     for key, m in _MANIFESTS.items()
 }

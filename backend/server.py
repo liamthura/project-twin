@@ -772,9 +772,9 @@ FIELD_ALIASES = {
     # (:1151), mental_tab_reference to "mental_tab" (:1169), domain_reference
     # to "domain" (:1173). So no lookup anywhere can reach a key added here.
     # Asserted executably, by deleting each entry and diffing normalize_data's
-    # output, in tests/test_ui_schema.py.
+    # output, in tests/test_section_bindings.py.
     #
-    # They exist so that tests/test_ui_schema.py's alias guard -- which is
+    # They exist so that tests/test_section_bindings.py's alias guard -- which is
     # inert for any entity this table does not name -- can see them. Without
     # them a `ui` child node binding `ref_name` fails NOTHING on the backend:
     # `ref_name` sits in each entity's `required`, so the spelling check waves
