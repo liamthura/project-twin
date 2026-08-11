@@ -409,10 +409,20 @@ def _fields_for(node, entity):
 
 This is what makes Phase A provable: after the packs convert, the renderers keep receiving exactly what they receive today, and 810 tests that know nothing about v2 keep passing.
 
-- [ ] **Step 1: Write the shim's own tests** — a v2 node in, today's keys out: `title_field` from `role: "title"`, `detail_fields` from `show` containing `form`, `badges`/`display_fields`/`count_badges` likewise, `array_fields`/`long_text`/`date_fields`/`time_fields` from `type`, `enum` + `field_defaults` + `field_placeholders` + `suggestions` from the descriptors, `children` from `type: "list"` fields, `item_control` from `control`. A v1 node passes through untouched (so the shim can land before the packs convert).
-- [ ] **Step 2: Run them, watch them fail.**
-- [ ] **Step 3: Implement, and call it from `normalizeUi`** so every consumer gets shimmed nodes without knowing.
-- [ ] **Step 4: Full frontend suite green, with no test edited. Commit.**
+- [x] **Step 1: Write the shim's own tests** — a v2 node in, today's keys out: `title_field` from `role: "title"`, `detail_fields` from `show` containing `form`, `badges`/`display_fields`/`count_badges` likewise, `array_fields`/`long_text`/`date_fields`/`time_fields` from `type`, `enum` + `field_defaults` + `field_placeholders` + `suggestions` from the descriptors, `children` from `type: "list"` fields, `item_control` from `control`. A v1 node passes through untouched (so the shim can land before the packs convert).
+- [x] **Step 2: Run them, watch them fail.**
+- [x] **Step 3: Implement, and call it from `normalizeUi`** so every consumer gets shimmed nodes without knowing.
+- [x] **Step 4: Full frontend suite green, with no test edited. Commit.**
+
+**Recorded during Task 5.** Green: **846 frontend unit tests, 1023 backend**, and no frontend test edited — `paths.js` is the only frontend file changed. The shim reproduces **every node of every pack byte-for-byte** save one documented chip swap.
+
+*The gate is `frontend/src/__fixtures__/shim-parity.json`*, holding the v1 `ui.sections`, the v1 `entities`, and the converted v2 tree per pack, frozen by `backend/tools/emit_shim_fixtures.py`. Do NOT regenerate it after Task 6 — that would compare the shim against itself. It goes with the shim in Task 9. Unit tests alone would not have found any of the five defects below; the gate found all of them, and three mutations confirmed it bites.
+
+*The plan's Step 1 list was right but incomplete.* Five mappings it did not name, each a shipped case: a field with `pin` takes **no** position, no type array and no placeholder (v1 named the pinned field in no display array at all); a labelled collection is a child node and the label is the discriminator — `show` is about the parent row and applies independently; a child **strings** node carries no `entity` and a child **list** node does, because `StringsRenderer` takes none; the title field's presence in `detail_fields` is not observable (`ListRenderer` prepends it either way, as its own comment says of goals, media and aesthetics); and a `fields` node's form array is called `fields`, not `detail_fields`.
+
+*Two converter defects, both found by the gate.* `_show_for` fell back to `["form"]` for a name in no display array, which would have put a control on screen for knowledge's `created_at` — a field v1 mentions only in `field_defaults`, deliberately never rendered because its two write paths disagree about the timezone. And `_fields_for` never reached it at all, silently retiring the `@now` the bespoke editor still writes. Both fixed; `show: []` is now legal in the schema and the loader requires it to come with a `label` or `ui_only`, so it cannot become a way to declare a field nothing reads or writes.
+
+*One rendered difference in the whole conversion, and it is a real format limit.* v1's `profile`/Education asks for two orders a single field list cannot both hold: `children` stacks Highlights above Coursework, `count_badges` chips Coursework before Highlights. v2 makes field order the one source for every order — that is the simplification — so one had to give. The blocks won; Education's two count chips swap. `_ORDER_CONFLICTS` in the converter records the decision by hand so a future conflict raises instead of quietly reordering something, and `_reading_order` topologically sorts the rest so that every other v1 array's order survives.
 
 ---
 

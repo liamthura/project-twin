@@ -409,6 +409,36 @@ def test_unknown_scope_name_is_still_rejected():
     _rejects(manifest, "spiritual")
 
 
+# --- a field that claims no position ------------------------------------
+
+
+def _goal_with(field):
+    node = _node()
+    node["element"]["fields"].append(field)
+    return _with_sections(node)
+
+
+def test_a_field_that_claims_no_position_and_draws_no_block_is_rejected():
+    # Neither a labelled block nor an admitted UI-only value: nothing renders it,
+    # and nothing outside the app knows it exists.
+    _rejects(_goal_with({"name": "priority", "show": []}), "claims no position")
+
+
+def test_a_ui_only_field_may_claim_no_position():
+    # knowledge's `created_at`: stamped on save, shown nowhere, because its two
+    # write paths disagree about the timezone.
+    _accepts(_goal_with({"name": "created_at", "show": [], "default": "@now", "ui_only": True}))
+
+
+def test_a_labelled_collection_may_claim_no_position():
+    # It draws its own titled block under the row, so it needs no slot in the form.
+    _accepts(
+        _goal_with(
+            {"name": "steps", "type": "strings", "show": [], "label": "Steps"}
+        )
+    )
+
+
 # --- the error says where -----------------------------------------------
 
 

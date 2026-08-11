@@ -306,12 +306,6 @@ def test_nested_list_field_is_accepted():
     pack_loader.validate_manifest_v2(_with_field(field))  # must not raise
 
 
-def test_empty_show_is_rejected():
-    # A field that renders nowhere says write_only: true. One way to say one thing.
-    with pytest.raises(pack_loader.PackError, match=_SHAPE):
-        pack_loader.validate_manifest_v2(_with_field({"name": "status", "show": []}))
-
-
 def test_write_only_field_is_accepted():
     pack_loader.validate_manifest_v2(
         _with_field({"name": "conversation_metadata", "write_only": True})

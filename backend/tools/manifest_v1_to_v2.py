@@ -188,32 +188,15 @@ def _fields_for(
 ) -> list:
     """The field list, in reading order, from what the `ui` block RENDERS.
 
-    Order: the form's own order first (`detail_fields`, or `fields` on a fields
-    node), then anything appearing only on the collapsed row, then the nested
-    arrays v1 kept in `children`, then the MCP-only names. Never
+    v1 spelled a field's positions as half a dozen independent arrays, each with
+    its own order. v2 has one array, so the ONE order it ships has to reproduce
+    all of them -- `_reading_order` is where that is worked out. Never
     `entity["optional"]` -- that is the set that would invent a control.
     """
-    order = list(node.get("detail_fields") or node.get("fields") or [])
-    title_field = node.get("title_field")
-    if title_field and title_field not in order:
-        order.insert(0, title_field)
-    for key in ("badges", "display_fields", "count_badges", "array_fields"):
-        for name in node.get(key) or []:
-            if name not in order:
-                order.append(name)
     # v1's `children` become fields of type list/strings, so their path names join
     # the field list at the point they were declared.
     children = {c["path"][-1]: c for c in node.get("children") or []}
-    for name in children:
-        if name not in order:
-            order.append(name)
-    # The pinned field appears in NO display array: v1's renderer drew it as the
-    # star that claims the slot and excluded it from the form and the Add dialog.
-    # Without this it never reached the field list, and `exclusive_fields` -- which
-    # is derived from it -- vanished from the entity.
-    pinned = (node.get("pinned") or {}).get("field")
-    if pinned and pinned not in order:
-        order.append(pinned)
+    order = _reading_order(node, children, pack)
 
     fields = [
         _descriptor(name, node, pack, entity_name, entity, entities, bound, children)
@@ -221,6 +204,95 @@ def _fields_for(
     ]
     fields += _mcp_only_fields(pack, entity_name, entity, order)
     return fields
+
+
+# The v1 node keys whose ORDER a reader can see: the form lays its controls out
+# in `detail_fields` order, the row draws chips in `badges` / `count_badges`
+# order, and the blocks under a row stack in `children` order. Each one becomes
+# a set of "a before b" constraints on the single v2 field list.
+_ORDERED_ARRAYS = ("badges", "display_fields", "count_badges")
+
+# ...and the keys whose order nothing can see, because every renderer asks them
+# `.includes(field)`. They contribute membership, not sequence -- imposing their
+# order too would collide with the arrays above for no gain.
+_MEMBERSHIP_KEYS = ("array_fields", "long_text", "date_fields", "time_fields", "bool_fields")
+
+# Node-level maps. A name can appear in one of these and in NO display array --
+# knowledge's `created_at` has a default and renders nowhere -- and dropping it
+# would silently retire a write the bespoke editor still makes.
+_MEMBERSHIP_MAPS = ("enum", "field_defaults", "field_placeholders", "suggestions",
+                    "display_formats")
+
+# Where a v1 node asks for two orders one field list cannot both keep, and which
+# one gives way. Keyed by (pack, node title) and listed by hand, so that a
+# future manifest with a new conflict raises instead of quietly reordering
+# something on screen.
+#
+# profile/Education is the only shipped case: its `children` stack Highlights
+# above Coursework, its `count_badges` chip Coursework before Highlights. The
+# blocks win -- `children` is a deliberately sequenced array of whole nodes,
+# where `count_badges` is a bag of names -- so Education's two chips swap. That
+# is the single rendered difference in the whole conversion.
+_ORDER_CONFLICTS = {("profile", "Education"): "count_badges"}
+
+
+def _reading_order(node: dict, children: dict, pack: str) -> list:
+    """One field order that reproduces every ordered v1 array."""
+    form = list(node.get("detail_fields") or node.get("fields") or [])
+    title_field = node.get("title_field")
+    if title_field and title_field not in form:
+        form.insert(0, title_field)
+
+    yields = _ORDER_CONFLICTS.get((pack, node.get("title")))
+    sequences = [form, list(children)] + [
+        list(node.get(k) or []) for k in _ORDERED_ARRAYS if k != yields
+    ]
+    # Seeded in this order, so that where the constraints leave a choice the
+    # result reads the way the section does: the form, then the blocks beneath
+    # it, then the row's chips, then everything only the contract can see.
+    seed = []
+    for names in sequences + [list(node.get(k) or []) for k in _MEMBERSHIP_KEYS]:
+        seed += names
+    for key in _MEMBERSHIP_MAPS:
+        seed += list(node.get(key) or {})
+    # The pinned field appears in NO display array: v1's renderer drew it as the
+    # star that claims the slot and excluded it from the form and the Add dialog.
+    # Without this it never reached the field list, and `exclusive_fields` --
+    # which is derived from it -- vanished from the entity.
+    pinned = (node.get("pinned") or {}).get("field")
+    if pinned:
+        seed.append(pinned)
+
+    rank: dict = {}
+    for name in seed:
+        rank.setdefault(name, len(rank))
+    after = {name: set() for name in rank}
+    blockers = dict.fromkeys(rank, 0)
+    for names in sequences:
+        for i, earlier in enumerate(names):
+            for later in names[i + 1 :]:
+                if later not in after[earlier]:
+                    after[earlier].add(later)
+                    blockers[later] += 1
+
+    ready = sorted((n for n in rank if not blockers[n]), key=rank.get)
+    order = []
+    while ready:
+        name = ready.pop(0)
+        order.append(name)
+        for later in after[name]:
+            blockers[later] -= 1
+            if not blockers[later]:
+                ready.append(later)
+        ready.sort(key=rank.get)
+    if len(order) != len(rank):
+        stuck = sorted(set(rank) - set(order))
+        raise ValueError(
+            f"cannot order the fields of {pack}/{node.get('title') or node.get('path')}: "
+            f"its display arrays disagree about {stuck}. Decide which array gives "
+            f"way and add it to _ORDER_CONFLICTS."
+        )
+    return order
 
 
 def _descriptor(
@@ -410,7 +482,11 @@ def _show_for(name: str, node: dict) -> list:
         show.append("row")
     if name in (node.get("count_badges") or []):
         show.append("count")
-    return show or ["form"]
+    # No fallback to ["form"]. A name the node mentions ONLY in `field_defaults`
+    # is stored and defaulted and drawn nowhere -- knowledge's `created_at` is
+    # the one shipped case -- and defaulting it into the form would put a
+    # control on screen that has never existed.
+    return show
 
 
 def _alias_for(pack: str, entity_name: str, name: str, entity: dict) -> list:

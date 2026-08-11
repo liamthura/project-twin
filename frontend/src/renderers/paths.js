@@ -4,6 +4,7 @@
 //
 // No React import, no DOM access, no side effects. Later renderer waves
 // depend on that purity, so keep it that way.
+import { v1Shape } from "./v2Node";
 
 /**
  * Reads the value at `path` inside `obj`. Returns `undefined` if any
@@ -182,7 +183,10 @@ export function outline(pack) {
 export function normalizeUi(pack) {
   const ui = pack?.ui;
   if (!ui) return { sections: [] };
-  if (Array.isArray(ui.sections)) return { sections: ui.sections };
+  // Every node leaves here in v1's shape, whichever format the manifest is in.
+  // `v1Shape` passes a v1 node through untouched, so this line is inert until
+  // the packs convert and dead once Phase B teaches the renderers v2 directly.
+  if (Array.isArray(ui.sections)) return { sections: ui.sections.map(v1Shape) };
 
   const entities = pack.entities || {};
   const entityByList = {};

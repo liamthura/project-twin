@@ -248,6 +248,24 @@ def _cross_check(manifest: dict) -> None:
         if len(pinned) > 1:
             fail(where, f"fields {pinned} all declare `pin`; at most one may")
 
+        # An empty `show` claims no position in the form or on the row. Two fields
+        # can honestly want that: a labelled collection, which draws its own block
+        # below the row, and a field the app stores without ever showing it -- which
+        # is only coherent outside the tool vocabulary, because anything the
+        # vocabulary names and the screen omits is `write_only`. Anything else with
+        # an empty `show` is a field nothing can read or write.
+        for field in fields:
+            if field.get("show") != []:
+                continue
+            if not field.get("label") and not field.get("ui_only"):
+                fail(
+                    where,
+                    f"field '{field['name']}' claims no position (`show: []`) and has "
+                    f"no `label` to draw a block of its own; if the app stores it "
+                    f"without showing it say `ui_only`, and if the tools know it and "
+                    f"the screen omits it say `write_only`",
+                )
+
         # Rule 8.
         claim_entity(element["entity"], _derivation_signature(element), where)
         for variant in element.get("variants", []):

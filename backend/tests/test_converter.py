@@ -143,16 +143,21 @@ def _census_cannot_see(field):
     2. `pin`: `fieldCensus.fieldsOf` reads the seven display arrays and v1 kept a
        pinned field out of every one of them -- the star that claims the slot was
        drawn by the renderer from `pinned.field`, which the census never looks at.
-    3. An array that was a v1 CHILD NODE. The census recorded those as their own
+    3. `show: []`: stored, defaulted, drawn nowhere. knowledge's `created_at` is
+       the shipped case -- it has a `@now` default the bespoke editor still
+       writes, and v1 named it in no display array precisely because its two
+       write paths disagree about the timezone.
+    4. An array that was a v1 CHILD NODE. The census recorded those as their own
        entries keyed by title (`entries > Key Decisions`) with an empty field list,
        because a `strings` node has no field descriptors. As a v2 field the same
        array is named by its stored key, which appears nowhere in the census.
 
-    The frontend covers what is left of case 3: Phase A regenerates packs.json from
+    The frontend covers what is left of case 4: Phase A regenerates packs.json from
     the converted manifests and 810 tests render the real shapes unchanged.
     """
     return (
         field.get("write_only")
         or "pin" in field
+        or field.get("show") == []
         or field.get("type") in ("strings", "list")
     )

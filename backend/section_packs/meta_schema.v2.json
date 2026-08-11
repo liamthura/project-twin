@@ -608,9 +608,8 @@
           ]
         },
         "show": {
-          "$comment": "Five positions. `pin` is the odd one and earns its place: a pinned field is drawn as the star that claims the slot, and v1 deliberately kept it out of the form and the Add dialog -- so the default form position would put a switch on screen that has never existed. An ARRAY because `status` is a badge and a form field at once. Order within a position comes from the `fields` array, which is how v2 replaces two independent orderings (v1's `badges` order and its `detail_fields` order) with one. Must be non-empty when present: a field that renders nowhere says `write_only: true`, because one way to say one thing is the point of the exercise.",
+          "$comment": "Five positions, and empty. `pin` is the odd one and earns its place: a pinned field is drawn as the star that claims the slot, and v1 deliberately kept it out of the form and the Add dialog -- so the default form position would put a switch on screen that has never existed. An ARRAY because `status` is a badge and a form field at once. Order within a position comes from the `fields` array, which is how v2 replaces two independent orderings (v1's `badges` order and its `detail_fields` order) with one. EMPTY means the app stores the field and draws it nowhere -- knowledge's `created_at` is timestamped on save and never shown, because its two writers disagree about the timezone -- and it is only legal alongside `ui_only`, which is checked in the loader. A field that renders nowhere AND is in the tool vocabulary says `write_only` instead and carries no `show` at all.",
           "type": "array",
-          "minItems": 1,
           "uniqueItems": true,
           "items": {
             "enum": [
