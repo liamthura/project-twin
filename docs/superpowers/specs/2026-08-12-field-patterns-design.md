@@ -23,7 +23,7 @@ sections below: parent 1 → §1, parent 3 → §2, parent 4 → §3, parent 5 �
 | 1 | Chip paste splits on comma and newline | Not done. `ArrayInput.jsx` handles Enter only. |
 | 2 | Row click expands inline to edit | **Already done.** `ListRenderer.jsx:636` renders live `ScalarField`s inside the expanded row. |
 | 3 | Search appears only past six items | Not done. Shows whenever the node declares `search` and holds ≥1 item (`:322`). |
-| 4 | Remove behind an overflow menu | Not done, and larger than the parent spec assumed. |
+| 4 | Remove behind an overflow menu | The menu is not done. The confirmation it refers to **does** exist and stays. |
 | 5 | `fields` labels at `headline-3` | Not done. `FieldsRenderer.jsx:72` is `text-xs text-muted-foreground`. |
 
 Pattern 2's wording was "**Row click expands inline to edit**, replacing today's
@@ -33,11 +33,23 @@ waves, before the redesign started. There is no `EditDialog`, `EditForm`,
 `frontend/src/components`. Nothing to do.
 
 Pattern 4's wording was "Remove sits behind an overflow `DropdownMenu` and
-**keeps its confirmation `Modal`**". There is no confirmation to keep.
-`ListRenderer.jsx:604` is a bare `Trash2` icon button that calls
-`removeItem(idx)` on one click, and no `AlertDialog` or confirm component exists
-in the renderers. So the recovery affordance is new work, and choosing which one
-was the only real design decision in this slice.
+**keeps its confirmation `Modal`**". That is correct as written: the modal exists
+and this slice keeps it. Only the menu is new.
+
+> **Correction, 2026-08-12.** The first draft of this spec claimed there was no
+> confirmation to keep, and a design decision was taken on that basis before the
+> claim was checked properly. It is wrong. `App.jsx:176-197` holds the dialog
+> state and `showConfirmation`, `App.jsx:784-799` renders it with Cancel and
+> Remove, and it reaches the row through
+> `App` → `SectionRenderer` → `renderNode` → `ListRenderer` → `useListItems`,
+> where `removeItem` (`useListItems.js:135`) routes through `onShowConfirmation`
+> when it is supplied. Six existing tests assert that flow and its exact copy.
+>
+> The draft missed it by grepping for `AlertDialog|ConfirmDialog|are you sure`
+> inside `src/renderers` and `src/components`. The dialog lives in `App.jsx`, is
+> built from `Dialog` rather than `AlertDialog`, and its body reads "This can't be
+> undone." Three misses compounding into a confident wrong answer, recorded here
+> because the same three would compound again.
 
 ## 1. Chip paste
 
@@ -89,102 +101,55 @@ not less.
 **Facets are untouched.** They are declared per node and shown independently of
 `search`; a node with `facets` and six items keeps its chips.
 
-## 3. Remove behind an overflow menu, with batched undo
+## 3. Remove behind an overflow menu
 
-**Files:** `frontend/src/renderers/ListRenderer.jsx`,
-`frontend/src/renderers/useListItems.js`
+**File:** `frontend/src/renderers/ListRenderer.jsx`
 
-The `Trash2` button at `:604` becomes a `⋯` `DropdownMenu` trigger holding one
-destructive `Remove` item. **The pin star stays inline.** It is a positive,
-idempotent, one-click action, and burying it would cost a click to buy nothing —
-the parent spec's argument is about destructive actions specifically
-("Destructive actions do not belong one stray click from a row body").
+The `Trash2` icon button at `:604` becomes a `⋯` `DropdownMenu` trigger holding
+one destructive `Remove` item. The item calls the same `removeItem(idx)` it calls
+today, so the confirmation dialog and everything behind it are untouched.
 
-### Why undo rather than a confirmation modal
+**The pin star stays inline.** It is a positive, idempotent, one-click action, and
+burying it would cost a click to buy nothing. The parent spec's argument is about
+destructive actions specifically: "Destructive actions do not belong one stray
+click from a row body."
 
-Decided 2026-08-12 by the owner, choosing between an overflow menu alone, an
-overflow menu plus an `AlertDialog`, and an overflow menu plus an undo toast.
+**`useListItems` does not change.** `removeItem` already routes through
+`onShowConfirmation`, and nothing about the menu alters list semantics.
 
-Undo wins on the thing that actually matters: it is the only one of the three
-that makes a mistaken delete *recoverable*. A confirmation modal asks you to
-predict a mistake before you make one, which people click through, and it costs a
-third click on every deliberate delete to do it. Undo costs nothing on the
-deliberate path and catches the accidental one.
+### The dependency this needs
 
-**This does not contradict slice 2's toast decision.** Slice 2 retired the
-per-flush `toast({ title: "Saved" })` because it confirmed something the reader
-never doubted. It kept the destructive-failure toast, because a failure needs
-interrupting. An undo toast is the same category as the second: a time-limited
-affordance for something that happened, offering an action. It is not a
-confirmation.
+There is no `DropdownMenu` in this project. `src/components/ui/` holds 19
+components and none of them is it, and `@radix-ui/react-dropdown-menu` is not in
+`package.json` — which lists seven other `@radix-ui/*` packages, including the
+`react-dialog` the confirmation is built from.
 
-### Batching
+So slice 2b adds a dependency. `@radix-ui/react-dropdown-menu` plus the shadcn
+`dropdown-menu.jsx` adapted for this project, which is where every other file in
+`ui/` came from. Adapt rather than hand-roll: a menu owes focus trapping, arrow-key
+navigation, typeahead, Escape, click-outside and `aria-*` wiring, and Radix has
+all of it. Watch the React 18 / Tailwind 3 / plain-JSX constraints — the registry's
+current output targets React 19, Tailwind 4 and TypeScript.
 
-Decided 2026-08-12 by the owner, choosing between a single replaceable slot, one
-batched toast, and a stack of separate toasts.
+### Undo was considered and is not in this slice
 
-Pruning a list means removing several rows in succession, so a single slot would
-make every delete but the last unrecoverable at exactly the moment recovery is
-most likely to be wanted. A stack of toasts reproduces the visual noise slice 2
-removed.
+Decided 2026-08-12 by the owner, after the correction above, choosing between
+keeping the confirmation and adding only the menu, replacing the confirmation with
+an undo toast, and doing both.
 
-So: one toast, message keyed to depth.
+Keeping the confirmation won. Undo is the better affordance in the abstract, but
+here it would mean **deleting a working safety net to add a weaker one**: the
+dialog blocks before the write, undo only offers a window after it, and that window
+does not survive a navigation or a closed tab because the removal has already
+autosaved. Trading a block for a window is not obviously an improvement, and it is
+certainly not one worth making as a side effect of adding a menu.
 
-| Removed | Message |
-|---|---|
-| one row | `Removed Northumbria University` (the row's title field) |
-| more | `Removed 3 entries` |
+It also would have forced the dialog's "This can't be undone." to become false, and
+that string is asserted by two existing tests.
 
-A row with no title field value reads `Removed Untitled entry`, matching the
-`aria-label` fallback already at `:605`.
-
-### Where it lives, and the invariant that decides it
-
-**Undo belongs in `useListItems`, not `ListRenderer`.** That hook's header
-documents the rule this depends on:
-
-> `expanded` is keyed by ARRAY INDEX, so any operation that changes the length of
-> the list has to move those keys with the rows they name. Add prepends and
-> shifts up; remove shifts down. Left alone, a key like `{0: true}` silently
-> follows the wrong row.
-
-Restoring a row is a length-changing operation, so it owes the same duty. Putting
-it anywhere else would separate it from the four operations that already carry
-this invariant and from the tests that hold them to it.
-
-### Mechanics
-
-Each remove pushes `{ row, index }` onto an ordered stack, where `row` is the
-stored object as it was and `index` is its position in the array *at the moment of
-that removal*.
-
-**Undo replays the stack in reverse.** This is the load-bearing detail: a
-captured index is only valid in the array state that existed just before its own
-removal. Remove index 2, then index 5 of the now-shorter array, and restoring in
-capture order lands the second row in the wrong place. Undoing last-first inserts
-each row back into exactly the array it came from. Each insert shifts `expanded`
-keys up from the insertion point, mirroring the shift-down that `removeItem`
-already performs.
-
-**The restored object keeps its `id`.** `persona_store._assign_ids` uses
-`setdefault`, so an id that arrives is never rewritten. Undo therefore restores
-the same entity, not a copy — search-index entries, staleness advisories and any
-nested `parent` lookup keyed on it all survive. This is why undo must splice the
-captured object back and **must not** route through `addItem`, which builds a
-fresh row and would earn a new id.
-
-The stack clears when the toast dismisses or times out.
-
-### What this deliberately does not solve
-
-The removal has already autosaved by the time the toast is up — autosave debounces
-at 1500ms and the toast outlives that. Undo is a second write, not a rollback of
-the first. So navigating away or closing the tab inside the undo window loses the
-rows.
-
-That is the same outcome as today, with a window added where there was none. A
-genuine fix means a server-side soft delete, which is a data-model change and is
-out of scope here.
+Recorded rather than dropped: if row removal ever stops being a two-click
+confirmed action, undo is the affordance to reach for, and a server-side soft
+delete is what would make it hold across a navigation.
 
 ## 4. Labels
 
@@ -229,31 +194,50 @@ they came to differ.
 
 ## Testing
 
-New tests only. No existing behavioural assertion changes, and no existing test
-is edited to make anything pass.
+Every behavioural assertion that exists today survives untouched. One mechanical
+change to existing tests is unavoidable, and it is worth being exact about which
+kind it is.
+
+**Nine call sites in `ListRenderer.test.jsx` reach the remove control directly**
+(`:164`, `:387`, `:434`, `:451`, `:581`, `:752`, `:753`, `:1075`, `:1363`), each
+via `getByRole("button", { name: "Remove <title>" })`. Behind a menu that control
+does not exist until the trigger is clicked, and a Radix menu item has role
+`menuitem`, not `button`. So each site gains a step that opens that row's `⋯` and
+changes the role it queries.
+
+What those tests assert does not change: removal still routes through
+`onShowConfirmation`, `onItems` is still not called until the confirm callback
+runs, the dialog copy is still `"Remove Scandinavian?"` / `"This can't be
+undone."`. Only the path to the control changes. No assertion is weakened, and no
+test is edited to make anything pass.
 
 **No test asserts either label class today** (checked across
 `src/renderers/*.test.jsx` and `src/components/*.test.jsx`), so §4 forces no test
-edits. The two frozen fixtures, `field-census-v1.json` and
+edits at all. The two frozen fixtures, `field-census-v1.json` and
 `control-census-v1.json`, record field names and control kinds; neither records a
 class, so neither moves.
 
 | Area | Cases |
 |---|---|
-| `ArrayInput` | delimiter-free paste falls through and commits nothing; comma-delimited paste commits chips; newline-delimited likewise; mixed delimiters; trailing delimiter leaves the input empty; no trailing delimiter leaves the last piece in the input; whitespace-only pieces dropped; a duplicate is accepted, matching Enter |
+| `ArrayInput` (new file) | delimiter-free paste falls through and commits nothing; comma-delimited paste commits chips; newline-delimited likewise; mixed delimiters; trailing delimiter leaves the input empty; no trailing delimiter leaves the last piece in the input; whitespace-only pieces dropped; a duplicate is accepted, matching Enter; Enter still commits after the `onKeyDown` swap |
 | `ListRenderer` search | hidden at exactly 6, shown at 7; hidden at 6 but shown when a query is active; a node without `search` never shows a box at any count; facets unaffected at 6 |
-| `ListRenderer` menu | Remove is behind the `⋯` trigger and not in the row body; the pin star is still inline; the menu item is destructive |
-| `useListItems` undo | one remove then undo restores the row at its index with its `id`; **two removes at different indices then undo restores both at their original indices**; `expanded` still names the same rows after a restore; the stack clears on dismiss |
+| `ListRenderer` menu | Remove is inside the `⋯` menu and absent from the row body until it opens; it still reaches `onShowConfirmation` with the same title and body; the menu item is destructive; the pin star is still inline and outside the menu; the trigger has an accessible name naming its row |
+| `useListItems` | unchanged, and its 2 confirmation tests must still pass untouched — the proof that this slice did not disturb list semantics |
 
-The two-remove case is the one that fails if the replay order is wrong, so it is
-the case that has to exist.
+The menu trigger needs an accessible name per row (`More actions for
+<title>`-shaped), because nine tests and every screen-reader user need to tell one
+row's menu from another's.
 
 ## Out of scope
 
-- Server-side soft delete. Named above as the real fix for the navigate-away hole.
+- **Undo, and the server-side soft delete that would make it hold.** Reasoned
+  through in §3. If row removal ever stops being a confirmed two-click action,
+  this is the affordance to revisit.
 - Chip deduplication, on either entry route. Its own decision if it is wanted.
 - Undo for chip removal in `ArrayInput`. A chip is one word and cheap to retype;
   a list row is a form.
 - The parent spec's per-card empty states and save tick. Both landed in slice 2.
 - Anything in `ScalarField`'s control selection. `controlCensus` freezes it, and
   nothing here changes which control a field resolves to.
+- Replacing the other icon-only row actions with menu items. Only the destructive
+  one moves.
