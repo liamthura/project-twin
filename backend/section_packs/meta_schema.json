@@ -538,7 +538,7 @@
       }
     },
     "field": {
-      "$comment": "Nineteen keys, and every one of them means the same thing wherever it appears -- which is the whole exercise. v1 said the same things with thirteen arrays and maps keyed by field name (`badges`, `detail_fields`, `date_fields`, `field_defaults`, `field_placeholders`, `enum`, ...), so a field's identity was spread across the node, the entities block and server.py's FIELD_ALIASES, and `institution` was named five times in profile's manifest. `name` is the only required key, and it is the STORED key -- the authority this repo did not have (see tests/test_ui_schema.py: 'There is no authority on storage keys in this repo').",
+      "$comment": "Twenty-one keys, and every one of them means the same thing wherever it appears -- which is the whole exercise. v1 said the same things with thirteen arrays and maps keyed by field name (`badges`, `detail_fields`, `date_fields`, `field_defaults`, `field_placeholders`, `enum`, ...), so a field's identity was spread across the node, the entities block and server.py's FIELD_ALIASES, and `institution` was named thirteen times in profile's manifest against five today. `name` is the only required key, and it is the STORED key -- the authority this repo did not have. tests/test_stored_key_audit.py used to open by saying there was none; it now walks these names and drives the real write path against every one.",
       "type": "object",
       "required": [
         "name"
@@ -639,7 +639,7 @@
           }
         },
         "off_contract": {
-          "$comment": "Which of this field's attributes the MCP contract does NOT carry. v1 held these twice, and the two copies disagree: `profile.education` offers a closed `status` vocabulary in the node's `enum` map that its entity does not declare, and six nodes prefill a default in `field_defaults` that their entity does not. That is not pedantry -- server.py:2518 REJECTS a value outside `valid_values` and server.py:2536 APPLIES `field_defaults`, for every entity on the generic path. So deriving these attributes into the contract wherever the form has them would start enforcing vocabularies and writing defaults that do not happen today. Eight fields in the shipped packs need this; everything else is on the contract, which is the common case and needs no declaration.",
+          "$comment": "Which of this field's attributes the MCP contract does NOT carry. v1 held these twice, and the two copies disagree: `profile.education` offers a closed `status` vocabulary in the node's `enum` map that its entity does not declare, and five nodes prefill a default in `field_defaults` that their entity does not. That is not pedantry -- server.py:2518 REJECTS a value outside `valid_values` and server.py:2536 APPLIES `field_defaults`, for every entity on the generic path. So deriving these attributes into the contract wherever the form has them would start enforcing vocabularies and writing defaults that do not happen today. Five fields in the shipped packs need this, six declarations between them: `profile.status` withholds both its vocabulary and its default, and learning_log's `source`, lifestyle's `status` and `kind` and preferences' `stance` withhold a default each. Everything else is on the contract, which is the common case and needs no declaration.",
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
@@ -651,7 +651,7 @@
           }
         },
         "ui_only": {
-          "$comment": "The mirror of `write_only`, and the pair is the whole story of a field's two audiences: `write_only` is in the MCP contract and rendered nowhere; `ui_only` renders and is in no MCP vocabulary. Four field slots need it, all server-written timestamps a client must not set -- knowledge's `added_date` and `last_updated`, projects' `added_date`, learning_log's `timestamp`. v1 had no way to say this: tests/test_ui_schema.py excludes `display_fields` from its vocabulary check for exactly these, and records that the exclusion is why the check is 'wrong in BOTH directions'. Derived by the converter, not hand-listed: a rendered field in none of its entity's vocabularies, under any of its spellings, is one of these.",
+          "$comment": "The mirror of `write_only`, and the pair is the whole story of a field's two audiences: `write_only` is in the MCP contract and rendered nowhere; `ui_only` renders and is in no MCP vocabulary. Five fields need it, all server-written timestamps a client must not set -- knowledge's `added_date`, `last_updated` and `created_at`, projects' `added_date`, learning_log's `timestamp`. v1 had no way to say this: its vocabulary check had to exclude the node's `display_fields` for exactly these, which is why that check was wrong in BOTH directions. It is gone, along with the second copy of the vocabulary it compared against -- see the note atop tests/test_section_bindings.py. Derived by the converter, not hand-listed: a rendered field in none of its entity's vocabularies, under any of its spellings, is one of these.",
           "type": "boolean"
         },
         "write_only": {

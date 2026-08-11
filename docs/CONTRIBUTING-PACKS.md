@@ -14,9 +14,11 @@ one from a stranger a reasonable thing to do.
 key it accepts carries a `$comment` explaining why it exists; set
 `"$schema": "../meta_schema.json"` at the top of your manifest and your editor
 will validate it as you type. Read it when this document and the schema seem to
-disagree — the schema is right. (The two pack pages on the docs site,
-`/docs/run/section-packs` and `/docs/run/pack-reference`, still describe the
-previous manifest format and have not been rewritten yet. Ignore them.)
+disagree — the schema is right.
+
+Two pages on the docs site cover the same ground for a reader who is not in this
+repo: `/docs/run/section-packs` walks through building a pack, and
+`/docs/run/pack-reference` lists every key. Both describe format v2.
 
 ## The one rule
 
@@ -320,7 +322,7 @@ write path **rejects** a value outside `valid_values` and **applies**
 `field_defaults`. So a form that offers a closed vocabulary or prefills a
 default where today's contract carries neither would start enforcing and writing
 things it does not today. `off_contract: ["values"]` / `["default"]` says the
-contract does not carry that attribute. Eight fields in the shipped packs need
+contract does not carry that attribute. Five fields in the shipped packs need
 it; a new pack normally declares nothing, and its form and its contract agree.
 
 ### Nested arrays, and `parent`
