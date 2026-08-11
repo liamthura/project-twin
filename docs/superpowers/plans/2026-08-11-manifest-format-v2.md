@@ -461,9 +461,15 @@ One commit, because the halves are not separately shippable: converted manifests
 
 v2 declares aliases; `server.py`'s `FIELD_ALIASES` still drives `normalize_data`. Rewriting that is out of scope — proving they agree is not.
 
-- [ ] **Step 1: Write the test** — for every entity `FIELD_ALIASES` names, the manifest's declared `alias` list for that entity's identifier field is a subset of the table's spellings, and the stored `name` is the table's canonical key. Skip entities the table does not name, and **assert the skip list is exactly the expected size**, so a new unlisted entity surfaces here rather than silently.
-- [ ] **Step 2: Run it. Fix whichever side is wrong** — if the manifest and the table disagree, that disagreement is a real bug and belongs in the commit message.
-- [ ] **Step 3: Commit.**
+- [x] **Step 1: Write the test** — for every entity `FIELD_ALIASES` names, the manifest's declared `alias` list for that entity's identifier field is a subset of the table's spellings, and the stored `name` is the table's canonical key. Skip entities the table does not name, and **assert the skip list is exactly the expected size**, so a new unlisted entity surfaces here rather than silently.
+- [x] **Step 2: Run it. Fix whichever side is wrong** — if the manifest and the table disagree, that disagreement is a real bug and belongs in the commit message.
+- [x] **Step 3: Commit.**
+
+**Recorded during Task 7.** Six tests in `backend/tests/test_alias_agreement.py`, reusing `CANONICAL_STORED_KEY`, `PACK_KEYS`, `_elements` and `_load` from `test_section_bindings`. The two sides agree; nothing had to be fixed.
+
+*The second claim was widened past what the step asked for.* Step 1 scoped it to the identifier field. An `alias` on any other field is just as capable of disagreeing with `FIELD_ALIASES`, so claim 2 walks every field in every element and is pinned at `total_fields_examined == 51` and `fields_with_alias == 5`. A new field with a new alias fails the count before it can quietly diverge.
+
+*Two entities are documented exceptions, each with its own test rather than a skip.* `value` stores bare strings, so `CANONICAL_STORED_KEY` is `None` and there is no stored key to agree about. `link`'s identifier is `label` while its canonical key is `url`: `server.py:1063` locates rows by `label`, which is also why `update` needs `new_label`. Both are asserted as the shape they are, so changing either side fails here.
 
 ---
 
@@ -473,10 +479,20 @@ v2 declares aliases; `server.py`'s `FIELD_ALIASES` still drives `normalize_data`
 
 **Files:** Modify `frontend/src/renderers/fieldMeta.js`, `ScalarField.jsx`; tests in both
 
-- [ ] **Step 1: Write the new tests** — `buildFieldMeta` (or its replacement) resolves type, placeholder, default, values and `allow_custom` from a descriptor; the documented precedence rule ("a NODE-level key wins over the entity's vocabulary") no longer exists because there is one source; `allow_custom` replaces the `custom_` prefix lookup at `ScalarField.jsx:58`.
-- [ ] **Step 2: Run them, watch them fail.**
-- [ ] **Step 3: Implement.** Keep the exported function name so the diff stays in one file.
-- [ ] **Step 4: Green, commit.**
+- [x] **Step 1: Write the new tests** — `buildFieldMeta` (or its replacement) resolves type, placeholder, default, values and `allow_custom` from a descriptor; the documented precedence rule ("a NODE-level key wins over the entity's vocabulary") no longer exists because there is one source; `allow_custom` replaces the `custom_` prefix lookup at `ScalarField.jsx:58`.
+- [x] **Step 2: Run them, watch them fail.**
+- [x] **Step 3: Implement.** Keep the exported function name so the diff stays in one file.
+- [x] **Step 4: Green, commit.**
+
+**Recorded during Task 8.** `buildFieldMeta` keeps its name and now takes one argument: the node. The `entity` second argument is gone, because nothing on the descriptor path read it.
+
+*Six fields silently stopped being textareas, and every frozen gate stayed green.* The old path defaulted `long_text` to `LONG_TEXT_FIELDS` — `{"notes", "why", "description"}` at `ScalarField.jsx:16` — whenever a node declared none, and ten shipped nodes relied on that default. The descriptor path builds `long_text` only from `type: "longtext"`, and the converter had emitted that type only where v1 declared it. Affected: goals `why` and `notes`, lifestyle hobby and interest `notes`, media `notes`, aesthetics `notes`. `fieldCensus` records field *names*, so it could not see a control change; the frozen entity schema does not carry control types at all. Found by rendering the real fixtures.
+
+*The fix went in the converter, not back into `fieldMeta`.* Re-adding the name heuristic to the renderer would put a second authority on a field's type next to the field's own `type` key, which is the thing this migration exists to remove. `_LONG_TEXT_NAME_HEURISTIC` in `manifest_v1_to_v2.py` transcribes the v1 rule once, at conversion time, and the manifests carry the result.
+
+*The missing gate now exists.* `controlCensus.js` mirrors ScalarField's branch order to name the control each field resolves to, frozen for all 10 packs in `control-census-v1.json` — 28 nodes, 102 controls, 20 of them `longtext`. Removing the converter rule fails it by name for all seven affected fields.
+
+*One comment claimed a guarantee that did not exist.* `controlCensus.js` said its test "renders real packs through the real component to prove they still agree". That file is `@vitest-environment node` and renders nothing, so `controlFor` was only ever compared against itself; the reviewer proved it by reversing the branch order and watching all four tests stay green. `controlCensus.render.test.jsx` makes the claim true: 14 tests that render `ScalarField` and read the control kind back out of the DOM by markup alone, including four deliberately ambiguous metas so that branch *order* is observable.
 
 ---
 
@@ -484,10 +500,16 @@ v2 declares aliases; `server.py`'s `FIELD_ALIASES` still drives `normalize_data`
 
 **Files:** Modify `ListRenderer.jsx`, `AddEntryDialog.jsx`, `FieldsRenderer.jsx`, `StringsRenderer.jsx`; delete `v2Node.js`
 
-- [ ] **Step 1: Replace the nine array reads** in `ListRenderer` with one pass over `item.fields`, filtered by `show`. `AddEntryDialog` likewise. `FieldsRenderer` and the list's edit form converge on the same descriptor loop — they are already the same layout described twice.
-- [ ] **Step 2: Delete `v2Node.js` and its call in `normalizeUi`.**
-- [ ] **Step 3: Run the suite.** Tests may now change **only** where they construct a synthetic v1 node; every behavioural assertion must survive untouched, and each edit gets a one-line reason.
-- [ ] **Step 4: `fieldCensus` still matches** — update it to read descriptors, and assert against the same frozen fixture. Green, commit.
+- [x] **Step 1: Replace the nine array reads** in `ListRenderer` with one pass over `item.fields`, filtered by `show`. `AddEntryDialog` likewise. `FieldsRenderer` and the list's edit form converge on the same descriptor loop — they are already the same layout described twice.
+- [x] **Step 2: Delete `v2Node.js` and its call in `normalizeUi`.**
+- [x] **Step 3: Run the suite.** Tests may now change **only** where they construct a synthetic v1 node; every behavioural assertion must survive untouched, and each edit gets a one-line reason.
+- [x] **Step 4: `fieldCensus` still matches** — update it to read descriptors, and assert against the same frozen fixture. Green, commit.
+
+**Recorded during Task 9.** The nine array reads became one pass: `frontend/src/renderers/elementShape.js`, 183 lines, returning `{titleField, suggestions, form, badges, row, count, blocks, pinned, formats, exclusive}`. It also exports `isBlockField`, shared with `fieldMeta.js`, and `blockNode`, which projects a labelled `strings`/`list` field back to a node so the block renderers keep their existing input. `v2Node.js`, `v2Node.test.js`, `shim-parity.json` and `emit_shim_fixtures.py` are all deleted.
+
+*`profile`'s two `highlights` writers were swapped, and had been since Task 4.* Education declared `work_highlight`; Work Experience declared `education_highlight`. The cause was in the converter: `_parent_spellings` built its accepted set out of `spec["parent"]` itself, so the caller's guard was vacuous — a value is trivially a member of a set built from it — and whichever entity came first in dict order won whenever two writers targeted the same array name. No gate could see it, because each entity supplies its own `parent` and the derived contract was correct either way. It only became reachable once `blockNode` started propagating `element`.
+
+*The first verification harness was untrustworthy and was thrown away.* A DOM dump across two commits showed zero difference — and so did a sensitivity probe that deleted every block placeholder, because rows expand on a click of the title *text* rather than a button, so the dump only ever captured collapsed state. What replaced it is a semantic snapshot of positions, order, blocks and meta, run by the same script in a throwaway worktree at `264eb29` and in the working tree: **32 shared nodes, zero real differences**. Worth recording because the implementer's report for this task claims a byte-identical DOM dump with "every row expanded", and that claim was wrong.
 
 ---
 
@@ -495,10 +517,21 @@ v2 declares aliases; `server.py`'s `FIELD_ALIASES` still drives `normalize_data`
 
 **Files:** `frontend/src/renderers/paths.js`, `backend/section_packs/meta_schema.json`, `backend/tests/test_ui_schema.py`
 
-- [ ] **Step 1:** `normalizeUi` loses its dual-shape support and the flat `ui` map; it reads `sections` and nothing else. `test_legacy_flat_ui_map_is_still_accepted` is deleted with the feature, with a comment in its place naming what replaced it.
-- [ ] **Step 2:** Delete `fields_outside_entity`, `children`, `bool_fields` and node-level `optional` from the schema and from any reader. The last two were dead before this plan started — no pack used them and `fieldMeta` read them both.
-- [ ] **Step 3:** Re-point `test_stored_key_audit.py`: its documented blind spots ("no authority on storage keys in this repo") are closed, because the manifest now enumerates stored keys. Rewrite its docstring to say what it guards now.
-- [ ] **Step 4:** Full suite both sides. Commit.
+- [x] **Step 1:** `normalizeUi` loses its dual-shape support and the flat `ui` map; it reads `sections` and nothing else. `test_legacy_flat_ui_map_is_still_accepted` is deleted with the feature, with a comment in its place naming what replaced it.
+- [x] **Step 2:** Delete `fields_outside_entity`, `children`, `bool_fields` and node-level `optional` from the schema and from any reader. The last two were dead before this plan started — no pack used them and `fieldMeta` read them both.
+- [x] **Step 3:** Re-point `test_stored_key_audit.py`: its documented blind spots ("no authority on storage keys in this repo") are closed, because the manifest now enumerates stored keys. Rewrite its docstring to say what it guards now.
+- [x] **Step 4:** Full suite both sides. Commit.
+
+**Recorded during Task 10.** `normalizeUi` is two lines. Sixteen tests were deleted with the shapes they exercised, each accounted for in the task report. `test_stored_key_audit.py` no longer claims there is no authority on storage keys in this repo: a field's `name` is that authority, and because the contract derives from it, the audit reaches the UI's bindings for the first time.
+
+**A commit the plan did not schedule, `c9d7b6b`.** Reviewing Task 10 turned up four more declarations a pack author could write today and get silence for. Each is the same shape as the swapped-`highlights` bug — the format permitting something the code ignores — so "no shipped pack does this" was not a reason to leave one standing:
+
+1. A nested element's `parent` must name the *enclosing* row's identifier, in either spelling the packs use: bare (`education_highlight` → `institution`) or entity-prefixed (`project_tag` → `project_name`). This is the rule whose absence let the swap ship; the test reconstructs that manifest and asserts rejection. All 12 nested elements satisfy it.
+2. A labelled `strings`/`list` field may not claim `form`. It draws its own titled block, so a text input over an array in the parent's form is incoherent. `elementShape` already skipped it in one line with nothing stating it — deleting that line left all 828 tests green.
+3. `label` works on any field now, which is what `meta_schema.json` had always promised. Only blocks honoured it, so a label on a scalar rendered the title-cased name and said nothing. Implemented rather than restricted; no shipped field carries a label outside a block, so nothing rendered changes.
+4. Block order under a row is gated. `field-census-v1.json` records blocks as object *keys* and `toEqual` ignores key order, so `blocks.reverse()` left every test green. The new assertion reads the rendered `data-ui-node` sequence under an expanded profile/Education row.
+
+All four were mutation-tested by the controller rather than only by their author: the reconstructed swap is rejected, `blocks.reverse()` fails one test, and deleting the form-position skip fails two.
 
 ---
 
@@ -506,19 +539,76 @@ v2 declares aliases; `server.py`'s `FIELD_ALIASES` still drives `normalize_data`
 
 **Files:** `docs/CONTRIBUTING-PACKS.md`, `backend/section_packs/_template/manifest.json`
 
-- [ ] **Step 1:** Rewrite `CONTRIBUTING-PACKS.md` around the one-sentence rule — *a node's `kind` states the shape of the value at its `path`* — then the four kinds, then the field descriptor table, then one worked example. Delete every reference to the `entities` block, `fields_outside_entity` and the `custom_` convention.
-- [ ] **Step 2:** Make `_template` a genuine minimum: one `list` node with three fields, nothing optional, comments pointing at the doc rather than repeating it.
-- [ ] **Step 3:** Follow your own doc: convert `media` (the smallest real pack) from scratch by hand using only the doc, and diff against the converter's output. Whatever the doc failed to tell you is what to fix.
-- [ ] **Step 4:** Commit.
+- [x] **Step 1:** Rewrite `CONTRIBUTING-PACKS.md` around the one-sentence rule — *a node's `kind` states the shape of the value at its `path`* — then the four kinds, then the field descriptor table, then one worked example. Delete every reference to the `entities` block, `fields_outside_entity` and the `custom_` convention.
+- [x] **Step 2:** Make `_template` a genuine minimum: one `list` node with three fields, nothing optional, comments pointing at the doc rather than repeating it.
+- [x] **Step 3:** Follow your own doc: convert `media` (the smallest real pack) from scratch by hand using only the doc, and diff against the converter's output. Whatever the doc failed to tell you is what to fix.
+- [x] **Step 4:** Commit.
+
+**Recorded during Task 11.** `CONTRIBUTING-PACKS.md` goes 88 → 553 lines: the one rule, the top level, the four kinds as closed key sets, "You do not write the entity contract", the field descriptor table, the 12 rules the loader checks, `goals` end to end with the contract it derives, and seven numbered steps to get a pack in. `_template` goes 55 → 31 lines — one `list` node, three fields — and keeps exactly two optional keys, each justified in the file: `default_enabled: false`, because a contributed pack ships opt-in, and `required: true` on the identifier, because a row whose identifier may be absent cannot be updated or removed by any client. It is hand-written from here, so `_NOT_GENERATED` makes the converter skip it; without that the next run would revert it.
+
+*The verification was against the code, not by reading.* Every command the doc tells an author to run was executed as written, including `npm run fixtures` and the `derive_entities` one-liner. All 48 keys quoted in the doc's four annotated skeletons were cross-checked against the property names `meta_schema.json` accepts. The worked example's derived contract was compared field for field against `derive_entities` output and matches exactly.
+
+*Step 3's zero diff under-tests the doc, and the implementer said so.* The hand conversion of `media` came out byte-identical to the shipped file, but its author had read `manifest_v1_to_v2.py` in full beforehand, so the doc was not the only input. `media` also exercises less than half the format — no nesting, no blocks, no aliases, no `fields` node, no groups, no variants — which leaves the harder sections unproven by any conversion.
 
 ---
 
 ### Task 12: Verify and hand over
 
-- [ ] **Step 1:** `pytest` green; `npm test` (both projects) green; census identical to the frozen fixture.
-- [ ] **Step 2:** Diff `get_schema`'s live output against the frozen snapshot through the running app, not only in tests: rebuild the Docker preview and call the MCP schema endpoint.
-- [ ] **Step 3:** Eyeball Profile, Preferences and Goals in the preview against the pre-migration screenshots. Goals is the one to look at hardest — it is the `allow_custom` case, so its "other" free-text box is the single visible behaviour that moved from a naming convention to a declared flag.
-- [ ] **Step 4:** Report line counts before and after per pack, and the key-count reduction. Those are the numbers the spec promised.
+- [x] **Step 1:** `pytest` green; `npm test` (both projects) green; census identical to the frozen fixture.
+- [x] **Step 2:** Diff `get_schema`'s live output against the frozen snapshot through the running app, not only in tests: rebuild the Docker preview and call the MCP schema endpoint.
+- [ ] **Step 3:** Eyeball Profile, Preferences and Goals in the preview against the pre-migration screenshots. Goals is the one to look at hardest — it is the `allow_custom` case, so its "other" free-text box is the single visible behaviour that moved from a naming convention to a declared flag. **Owner's, not claimed here.** The preview is rebuilt at `129e88f` and serving on `http://127.0.0.1:8100`.
+- [x] **Step 4:** Report line counts before and after per pack, and the key-count reduction. Those are the numbers the spec promised.
+
+**Recorded during Task 12.**
+
+*Step 1.* Backend **996 passed, 1 skipped**. Frontend **837 passed across 43 files**, both projects. `npm run fixtures` regenerates `packs.json` byte-identically from the backend, so the fixtures are not stale, and both frozen censuses — `field-census-v1.json` and `control-census-v1.json` — are compared by tests in that run.
+
+*Step 2 needed two checks, because `get_schema` does not publish everything the snapshot holds.* The detail view renames `description` to `purpose` and never publishes `list`, `field_defaults` or `exclusive_fields`, which are write-path behaviour rather than client vocabulary. So:
+
+- Over live JSON-RPC to the rebuilt container, `get_schema(entity=…)` for **all 42 entities** plus the no-args digest's file list: **no differences**. Two entities needed `media` and `aesthetics` temporarily enabled for the local test user to be reachable at all; that setting and the read-only token minted for the call were both reverted afterwards, and the revoked token now returns 401.
+- Inside the same container, `pack_loader.build_entity_schema(pack_loader.manifests())` against the snapshot key for key, including the three the tool withholds: **10 packs, 42 entities, no differences**. This is the check that covers the shipped image's manifests and its `meta_schema.json` rather than the working tree's.
+
+*Both harnesses were mutation-tested before their green was believed*, given how many of this plan's gates turned out to be vacuous. Corrupting `goals.goal`'s `identifier`, `required` and `description` in a copy of the snapshot makes each harness report exactly three differences and exit non-zero.
+
+*Step 3's one behavioural risk is already pinned by a rendered test.* `SectionRenderer.test.jsx:465` drives the real `goals` manifest end to end: expand a row, open the `type` dropdown, pick "other", and type into the box that appears. The eyeball is still the owner's, but it is not the only thing standing behind `allow_custom`.
+
+*Step 4 — the numbers.* Lines per manifest, v1 at `4595432` against v2 at `129e88f`:
+
+| pack | lines v1 | lines v2 | Δ |
+|---|---|---|---|
+| `_template` | 65 | 31 | −52% |
+| `aesthetics` | 121 | 118 | −2% |
+| `circle` | 81 | 67 | −17% |
+| `goals` | 93 | 92 | −1% |
+| `knowledge` | 292 | 263 | −10% |
+| `learning_log` | 115 | 109 | −5% |
+| `lifestyle` | 418 | 373 | −11% |
+| `media` | 93 | 96 | +3% |
+| `preferences` | 339 | 285 | −16% |
+| `profile` | 594 | 505 | −15% |
+| `projects` | 238 | 206 | −13% |
+| **total** | **2449** | **2145** | **−12%** |
+
+The saving tracks how much a pack *declared*, not how big it is: `profile` −15% and `preferences` −16% are where the parallel arrays ran longest, while `media` (+3%) and `goals` (−1%) barely declared any and so barely move.
+
+Then the spec's own table, re-measured against the code rather than carried forward:
+
+| | spec said | measured at `129e88f` | |
+|---|---|---|---|
+| manifest lines, all 11 packs | 2149 (−12%) | **2145** (−12%) | reconciled below |
+| `"institution"` in `profile` | 13× → 5× | **13× → 5×** | ✓ |
+| `"status"` in `profile` | 5× → 1× | **5× → 1×** | ✓ |
+| node keys, union of all kinds | 33 → 13 | **13** | ✓ |
+| `fields` node keys | 7 | **7** | ✓ |
+| field descriptor keys | 21 | **21** | ✓ |
+
+*The line total reconciles exactly, and the four-line gap is not drift.* At the cutover (`8ec38a2`) the 11 manifests were 2158 lines. Task 8's `longtext` fix added 11, taking it to 2169; Task 11 hand-writing `_template` removed 24, giving 2145. The spec's 2149 was taken from a converter dry run before Task 8's fix existed.
+
+*One thing in the spec's prose is wrong, though its number is right.* It explains `"institution"` remaining 5× as "four of those are `parent` declarations". There are three (`profile/manifest.json:205`, `:224`, `:267`); the other two are the entity's `identifier` and the field's own `name`. Five is correct, the breakdown is not.
+
+*Two counts need the exact-string form to reproduce.* Counting `institution` as a substring gives 14× → 6×, because a `$comment` mentions the word in prose; `status` gives 7× → 3× for the same reason. The spec counted whole JSON strings, which is the right measure — prose in a comment is not a fact spelled twice.
+
+**The spec did not promise fewer total keys, and there are not fewer.** Counting every key occurrence in every manifest gives 1046 → 1071, up 2%. That is the format working as designed: v2 spends a named key on each fact, where v1 spent a positional entry in an array. What it promised, and what holds, is a smaller *vocabulary* — 13 node keys against 33 on one node — and each fact about a field spelled once, on that field.
 
 ---
 
