@@ -388,7 +388,11 @@ pack and the node. Every one of them describes a mistake that used to be silent.
     top-level `list` node.
 11. Every `scope_contributions` scope name must be a real scope, and every key
     it names must be a key of `defaults`, or it contributes nothing to context
-    output.
+    output. `full` is rejected for the same reason even though it is a real
+    scope: `get_context(scope: "full")` returns every enabled section's whole
+    file, and the resolver returns before it reads any pack's contributions, so
+    an entry there can never have an effect. Name the four scopes a pack can
+    actually contribute to — `minimal`, `professional`, `personal`, `learning`.
 12. `key` must equal the pack's directory name.
 
 The schema states the rest structurally: `values` if and only if `type` is
@@ -507,9 +511,11 @@ exercises nested lists, labelled string blocks, aliases, `off_contract`,
    a `PackError` naming your pack and the offending key. Fix, repeat.
 4. Read your derived contract with the command above, and check every name in it
    is a name you meant.
-5. `python -m pytest -q` in `backend/`.
-6. `npm run fixtures` in `frontend/` — `src/__fixtures__/packs.json` is
-   generated from the manifests, and CI fails on a stale one.
+5. `npm run fixtures` in `frontend/` — `src/__fixtures__/packs.json` is
+   generated from the manifests, so it is stale the moment you edit one. Do this
+   before the next step: `tests/test_pack_fixture_current.py` fails on a stale
+   fixture, and so does CI.
+6. `python -m pytest -q` in `backend/`.
 7. Open a PR containing exactly one new directory under
    `backend/section_packs/`.
 

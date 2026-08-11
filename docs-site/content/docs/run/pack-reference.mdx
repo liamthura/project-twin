@@ -49,15 +49,18 @@ Every named path must be a list in `defaults` **and** be bound by a top-level
 "scope_contributions": { "minimal": ["styles"], "personal": ["styles"] }
 ```
 
-The keys are `minimal`, `professional`, `personal`, `learning` and `full`; any
-other name is a `PackError` at boot. Each value names top-level keys of
-`defaults`, and a name that is not a key of `defaults` is also a `PackError`,
-because it would contribute nothing to context output.
+The keys are `minimal`, `professional`, `personal` and `learning`; any other name
+is a `PackError` at boot. Each value names top-level keys of `defaults`, and a
+name that is not a key of `defaults` is also a `PackError`, because it would
+contribute nothing to context output.
 
-No pack declares `full`. `get_context(scope: "full")` returns every enabled
-section whatever the manifests say, so a `full` entry is accepted and then never
-read. Your section also gets its own scope token for free: `get_context(scope:
-"<key>")` works whether or not it contributes to any global scope.
+`full` is the fifth scope a client may ask for, and the loader rejects it here.
+`get_context(scope: "full")` returns every enabled section's whole file whatever
+the manifests say — the resolver answers before it reads a single pack's
+contributions — so an entry under `full` could never have an effect, and a
+`PackError` is a better answer than accepting one and ignoring it. Your section
+also gets its own scope token for free: `get_context(scope: "<key>")` works
+whether or not it contributes to any global scope.
 
 <Callout>
 One section reaches every scope without declaring anything here: preferences,

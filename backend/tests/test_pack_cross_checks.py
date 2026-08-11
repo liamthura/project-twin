@@ -409,6 +409,38 @@ def test_unknown_scope_name_is_still_rejected():
     _rejects(manifest, "spiritual")
 
 
+def test_a_contribution_to_the_full_scope_is_rejected():
+    # `full` is a real scope name -- GLOBAL_SCOPE_NAMES mirrors sections.SCOPES,
+    # which is what a client may ask for -- but no pack can contribute to it.
+    # `_resolve_scope_fields` (server.py:297) returns "all" for `full` before it
+    # reads any pack, so the entry validated at boot and was never read once.
+    # Same rule as a key that is not in `defaults`: a declaration with no effect,
+    # written by an author who believed otherwise.
+    manifest = copy.deepcopy(BASE)
+    manifest["scope_contributions"] = {"full": ["goals"]}
+    _rejects(manifest, "full")
+
+
+def test_the_other_four_scope_names_are_all_still_accepted():
+    # The over-rejection guard for the test above. Rejecting `full` must not cost
+    # the four scopes a pack CAN contribute to -- and each is named here rather
+    # than iterated over GLOBAL_SCOPE_NAMES, because that set contains `full` and
+    # a loop over it would have to special-case the very thing under test.
+    for scope in ("minimal", "professional", "personal", "learning"):
+        manifest = copy.deepcopy(BASE)
+        manifest["scope_contributions"] = {scope: ["goals"]}
+        _accepts(manifest)
+    # And all four at once, since the check runs per entry.
+    manifest = copy.deepcopy(BASE)
+    manifest["scope_contributions"] = {
+        "minimal": ["goals"],
+        "professional": ["goals"],
+        "personal": ["goals"],
+        "learning": ["goals"],
+    }
+    _accepts(manifest)
+
+
 # --- a field that claims no position ------------------------------------
 
 

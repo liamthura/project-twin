@@ -119,10 +119,45 @@ def _cross_check(manifest: dict) -> None:
     the entity's `valid_values`, so no single reader ever saw both. v2 puts them
     in one declaration, which is what makes them checkable at all.
 
-    Numbering follows the spec's list of eleven. Rules 4 and 5, and "pin only on
-    a bool field" (half of 7), are enforced by the schema. Rule 11 (`key` equals
-    the directory name) belongs to `load_packs`, the only caller that knows the
-    directory.
+    Numbering follows the spec's list of eleven. Three of the eleven are enforced
+    somewhere else, which is why the inline `Rule N` comments below skip 4, 5
+    and 11:
+
+      1   `identifier` names a declared field                        here
+      2   exactly one `role: "title"`, and a list row needs one      here
+      3   `facets` are enum fields; `sort.field` is a declared one   here
+      4   `values` iff `type: "enum"`                                schema
+      5   `element` on the two array types and nowhere else          schema
+      6   no duplicate `name`, no colliding `alias`                  here
+      7   at most one `pin` per element                              here
+          (`pin` only on a `bool` field, the other half)             schema
+      8   an entity name is unique unless both declarations agree    here
+      9   `id_lists` resolve to `defaults` AND a top-level list      here
+      10  `scope_contributions` name real scopes and `defaults` keys here
+      11  `key` equals the directory name                            load_packs
+
+    Rule 11 sits in `load_packs` because that is the only caller that knows the
+    directory a manifest was read from.
+
+    Three further rules are enforced here and are NOT among the spec's eleven.
+    They came out of reviewing the migration (commit c9d7b6b), each a declaration
+    the format permitted and the code silently discarded:
+
+      - `show: []` is legal only with `ui_only` or a `label`
+      - a labelled `strings`/`list` field may not claim the `form` position
+      - a nested element's `parent` must name the enclosing row's identifier
+
+    They are deliberately unnumbered. Calling them 12, 13 and 14 would read as
+    the spec having grown, and it has not -- the spec is the frozen record of what
+    the format was designed to be, and these are things the implementation found.
+
+    `docs/CONTRIBUTING-PACKS.md` numbers TWELVE rules, and its numbers are not
+    these. It is written for a pack author, so it lists only what a manifest can
+    be rejected for: 4 and 5 move into its "the schema states the rest
+    structurally" paragraph, and the three above are folded into the list at 6, 7
+    and 8. So its Rule 8 is the nested-`parent` rule where this file's Rule 8 is
+    entity uniqueness. A `Rule N` in this file is a pointer into the spec, which
+    is where each rule's rationale was argued; it is not a pointer into the doc.
     """
     pack = manifest["key"]
     seen_entities: dict[str, tuple[str, str]] = {}  # name -> (signature, where)
@@ -208,6 +243,8 @@ def _cross_check(manifest: dict) -> None:
         if len(pinned) > 1:
             fail(where, f"fields {pinned} all declare `pin`; at most one may")
 
+        # Unnumbered rule: `show: []` needs `ui_only` or a `label`.
+        #
         # An empty `show` claims no position in the form or on the row. Two fields
         # can honestly want that: a labelled collection, which draws its own block
         # below the row, and a field the app stores without ever showing it -- which
@@ -226,6 +263,8 @@ def _cross_check(manifest: dict) -> None:
                     f"the screen omits it say `write_only`",
                 )
 
+        # Unnumbered rule: a labelled block may not claim the `form` position.
+        #
         # A labelled `strings`/`list` field (a BLOCK: elementShape.js's
         # `isBlockField`) draws its own titled control under the row -- that
         # control IS the field's input, so a `form` position on it would draw a
@@ -265,6 +304,8 @@ def _cross_check(manifest: dict) -> None:
                 continue
             sub_where = f"{where} > {field['name']}"
 
+            # Unnumbered rule: a nested element's `parent` names the enclosing row.
+            #
             # A nested element's `parent` must name the ROW IT SITS UNDER -- this
             # element, not some other row elsewhere in the pack. Nothing checked
             # that before: each nested entity supplies its own `parent`, so a
@@ -352,9 +393,24 @@ def _cross_check(manifest: dict) -> None:
     # (fields of a `path: []` node, not nodes of their own) and lifestyle names
     # `wellness` (a storage prefix only a group sits over). A name that is in
     # neither place contributes nothing to context output, silently.
+    #
+    # `full` is a real scope name -- it is in GLOBAL_SCOPE_NAMES because that set
+    # mirrors sections.SCOPES, which is what a client may ASK for. It is not a
+    # scope a pack can contribute to. `_resolve_scope_fields` (server.py:297)
+    # returns "all" for it before it reads any pack, so an entry under `full` is
+    # the same kind of mistake as a key that is not in `defaults` -- a declaration
+    # with no effect, written by an author who thought it had one.
     for scope, keys in manifest.get("scope_contributions", {}).items():
         if scope not in GLOBAL_SCOPE_NAMES:
             raise PackError(f"{pack}: unknown scope '{scope}' in scope_contributions")
+        if scope == "full":
+            raise PackError(
+                f"{pack}: scope_contributions declares 'full', which can contribute "
+                f"nothing -- get_context(scope: \"full\") returns every enabled "
+                f"section's whole file regardless, so the resolver returns before it "
+                f"reads a single pack's contributions. Name the scopes this section "
+                f"belongs in instead."
+            )
         for key in keys:
             if key not in defaults:
                 raise PackError(

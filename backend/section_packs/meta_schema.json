@@ -59,7 +59,7 @@
     },
     "scope_contributions": {
       "type": "object",
-      "description": "Optional. Scope name -> the paths that scope includes. Scope names are checked against sections.SCOPES by the loader.",
+      "description": "Optional. Scope name -> the paths that scope includes. The loader accepts `minimal`, `professional`, `personal` and `learning`, and rejects any other name -- including `full`, which is a real scope a client may ask for but not one a pack can contribute to: the resolver answers `full` with every enabled section's whole file before it reads a single manifest.",
       "additionalProperties": {
         "type": "array",
         "items": {
