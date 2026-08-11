@@ -477,3 +477,134 @@ editor" lists `scalar` as a node kind in its header-slot table. There is no
 `scalar` node kind — `meta_schema.json` closes the set at `list`, `fields`,
 `strings`, `group`, and `ScalarField` is the per-**field** control. The rule it
 states still holds, reworded: a field with no denominator shows no count.
+
+---
+
+## Amendment, 2026-08-11: what implementation forced
+
+Everything above is the format as designed before a line of it met the shipped
+packs. Tasks 2–4 built it, and the derivation gate — all 42 entities across all
+10 packs, compared to the frozen snapshot — reached **zero differences** only
+after six changes. Each is recorded here with the evidence, because the sections
+above are now wrong on these points and this section governs.
+
+### 1. `item` is spelled `element`
+
+`item` is a real field, identifier or entity name **ten times** in the shipped
+packs, so `preferences` would have read `"item": { "identifier": "item" }`.
+`element` collides with nothing and is the ordinary word for one member of an
+array in any programming culture. `each` was considered and rejected: it reads as
+a sentence fragment to anyone whose first language is not English.
+
+### 2. `element` on a `strings` node and a `strings` field
+
+The format as designed could not hold what ships. **Eleven** live entities write
+into an array of bare strings — `personality_trait` into `personality_traits`,
+`work_skill` into work_experience's `skills` — and `strings` had eight keys, none
+of them naming an entity. Those entities existed only in the authored `entities`
+block, with nothing tying them to the array they write.
+
+`element` on a strings array carries `entity`, `identifier`, and optionally
+`actions`, `description`, `parent`, `bulk`. It declares no `fields`, because a
+bare string has none — which is how one key covers both array kinds. It is
+**optional**: `preferences` ships six `strings` nodes and only `response_format`
+is in the contract.
+
+`bulk` says a client may pass the whole array under its own stored name instead
+of one string per call. Verified per branch: only `work_skill`,
+`work_highlight` and `project_highlight` accept it, and only `work_skill` said
+so. The other two are corrected — an addition to the contract, never a removal.
+
+### 3. `ui_only`, the mirror of `write_only`
+
+`write_only` is in the contract and rendered nowhere. Its mirror is rendered,
+stored, and in no MCP vocabulary: knowledge's `added_date` and `last_updated`,
+projects' `added_date`, learning_log's `timestamp`. Four field slots, all
+server-written. `test_ui_schema.py` already excluded `display_fields` from its
+vocabulary check for exactly these, and recorded that the exclusion is why the
+check is "wrong in BOTH directions". The converter derives it — a rendered field
+in none of its entity's vocabularies under any spelling — rather than listing it.
+
+### 4. `off_contract`, and why it is not optional
+
+This is the amendment that mattered most, and the one a reasonable reading of the
+spec would have got wrong. v1 holds a field's vocabulary and default **twice** —
+in the node's `enum`/`field_defaults` maps and in the entity's
+`valid_values`/`field_defaults` — and the two copies disagree: `profile.education`
+offers a closed `status` vocabulary the entity does not declare, and six nodes
+prefill a default the entity does not.
+
+Deriving these into the contract wherever the form has them is **not** additive.
+`server.py:2518` rejects a value outside `valid_values`, and `server.py:2536`
+applies `field_defaults`, for every entity on the generic path. So a derived
+`valid_values` would start rejecting a `status` that is accepted today, and a
+derived `field_defaults` would start writing values that are not written today.
+
+`off_contract: ["values"]` / `["default"]` names the attributes the contract does
+not carry. Eight fields need it. The common case — on the contract — declares
+nothing.
+
+### 5. `parent` and `list` are copied, not derived
+
+The derivation table above claims `parent` is "the enclosing `item`'s
+`identifier`". It is not: `domain`'s identifier is the stored key `name`, while a
+reference beneath it is addressed as `domain_name`. Three reference entities and
+four string writers depend on this. `parent` is therefore a declared key on an
+element.
+
+`list` is likewise not "the top-level path segment when the entity name differs
+from it": only **5 of 42** entities carry it, by no rule — `interest` at path
+`interests` has it and `goal` at path `goals` does not. Copied verbatim, and
+marked in the schema as removable only by an intentional contract change.
+
+### 6. A `fields` node has an `element` too
+
+The spec argued that a `record: {…}` block on both kinds was "uniform, but makes
+every `fields` node one level deeper for no gain". That was wrong, and the gate
+proved it: with the entity **on** the node, the node's `description` (on-screen
+helper text) and the entity's `description` (MCP-facing, for a client choosing a
+tool) collide on one key, and the converter shipped the wrong one to two entities
+until the gate caught it.
+
+Uniformity made the format **smaller**, not deeper: the union of node keys across
+all four kinds went from 17 to **13**, and a `fields` node from 10 keys to
+**7** — `kind`, `path`, `title`, `description`, `info`, `element`, `$comment`.
+
+### Corrections to the "13 names that render nothing" table
+
+- **`new_topic` and `new_label` are not aliases.** Each is a separate entry in its
+  entity's `optional`, so modelling them as `alias` changed the derived
+  `identifier` and `optional`. Both are `write_only`.
+- **`primary` needed a fifth `show` position, `pin`.** v1 kept a pinned field out
+  of the form and the Add dialog and drew a star on each row instead, so the
+  `["form"]` default would have put a switch on screen that has never existed.
+- **`coursework_topic` is a pure `variants` entry**, differing from `coursework`
+  in `description` alone — not the irregular case first supposed.
+
+### The quarantine, and its actual size
+
+`mcp_entities` (top level, optional) holds entities whose storage path is computed
+at runtime, so no node shape implies them: **`knowledge.knowledge`** (writes into
+`knowledge[category]`, the client choosing the category) and
+**`preferences.preference`** (a generic key-value store). Two of 42.
+
+The first estimate was fifteen. Eleven turned out to be strings writers (item 2)
+and two are `variants` — `dislike` and `coursework_topic` — detected by comparing
+entity shapes rather than listed, so a third would be found instead of silently
+dropped.
+
+### Numbers, measured rather than promised
+
+| | before | after |
+|---|---|---|
+| manifest lines, all 11 packs | 2449 | **2149** (−12%) |
+| `institution` in profile | 13× | **5×** |
+| `status` in profile | 5× | **1×** |
+| node keys, union of all kinds | 33 on one node | **13** |
+| `fields` node keys | — | 7 |
+| field descriptor keys | 13 arrays and maps | **21** |
+
+`institution` remains 5× because four of those are `parent` declarations — the MCP
+parameter naming the enclosing row — which are contract facts, not repetition.
+The field descriptor grew from the spec's 19 to 21 keys (`ui_only`,
+`off_contract`), and `element` replaced `item` rather than adding to it.

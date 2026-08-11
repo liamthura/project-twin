@@ -288,7 +288,7 @@ The 11 rules from the spec, each raising `PackError` and naming the pack, the no
 
 The converter is where the whole migration's risk lives, so it is written before anything is converted and gated against Task 1's snapshot.
 
-- [ ] **Step 1: Write the gate test first**
+- [x] **Step 1: Write the gate test first**
 
 ```python
 # backend/tests/test_converter.py
@@ -355,9 +355,9 @@ def test_no_field_is_invented_from_the_entity_vocabulary_alone():
 
 (`_walk_fields` is a five-line helper in the test file: recurse `sections`, then `fields`, then any field's `item.fields`.)
 
-- [ ] **Step 2: Run it. Every test fails — there is no converter.**
+- [x] **Step 2: Run it. Every test fails — there is no converter.**
 
-- [ ] **Step 3: Implement the converter.** Field-list construction, which is the part that must not be clever:
+- [x] **Step 3: Implement the converter.** Field-list construction, which is the part that must not be clever:
 
 ```python
 def _fields_for(node, entity):
@@ -380,11 +380,25 @@ def _fields_for(node, entity):
 
 `_descriptor` sets `type` from which array the name appears in (`long_text` → `longtext`, `array_fields` → `strings`, `date_fields` → `date`, `time_fields` → `time`, `enum`/`valid_values` → `enum` plus `values`), `show` from which display array it appears in (defaulting to `["form"]`), `required`/`role` from the entity's `required`/`identifier`, `alias` from the entity's spelling plus `FIELD_ALIASES`, and `placeholder`/`default`/`suggestions` from the three maps. `_mcp_only` emits the classified names from the spec's table.
 
-- [ ] **Step 4: Iterate until all four tests pass.** Expect the last one to fail last: `custom_type` must be dropped in favour of `allow_custom` on `type`, and `primary` must come out as a `bool` with `exclusive` and `pin`.
+- [x] **Step 4: Iterate until all four tests pass.** Expect the last one to fail last: `custom_type` must be dropped in favour of `allow_custom` on `type`, and `primary` must come out as a `bool` with `exclusive` and `pin`.
 
-- [ ] **Step 5: Commit the converter alone** — no manifests yet.
+- [x] **Step 5: Commit the converter alone** — no manifests yet.
 
 ---
+
+**Recorded during Task 4.** The gate reached **zero differences** -- all 42 entities across all 10 packs, exactly as authored -- but only after six format amendments, all now normative in the spec's "Amendment, 2026-08-11" section. Read that, not the sections above it, for the format.
+
+*The plan had the derivation in the wrong task.* Task 4's gate calls `build_entity_schema(convert(v1))`, but that function reads the authored `entities` block and is not changed until Task 6 -- so the gate could not run. `derive_entities(manifest_v2)` was written here instead, and Task 6 now only has to point `build_entity_schema` at it. The converter and the derivation are two halves of one claim; separating them made the claim untestable.
+
+*The amendments, each forced by shipped data:* `item` -> `element`; `element` on `strings` nodes and fields (11 entities had nowhere to be declared); `ui_only` as the mirror of `write_only` (4 server-written timestamps); `off_contract` for the eight fields whose UI vocabulary or default is not in the contract; `parent` and `list` copied rather than derived; and an `element` on `fields` nodes too, which made the format smaller -- the union of node keys fell 17 -> 13.
+
+*`off_contract` is the one that would have caused a real regression.* `server.py:2518` rejects a value outside `valid_values` and `server.py:2536` applies `field_defaults`, for every entity on the generic path. Deriving those attributes wherever the form declares them -- which is what "one field, one place" naively implies -- would have made `profile.education` start rejecting a `status` it accepts today. The gate caught it as a key-set difference; nothing else would have.
+
+*Three corrections to the spec's classification table:* `new_topic` and `new_label` are separate `optional` entries, not aliases, so they are `write_only`; a pinned field needed a fifth `show` position (`pin`); and `coursework_topic` is a pure `variants` entry, not an irregular one.
+
+*The quarantine is 2 entities, not the 15 first estimated* -- eleven are strings writers and two are variants, detected by shape rather than listed.
+
+*Task 5's shim has more to absorb than the plan assumed.* `normalizeUi` must now present `element` (on four node kinds, not one), the `fields` node's `element` indirection, and per-field descriptors, in the v1 shape the renderers read. The `strings`-node `element` is invisible to the UI, so it is the one addition the shim can ignore.
 
 ### Task 5: The shim, so the renderers do not have to change yet
 
