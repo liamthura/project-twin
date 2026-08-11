@@ -23,7 +23,9 @@ import { elementShape } from "./elementShape";
 
 // "detail_level" -> "Detail level". Storage keys are snake_case; the label is
 // the only place a user sees them, and every migrated pack spells them this
-// way already.
+// way already. Only the DEFAULT: a field descriptor's own `label` -- read from
+// `meta.field_labels`, at the one call site below -- wins over this whenever
+// it is declared, exactly as meta_schema.json's `label` `$comment` promises.
 function labelFor(field) {
   const words = field.replace(/_/g, " ");
   return words.charAt(0).toUpperCase() + words.slice(1);
@@ -68,7 +70,7 @@ export function FieldsRenderer({ node, entity, value, onValue, packKey }) {
             className={`space-y-1.5 ${needsFullRow(meta, field) ? "sm:col-span-2" : ""}`}
           >
             <Label htmlFor={id} className="text-xs text-muted-foreground">
-              {labelFor(field)}
+              {meta.field_labels[field] ?? labelFor(field)}
             </Label>
             <ScalarField
               id={id}

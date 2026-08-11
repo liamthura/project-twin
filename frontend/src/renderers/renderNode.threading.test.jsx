@@ -20,7 +20,7 @@ import { render } from "@testing-library/react";
 // the wave; the entity-resolves-to-a-segmented-button proxy the brief also
 // suggests is already covered by an existing renderNode.test.jsx case and
 // does not depend on this task's change (renderNode has always resolved
-// `entities?.[node.entity]` itself), so it is not repeated here.
+// `entities?.[node.element?.entity]` itself), so it is not repeated here.
 vi.mock("./ListRenderer", () => ({ default: vi.fn(() => null) }));
 
 import ListRenderer from "./ListRenderer";

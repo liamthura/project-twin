@@ -226,22 +226,77 @@ def _cross_check(manifest: dict) -> None:
                     f"the screen omits it say `write_only`",
                 )
 
+        # A labelled `strings`/`list` field (a BLOCK: elementShape.js's
+        # `isBlockField`) draws its own titled control under the row -- that
+        # control IS the field's input, so a `form` position on it would draw a
+        # text box over an array beside it. elementShape.js already skips `form`
+        # for a block (`if (isBlock && position === "form") continue`), one line
+        # with nothing stating the rule it encodes -- so until now
+        # meta_schema.json happily accepted `{label, type: "strings", show:
+        # ["form"]}` and the renderer silently threw the position away. Reject the
+        # declaration instead of letting the renderer eat it quietly.
+        for field in fields:
+            if (
+                field.get("label")
+                and field.get("type") in ("strings", "list")
+                and "form" in field.get("show", [])
+            ):
+                fail(
+                    where,
+                    f"field '{field['name']}' is a labelled {field['type']} -- it draws "
+                    f"its own block under the row, and may not also claim the 'form' "
+                    f"position there",
+                )
+
         # Rule 8.
         claim_entity(element["entity"], _derivation_signature(element), where)
         for variant in element.get("variants", []):
             claim_entity(variant["entity"], None, f"{where} (variant)")
 
         # Descend into nested arrays, or every nested list is unchecked -- which is
-        # most of profile. A `strings` field's `element` has no fields, so it takes the
-        # other branch: all that can be checked there is the entity name.
+        # most of profile. A `strings` field's `element` has no fields, so it takes
+        # the other branch: all that can be checked there is the entity name. This
+        # is also where a nested element's `parent` is checked against the row it
+        # actually sits under -- see the comment just below.
+        enclosing_entity = element["entity"]
         for field in fields:
-            element = field.get("element")
-            if element is None:
+            nested = field.get("element")
+            if nested is None:
                 continue
+            sub_where = f"{where} > {field['name']}"
+
+            # A nested element's `parent` must name the ROW IT SITS UNDER -- this
+            # element, not some other row elsewhere in the pack. Nothing checked
+            # that before: each nested entity supplies its own `parent`, so a
+            # WRONG one still produces a manifest that is internally consistent
+            # and passes every other rule here. That is exactly how it shipped
+            # wrong once: profile's Education block declared `work_highlight`
+            # (parent `company`, work experience's identifier) and Work
+            # Experience declared `education_highlight` (parent `institution`,
+            # education's identifier) -- SWAPPED -- and no test, gate or schema
+            # rule noticed, because each block's own entity and parent still
+            # agreed with each other, just not with the row it actually sat
+            # under. Two spellings are legal: the enclosing element's bare
+            # identifier (`education_highlight`'s parent is `institution`, and
+            # `education`'s identifier is `institution`) or that identifier
+            # prefixed by the enclosing entity's name (`project_tag`'s parent is
+            # `project_name`, and `project`'s identifier is `name`).
+            parent = nested.get("parent")
+            if parent is not None:
+                legal = {identifier, f"{enclosing_entity}_{identifier}"} if identifier else set()
+                if parent not in legal:
+                    fail(
+                        sub_where,
+                        f"parent '{parent}' does not name the enclosing element -- "
+                        f"'{enclosing_entity}' identifies its rows by '{identifier}', so "
+                        f"the legal spellings are '{identifier}' or "
+                        f"'{enclosing_entity}_{identifier}'",
+                    )
+
             if field.get("type") == "strings":
-                check_strings_element(element, f"{where} > {field['name']}")
+                check_strings_element(nested, sub_where)
             else:
-                check_element(element, f"{where} > {field['name']}", is_list_row=True)
+                check_element(nested, sub_where, is_list_row=True)
 
         return names
 

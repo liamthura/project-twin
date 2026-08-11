@@ -40,6 +40,19 @@ describe("FieldsRenderer", () => {
     expect(screen.getByLabelText("Locale")).toBeInTheDocument();
   });
 
+  it("prefers a field's own `label` over the title-cased name", () => {
+    // meta_schema.json's `label` promises exactly this: "declare it only where
+    // [the title-cased default] reads wrong." Before this, only a block field's
+    // title ever consulted `label` -- a scalar field's was accepted by the
+    // schema and then silently dropped, so this pins the fix rather than the
+    // schema's mere promise.
+    const labelledNode = withField("detail_level", { label: "How much detail" });
+    render(<FieldsRenderer node={labelledNode} entity={entity} value={{}} onValue={() => {}} />);
+
+    expect(screen.getByLabelText("How much detail")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Detail level")).not.toBeInTheDocument();
+  });
+
   it("renders nothing for a field the node does not declare", () => {
     renderFields({ value: { mood_overrides: [] } });
     expect(screen.queryByLabelText(/mood/i)).not.toBeInTheDocument();

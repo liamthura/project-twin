@@ -439,6 +439,139 @@ def test_a_labelled_collection_may_claim_no_position():
     )
 
 
+# --- a labelled block field may not also claim the `form` position -------
+#
+# elementShape.js already skips `form` for a block field (`if (isBlock &&
+# position === "form") continue`) -- a block draws its own titled control, so a
+# text input over an array in the parent's form is incoherent. But that skip was
+# the ONLY place the rule existed: meta_schema.json happily accepted
+# `{label, type: "strings", show: ["form"]}`, and the renderer just quietly
+# threw the position away. This closes that gap in the manifest itself.
+
+
+def test_a_labelled_strings_field_may_not_claim_the_form_position():
+    _rejects(
+        _goal_with(
+            {"name": "steps", "type": "strings", "show": ["form"], "label": "Steps"}
+        ),
+        "form",
+    )
+
+
+def test_a_labelled_list_field_may_not_claim_the_form_position():
+    node = _node()
+    node["element"]["fields"].append(
+        {
+            "name": "coursework",
+            "type": "list",
+            "show": ["form"],
+            "label": "Coursework",
+            "element": {
+                "entity": "coursework",
+                "identifier": "title",
+                "fields": [{"name": "title", "role": "title"}],
+            },
+        }
+    )
+    _rejects(_with_sections(node), "form")
+
+
+def test_a_labelled_block_field_may_claim_form_together_with_other_positions():
+    # `form` specifically is illegal; any OTHER position beside it is fine, and
+    # must stay fine -- this rule must not overreach into rejecting `count`.
+    _accepts(
+        _goal_with(
+            {"name": "steps", "type": "strings", "show": ["count"], "label": "Steps"}
+        )
+    )
+
+
+def test_an_unlabelled_strings_field_may_claim_the_form_position():
+    # Without a `label` the field is an inline chip control, not a block -- `form`
+    # is exactly where it belongs, and always has been (e.g. education's
+    # `coursework.topics`).
+    _accepts(_goal_with({"name": "tags", "type": "strings", "show": ["form"]}))
+
+
+# --- a nested element's `parent` must name the enclosing row -------------
+#
+# The rule this closes has a proven cost: profile's Education block declared
+# `work_highlight` (parent `company`, work experience's identifier) and Work
+# Experience declared `education_highlight` (parent `institution`, education's
+# identifier) -- SWAPPED -- and shipped that way. Nothing noticed, because each
+# nested entity supplies its own `parent`, so the derived MCP contract was
+# self-consistent either way; only cross-referencing the declaration against the
+# row it actually sits under catches the swap.
+
+
+def _education_like_node_with_highlight_parent(parent):
+    """An `education`-shaped list row (identifier `institution`) with a nested
+    `highlights` strings block whose `parent` is under test. Mirrors the actual
+    shipped shape closely enough to reconstruct the historical bug verbatim."""
+    return {
+        "kind": "list",
+        "path": ["education"],
+        "title": "Education",
+        "element": {
+            "entity": "education",
+            "identifier": "institution",
+            "fields": [
+                {"name": "institution", "role": "title", "required": True},
+                {
+                    "name": "highlights",
+                    "type": "strings",
+                    "show": [],
+                    "label": "Highlights",
+                    "element": {
+                        "entity": "education_highlight",
+                        "identifier": "highlight",
+                        "parent": parent,
+                    },
+                },
+            ],
+        },
+    }
+
+
+def test_the_historical_swap_is_rejected():
+    # Reconstructs the actual bug: a `highlights` block under an
+    # Education-shaped row (identifier `institution`) declaring the parent name
+    # that belongs to Work Experience's row (`company`) instead of its own.
+    node = _education_like_node_with_highlight_parent("company")
+    _rejects(_without_the_goals_list(node), "company")
+
+
+def test_nested_parent_matching_the_bare_identifier_is_accepted():
+    node = _education_like_node_with_highlight_parent("institution")
+    _accepts(_without_the_goals_list(node))
+
+
+def test_nested_parent_matching_the_entity_prefixed_identifier_is_accepted():
+    # knowledge's `domain.references`: entity `domain`, identifier `name`,
+    # parent `domain_name` -- the OTHER legal spelling. `title` here plays the
+    # role `name` plays there (BASE's title field is already the identifier).
+    node = _node()
+    node["element"]["entity"] = "domain"
+    node["element"]["fields"][1] = {
+        "name": "references",
+        "type": "list",
+        "show": [],
+        "label": "References",
+        "element": {
+            "entity": "domain_reference",
+            "identifier": "name",
+            "parent": "domain_title",
+            "fields": [{"name": "name", "role": "title"}],
+        },
+    }
+    _accepts(_with_sections(node))
+
+
+def test_nested_parent_naming_neither_spelling_is_rejected():
+    node = _education_like_node_with_highlight_parent("some_other_name")
+    _rejects(_without_the_goals_list(node), "some_other_name")
+
+
 # --- the error says where -----------------------------------------------
 
 

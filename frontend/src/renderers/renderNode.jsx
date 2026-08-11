@@ -1,7 +1,8 @@
 // Picks a renderer for one ui node. Extracted from SectionRenderer's inline
 // CardContent.map so a node that is NOT a direct child of the section root
-// can be dispatched too: wave 4 calls this for `node.children` against a list
-// item, where the path resolves against the item rather than the section.
+// can be dispatched too: ListRenderer calls this for a row's own BLOCK fields
+// (elementShape.js's `blocks`, projected into nodes by `blockNode`), where the
+// path resolves against the row's item rather than the section.
 //
 // The seam is a plain function, not a component, so a caller can decide where
 // its output goes -- inside a Card, inside a row, or nowhere.

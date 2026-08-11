@@ -1034,6 +1034,27 @@ describe("title field also taking the form position", () => {
   });
 });
 
+describe("a field's own `label` overrides the derived one", () => {
+  // meta_schema.json's `label` promises "declare it only where [the derived
+  // default] reads wrong" -- but ListRenderer ran every field's name through
+  // `.replace(/_/g, " ")` unconditionally and never looked at `label` at all,
+  // so a pack author's override was accepted by the schema and silently
+  // dropped on screen. This pins the fix, not just the schema's promise.
+  it("labels a detail-grid field with its descriptor's `label`, not its name", async () => {
+    const node = listNode(["entries"], "topic", [
+      { name: "source", label: "Where it came from" },
+    ]);
+    const items = [{ topic: "RSC", source: "conversation" }];
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+
+    await user.click(screen.getByText("RSC"));
+
+    expect(screen.getByText("Where it came from")).toBeInTheDocument();
+    expect(screen.queryByText(/^source$/i)).not.toBeInTheDocument();
+  });
+});
+
 describe("row delete button naming", () => {
   // Both the row delete and (before it moved to the heading) the info button
   // were icon-only with empty textContent, so a selector like

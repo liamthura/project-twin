@@ -623,7 +623,9 @@ export default function ListRenderer({
                   <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 pb-2 sm:px-9">
                     {bodyDisplayFields.map((f) => (
                       <div key={f}>
-                        <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
+                        <Label className="text-xs capitalize">
+                          {meta.field_labels[f] ?? f.replace(/_/g, " ")}
+                        </Label>
                         <p className="font-mono text-xs text-muted-foreground">
                           {formatDisplay(item[f], formats[f])}
                         </p>
@@ -634,7 +636,9 @@ export default function ListRenderer({
                 <div className="grid gap-3 px-4 pb-3 sm:grid-cols-2 sm:px-9">
                   {bodyEditFields.map((f) => (
                     <div key={f} className={needsFullRow(f) ? "sm:col-span-2" : ""}>
-                      <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
+                      <Label className="text-xs capitalize">
+                        {meta.field_labels[f] ?? f.replace(/_/g, " ")}
+                      </Label>
                       <ScalarField
                         field={f}
                         value={item[f]}
@@ -676,8 +680,13 @@ export default function ListRenderer({
                   // A field's `name` is required and its `type` decides the kind,
                   // so unlike a hand-authored v1 child there is no such thing
                   // here as a block with no path or an unsupported kind -- see
-                  // blockNode in elementShape.js. renderNode's own guards still
-                  // hold that line for a node arriving from anywhere else.
+                  // blockNode in elementShape.js. That means renderNode's own
+                  // guards (a missing/empty path, an unsupported kind) can never
+                  // fire on a node THIS FUNCTION builds -- `child.kind` is always
+                  // "list" or "strings" and `child.path` is always the field's
+                  // own required, non-empty `name` -- so there is no `if
+                  // (!rendered) return null` here to bail out of; a block is
+                  // rejected only if renderNode's rules change under it.
                   const child = blockNode(field);
                   const rendered = renderNode({
                     node: child,
@@ -687,11 +696,6 @@ export default function ListRenderer({
                     packKey,
                     onShowConfirmation,
                   });
-                  // renderNode returns null (after logging) for a node it
-                  // rejects. Bail before the wrapper so a rejected block
-                  // contributes nothing -- not an empty div, and not a
-                  // heading floating over nothing.
-                  if (!rendered) return null;
                   return (
                     <div
                       key={`${ci}:${child.path.join(".")}`}

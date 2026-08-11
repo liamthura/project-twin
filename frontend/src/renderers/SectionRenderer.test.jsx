@@ -2209,6 +2209,26 @@ describe("section headings and info placement", () => {
       expect(screen.getByText("mentoring")).toBeInTheDocument();
     });
 
+    it("keeps education's blocks in the order the manifest declares them", async () => {
+      // field-census-v1.json records a node's blocks as separate object KEYS,
+      // and `toEqual` on an object ignores key order -- so the frozen census
+      // that gates field NAMES says nothing about block ORDER. Nothing else
+      // did either: `elementShape.js`'s `shape.blocks.reverse()` leaves every
+      // existing test green. This reads the actual rendered sequence instead,
+      // via the `data-ui-node` attribute ListRenderer stamps on each block's
+      // own wrapper (see `uiNode` above) -- against the real `packs.json` and
+      // `profile.json` fixtures, not a synthetic node, because the point is to
+      // gate the shipped order rather than an order this test invented.
+      const { user } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Northumbria University"));
+
+      const educationCard = uiNode("Education");
+      const blockTitles = Array.from(educationCard.querySelectorAll("[data-ui-node]")).map(
+        (el) => el.getAttribute("data-ui-node")
+      );
+      expect(blockTitles).toEqual(["Highlights", "Coursework / Modules", "Clubs & Societies"]);
+    });
+
     it("edits a highlight in place rather than making the user retype it", async () => {
       // The retired editor gave each highlight its own input. Binding them as
       // chips meant deleting and retyping a whole sentence to fix a typo.

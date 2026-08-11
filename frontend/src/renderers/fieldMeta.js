@@ -65,6 +65,16 @@ function fromDescriptors(fields) {
   // for this purpose -- see the meta_schema.json `$comment` on `allow_custom`
   // and the comment in ScalarField.jsx where this is read.
   const allow_custom = [];
+  // meta_schema.json's `label` promises a title-cased `name` as the DEFAULT,
+  // to be overridden only where that reads wrong -- but until now only a block
+  // field's own title (`blockNode`, elementShape.js) ever read `label`; a
+  // scalar field's was accepted by the schema and then silently dropped on the
+  // floor by both renderers, which title-cased `name` unconditionally. Withheld
+  // from a block for the same reason its placeholder and default are: a
+  // block's `label` is already spoken for as the heading over its own titled
+  // control (see fromDescriptors' comment above), so it must not also compete
+  // to relabel a parent-row control that field never draws.
+  const field_labels = {};
 
   for (const field of fields) {
     if (field.write_only || field.pin) continue;
@@ -74,6 +84,7 @@ function fromDescriptors(fields) {
       if ("values" in field) valid_values[field.name] = field.values;
       if ("default" in field) field_defaults[field.name] = field.default;
       if ("placeholder" in field) field_placeholders[field.name] = field.placeholder;
+      if (field.label) field_labels[field.name] = field.label;
       if (field.type === "longtext") long_text.add(field.name);
       if (field.type === "date") date_fields.push(field.name);
       if (field.type === "time") time_fields.push(field.name);
@@ -84,7 +95,7 @@ function fromDescriptors(fields) {
   }
 
   return {
-    valid_values, field_defaults, field_placeholders,
+    valid_values, field_defaults, field_placeholders, field_labels,
     long_text, date_fields, time_fields, bool_fields, array_fields, allow_custom,
   };
 }
