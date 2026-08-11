@@ -45,18 +45,18 @@
         ],
         "identifier": "institution"
       },
-      "work_highlight": {
+      "education_highlight": {
         "actions": [
           "add",
           "remove"
         ],
         "required": [
-          "company",
+          "institution",
           "highlight"
         ],
         "optional": [],
         "identifier": "highlight",
-        "parent": "company"
+        "parent": "institution"
       },
       "coursework": {
         "actions": [
@@ -142,18 +142,18 @@
         "parent": "company",
         "description": "A skill or technology used in a role. Bare strings on the parent row, like work_highlight."
       },
-      "education_highlight": {
+      "work_highlight": {
         "actions": [
           "add",
           "remove"
         ],
         "required": [
-          "institution",
+          "company",
           "highlight"
         ],
         "optional": [],
         "identifier": "highlight",
-        "parent": "institution"
+        "parent": "company"
       },
       "email": {
         "actions": [
@@ -337,9 +337,9 @@
               "placeholder": "e.g. Graduated with honours, Led the debate team",
               "control": "input",
               "element": {
-                "entity": "work_highlight",
+                "entity": "education_highlight",
                 "identifier": "highlight",
-                "parent": "company"
+                "parent": "institution"
               },
               "$comment": "Bare strings on both writers (server.py:2559 appends the string itself). item_control:\"input\" because these are sentence-like -- the retired editor gave each its own editable row, and chips would mean retyping a whole achievement to fix a typo."
             },
@@ -510,9 +510,9 @@
               "placeholder": "e.g. Led a team of five, Cut response time by 40%",
               "control": "input",
               "element": {
-                "entity": "education_highlight",
+                "entity": "work_highlight",
                 "identifier": "highlight",
-                "parent": "institution"
+                "parent": "company"
               },
               "$comment": "Bare strings on both writers (server.py:1541). item_control:\"input\" matches the retired editor, which gave each highlight its own editable row -- see the education node."
             }

@@ -39,13 +39,17 @@ export const HH_MM = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 // programmatic association. FieldsRenderer is the caller that needs this;
 // ListRenderer's edit grid labels its own cells and passes nothing.
 export function ScalarField({ id, field, value, meta, onChange, customValue, onCustomChange }) {
-  // meta.long_text is documented as a Set (that's what every caller inside
-  // this codebase passes), but the published schema declares the manifest's
-  // `long_text` key as a JSON array, and a node built straight from a
-  // manifest (`node.long_text`) is exactly that -- an array with no `.has`.
-  // Normalise here, at the one place that reads it, so an array-shaped
-  // long_text degrades to nothing worse than a Set-shaped one instead of
-  // silently turning every declared textarea into a one-line input.
+  // meta.long_text is documented as a Set, and every caller inside this
+  // codebase passes one -- `buildFieldMeta` (fieldMeta.js) always builds it as
+  // one, for the only path it has left after Task 10 deleted the pre-v2 branch
+  // that used to read a manifest's own `long_text` array straight off the
+  // node. That array shape is gone from the schema too (meta_schema.json
+  // declares no such key any more). Still normalised here rather than trusted,
+  // because `meta` is this component's public parameter, not something only
+  // `buildFieldMeta` may construct -- a hand-built array-shaped `long_text`
+  // (this file's own tests build one) degrades to nothing worse than a
+  // Set-shaped one instead of silently turning every declared textarea into a
+  // one-line input.
   const longText =
     meta.long_text instanceof Set ? meta.long_text : new Set(meta.long_text ?? []);
   // Manifest-declared hint for this field, if the node carries one. Undefined

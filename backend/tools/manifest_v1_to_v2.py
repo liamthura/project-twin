@@ -649,13 +649,16 @@ def _strings_writer(
     nothing else -- against the array's position in the tree. Eleven entities in
     the shipped packs bind this way, and the gate proves each one lands.
     """
-    parent_entity = entities.get((parent or {}).get("entity"), {})
+    parent_entity_name = (parent or {}).get("entity")
+    parent_entity = entities.get(parent_entity_name, {})
     for name, spec in entities.items():
         if name in bound or _STRINGS_WRITERS.get((pack, name)) != array_name:
             continue
         if bool(spec.get("parent")) != bool(parent):
             continue
-        if parent is not None and spec.get("parent") not in _parent_spellings(parent_entity, spec):
+        if parent is not None and spec.get("parent") not in _parent_spellings(
+            parent_entity_name, parent_entity
+        ):
             continue
         bound.add(name)
         element = {"entity": name, "identifier": spec["identifier"]}
@@ -671,11 +674,33 @@ def _strings_writer(
     return None
 
 
-def _parent_spellings(parent_entity: dict, spec: dict) -> set:
-    """Every spelling the enclosing row's identifier could be reported under. A
-    reference says `domain_name` where the row's stored key is `name`, so matching
-    on the identifier alone would find nothing."""
-    return {spec.get("parent"), parent_entity.get("identifier")} - {None}
+def _parent_spellings(parent_entity_name: str | None, parent_entity: dict) -> set:
+    """Every spelling the ENCLOSING ROW's identifier could be reported under.
+
+    Two spellings are in use: the bare identifier (`education_highlight`'s parent
+    is `institution`, which is `education`'s own identifier) and the identifier
+    prefixed by the parent entity's name (`project_tag`'s parent is
+    `project_name`, where `project`'s identifier is `name`). Both appear in the
+    shipped packs, so matching on the bare identifier alone would find nothing
+    for half of them.
+
+    What must NOT be in this set is `spec["parent"]` itself. It was, and that made
+    the caller's guard vacuous -- a value is trivially a member of a set built
+    from it -- so the first entity in dict order won whenever two writers targeted
+    the same array name. `profile`'s two `highlights` writers are exactly that
+    case, and the result was Education's Highlights block declaring
+    `work_highlight` while Work Experience's declared `education_highlight`. The
+    swap was invisible because no renderer read the entity, and the contract gate
+    could not see it either: both entities derive correctly whichever node they
+    hang off, since their own spec supplies their `parent`.
+    """
+    identifier = parent_entity.get("identifier")
+    if identifier is None:
+        return set()
+    spellings = {identifier}
+    if parent_entity_name:
+        spellings.add(f"{parent_entity_name}_{identifier}")
+    return spellings
 
 
 # Which string array each writer targets: (pack, entity) -> (array name, parent

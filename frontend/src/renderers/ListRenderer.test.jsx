@@ -48,10 +48,11 @@ function withFields(...fields) {
   return { ...node, element: { ...node.element, fields: [...byName.values()] } };
 }
 
-// Reachable only through `buildFieldMeta`'s pre-v2 branch now, and kept as the
-// prop it always was so these tests pass what renderNode passes. Nothing in it is
-// read while the node carries descriptors -- which two tests below assert
-// outright rather than leaving to inference.
+// Not read by anything any more: `buildFieldMeta`'s pre-v2 entity-fallback
+// branch (the last thing that consulted this object) was deleted in Task 10
+// along with the `entity` parameter itself. Kept as the prop it always was so
+// these tests pass what renderNode passes -- which two tests below assert has
+// no effect, rather than leaving it to inference.
 const entity = {
   valid_values: { domain: ["interior", "graphic"], stance: ["love", "like", "avoid"] },
   optional: ["custom_stance"],

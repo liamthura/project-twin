@@ -7,6 +7,35 @@ can sit in an entity's `optional` forever, be advertised to every MCP client by
 `get_schema`, and be discarded on arrival. Wave 6 found seven such fields in
 `profile` alone.
 
+**What "the vocabulary" means changed under this audit, and widened its reach.**
+`_probeable_entities` below reads `server.ENTITY_SCHEMA`, and since format v2
+that is `pack_loader.build_entity_schema` output -- `required`/`optional` for
+every entity is DERIVED from its manifest's own field descriptors, not a second,
+hand-authored copy (see `derive_entities` in pack_loader.py, and the "spelling
+check is gone" note atop test_section_bindings.py). A field the UI renders a
+control for is, by that construction, a field this audit now probes: it did not
+used to be. Under v1 this audit only ever saw the authored `entities` block, so
+a field the UI bound but the hand-written vocabulary omitted -- or the reverse,
+a vocabulary entry no node bound -- was invisible to it either way. That gap is
+closed: the manifest's field `name`s are now the one enumeration of what a
+section's controls are supposed to store, and this audit walks exactly that
+enumeration.
+
+**What it still cannot tell you: whether a stored field landed under its OWN
+declared name.** `_is_stored` diffs the whole persisted blob for two different
+values of one field; a `True` here only means *something* in the blob moved, not
+that it moved at the field's own key. `execute_modify`'s `get_field` normalises
+several accepted input spellings down to one stored key -- the four
+`*_reference` entities' `ref_name` is stored as `name`, for instance -- and
+varying `ref_name` still flips the blob, so this audit is satisfied while never
+learning which key actually changed. That is a different question, with a
+different, narrower authority: `test_section_bindings.py`'s alias guard, backed
+by the hand-audited `CANONICAL_STORED_KEY` table, is the only thing in this repo
+that says which single spelling in `FIELD_ALIASES[entity]` is the one
+`execute_modify` persists. This audit and that one are complementary, not
+redundant -- this proves a declared field is WRITTEN somewhere; that one proves
+WHERE.
+
 Both write actions are swept: `add` (wave 8) and `update` (wave 9). Sweeping
 `update` is not redundant -- a branch can honour a field on the way in and ignore
 it on every subsequent edit, which is what `work_experience.highlights` did until

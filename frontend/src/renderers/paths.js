@@ -97,19 +97,16 @@ export function removeAt(obj, path) {
 }
 
 /**
- * Normalises a pack's `ui` block into `{ sections: [...] }`.
+ * Normalises a pack into `{ sections: [...] }`.
  *
- * Accepts:
- * - The new explicit form: `ui.sections` is already an array — passed
- *   through unchanged.
- * - The legacy flat map: `ui` is `{ [listKey]: uiSpec }`. Each entry becomes
- *   `{ kind: "list", path: [listKey], entity: <resolved>, ...uiSpec }`.
- * - No `ui` block at all: returns `{ sections: [] }`.
- *
- * Entity resolution for the legacy map reproduces GenericSectionEditor.jsx's
- * behaviour exactly: prefer the entity whose declared `list` equals the
- * key; if none matches and the pack has exactly one entity, fall back to
- * it; otherwise the section is skipped (no entity to bind it to).
+ * A pack declares its nodes at the top level (`pack.sections`), which is
+ * every shipped pack and every fixture -- this reads that array and nothing
+ * else. Two other shapes used to be accepted here: the `ui.sections`
+ * wrapper (the pre-v2 manifests' spelling) and a legacy flat `ui` map
+ * (`{ [listKey]: uiSpec }`, resolved to an entity by matching `entity.list`,
+ * reproducing GenericSectionEditor.jsx's behaviour). Both are gone as of
+ * Task 10 -- no shipped pack used either, and the hand-built test packs that
+ * exercised them now use `sections` directly. See paths.test.js.
  */
 /**
  * A band id: URL-safe, readable, and derived only here.
@@ -180,33 +177,5 @@ export function outline(pack) {
 }
 
 export function normalizeUi(pack) {
-  // A pack declares its nodes at the top level. `ui.sections` is the wrapper the
-  // manifests used before format v2, and the shape a handful of hand-built test
-  // packs still use, so both are read; the wrapper itself goes in Task 10, along
-  // with the legacy flat map below.
-  const explicit = pack?.sections ?? pack?.ui?.sections;
-  // Passed through untouched. The shim that used to sit on this line rebuilt
-  // v1's parallel arrays from each node's field descriptors so the renderers
-  // did not have to change in the same commit the manifests did; every renderer
-  // now reads the descriptors, so there is one shape and nothing to translate.
-  if (Array.isArray(explicit)) return { sections: explicit };
-
-  const ui = pack?.ui;
-  if (!ui) return { sections: [] };
-
-  const entities = pack.entities || {};
-  const entityByList = {};
-  for (const [entityName, espec] of Object.entries(entities)) {
-    if (espec.list) entityByList[espec.list] = entityName;
-  }
-  const entityNames = Object.keys(entities);
-
-  const sections = [];
-  for (const [listKey, uiSpec] of Object.entries(ui)) {
-    const entity =
-      entityByList[listKey] || (entityNames.length === 1 ? entityNames[0] : undefined);
-    if (entity === undefined) continue;
-    sections.push({ kind: "list", path: [listKey], entity, ...uiSpec });
-  }
-  return { sections };
+  return { sections: Array.isArray(pack?.sections) ? pack.sections : [] };
 }

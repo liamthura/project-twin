@@ -24,9 +24,13 @@ import { buildFieldMeta } from "./fieldMeta";
 import { elementShape } from "./elementShape";
 import { ScalarField } from "./ScalarField";
 
+// `entity` is accepted but no longer read: `buildFieldMeta` dropped its
+// pre-v2 entity-fallback branch (and the parameter along with it) in Task 10.
+// ListRenderer still passes its own resolved `entity` prop down here, for the
+// existing call shape -- see renderNode.threading.test.jsx.
 export function AddEntryDialog({ node, entity, items, onAdd, open, onOpenChange, trigger }) {
   const { titleField, badges, form: detailFields, suggestions } = elementShape(node);
-  const meta = buildFieldMeta(node, entity);
+  const meta = buildFieldMeta(node);
   // Per-field `default`, resolved exactly as ListRenderer resolves it -- from
   // the descriptors, with no entity fallback. Both must agree or the dialog
   // would preselect one set of values and `addItem` would write another.

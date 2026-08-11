@@ -29,6 +29,11 @@ function labelFor(field) {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+// `entity` is no longer read by anything in this file -- `buildFieldMeta`
+// dropped its pre-v2 entity-fallback branch (and the parameter along with it)
+// in Task 10, since v2 states a field's vocabulary and default on the field
+// itself. The prop stays because renderNode still resolves and passes one, for
+// every existing call site and test; see renderNode.threading.test.jsx.
 export function FieldsRenderer({ node, entity, value, onValue, packKey }) {
   // A path never written reads back as undefined, and an MCP client can leave
   // any shape behind. Either way this renders empty controls rather than
@@ -36,13 +41,14 @@ export function FieldsRenderer({ node, entity, value, onValue, packKey }) {
   // below, so a stray string at this path is replaced by a clean object on
   // first edit rather than exploding into indexed character keys.
   const stored = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const meta = buildFieldMeta(node, entity);
+  const meta = buildFieldMeta(node);
   // The `form` position, which for a `fields` node is every field that does not
   // opt out: a node like this IS a form, so `show` is rarely declared on it at
   // all. A field that declares only `write_only` (lifestyle's `day_type`, the
   // router server.py never stores) is already gone by this point -- which is the
   // one thing v1's flat `fields` array could not express, and why
-  // test_ui_schema.py had to exclude a whole vocabulary from its check.
+  // test_section_bindings.py (formerly test_ui_schema.py) has to exclude a
+  // whole vocabulary from its check.
   const fields = elementShape(node).form;
 
   // Every write spreads the CURRENT stored object first, so keys this node

@@ -25,6 +25,11 @@ import { normalizeUi, outline } from "@/renderers/paths";
 import { elementShape, blockNode } from "@/renderers/elementShape";
 import { buildFieldMeta } from "@/renderers/fieldMeta";
 
+// Every hand-built pack below declares its nodes as a top-level `sections`
+// array. They used to wrap it as `ui: { sections: [...] }`, the pre-v2
+// manifest shape normalizeUi accepted alongside the real one -- Task 10
+// deleted that wrapper (no shipped pack used it), so these moved up one
+// level. The behaviour under test at each of those sites is unchanged.
 const goalsPack = packs.find((p) => p.key === "goals");
 const mediaPack = packs.find((p) => p.key === "media");
 const aestheticsPack = packs.find((p) => p.key === "aesthetics");
@@ -156,13 +161,8 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   const chain = resolveChain(pack, keys, data);
   const ancestors = chain.slice(0, -1);
   const { node, rows } = chain[chain.length - 1];
-  // Resolved exactly as renderNode resolves it -- via the element's entity name
-  // -- not by re-deriving it from legacy list-matching rules. Those rules live
-  // inside normalizeUi already; re-implementing them here made this guard
-  // consistent with ListRenderer only by coincidence.
-  const entity = pack.entities?.[node.element?.entity];
   const shape = elementShape(node);
-  const meta = buildFieldMeta(node, entity);
+  const meta = buildFieldMeta(node);
   const arrayFields = meta.array_fields;
   const covered = [...new Set([...shape.badges, ...shape.form])];
   const item = rows[0];
@@ -1290,11 +1290,9 @@ describe("SectionRenderer", () => {
       title: "Lifestyle",
       description: "",
       entities: { goal: { list: "goals" } },
-      ui: {
-        sections: [
-          listNode(["goals"], "title", { title: "Goals" }),
-        ],
-      },
+      sections: [
+        listNode(["goals"], "title", { title: "Goals" }),
+      ],
     };
     const data = { goals: [{ title: "Ship it" }] };
 
@@ -1340,9 +1338,9 @@ describe("SectionRenderer", () => {
     const data = { goals: [{ title: "Ship it" }], other: [{ label: "X" }] };
     const packBefore = {
       key: "reorder_shared_path", title: "Reorder", description: "",
-      entities, ui: { sections: [nodeOther, nodeFirst, nodeSecond] },
+      entities, sections: [nodeOther, nodeFirst, nodeSecond],
     };
-    const packAfter = { ...packBefore, ui: { sections: [nodeFirst, nodeSecond] } };
+    const packAfter = { ...packBefore, sections: [nodeFirst, nodeSecond] };
 
     it("renders both nodes, not just one, when they share a path", () => {
       render(<SectionRenderer pack={packBefore} data={data} onChange={() => {}} />);
@@ -1398,12 +1396,10 @@ describe("SectionRenderer", () => {
         title: "Mixed",
         description: "",
         entities: { goal: { list: "goals" } },
-        ui: {
-          sections: [
-            { kind: "table", path: ["profile"] },
-            listNode(["goals"], "title"),
-          ],
-        },
+        sections: [
+          { kind: "table", path: ["profile"] },
+          listNode(["goals"], "title"),
+        ],
       };
       const data = { profile: { name: "irrelevant" }, goals: [{ title: "Ship it" }] };
 
@@ -1430,12 +1426,10 @@ describe("SectionRenderer", () => {
         title: "Mixed",
         description: "",
         entities: { goal: { list: "goals" } },
-        ui: {
-          sections: [
-            { kind: "table", path: ["profile"], title: "Basics" },
-            listNode(["goals"], "title"),
-          ],
-        },
+        sections: [
+          { kind: "table", path: ["profile"], title: "Basics" },
+          listNode(["goals"], "title"),
+        ],
       };
       const data = { profile: { name: "irrelevant" }, goals: [{ title: "Ship it" }] };
 
@@ -1461,12 +1455,10 @@ describe("SectionRenderer", () => {
         title: "Mixed2",
         description: "",
         entities: { goal: { list: "goals" } },
-        ui: {
-          sections: [
-            { kind: "table" },
-            listNode(["goals"], "title"),
-          ],
-        },
+        sections: [
+          { kind: "table" },
+          listNode(["goals"], "title"),
+        ],
       };
       const data = { goals: [{ title: "Ship it" }] };
 
@@ -1489,25 +1481,23 @@ describe("SectionRenderer", () => {
       title: "Wellness",
       description: "",
       entities: { sleep: { optional: ["bedtime", "wakeup"] } },
-      ui: {
-        sections: [
-          {
-            kind: "fields",
-            path: ["wellness", "sleep", "weekday"],
-            element: {
-              entity: "sleep",
-              fields: [{ name: "bedtime" }, { name: "wakeup" }],
-            },
-            title: "Weekday",
+      sections: [
+        {
+          kind: "fields",
+          path: ["wellness", "sleep", "weekday"],
+          element: {
+            entity: "sleep",
+            fields: [{ name: "bedtime" }, { name: "wakeup" }],
           },
-          {
-            kind: "strings",
-            path: ["wellness", "energy_peaks"],
-            title: "Energy peaks",
-            placeholder: "e.g. Early morning...",
-          },
-        ],
-      },
+          title: "Weekday",
+        },
+        {
+          kind: "strings",
+          path: ["wellness", "energy_peaks"],
+          title: "Energy peaks",
+          placeholder: "e.g. Early morning...",
+        },
+      ],
     };
     const data = {
       wellness: {
@@ -1571,9 +1561,7 @@ describe("SectionRenderer", () => {
       title: "Corrupted",
       description: "",
       entities: { goal: { list: "goals" } },
-      ui: {
-        sections: [listNode(["goals"], "title")],
-      },
+      sections: [listNode(["goals"], "title")],
     };
     const data = { goals: "not a list" };
 
@@ -1965,20 +1953,18 @@ describe("section headings and info placement", () => {
       title: "Grouped",
       description: "",
       entities: {},
-      ui: {
-        sections: [
-          {
-            kind: "group",
-            title: "Code Style",
-            description: "Languages, frameworks and tools",
-            sections: [
-              { kind: "strings", path: ["code_style", "frameworks"], title: "Frameworks" },
-              { kind: "strings", path: ["code_style", "tools"], title: "Tools" },
-            ],
-          },
-          { kind: "strings", path: ["loose"], title: "Ungrouped" },
-        ],
-      },
+      sections: [
+        {
+          kind: "group",
+          title: "Code Style",
+          description: "Languages, frameworks and tools",
+          sections: [
+            { kind: "strings", path: ["code_style", "frameworks"], title: "Frameworks" },
+            { kind: "strings", path: ["code_style", "tools"], title: "Tools" },
+          ],
+        },
+        { kind: "strings", path: ["loose"], title: "Ungrouped" },
+      ],
     };
     const data = { code_style: { frameworks: ["React"], tools: ["Docker"] }, loose: ["x"] };
 
@@ -2021,7 +2007,7 @@ describe("section headings and info placement", () => {
       // rejected node, and gets the same treatment.
       const empty = {
         ...pack,
-        ui: { sections: [{ kind: "group", title: "Hollow", sections: [] }] },
+        sections: [{ kind: "group", title: "Hollow", sections: [] }],
       };
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
       renderSection({ pack: empty, initial: {} });
@@ -2034,11 +2020,9 @@ describe("section headings and info placement", () => {
     it("renders nothing for a group whose every child is rejected", () => {
       const allBad = {
         ...pack,
-        ui: {
-          sections: [
-            { kind: "group", title: "Hollow", sections: [{ kind: "table", path: ["x"] }] },
-          ],
-        },
+        sections: [
+          { kind: "group", title: "Hollow", sections: [{ kind: "table", path: ["x"] }] },
+        ],
       };
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
       renderSection({ pack: allBad, initial: {} });
@@ -2066,17 +2050,15 @@ describe("section headings and info placement", () => {
         title: "Mixed",
         description: "",
         entities: {},
-        ui: {
-          sections: [
-            {
-              kind: "fields",
-              path: ["comm"],
-              title: "Default",
-              description: "always active",
-              fields: ["tone"],
-            },
-          ],
-        },
+        sections: [
+          {
+            kind: "fields",
+            path: ["comm"],
+            title: "Default",
+            description: "always active",
+            fields: ["tone"],
+          },
+        ],
       };
       renderSection({ pack: mixed, initial: {} });
       expect(screen.getByText("always active")).toBeInTheDocument();
@@ -2656,25 +2638,23 @@ describe("the section's structure", () => {
       title: "Nested",
       description: "",
       entities: {},
-      ui: {
-        sections: [
-          {
-            kind: "group",
-            title: "Outer",
-            sections: [
-              { kind: "strings", path: ["first"], title: "First" },
-              {
-                kind: "group",
-                title: "Inner",
-                sections: [
-                  { kind: "strings", path: ["second"], title: "Second" },
-                  { kind: "strings", path: ["third"], title: "Third" },
-                ],
-              },
-            ],
-          },
-        ],
-      },
+      sections: [
+        {
+          kind: "group",
+          title: "Outer",
+          sections: [
+            { kind: "strings", path: ["first"], title: "First" },
+            {
+              kind: "group",
+              title: "Inner",
+              sections: [
+                { kind: "strings", path: ["second"], title: "Second" },
+                { kind: "strings", path: ["third"], title: "Third" },
+              ],
+            },
+          ],
+        },
+      ],
     };
     const data = { first: ["a"], second: ["b"], third: ["c"] };
 
@@ -2710,27 +2690,25 @@ describe("the section's structure", () => {
     it("flattens a fourth level into the same card rather than nesting further", () => {
       const deeper = {
         ...nested,
-        ui: {
-          sections: [
-            {
-              kind: "group",
-              title: "Outer",
-              sections: [
-                {
-                  kind: "group",
-                  title: "Inner",
-                  sections: [
-                    {
-                      kind: "group",
-                      title: "Deepest",
-                      sections: [{ kind: "strings", path: ["second"], title: "Second" }],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
+        sections: [
+          {
+            kind: "group",
+            title: "Outer",
+            sections: [
+              {
+                kind: "group",
+                title: "Inner",
+                sections: [
+                  {
+                    kind: "group",
+                    title: "Deepest",
+                    sections: [{ kind: "strings", path: ["second"], title: "Second" }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
       };
       render(<SectionRenderer pack={deeper} data={data} onChange={vi.fn()} />);
 
@@ -2759,19 +2737,17 @@ describe("the fields count in a card header", () => {
     title: "Counted",
     description: "",
     entities: {},
-    ui: {
-      sections: [
-        {
-          kind: "fields",
-          path: ["comm"],
-          title: "Default style",
-          element: {
-            entity: "communication_default",
-            fields: [{ name: "tone" }, { name: "detail_level" }, { name: "locale" }],
-          },
+    sections: [
+      {
+        kind: "fields",
+        path: ["comm"],
+        title: "Default style",
+        element: {
+          entity: "communication_default",
+          fields: [{ name: "tone" }, { name: "detail_level" }, { name: "locale" }],
         },
-      ],
-    },
+      },
+    ],
   };
 
   it("reports how many of the declared keys are filled", () => {
@@ -2841,7 +2817,7 @@ describe("the fields count in a card header", () => {
   it("renders nothing at all for a fields node declaring no keys", () => {
     const empty = {
       ...pack,
-      ui: { sections: [{ kind: "fields", path: ["comm"], title: "Default style", fields: [] }] },
+      sections: [{ kind: "fields", path: ["comm"], title: "Default style", fields: [] }],
     };
     render(<SectionRenderer pack={empty} data={{}} onChange={vi.fn()} />);
     // Not "0 of 0", and not "Nothing yet" either: there is nothing to fill.
@@ -2862,12 +2838,10 @@ describe("the save tick", () => {
     title: "Ticked",
     description: "",
     entities: {},
-    ui: {
-      sections: [
-        { kind: "strings", path: ["a"], title: "First" },
-        { kind: "strings", path: ["b"], title: "Second" },
-      ],
-    },
+    sections: [
+      { kind: "strings", path: ["a"], title: "First" },
+      { kind: "strings", path: ["b"], title: "Second" },
+    ],
   };
 
   function TickHarness({ pack: p = pack, initial = { a: [], b: [] } }) {

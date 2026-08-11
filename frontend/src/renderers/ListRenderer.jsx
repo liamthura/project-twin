@@ -6,7 +6,7 @@
 //   - takes `node` instead of `uiSpec` + `listKey`
 //   - takes a pre-resolved `entity` spec object (or undefined)
 //   - delegates every field control to ScalarField via a `meta` built from
-//     `node` and `entity`
+//     `node` alone
 //
 // WHERE THE FIELDS COME FROM. Everything this file used to read off nine
 // parallel arrays on the node (`title_field`, `badges`, `detail_fields`,
@@ -19,9 +19,13 @@
 //
 // The pre-resolved `entity` is no longer consulted for anything this file
 // renders: v2 states a field's vocabulary and default on the field, so there is
-// no second copy on the entity to prefer or fall back to. It is still passed to
-// `buildFieldMeta`, whose pre-v2 branch is Task 10's to delete along with the
-// last node keys that feed it.
+// no second copy on the entity to prefer or fall back to. It used to be passed
+// on to `buildFieldMeta` for exactly that fallback; Task 10 deleted that pre-v2
+// branch (and the `entity` parameter along with it), so `buildFieldMeta` below
+// takes `node` alone now. `entity` itself stays a prop of this component --
+// renderNode still resolves and passes it, and `AddEntryDialog` still receives
+// it from here unread, both purely for the existing call shape; see
+// renderNode.threading.test.jsx.
 import { useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Trash2, ChevronDown, Star } from "lucide-react";
@@ -116,7 +120,7 @@ export default function ListRenderer({
   // key and adds nothing to the storage-keys reference.
   const [sortDir, setSortDir] = useState(null);
   const sortId = useId();
-  const meta = buildFieldMeta(node, entity);
+  const meta = buildFieldMeta(node);
   // Every position this node's fields occupy, in declaration order, from one
   // pass over `element.fields`. `blocks` and `pinned` are the two that are not
   // just names -- see elementShape.js.

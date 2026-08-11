@@ -76,7 +76,7 @@ export function controlCensus(pack) {
       // controls for and no `meta` to consult -- its one presentation choice
       // (chips or rows) is the node's `control`, not a field's.
       if (node.kind !== "strings") {
-        const meta = buildFieldMeta(node, pack.entities?.[node.element?.entity]);
+        const meta = buildFieldMeta(node);
         out[label] = Object.fromEntries(
           controlledFields(shape).map((f) => [f, controlFor(meta, f)])
         );

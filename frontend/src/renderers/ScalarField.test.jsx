@@ -39,10 +39,15 @@ describe("ScalarField", () => {
     expect(el.tagName).toBe("TEXTAREA");
   });
 
-  it("renders a Textarea for a field in long_text given as a plain array (the manifest/schema shape)", () => {
-    // meta_schema.json declares `long_text` as a JSON array, so a node built
-    // straight from a manifest (node.long_text) is array-shaped, not a Set.
-    // ScalarField must normalise rather than silently degrading to an Input.
+  it("renders a Textarea for a field given a plain-array long_text, not just a Set", () => {
+    // Was "the manifest/schema shape": meta_schema.json used to declare
+    // `long_text` as a JSON array read straight off a node, so a manifest-fed
+    // meta was array-shaped rather than a Set. Task 10 deleted that node key
+    // and the branch that read it -- `buildFieldMeta` only ever builds a Set
+    // now -- but `meta` is ScalarField's own public parameter, not something
+    // only `buildFieldMeta` may construct, so the normalisation (and this
+    // test of it) stays: a hand-built array must not silently degrade to an
+    // Input.
     render(
       <ScalarField
         field="notes"

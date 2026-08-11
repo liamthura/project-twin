@@ -4,52 +4,29 @@
 // precedence rules below live in one place rather than in two copies that
 // drift.
 //
-// Two paths, because two vintages of node describe a field's properties
-// differently.
+// One path: v2 states a field's vocabulary, default and placeholder once, on
+// the field itself, in `node.element.fields` -- and nowhere else, which was
+// the whole point of the format change. `fromDescriptors` below reads that one
+// place, and it is the branch every shipped node takes, and (as of Task 10)
+// the only one this file has.
 //
-// A descriptor-shaped node (`node.element.fields` present) has exactly ONE
-// source for everything below: the field's own descriptor. There is no entity to
-// fall back to and no node-level override to prefer, because v2 states a field's
-// vocabulary, default and placeholder once, on the field, and nowhere else --
-// the whole point of the format change was deleting the second copy.
-// `fromDescriptors` below reads that one place, and it is the branch every
-// shipped node takes.
-//
-// The other branch is for a hand-built v1 node, of which this file's own tests
-// construct many, and its precedence still needs documenting: a NODE-level key
-// wins over the entity's vocabulary, which is the whole reason ScalarField takes
-// a pre-resolved meta instead of an entity. Nothing in the manifests, in
-// `normalizeUi` or in any renderer produces such a node any more -- the shim
-// that did was deleted with the parallel arrays it rebuilt -- so this branch and
-// the node keys that feed it (`enum`, `long_text`, `optional`, `bool_fields`)
-// are Task 10's to remove.
+// Until Task 10 there was a second branch, for a hand-built v1 node that
+// carried the same information as flat arrays on the node itself
+// (`node.enum`, `node.long_text`, `node.optional`, `node.bool_fields`, ...),
+// with a node-level key winning over the entity's own vocabulary -- which was
+// the whole reason ScalarField took a pre-resolved `meta` instead of an
+// entity. Nothing in the manifests, in `normalizeUi` or in any renderer had
+// produced such a node since the v1-parity shim was deleted (a few commits
+// before this one), so the branch was dead: every shipped node already took
+// the descriptor path, and the `entity` argument that branch alone consulted
+// was never read by the other. Task 10 deleted it along with the node keys
+// that fed it. `buildFieldMeta` therefore no longer takes an `entity`
+// argument either -- there is nothing left inside it that would read one.
 import { SEGMENTED_MAX } from "@/components/controls";
-import { LONG_TEXT_FIELDS } from "./ScalarField";
 import { isBlockField } from "./elementShape";
 
-export function buildFieldMeta(node, entity) {
-  if (node.element?.fields) return fromDescriptors(node.element.fields);
-  return {
-    valid_values: node.enum ?? entity?.valid_values,
-    optional: node.optional ?? entity?.optional ?? [],
-    array_fields: node.array_fields || [],
-    // A node-declared long_text (schema: array of storage keys) takes
-    // precedence over the entity-agnostic default set, same as enum and
-    // field_defaults -- normalised to a Set once here so every caller and
-    // ScalarField's own (defensive) normalising agree on what "long text"
-    // means for this node.
-    long_text: node.long_text ? new Set(node.long_text) : LONG_TEXT_FIELDS,
-    // Opt-in per node rather than inferred from the field name: `period` on
-    // profile.education and `bedtime` on lifestyle.sleep read like dates and
-    // are not, so a name heuristic would turn free text into a lossy picker.
-    date_fields: node.date_fields ?? [],
-    time_fields: node.time_fields ?? [],
-    bool_fields: node.bool_fields ?? [],
-    // Per-field placeholder text. Node-only, with no entity fallback: a
-    // placeholder is a presentation choice about one binding, not part of the
-    // tool contract -- the same field on two nodes can want different hints.
-    field_placeholders: node.field_placeholders ?? {},
-  };
+export function buildFieldMeta(node) {
+  return fromDescriptors(node.element?.fields ?? []);
 }
 
 // One field descriptor can describe a control this node does not draw at all: a

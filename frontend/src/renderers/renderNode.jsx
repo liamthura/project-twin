@@ -10,9 +10,13 @@
 // carry the map around: a node names its entity inside its `element` (v1 put the
 // name on the node itself, which is why a `fields` node's on-screen description
 // and its entity's MCP-facing description collided on one key). Every renderer
-// below gets the resolved object or `undefined`, and none of them reads a
-// field's vocabulary or default from it any more -- see the note on
-// `buildFieldMeta`'s two branches in fieldMeta.js.
+// below gets the resolved object or `undefined`. Neither reads a field's
+// vocabulary or default from it any more -- `buildFieldMeta` (fieldMeta.js)
+// dropped its pre-v2 branch and its `entity` parameter in Task 10, since v2
+// states both on the field itself -- but the resolved object is still threaded
+// down to `ListRenderer` and `FieldsRenderer` as their own `entity` prop; see
+// renderNode.threading.test.jsx, which pins that as backwards compatibility
+// independent of what buildFieldMeta happens to do with it.
 //
 // A node with no valid `path` array logs loudly and renders nothing,
 // rather than silently falling back to an empty, unwritable list -- see the
