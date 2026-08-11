@@ -112,7 +112,7 @@
           }
         ]
       },
-      "$comment": "`primary` marks the one entry that IS the user's design language, as opposed to a style they merely like. It is the only entry that rides into the `minimal` scope, so an AI client gets the governing aesthetic at conversation start without the whole list. Rendered via `pinned` rather than as a field control -- a labelled switch in a detail grid is a poor way to say \"this one is THE one\" -- and kept to a single holder by the entity's `exclusive_fields`, which both the renderer and execute_modify honour."
+      "$comment": "`primary` marks the one entry that IS the user's design language, as opposed to a style they merely like. It is the only entry that rides into the `minimal` scope, so an AI client gets the governing aesthetic at conversation start without the whole list. Drawn by `show: [\"pin\"]` as the star that lifts its row above the list rather than as a field control -- a labelled switch in a detail grid is a poor way to say \"this one is THE one\" -- and kept to a single holder by `exclusive: true`, which the renderer honours directly and execute_modify honours through the `exclusive_fields` derived from it."
     }
   ]
 }

@@ -341,7 +341,7 @@
                 "identifier": "highlight",
                 "parent": "institution"
               },
-              "$comment": "Bare strings on both writers (server.py:2559 appends the string itself). item_control:\"input\" because these are sentence-like -- the retired editor gave each its own editable row, and chips would mean retyping a whole achievement to fix a typo."
+              "$comment": "Bare strings on both writers (server.py:2559 appends the string itself). `control: \"input\"` because these are sentence-like -- the retired editor gave each its own editable row, and chips would mean retyping a whole achievement to fix a typo."
             },
             {
               "name": "coursework",
@@ -498,7 +498,7 @@
                 "parent": "company",
                 "bulk": true
               },
-              "$comment": "Bare strings on the parent row, same shape as `highlights` (server.py work_skill branch). Left as CHIPS rather than item_control:\"input\": these are short, word-like values you add and drop but never revise, and chips show many at a glance -- the opposite of a highlight, which is a sentence where a typo means retyping the lot."
+              "$comment": "Bare strings on the parent row, same shape as `highlights` (server.py work_skill branch). Left as CHIPS rather than `control: \"input\"`: these are short, word-like values you add and drop but never revise, and chips show many at a glance -- the opposite of a highlight, which is a sentence where a typo means retyping the lot."
             },
             {
               "name": "highlights",
@@ -514,7 +514,7 @@
                 "identifier": "highlight",
                 "parent": "company"
               },
-              "$comment": "Bare strings on both writers (server.py:1541). item_control:\"input\" matches the retired editor, which gave each highlight its own editable row -- see the education node."
+              "$comment": "Bare strings on both writers (server.py:1541). `control: \"input\"` matches the retired editor, which gave each highlight its own editable row -- see the education node."
             }
           ]
         },
@@ -962,7 +962,7 @@
             }
           ]
         },
-        "$comment": "Two entities write into this ONE list, with different shapes. `domain` add (server.py) writes {id,name,level,notes,references} and never a date; the `knowledge` entity, whose `category` defaults to \"domains\", writes {name,level,notes,references,added_date} with NO id, and its update writes last_updated. So `domains` legitimately holds entries with and without added_date/last_updated, and id only appears because persona_store._assign_ids backfills it on the next save. Both shapes must round-trip untouched: added_date and last_updated are bound read-only via display_fields and NEVER as detail_fields, and nothing here rebuilds an item from a whitelist."
+        "$comment": "Two entities write into this ONE list, with different shapes. `domain` add (server.py) writes {id,name,level,notes,references} and never a date; the `knowledge` entity, whose `category` defaults to \"domains\", writes {name,level,notes,references,added_date} with NO id, and its update writes last_updated. So `domains` legitimately holds entries with and without added_date/last_updated, and id only appears because persona_store._assign_ids backfills it on the next save. Both shapes must round-trip untouched: added_date and last_updated are read-only -- `show: [\"row\"]` and NEVER `form`, so nothing draws a control over them -- and nothing here rebuilds an item from a whitelist."
       },
       {
         "kind": "list",
@@ -1064,7 +1064,7 @@
             }
           ]
         },
-        "$comment": "title_field is `title` and nothing else. FIELD_ALIASES[\"mental_tab\"] is [name, mental_tab, topic, title, subject] -- four MCP input spellings and one stored key -- and server.py writes only `title`. `topic` is the legacy key of the pair: still READ as a fallback in four places (add-dedupe, update lookup, remove lookup, and mental_tab_reference's parent lookup) and written by nothing since. It is deliberately absent from every binding below, because a control bound to it would write a key no renderer reads back. Old blobs carrying `topic` with no `title` are repaired on load by persona_store._normalize, which backfills `title` from `topic` without clobbering an existing one and without dropping `topic` -- see that function for why the repair belongs there and not here. A `topic` this node never names still survives every edit, because updateItem spreads the stored item rather than rebuilding it. `created_at` is machine-written (server.py on add, and the bespoke editor client-side); field_defaults keeps the client-side write alive under the generic renderer. It is deliberately NOT a display_field: the two write paths disagree (datetime.now().isoformat()+\"Z\" is local time labelled UTC, new Date().toISOString() is real UTC), so any rendering of it would be wrong by the local offset for whichever half of the entries came from the other path."
+        "$comment": "The field carrying `role: \"title\"` is `title` and nothing else. FIELD_ALIASES[\"mental_tab\"] is [name, mental_tab, topic, title, subject] -- four MCP input spellings and one stored key -- and server.py writes only `title`. `topic` is the legacy key of the pair: still READ as a fallback in four places (add-dedupe, update lookup, remove lookup, and mental_tab_reference's parent lookup) and written by nothing since. It is deliberately absent from every binding below, because a control bound to it would write a key no renderer reads back. Old blobs carrying `topic` with no `title` are repaired on load by persona_store._normalize, which backfills `title` from `topic` without clobbering an existing one and without dropping `topic` -- see that function for why the repair belongs there and not here. A `topic` this node never names still survives every edit, because updateItem spreads the stored item rather than rebuilding it. `created_at` is machine-written (server.py on add, and the bespoke editor client-side); its `default` of `@now` keeps the client-side write alive under the generic renderer. Its `show` is deliberately empty: the two write paths disagree (datetime.now().isoformat()+\"Z\" is local time labelled UTC, new Date().toISOString() is real UTC), so any rendering of it would be wrong by the local offset for whichever half of the entries came from the other path."
       }
     ]
   },
@@ -1952,7 +1952,7 @@
             }
           ]
         },
-        "$comment": "`status` binds the full three-value enum the entity declares. Until 2026-07-29 execute_modify collapsed \"paused\" to \"inactive\" on write, so a user's \"paused\" survived only until the next AI edit; see docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md 1.1.1. `references` is a child list whose rows store `name`, NOT the `ref_name` the entity declares as its identifier -- server.py:2133."
+        "$comment": "`status` declares the full three-value enum itself; the contract's `valid_values` is derived from that, not the other way round. Until 2026-07-29 execute_modify collapsed \"paused\" to \"inactive\" on write, so a user's \"paused\" survived only until the next AI edit; see docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md 1.1.1. `references` is a child list whose rows store `name`, NOT the `ref_name` the entity declares as its identifier -- server.py:2133."
       },
       {
         "kind": "list",
@@ -2429,7 +2429,7 @@
             }
           ]
         },
-        "$comment": "`primary` marks the one entry that IS the user's design language, as opposed to a style they merely like. It is the only entry that rides into the `minimal` scope, so an AI client gets the governing aesthetic at conversation start without the whole list. Rendered via `pinned` rather than as a field control -- a labelled switch in a detail grid is a poor way to say \"this one is THE one\" -- and kept to a single holder by the entity's `exclusive_fields`, which both the renderer and execute_modify honour."
+        "$comment": "`primary` marks the one entry that IS the user's design language, as opposed to a style they merely like. It is the only entry that rides into the `minimal` scope, so an AI client gets the governing aesthetic at conversation start without the whole list. Drawn by `show: [\"pin\"]` as the star that lifts its row above the list rather than as a field control -- a labelled switch in a detail grid is a poor way to say \"this one is THE one\" -- and kept to a single holder by `exclusive: true`, which the renderer honours directly and execute_modify honours through the `exclusive_fields` derived from it."
       }
     ]
   },
@@ -2585,7 +2585,7 @@
               "label": "Key Decisions",
               "placeholder": "e.g. Chose Postgres over SQLite for the vector index",
               "control": "input",
-              "$comment": "Bare strings on the parent row (server.py learning entry update). item_control:\"input\" for the same reason profile's work `highlights` uses it: these are SENTENCES, and a chip control makes fixing a typo mean deleting and retyping the whole line. They were chips until wave 12."
+              "$comment": "Bare strings on the parent row (server.py learning entry update). `control: \"input\"` for the same reason profile's work `highlights` uses it: these are SENTENCES, and a chip control makes fixing a typo mean deleting and retyping the whole line. They were chips until wave 12."
             },
             {
               "name": "followup_items",

@@ -204,7 +204,7 @@
               "identifier": "highlight",
               "parent": "institution"
             },
-            "$comment": "Bare strings on both writers (server.py:2559 appends the string itself). item_control:\"input\" because these are sentence-like -- the retired editor gave each its own editable row, and chips would mean retyping a whole achievement to fix a typo."
+            "$comment": "Bare strings on both writers (server.py:2559 appends the string itself). `control: \"input\"` because these are sentence-like -- the retired editor gave each its own editable row, and chips would mean retyping a whole achievement to fix a typo."
           },
           {
             "name": "coursework",
@@ -361,7 +361,7 @@
               "parent": "company",
               "bulk": true
             },
-            "$comment": "Bare strings on the parent row, same shape as `highlights` (server.py work_skill branch). Left as CHIPS rather than item_control:\"input\": these are short, word-like values you add and drop but never revise, and chips show many at a glance -- the opposite of a highlight, which is a sentence where a typo means retyping the lot."
+            "$comment": "Bare strings on the parent row, same shape as `highlights` (server.py work_skill branch). Left as CHIPS rather than `control: \"input\"`: these are short, word-like values you add and drop but never revise, and chips show many at a glance -- the opposite of a highlight, which is a sentence where a typo means retyping the lot."
           },
           {
             "name": "highlights",
@@ -377,7 +377,7 @@
               "identifier": "highlight",
               "parent": "company"
             },
-            "$comment": "Bare strings on both writers (server.py:1541). item_control:\"input\" matches the retired editor, which gave each highlight its own editable row -- see the education node."
+            "$comment": "Bare strings on both writers (server.py:1541). `control: \"input\"` matches the retired editor, which gave each highlight its own editable row -- see the education node."
           }
         ]
       },

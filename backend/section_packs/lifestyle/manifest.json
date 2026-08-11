@@ -161,7 +161,7 @@
           }
         ]
       },
-      "$comment": "`status` binds the full three-value enum the entity declares. Until 2026-07-29 execute_modify collapsed \"paused\" to \"inactive\" on write, so a user's \"paused\" survived only until the next AI edit; see docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md 1.1.1. `references` is a child list whose rows store `name`, NOT the `ref_name` the entity declares as its identifier -- server.py:2133."
+      "$comment": "`status` declares the full three-value enum itself; the contract's `valid_values` is derived from that, not the other way round. Until 2026-07-29 execute_modify collapsed \"paused\" to \"inactive\" on write, so a user's \"paused\" survived only until the next AI edit; see docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md 1.1.1. `references` is a child list whose rows store `name`, NOT the `ref_name` the entity declares as its identifier -- server.py:2133."
     },
     {
       "kind": "list",

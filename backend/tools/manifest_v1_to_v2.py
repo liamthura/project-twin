@@ -172,12 +172,145 @@ def _stored_identifier(node: dict, entity: dict) -> str:
 def _carry_comment(out: dict, node: dict, entities: dict, entity_name: str | None) -> None:
     """v1 put authoring notes on the node AND on the entity. v2 has one place per
     node, so the two are joined -- nothing is dropped, and `item` has no `$comment`
-    of its own precisely so there is only ever one place to look."""
+    of its own precisely so there is only ever one place to look. The prose itself
+    goes through `_translate_comment`, because the v1 notes name v1 keys."""
     parts = [node["$comment"]] if "$comment" in node else []
     if entity_name and "$comment" in entities.get(entity_name, {}):
         parts.append(f"On the entity: {entities[entity_name]['$comment']}")
     if parts:
-        out["$comment"] = " ".join(parts)
+        out["$comment"] = _translate_comment(" ".join(parts))
+
+
+# --- authoring notes ------------------------------------------------------
+
+# The prose used to come across verbatim -- `_carry_comment` above and the
+# field-level copy at the end of `_descriptor` both handed the string through
+# untouched -- so nine shipped notes went on describing the format in v1 key
+# names. `$comment` is the only prose a pack author reads inside the file they
+# are copying from, and a note saying a field is "bound read-only via
+# display_fields" sends them looking for a key `meta_schema.json` does not
+# accept. Same defect as the four rules c9d7b6b fixed: the format's own
+# documentation describing something the code does not have.
+#
+# Each entry is keyed on the EXACT v1 snippet, never on a vocabulary word,
+# because one note names a dead key CORRECTLY -- preferences' `stance` comment
+# says it "was declared here via fields_outside_entity ... so that declaration is
+# gone", which is true past tense and the whole point of the sentence. A
+# substitution applied to the vocabulary rather than to the text would rewrite it
+# into nonsense.
+#
+# The third element is how many times the snippet occurs in the whole v1 corpus.
+# `_check_translations` asserts every count before a run writes anything: an
+# entry that quietly stops matching leaves a v1 key name in a shipped manifest,
+# which is the same failure mode as a gate that passes because it asserts
+# nothing.
+_COMMENT_TRANSLATIONS = (
+    # aesthetics/Styles. v1 drew the pinned slot from a node-level `pinned` map;
+    # v2 puts it on the field, as a `pin` object plus the `pin` show position.
+    # The second half moves for the same reason: the renderer reads the FIELD's
+    # `exclusive` (elementShape.js:149) and only execute_modify (server.py:2508)
+    # reads the `exclusive_fields` derived from it, so naming the derived key as
+    # the thing both honour points an author at the wrong end of the derivation.
+    (
+        'Rendered via `pinned` rather than as a field control -- a labelled switch in a '
+        'detail grid is a poor way to say "this one is THE one" -- and kept to a single '
+        "holder by the entity's `exclusive_fields`, which both the renderer and "
+        "execute_modify honour.",
+        'Drawn by `show: ["pin"]` as the star that lifts its row above the list rather '
+        'than as a field control -- a labelled switch in a detail grid is a poor way to say "this '
+        'one is THE one" -- and kept to a single holder by `exclusive: true`, which the '
+        "renderer honours directly and execute_modify honours through the "
+        "`exclusive_fields` derived from it.",
+        1,
+    ),
+    # knowledge/Skills & Domains. v1's two arrays for one fact become one `show`.
+    (
+        "added_date and last_updated are bound read-only via display_fields and NEVER as "
+        "detail_fields, and nothing here rebuilds an item from a whitelist.",
+        'added_date and last_updated are read-only -- `show: ["row"]` and NEVER `form`, so '
+        "nothing draws a control over them -- and nothing here rebuilds an item from a "
+        "whitelist.",
+        1,
+    ),
+    # knowledge/Mental Tabs, three separate v1 keys in one long note.
+    (
+        "title_field is `title` and nothing else.",
+        'The field carrying `role: "title"` is `title` and nothing else.',
+        1,
+    ),
+    (
+        "field_defaults keeps the client-side write alive under the generic renderer",
+        "its `default` of `@now` keeps the client-side write alive under the generic renderer",
+        1,
+    ),
+    (
+        "It is deliberately NOT a display_field:",
+        "Its `show` is deliberately empty:",
+        1,
+    ),
+    # The four sentence-vs-chip notes on string arrays. A rename only, per the
+    # Task 2 finding: v1's `item_control` default was "tag", v2's `control`
+    # default is "chips", and all five shipped uses are "input".
+    (
+        'item_control:"input"',
+        '`control: "input"`',
+        4,
+    ),
+    # lifestyle/Hobbies. "enum" stays -- it is the field's `type`. What was
+    # backwards is the direction: v1 bound a node's field to a vocabulary the
+    # entity block authored, v2 derives the entity from the field.
+    (
+        "`status` binds the full three-value enum the entity declares.",
+        "`status` declares the full three-value enum itself; the contract's `valid_values` "
+        "is derived from that, not the other way round.",
+        1,
+    ),
+)
+
+
+def _translate_comment(text: str) -> str:
+    for old, new, _ in _COMMENT_TRANSLATIONS:
+        text = text.replace(old, new)
+    return text
+
+
+def _comments(node) -> list:
+    """Every `$comment` string anywhere in a manifest, node-level and field-level."""
+    found = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "$comment" and isinstance(value, str):
+                found.append(value)
+            else:
+                found += _comments(value)
+    elif isinstance(node, list):
+        for value in node:
+            found += _comments(value)
+    return found
+
+
+def _check_translations(corpus: dict) -> None:
+    """Every entry matches its snippet as many times as it was written for."""
+    counts = dict.fromkeys((old for old, _, _ in _COMMENT_TRANSLATIONS), 0)
+    for manifest in corpus.values():
+        for comment in _comments(manifest):
+            for old in counts:
+                counts[old] += comment.count(old)
+    wrong = [
+        (old, counts[old], want) for old, _, want in _COMMENT_TRANSLATIONS if counts[old] != want
+    ]
+    if wrong:
+        detail = "\n".join(
+            f"  found {got}x, expected {want}x: {old!r}" for old, got, want in wrong
+        )
+        raise ValueError(
+            "_COMMENT_TRANSLATIONS no longer agrees with the v1 corpus:\n"
+            f"{detail}\n"
+            "An entry that matches nothing translates nothing, and the shipped manifest "
+            "keeps a v1 key name in the one piece of prose a pack author copies from. "
+            "Re-read the comment in tests/fixtures/manifests_v1.json and fix the entry, "
+            "or delete it if the prose it translated is gone."
+        )
 
 
 # --- the field list -------------------------------------------------------
@@ -445,7 +578,7 @@ def _descriptor(
             field["element"] = writer
 
     if "$comment" in (child or {}):
-        field["$comment"] = child["$comment"]
+        field["$comment"] = _translate_comment(child["$comment"])
     return field
 
 
@@ -758,8 +891,12 @@ _NOT_GENERATED = {"_template"}
 
 def _main(argv: list) -> int:
     check = "--check" in argv
+    corpus = v1_manifests()
+    # Before anything is written, and on `--check` too: a translation entry that
+    # has stopped matching must stop the run rather than be a no-op nobody sees.
+    _check_translations(corpus)
     changed = []
-    for name, v1 in sorted(v1_manifests().items()):
+    for name, v1 in sorted(corpus.items()):
         if name in _NOT_GENERATED:
             continue
         path = pack_loader.PACKS_DIR / name / "manifest.json"

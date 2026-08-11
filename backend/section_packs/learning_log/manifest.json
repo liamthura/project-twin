@@ -70,7 +70,7 @@
             "label": "Key Decisions",
             "placeholder": "e.g. Chose Postgres over SQLite for the vector index",
             "control": "input",
-            "$comment": "Bare strings on the parent row (server.py learning entry update). item_control:\"input\" for the same reason profile's work `highlights` uses it: these are SENTENCES, and a chip control makes fixing a typo mean deleting and retyping the whole line. They were chips until wave 12."
+            "$comment": "Bare strings on the parent row (server.py learning entry update). `control: \"input\"` for the same reason profile's work `highlights` uses it: these are SENTENCES, and a chip control makes fixing a typo mean deleting and retyping the whole line. They were chips until wave 12."
           },
           {
             "name": "followup_items",
