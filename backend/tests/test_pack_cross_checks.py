@@ -9,7 +9,7 @@ both. v2 puts them in one declaration, which is what makes these checkable.
 
 Three rules from the spec's list of eleven are NOT here:
 
-- Rules 4 and 5 (`values` iff `type: "enum"`, `item` iff `type: "list"`) turned
+- Rules 4 and 5 (`values` iff `type: "enum"`, `element` on `type: "list"`) turned
   out to be statable structurally and are enforced by meta_schema.v2.json, tested
   in test_manifest_v2_schema.py. So is "pin only on a bool field", half of rule 7.
   They are not duplicated here; two tests for one rule is two things to update.
@@ -40,7 +40,7 @@ BASE = {
             "kind": "list",
             "path": ["goals"],
             "title": "Goals",
-            "item": {
+            "element": {
                 "entity": "goal",
                 "identifier": "title",
                 "fields": [
@@ -101,7 +101,7 @@ def test_the_baseline_manifest_is_valid():
 
 def test_identifier_naming_no_declared_field_is_rejected():
     node = _node()
-    node["item"]["identifier"] = "name"  # the field is called `title`
+    node["element"]["identifier"] = "name"  # the field is called `title`
     _rejects(_with_sections(node), "name")
 
 
@@ -114,14 +114,14 @@ def test_identifier_naming_a_declared_field_is_accepted():
 
 def test_two_title_roles_in_one_item_is_rejected():
     node = _node()
-    node["item"]["fields"][1]["role"] = "title"
+    node["element"]["fields"][1]["role"] = "title"
     _rejects(_with_sections(node), "role")
 
 
 def test_list_item_without_a_title_role_is_rejected():
     # A list row with nothing marked as its name renders a row with no heading.
     node = _node()
-    del node["item"]["fields"][0]["role"]
+    del node["element"]["fields"][0]["role"]
     _rejects(_with_sections(node), "role")
 
 
@@ -129,7 +129,7 @@ def test_fields_node_needs_no_title_role():
     # A `fields` node is one record, not a row in a list: there is no collapsed
     # row for a title to name. Only a list item must have one.
     manifest = _without_the_goals_list(
-        {"kind": "fields", "path": [], "entity": "basic_info", "fields": [{"name": "name"}]}
+        {"kind": "fields", "path": [], "element": {"entity": "basic_info", "fields": [{"name": "name"}]}}
     )
     _accepts(manifest)
 
@@ -139,11 +139,13 @@ def test_two_title_roles_in_a_fields_node_is_still_rejected():
         {
             "kind": "fields",
             "path": [],
-            "entity": "basic_info",
-            "fields": [
-                {"name": "name", "role": "title"},
-                {"name": "preferred_name", "role": "title"},
-            ],
+            "element": {
+                "entity": "basic_info",
+                "fields": [
+                    {"name": "name", "role": "title"},
+                    {"name": "preferred_name", "role": "title"},
+                ],
+            },
         }
     )
     _rejects(manifest, "role")
@@ -183,7 +185,7 @@ def test_sort_field_naming_a_declared_field_is_accepted():
     # which the entity vocabulary does not carry -- so it must be DECLARED in v2,
     # not merely stored. That is the whole point of `name` being the authority.
     node = _node()
-    node["item"]["fields"].append({"name": "timestamp", "show": ["row"], "format": "datetime"})
+    node["element"]["fields"].append({"name": "timestamp", "show": ["row"], "format": "datetime"})
     node["sort"] = {"field": "timestamp", "dir": "desc"}
     _accepts(_with_sections(node))
 
@@ -193,7 +195,7 @@ def test_sort_field_naming_a_declared_field_is_accepted():
 
 def test_two_fields_sharing_a_name_is_rejected():
     node = _node()
-    node["item"]["fields"].append({"name": "status", "type": "bool"})
+    node["element"]["fields"].append({"name": "status", "type": "bool"})
     _rejects(_with_sections(node), "status")
 
 
@@ -201,13 +203,13 @@ def test_alias_colliding_with_another_fields_name_is_rejected():
     # The trap this catches: `status`'s alias claims `title`'s stored key, so an
     # MCP write to one silently lands on the other.
     node = _node()
-    node["item"]["fields"][1]["alias"] = ["state", "title"]
+    node["element"]["fields"][1]["alias"] = ["state", "title"]
     _rejects(_with_sections(node), "title")
 
 
 def test_alias_colliding_with_its_own_name_is_rejected():
     node = _node()
-    node["item"]["fields"][1]["alias"] = ["status"]
+    node["element"]["fields"][1]["alias"] = ["status"]
     _rejects(_with_sections(node), "status")
 
 
@@ -216,8 +218,8 @@ def test_two_fields_sharing_an_alias_is_rejected():
     # if it fired here the test would pass while proving nothing about collisions
     # BETWEEN fields.
     node = _node()
-    node["item"]["fields"][0]["alias"] = ["goal_title", "label"]
-    node["item"]["fields"][1]["alias"] = ["state", "label"]
+    node["element"]["fields"][0]["alias"] = ["goal_title", "label"]
+    node["element"]["fields"][1]["alias"] = ["state", "label"]
     _rejects(_with_sections(node), "label")
 
 
@@ -225,11 +227,11 @@ def test_the_same_name_in_two_different_items_is_accepted():
     # `name` is scoped to its item. profile's coursework and clubs both declare
     # one, and they are different stored keys on different rows.
     node = _node()
-    node["item"]["fields"].append(
+    node["element"]["fields"].append(
         {
             "name": "coursework",
             "type": "list",
-            "item": {
+            "element": {
                 "entity": "coursework",
                 "identifier": "title",
                 "fields": [{"name": "title", "role": "title"}],
@@ -243,11 +245,11 @@ def test_a_nested_items_own_duplicate_is_still_rejected():
     # The walk must descend into a `type: "list"` field's item, or every nested
     # list is unchecked -- which is most of profile.
     node = _node()
-    node["item"]["fields"].append(
+    node["element"]["fields"].append(
         {
             "name": "coursework",
             "type": "list",
-            "item": {
+            "element": {
                 "entity": "coursework",
                 "identifier": "title",
                 "fields": [
@@ -266,14 +268,14 @@ def test_a_nested_items_own_duplicate_is_still_rejected():
 def test_two_pinned_fields_in_one_item_is_rejected():
     node = _node()
     pin = {"title": "Your pick", "empty": "None yet", "noun": "primary"}
-    node["item"]["fields"].append({"name": "primary", "type": "bool", "pin": dict(pin)})
-    node["item"]["fields"].append({"name": "secondary", "type": "bool", "pin": dict(pin)})
+    node["element"]["fields"].append({"name": "primary", "type": "bool", "pin": dict(pin)})
+    node["element"]["fields"].append({"name": "secondary", "type": "bool", "pin": dict(pin)})
     _rejects(_with_sections(node), "pin")
 
 
 def test_one_pinned_field_is_accepted():
     node = _node()
-    node["item"]["fields"].append(
+    node["element"]["fields"].append(
         {
             "name": "primary",
             "type": "bool",
@@ -300,8 +302,7 @@ def test_two_nodes_declaring_the_same_entity_identically_is_accepted():
         "kind": "fields",
         "path": ["wellness", "sleep", "weekday"],
         "title": "Sleep — weekdays",
-        "entity": "sleep",
-        "fields": [{"name": "bedtime"}, {"name": "wake_time"}],
+        "element": {"entity": "sleep", "fields": [{"name": "bedtime"}, {"name": "wake_time"}]},
     }
     weekend = copy.deepcopy(weekday)
     weekend["path"] = ["wellness", "sleep", "weekend"]
@@ -314,24 +315,23 @@ def test_two_nodes_declaring_the_same_entity_differently_is_rejected():
         "kind": "fields",
         "path": ["wellness", "sleep", "weekday"],
         "title": "Sleep — weekdays",
-        "entity": "sleep",
-        "fields": [{"name": "bedtime"}, {"name": "wake_time"}],
+        "element": {"entity": "sleep", "fields": [{"name": "bedtime"}, {"name": "wake_time"}]},
     }
     weekend = copy.deepcopy(weekday)
     weekend["path"] = ["wellness", "sleep", "weekend"]
-    weekend["fields"] = [{"name": "bedtime"}, {"name": "rise_time"}]
+    weekend["element"]["fields"] = [{"name": "bedtime"}, {"name": "rise_time"}]
     _rejects(_without_the_goals_list(weekday, weekend), "sleep")
 
 
 def test_a_variant_colliding_with_a_real_entity_is_rejected():
     node = _node()
-    node["item"]["variants"] = [{"entity": "goal", "description": "The same name."}]
+    node["element"]["variants"] = [{"entity": "goal", "description": "The same name."}]
     _rejects(_with_sections(node), "goal")
 
 
 def test_two_variants_sharing_a_name_is_rejected():
     node = _node()
-    node["item"]["variants"] = [
+    node["element"]["variants"] = [
         {"entity": "aspiration", "description": "One."},
         {"entity": "aspiration", "description": "Two."},
     ]
@@ -340,7 +340,7 @@ def test_two_variants_sharing_a_name_is_rejected():
 
 def test_a_distinct_variant_is_accepted():
     node = _node()
-    node["item"]["variants"] = [{"entity": "aspiration", "description": "A softer goal."}]
+    node["element"]["variants"] = [{"entity": "aspiration", "description": "A softer goal."}]
     _accepts(_with_sections(node))
 
 
@@ -358,7 +358,7 @@ def test_id_list_naming_no_list_node_is_rejected():
 
 def test_id_list_naming_a_fields_node_is_rejected():
     manifest = _with_sections(
-        {"kind": "fields", "path": ["goals"], "entity": "goal", "fields": [{"name": "title"}]}
+        {"kind": "fields", "path": ["goals"], "element": {"entity": "goal", "fields": [{"name": "title"}]}}
     )
     _rejects(manifest, "goals")
 
@@ -397,7 +397,7 @@ def test_scope_contribution_may_name_a_scalar_field_not_a_node():
     manifest = copy.deepcopy(BASE)
     manifest["defaults"]["bio"] = ""
     manifest["sections"].append(
-        {"kind": "fields", "path": [], "entity": "basic_info", "fields": [{"name": "bio"}]}
+        {"kind": "fields", "path": [], "element": {"entity": "basic_info", "fields": [{"name": "bio"}]}}
     )
     manifest["scope_contributions"] = {"minimal": ["bio"]}
     _accepts(manifest)

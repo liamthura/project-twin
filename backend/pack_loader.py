@@ -89,7 +89,7 @@ def validate_manifest_v2(manifest: dict) -> None:
     a semantic one -- a cross-check reading a malformed node reports a confusing
     consequence of the real mistake. Two rules the spec listed as cross-checks
     turned out to be statable structurally and live in the schema instead:
-    `values` iff `type: "enum"`, and `item` iff `type: "list"`.
+    `values` iff `type: "enum"`, and `element` on the two array types.
     """
     error = best_match(_validator_v2().iter_errors(manifest))
     # Same reason as validate_manifest: best_match descends into the branch's own
@@ -122,28 +122,29 @@ _DERIVED_FIELD_KEYS = (
     "exclusive",
     "allow_custom",
     "write_only",
-    "item",
+    "element",
 )
 
 
-def _derivation_signature(item: dict) -> str:
-    """A canonical form of everything `build_entity_schema` reads from an item."""
+def _derivation_signature(element: dict) -> str:
+    """A canonical form of everything `build_entity_schema` reads from an `element`."""
 
     def field_sig(field: dict) -> dict:
         out = {}
         for key in _DERIVED_FIELD_KEYS:
             if key not in field:
                 continue
-            out[key] = _derivation_signature(field[key]) if key == "item" else field[key]
+            out[key] = _derivation_signature(field[key]) if key == "element" else field[key]
         return out
 
     return json.dumps(
         {
-            "identifier": item.get("identifier"),
-            "actions": item.get("actions"),
-            "description": item.get("description"),
-            "variants": item.get("variants"),
-            "fields": [field_sig(f) for f in item.get("fields", [])],
+            "identifier": element.get("identifier"),
+            "actions": element.get("actions"),
+            "description": element.get("description"),
+            "variants": element.get("variants"),
+            "bulk": element.get("bulk"),
+            "fields": [field_sig(f) for f in element.get("fields", [])],
         },
         sort_keys=True,
     )
@@ -190,8 +191,17 @@ def _cross_check(manifest: dict) -> None:
                 f"which node was read last",
             )
 
-    def check_item(item: dict, where: str, *, is_list_row: bool) -> None:
-        fields = item["fields"]
+    def check_strings_element(element: dict, where: str) -> None:
+        """A string array's writer. No fields, so most of the rules do not apply.
+
+        `identifier` is the parameter name for one string, not a field name, so
+        rule 1 has nothing to check it against -- there are no fields. All this
+        can do is claim the entity name.
+        """
+        claim_entity(element["entity"], _derivation_signature(element), where)
+
+    def check_element(element: dict, where: str, *, is_list_row: bool) -> None:
+        fields = element["fields"]
 
         # Rule 6, first half: one stored key per field.
         names: dict[str, dict] = {}
@@ -210,7 +220,7 @@ def _cross_check(manifest: dict) -> None:
                     fail(
                         where,
                         f"field '{field['name']}' declares the alias '{alias}', which "
-                        f"is already the stored name of another field in this item",
+                        f"is already the stored name of another field in this element",
                     )
                 if alias in claimed_aliases:
                     fail(
@@ -229,7 +239,7 @@ def _cross_check(manifest: dict) -> None:
             fail(where, "no field carries role 'title', so a row would have no name")
 
         # Rule 1.
-        identifier = item.get("identifier")
+        identifier = element.get("identifier")
         if identifier is not None and identifier not in names:
             fail(where, f"identifier '{identifier}' names no declared field")
 
@@ -239,15 +249,21 @@ def _cross_check(manifest: dict) -> None:
             fail(where, f"fields {pinned} all declare `pin`; at most one may")
 
         # Rule 8.
-        claim_entity(item["entity"], _derivation_signature(item), where)
-        for variant in item.get("variants", []):
+        claim_entity(element["entity"], _derivation_signature(element), where)
+        for variant in element.get("variants", []):
             claim_entity(variant["entity"], None, f"{where} (variant)")
 
-        # Descend into nested lists, or every nested list is unchecked -- which is
-        # most of profile.
+        # Descend into nested arrays, or every nested list is unchecked -- which is
+        # most of profile. A `strings` field's `element` has no fields, so it takes the
+        # other branch: all that can be checked there is the entity name.
         for field in fields:
-            if "item" in field:
-                check_item(field["item"], f"{where} > {field['name']}", is_list_row=True)
+            element = field.get("element")
+            if element is None:
+                continue
+            if field.get("type") == "strings":
+                check_strings_element(element, f"{where} > {field['name']}")
+            else:
+                check_element(element, f"{where} > {field['name']}", is_list_row=True)
 
         return names
 
@@ -261,14 +277,16 @@ def _cross_check(manifest: dict) -> None:
                 visit(node["sections"], f"{where} > ")
                 continue
             if kind == "strings":
+                if "element" in node:
+                    check_strings_element(node["element"], where)
                 continue
             if kind == "fields":
-                check_item(node, where, is_list_row=False)
+                check_element(node["element"], where, is_list_row=False)
                 continue
             # list
             if len(node["path"]) == 1:
                 top_level_lists.add(node["path"][0])
-            names = check_item(node["item"], where, is_list_row=True)
+            names = check_element(node["element"], where, is_list_row=True)
             # Rule 3. `facets` needs a closed vocabulary to build its chips from,
             # which is what makes the enum requirement more than pedantry.
             for facet in node.get("facets", []):
@@ -417,3 +435,164 @@ def build_entity_schema(packs: dict[str, dict]) -> dict[str, dict]:
         }
         for key, m in packs.items()
     }
+
+
+def derive_entities(manifest: dict) -> dict:
+    """The entity schema of one v2 manifest: {entity_name: spec}, MCP's contract.
+
+    This is the function that replaces the authored `entities` block. It is the
+    whole point of format v2 -- a field's name, type, vocabulary, default and
+    requiredness are declared once, and the contract MCP clients see is computed
+    from that rather than maintained beside it. `tests/test_converter.py` asserts
+    per pack that what it computes equals the schema authored today, entity for
+    entity and key for key.
+
+    It stays a pure function of the manifest so that assertion is meaningful: no
+    file reads, no imports of sections.py or server.py, nothing cached.
+
+    The one wart, `list`, is copied rather than derived, and the `$comment` on
+    `listElement.list` in meta_schema.v2.json says why. `mcp_entities` is merged in
+    verbatim; only two entities in the shipped packs need it.
+    """
+    out: dict[str, dict] = {}
+
+    def spelling(field: dict) -> str:
+        """A field's name AS MCP SEES IT: alias[0] if it declares one, else the
+        stored name. `course` reaches clients while `name` is what is written."""
+        alias = field.get("alias")
+        return alias[0] if alias else field["name"]
+
+    def add(name: str, spec: dict, where: str) -> None:
+        if name in out:
+            # Rule 8 permits a repeat only when both derive the same entity, and
+            # _cross_check has already proved that -- so this is a no-op, not a
+            # conflict. Asserting it here would duplicate the rule; silently
+            # overwriting would hide a bug if the rule were ever relaxed.
+            if out[name] != spec:
+                raise PackError(
+                    f"{manifest['key']}: {where}: entity '{name}' derives two different "
+                    f"specs; _cross_check should have rejected this manifest"
+                )
+            return
+        out[name] = spec
+
+    def derive_element(element: dict, *, parent_identifier: str | None, where: str) -> None:
+        # `ui_only` fields are excluded outright: they render and are stored, but
+        # no client may set them, so they belong to no vocabulary. See the
+        # `$comment` on `ui_only` in meta_schema.v2.json.
+        fields = [f for f in element["fields"] if not f.get("ui_only")]
+        parent_spelling = element.get("parent", parent_identifier)
+        required = [parent_spelling] if parent_identifier else []
+        required += [spelling(f) for f in fields if f.get("required")]
+        optional = [spelling(f) for f in fields if not f.get("required")]
+
+        valid_values = {}
+        field_defaults = {}
+        exclusive = []
+        for field in fields:
+            off = field.get("off_contract", ())
+            if field.get("type") == "enum" and "values" not in off:
+                valid_values[field["name"]] = list(field["values"])
+                if field.get("allow_custom"):
+                    # Replaces the `custom_` naming convention, which ScalarField
+                    # matched on a magic prefix that nothing declared.
+                    optional.append(f"custom_{field['name']}")
+            if "default" in field and "default" not in off:
+                field_defaults[field["name"]] = field["default"]
+            if field.get("exclusive"):
+                exclusive.append(field["name"])
+
+        # `element.identifier` names a STORED field; the contract reports it under
+        # that field's MCP spelling. domain_reference stores `name` and clients say
+        # `ref_name`, so the two must not be conflated in either direction.
+        by_name = {f["name"]: f for f in element["fields"]}
+        identifier = element.get("identifier")
+        if identifier in by_name:
+            identifier = spelling(by_name[identifier])
+        spec = {
+            "actions": list(element.get("actions", ["add", "update", "remove"])),
+            "required": required,
+            "optional": optional,
+            "identifier": identifier,
+        }
+        if parent_identifier:
+            spec["parent"] = element.get("parent", parent_identifier)
+        if "description" in element:
+            spec["description"] = element["description"]
+        if valid_values:
+            spec["valid_values"] = valid_values
+        if field_defaults:
+            spec["field_defaults"] = field_defaults
+        if exclusive:
+            spec["exclusive_fields"] = exclusive
+        if "list" in element:
+            spec["list"] = element["list"]
+
+        add(element["entity"], spec, where)
+        for variant in element.get("variants", []):
+            # A variant is the same contract under another name, differing in its
+            # client-facing description only.
+            copy = dict(spec)
+            if "description" in variant:
+                copy["description"] = variant["description"]
+            add(variant["entity"], copy, f"{where} (variant)")
+
+        # A nested array's own writer. Its parent is THIS element's identifier.
+        for field in fields:
+            nested = field.get("element")
+            if nested is None:
+                continue
+            sub = f"{where} > {field['name']}"
+            if field.get("type") == "strings":
+                derive_strings(nested, field["name"], element["identifier"], sub)
+            else:
+                derive_element(nested, parent_identifier=element["identifier"], where=sub)
+
+    def derive_strings(
+        element: dict, array_name: str, parent_identifier: str | None, where: str
+    ) -> None:
+        """One entity for an array of bare strings. `required` is the parent's
+        identifier plus the singular parameter; `bulk` adds the array's own name,
+        which is the plural form a client may send instead of one string."""
+        parent_spelling = element.get("parent", parent_identifier)
+        required = [parent_spelling] if parent_identifier else []
+        required.append(element["identifier"])
+        spec = {
+            "actions": list(element.get("actions", ["add", "remove"])),
+            "required": required,
+            "optional": [array_name] if element.get("bulk") else [],
+            "identifier": element["identifier"],
+        }
+        if parent_identifier:
+            spec["parent"] = parent_spelling
+        if "description" in element:
+            spec["description"] = element["description"]
+        add(element["entity"], spec, where)
+
+    def visit(nodes: list, trail: str) -> None:
+        for node in nodes:
+            where = f"{trail}{node.get('title') or '.'.join(node.get('path') or [])}"
+            kind = node["kind"]
+            if kind == "group":
+                visit(node["sections"], f"{where} > ")
+            elif kind == "strings":
+                if "element" in node:
+                    derive_strings(node["element"], node["path"][-1], None, where)
+            elif kind == "fields":
+                # A singleton object is updated in place, never added to, and it is
+                # not one of many -- so it usually has no identifier at all:
+                # basic_info and communication_default both derive `null`.
+                # lifestyle's sleep pair is the exception (`day_type`).
+                element = node["element"]
+                derive_element(
+                    {**element, "actions": element.get("actions", ["update"])},
+                    parent_identifier=None,
+                    where=where,
+                )
+            else:
+                derive_element(node["element"], parent_identifier=None, where=where)
+
+    visit(manifest["sections"], "")
+    for name, spec in manifest.get("mcp_entities", {}).items():
+        out[name] = {k: v for k, v in spec.items() if k != "$comment"}
+    return out

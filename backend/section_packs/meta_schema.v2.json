@@ -74,6 +74,14 @@
       "items": {
         "$ref": "#/$defs/node"
       }
+    },
+    "mcp_entities": {
+      "$comment": "THE QUARANTINE, and it is deliberately small. Two of the 42 shipped entities compute their storage path at runtime, so no node shape implies them and nothing in `sections` can derive them: `knowledge.knowledge` writes into `knowledge[category]` where the client chooses the category (server.py:2275), and `preferences.preference` is a generic key-value store (server.py:1951). Both are live MCP branches, so dropping them would silently contract the tool surface. Everything else in this pack's contract is derived. A THIRD entry here should be argued for, not added: the reason this is not a general escape hatch is that a hand-authored entity beside a derived one is exactly the drift v2 exists to stop -- see the `$comment` on profile.education for what that cost last time.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/quarantinedEntity"
+      }
     }
   },
   "$defs": {
@@ -192,13 +200,12 @@
       }
     },
     "fieldsNode": {
-      "$comment": "Nine keys. The value at `path` is one object with named keys, and the NODE is the record -- which is why `entity` sits directly on it rather than inside an `item` block. `path: []` is legal and meaningful here: it addresses the section root, which is how profile's Personal Information binds its scalars. That is exactly why the non-empty-path rule below is per-kind rather than a blanket minItems.",
+      "$comment": "Seven keys. The value at `path` is one object with named keys, and `element` says what that object is -- the same key, meaning the same thing, as on a list node. Uniform on purpose: v1 put the entity ON the fields node, which made the node's `description` (on-screen helper text) and the entity's `description` (MCP-facing, for a client choosing a tool) collide on one key, and the converter silently shipped the wrong one until the gate caught it. `path: []` is legal and meaningful here: it addresses the section root, which is how profile's Personal Information binds its scalars. That is exactly why the non-empty-path rule is per-kind rather than a blanket minItems.",
       "type": "object",
       "required": [
         "kind",
         "path",
-        "entity",
-        "fields"
+        "element"
       ],
       "additionalProperties": false,
       "properties": {
@@ -218,18 +225,38 @@
         "info": {
           "$ref": "#/$defs/info"
         },
-        "entity": {
-          "$ref": "#/$defs/entityName"
-        },
-        "actions": {
-          "$comment": "Optional, default [\"update\"] for a fields node: a singleton object is edited in place, never added to or removed.",
-          "$ref": "#/$defs/actions"
-        },
-        "fields": {
-          "$ref": "#/$defs/fieldList"
+        "element": {
+          "$ref": "#/$defs/fieldsElement"
         },
         "$comment": {
           "$ref": "#/$defs/authoringNote"
+        }
+      }
+    },
+    "fieldsElement": {
+      "$comment": "`element` for a singleton object. Same shape as a list's, except `identifier` is OPTIONAL: a singleton is not one of many, so there is usually nothing to name it by -- profile's basic_info and preferences' communication_default both derive `identifier: null`. lifestyle's sleep pair is the exception, whose identifier is `day_type`, a write_only router selecting which fixed sub-object a client means (server.py:2295 never stores it). `actions` defaults to [\"update\"]: a singleton is edited in place, never added to or removed.",
+      "type": "object",
+      "required": [
+        "entity",
+        "fields"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "entity": {
+          "$ref": "#/$defs/entityName"
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actions": {
+          "$ref": "#/$defs/actions"
+        },
+        "description": {
+          "$ref": "#/$defs/mcpDescription"
+        },
+        "fields": {
+          "$ref": "#/$defs/fieldList"
         }
       }
     },
@@ -239,7 +266,7 @@
       "required": [
         "kind",
         "path",
-        "item"
+        "element"
       ],
       "additionalProperties": false,
       "properties": {
@@ -283,8 +310,8 @@
         "sort": {
           "$ref": "#/$defs/sort"
         },
-        "item": {
-          "$ref": "#/$defs/item"
+        "element": {
+          "$ref": "#/$defs/listElement"
         },
         "$comment": {
           "$ref": "#/$defs/authoringNote"
@@ -292,7 +319,7 @@
       }
     },
     "stringsNode": {
-      "$comment": "Eight keys. The value at `path` is an array of bare strings -- no keys, so no field descriptors and no entity: there is no record here to name. `path` must be non-empty for the same reason a list node's must.",
+      "$comment": "Nine keys. The value at `path` is an array of bare strings -- no named keys, so no field descriptors. `element` is optional and says only who may write the array over MCP; without it the array is editable in the app and invisible to a client. `path` must be non-empty for the same reason a list node's must.",
       "type": "object",
       "required": [
         "kind",
@@ -330,13 +357,16 @@
           "type": "string",
           "description": "Placeholder for this node's one input."
         },
+        "element": {
+          "$ref": "#/$defs/stringsElement"
+        },
         "$comment": {
           "$ref": "#/$defs/authoringNote"
         }
       }
     },
-    "item": {
-      "$comment": "What one record looks like. Used by a list node and by a `type: \"list\"` field, and it means the same thing in both places -- which is how v2 deletes `children`. v1's nested `children` bound against the ROW while a group's children bound against the SECTION ROOT, a documented confusion; as a field inside item.fields, binding against the row is the only reading available. `entity` is required and is NOT derivable from `path` (profile's education list holds `education` records; nothing in the path says so).",
+    "listElement": {
+      "$comment": "`element` says what ONE MEMBER of an array is, and who may write it. On a list the element is a record, so it declares `fields`; on a `strings` array the element is a bare string, so `stringsElement` declares none. One key, one idea, two shapes that follow from the kind -- which is the format's core rule applied to itself. Used by a list node and by a `type: \"list\"` field, meaning the same thing in both, which is how v2 deletes `children`: v1's nested `children` bound against the ROW while a group's children bound against the SECTION ROOT, a documented confusion. As a field inside `each.fields`, binding against the row is the only reading available. `entity` is NOT derivable from `path` -- profile's education list holds `education` records and nothing in the path says so. (Spelled `item` in the first draft of the spec; renamed because `identifier: \"item\"` is a real declaration in three packs, so `\"item\": {\"identifier\": \"item\"}` would have been a structural key colliding with a field name.)",
       "type": "object",
       "required": [
         "entity",
@@ -351,32 +381,147 @@
         "identifier": {
           "type": "string",
           "minLength": 1,
-          "description": "The field that names a row. Must name a declared field in this item (loader cross-check 1)."
+          "description": "The field that names a row. Must name a declared field in this element (loader cross-check 1)."
         },
         "actions": {
-          "$comment": "Optional, default [\"add\", \"update\", \"remove\"] for a list item.",
+          "$comment": "Optional, default [\"add\", \"update\", \"remove\"] for a list element.",
           "$ref": "#/$defs/actions"
         },
         "description": {
-          "type": "string",
-          "minLength": 1,
-          "description": "MCP-facing: what this record is, for a client choosing an entity. Distinct from a node's `description`, which is on-screen helper text."
+          "$ref": "#/$defs/mcpDescription"
         },
         "variants": {
-          "type": "array",
-          "minItems": 1,
-          "description": "Extra MCP entity names over this same stored list. `preferences` needs this and nothing else does: `like` and `dislike` are two entities over one `likes_dislikes` array, identical but for their description. Without it `dislike` -- which binds no node -- could not be derived at all, and dropping it would silently contract the MCP surface.",
-          "items": {
-            "$ref": "#/$defs/variant"
-          }
+          "$ref": "#/$defs/variants"
+        },
+        "parent": {
+          "$comment": "The MCP parameter that names the ENCLOSING row, for a nested array only. Not derivable from the parent's identifier and not equal to it: `domain`'s identifier is the stored key `name`, while a reference under it is addressed as `domain_name`. Copied verbatim from today's contract.",
+          "type": "string",
+          "minLength": 1
+        },
+        "list": {
+          "$comment": "The stored array's own name, as today's entity block reports it to MCP clients. Redundant with the node's `path` and NOT derivable from it: only 5 of the 42 shipped entities carry it, and which 5 follows no rule -- `interest` at path `interests` has it while `goal` at path `goals` does not. Copied verbatim by the converter so `get_schema` stays byte-identical. Deleting it is a change to the MCP contract, which this format change deliberately is not.",
+          "type": "string",
+          "minLength": 1
         },
         "fields": {
           "$ref": "#/$defs/fieldList"
         }
       }
     },
+    "stringsElement": {
+      "$comment": "`element` for an array of bare strings: no `fields`, because a string has no named keys. Its presence is what makes the array MCP-writable at all -- and it is OPTIONAL, because most string arrays are not. `preferences` ships six `strings` nodes and only `response_format` is in the MCP contract; six `array_fields` across the packs have no entity either. v1 could not express that distinction anywhere: these entities existed only in the authored `entities` block, with nothing connecting `personality_trait` to the `personality_traits` array it writes. Eleven entities in the shipped packs are bound this way, and every one of them has `actions: [\"add\", \"remove\"]` and `required: [parent identifier?, identifier]`, so both are derived rather than declared.",
+      "type": "object",
+      "required": [
+        "entity",
+        "identifier"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "entity": {
+          "$ref": "#/$defs/entityName"
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The parameter name an MCP client passes for ONE string. Ad-hoc singulars that do not follow from the array's name, so they must be declared: `energy_peaks` takes `peak`, `stress_triggers` takes `trigger`, `response_format` takes `item`."
+        },
+        "actions": {
+          "$comment": "Optional, default [\"add\", \"remove\"]. Uniform across all eleven shipped string writers, so no pack declares it: a bare string has no identity apart from its value, so there is nothing to `update` -- you remove one and add another.",
+          "$ref": "#/$defs/actions"
+        },
+        "description": {
+          "$ref": "#/$defs/mcpDescription"
+        },
+        "parent": {
+          "$comment": "The MCP parameter that names the ENCLOSING row, for a nested array only. Not derivable from the parent's identifier and not equal to it: `domain`'s identifier is the stored key `name`, while a reference under it is addressed as `domain_name`. Copied verbatim from today's contract.",
+          "type": "string",
+          "minLength": 1
+        },
+        "bulk": {
+          "$comment": "Whether a client may pass the WHOLE array at once, under the array's own stored name, instead of one string per call. The name is derivable (the field's `name`, or a strings node's last path segment) so only the capability is declared -- it adds that name to the derived entity's `optional`. Verified per branch, not assumed: only `work_skill`, `work_highlight` and `project_highlight` accept it (`data.get(\"highlights\", [])` at server.py, inside each branch's `add`), and until v2 only `work_skill` said so.",
+          "type": "boolean"
+        }
+      }
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Extra MCP entity names over this same stored array. `preferences` needs it: `like` and `dislike` are two entities over one `likes_dislikes` list, identical but for their description. Without it `dislike` -- which binds no node -- could not be derived at all, and dropping it would silently contract the MCP surface.",
+      "items": {
+        "$ref": "#/$defs/variant"
+      }
+    },
+    "quarantinedEntity": {
+      "$comment": "The v1 entity shape, kept only for `mcp_entities`. This is what every entity used to look like, hand-authored, with a field's identity spread across it, the `ui` node and server.py's FIELD_ALIASES. It survives here for the two entities that bind no path, and it is the one place in v2 where a field name is written twice.",
+      "type": "object",
+      "required": [
+        "identifier",
+        "required",
+        "optional",
+        "actions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "identifier": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "optional": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "actions": {
+          "$ref": "#/$defs/actions"
+        },
+        "description": {
+          "$ref": "#/$defs/mcpDescription"
+        },
+        "valid_values": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "field_defaults": {
+          "type": "object"
+        },
+        "exclusive_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "list": {
+          "type": "string",
+          "minLength": 1
+        },
+        "$comment": {
+          "$ref": "#/$defs/authoringNote"
+        }
+      }
+    },
+    "mcpDescription": {
+      "type": "string",
+      "minLength": 1,
+      "description": "MCP-facing: what this record is, for a client choosing an entity. Distinct from a node's `description`, which is on-screen helper text."
+    },
     "variant": {
-      "$comment": "Deliberately only two keys. A variant may differ from its parent item in its MCP name and its MCP-facing description, and in nothing else -- same stored list, same fields, same identifier, same actions. Anything more and it is a second item, not a variant of this one.",
+      "$comment": "Deliberately only two keys. A variant may differ from its parent in its MCP name and its MCP-facing description, and in nothing else -- same stored array, same fields, same identifier, same actions. Anything more and it is a second element shape, not a variant of this one.",
       "type": "object",
       "required": [
         "entity"
@@ -463,7 +608,7 @@
           ]
         },
         "show": {
-          "$comment": "An ARRAY because `status` is a badge and a form field at once. Order within a position comes from the `fields` array, which is how v2 replaces two independent orderings (v1's `badges` order and its `detail_fields` order) with one. Must be non-empty when present: a field that renders nowhere says `write_only: true`, because one way to say one thing is the point of the exercise.",
+          "$comment": "Five positions. `pin` is the odd one and earns its place: a pinned field is drawn as the star that claims the slot, and v1 deliberately kept it out of the form and the Add dialog -- so the default form position would put a switch on screen that has never existed. An ARRAY because `status` is a badge and a form field at once. Order within a position comes from the `fields` array, which is how v2 replaces two independent orderings (v1's `badges` order and its `detail_fields` order) with one. Must be non-empty when present: a field that renders nowhere says `write_only: true`, because one way to say one thing is the point of the exercise.",
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
@@ -472,7 +617,8 @@
               "form",
               "badge",
               "row",
-              "count"
+              "count",
+              "pin"
             ]
           }
         },
@@ -493,6 +639,22 @@
             "minLength": 1
           }
         },
+        "off_contract": {
+          "$comment": "Which of this field's attributes the MCP contract does NOT carry. v1 held these twice, and the two copies disagree: `profile.education` offers a closed `status` vocabulary in the node's `enum` map that its entity does not declare, and six nodes prefill a default in `field_defaults` that their entity does not. That is not pedantry -- server.py:2518 REJECTS a value outside `valid_values` and server.py:2536 APPLIES `field_defaults`, for every entity on the generic path. So deriving these attributes into the contract wherever the form has them would start enforcing vocabularies and writing defaults that do not happen today. Eight fields in the shipped packs need this; everything else is on the contract, which is the common case and needs no declaration.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "values",
+              "default"
+            ]
+          }
+        },
+        "ui_only": {
+          "$comment": "The mirror of `write_only`, and the pair is the whole story of a field's two audiences: `write_only` is in the MCP contract and rendered nowhere; `ui_only` renders and is in no MCP vocabulary. Four field slots need it, all server-written timestamps a client must not set -- knowledge's `added_date` and `last_updated`, projects' `added_date`, learning_log's `timestamp`. v1 had no way to say this: tests/test_ui_schema.py excludes `display_fields` from its vocabulary check for exactly these, and records that the exclusion is why the check is 'wrong in BOTH directions'. Derived by the converter, not hand-listed: a rendered field in none of its entity's vocabularies, under any of its spellings, is one of these.",
+          "type": "boolean"
+        },
         "write_only": {
           "type": "boolean",
           "description": "Optional. In the MCP contract, rendered nowhere. `conversation_metadata` and `related_entries` on learning_log entries, and lifestyle's `day_type` -- a router that server.py:2295 never stores."
@@ -512,9 +674,9 @@
           "$comment": "Overrides the control `type` would pick. Only meaningful on a `strings` field today, where it replaces v1's node-level `item_control`. NOTE the rename: v1's default was spelled \"tag\", v2 spells it \"chips\", which is what ArrayInput actually renders. No shipped pack declares the default (all five uses are \"input\"), so the converter never has to emit it.",
           "$ref": "#/$defs/stringsControl"
         },
-        "item": {
-          "$comment": "Required if and only if type is `list`. This is v2's replacement for v1's `children`.",
-          "$ref": "#/$defs/item"
+        "element": {
+          "$comment": "What one element of this field's array is. Required if type is `list` -- v2's replacement for v1's `children` -- and optional if type is `strings`, where it says only who may write the array over MCP. Legal on no other type: a `text` field is not an array. The two shapes are refined by type in the allOf below.",
+          "type": "object"
         },
         "$comment": {
           "$ref": "#/$defs/authoringNote"
@@ -557,10 +719,10 @@
           }
         },
         {
-          "$comment": "`item` iff type is list, both directions.",
+          "$comment": "`element` belongs only to the two array types. Unlike the `values`/`enum` pair this is not an iff: `list` requires it (a row of what?), `strings` merely permits it (most string arrays are not in the MCP contract).",
           "if": {
             "required": [
-              "item"
+              "element"
             ]
           },
           "then": {
@@ -569,7 +731,10 @@
             ],
             "properties": {
               "type": {
-                "const": "list"
+                "enum": [
+                  "list",
+                  "strings"
+                ]
               }
             }
           }
@@ -587,8 +752,32 @@
           },
           "then": {
             "required": [
-              "item"
-            ]
+              "element"
+            ],
+            "properties": {
+              "element": {
+                "$ref": "#/$defs/listElement"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "strings"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "element": {
+                "$ref": "#/$defs/stringsElement"
+              }
+            }
           }
         },
         {

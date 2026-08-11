@@ -9,7 +9,7 @@ lives here.
 
 Two of the spec's eleven cross-checks turn out to be statable structurally, so
 they are enforced here instead of in `_cross_check`: `values` iff `type: "enum"`
-(rule 4) and `item` iff `type: "list"` (rule 5). That is strictly better -- a
+(rule 4) and `element` on `type: "list"` (rule 5). That is strictly better -- a
 shape error is reported before any semantic pass runs -- and it costs the loader
 tests nothing, because both layers raise PackError through the same entry point.
 
@@ -44,7 +44,7 @@ BASE = {
         {
             "kind": "list",
             "path": ["goals"],
-            "item": {
+            "element": {
                 "entity": "goal",
                 "identifier": "title",
                 "fields": [{"name": "title", "role": "title", "required": True}],
@@ -69,9 +69,9 @@ def _with_sections(*nodes):
 
 
 def _with_field(field):
-    """BASE's list item, with `field` appended to its one declared field."""
+    """BASE's list element, with `field` appended to its one declared field."""
     m = copy.deepcopy(BASE)
-    m["sections"][0]["item"]["fields"].append(field)
+    m["sections"][0]["element"]["fields"].append(field)
     return m
 
 
@@ -87,8 +87,7 @@ def test_minimal_fields_node_is_accepted():
         {
             "kind": "fields",
             "path": [],
-            "entity": "basic_info",
-            "fields": [{"name": "name"}],
+            "element": {"entity": "basic_info", "fields": [{"name": "name"}]},
         }
     )
     pack_loader.validate_manifest_v2(manifest)  # must not raise
@@ -131,8 +130,7 @@ def test_a_key_from_another_kind_is_rejected():
         {
             "kind": "fields",
             "path": [],
-            "entity": "basic_info",
-            "fields": [{"name": "name"}],
+            "element": {"entity": "basic_info", "fields": [{"name": "name"}]},
             "search": True,
         }
     )
@@ -182,7 +180,7 @@ def test_group_without_sections_is_rejected():
         pack_loader.validate_manifest_v2(_with_sections({"kind": "group", "title": "Wellness"}))
 
 
-def test_list_without_an_item_block_is_rejected():
+def test_list_without_an_element_block_is_rejected():
     with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections({"kind": "list", "path": ["goals"]}))
 
@@ -206,7 +204,7 @@ def test_fields_node_with_an_empty_path_is_accepted():
     # The one kind for which `path: []` is meaningful: it addresses the section
     # root, which is how profile's Personal Information binds its scalars.
     manifest = _with_sections(
-        {"kind": "fields", "path": [], "entity": "basic_info", "fields": [{"name": "name"}]}
+        {"kind": "fields", "path": [], "element": {"entity": "basic_info", "fields": [{"name": "name"}]}}
     )
     pack_loader.validate_manifest_v2(manifest)  # must not raise
 
@@ -214,27 +212,27 @@ def test_fields_node_with_an_empty_path_is_accepted():
 def test_fields_node_without_an_entity_is_rejected():
     with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(
-            _with_sections({"kind": "fields", "path": [], "fields": [{"name": "name"}]})
+            _with_sections({"kind": "fields", "path": [], "element": {"fields": [{"name": "name"}]}})
         )
 
 
-def test_item_without_an_entity_is_rejected():
+def test_element_without_an_entity_is_rejected():
     node = copy.deepcopy(BASE["sections"][0])
-    del node["item"]["entity"]
+    del node["element"]["entity"]
     with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections(node))
 
 
-def test_item_without_an_identifier_is_rejected():
+def test_element_without_an_identifier_is_rejected():
     node = copy.deepcopy(BASE["sections"][0])
-    del node["item"]["identifier"]
+    del node["element"]["identifier"]
     with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections(node))
 
 
 def test_empty_field_list_is_rejected():
     node = copy.deepcopy(BASE["sections"][0])
-    node["item"]["fields"] = []
+    node["element"]["fields"] = []
     with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections(node))
 
@@ -273,16 +271,18 @@ def test_well_formed_enum_is_accepted():
     )
 
 
-def test_list_type_without_an_item_is_rejected():
+def test_list_type_without_an_element_is_rejected():
     with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field({"name": "coursework", "type": "list"}))
 
 
-def test_item_on_a_non_list_field_is_rejected():
+def test_element_on_a_non_array_field_is_rejected():
+    # `text` is not an array, so there is no "one element" for `element` to describe.
+    # (A `strings` field MAY carry one -- that is a different test, below.)
     field = {
         "name": "coursework",
-        "type": "strings",
-        "item": {"entity": "coursework", "identifier": "name", "fields": [{"name": "name"}]},
+        "type": "text",
+        "element": {"entity": "coursework", "identifier": "name", "fields": [{"name": "name"}]},
     }
     with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field(field))
@@ -296,7 +296,7 @@ def test_nested_list_field_is_accepted():
         "type": "list",
         "show": ["count"],
         "label": "Coursework / Modules",
-        "item": {
+        "element": {
             "entity": "coursework",
             "identifier": "name",
             "actions": ["add", "remove"],
@@ -372,15 +372,15 @@ def test_unknown_role_is_rejected():
 
 def test_variant_with_only_entity_and_description_is_accepted():
     node = copy.deepcopy(BASE["sections"][0])
-    node["item"]["variants"] = [{"entity": "dislike", "description": "Something you dislike."}]
+    node["element"]["variants"] = [{"entity": "dislike", "description": "Something you dislike."}]
     pack_loader.validate_manifest_v2(_with_sections(node))  # must not raise
 
 
 def test_variant_that_redeclares_fields_is_rejected():
     # A variant differs from its parent in name and description only. Anything
-    # more and it is a second item, not a variant of this one.
+    # more and it is a second element shape, not a variant of this one.
     node = copy.deepcopy(BASE["sections"][0])
-    node["item"]["variants"] = [{"entity": "dislike", "fields": [{"name": "item"}]}]
+    node["element"]["variants"] = [{"entity": "dislike", "fields": [{"name": "item"}]}]
     with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections(node))
 
@@ -396,3 +396,87 @@ def test_the_error_names_the_offending_key():
     node["detail_fields"] = ["title"]
     with pytest.raises(pack_loader.PackError, match=_SHAPE + ".*detail_fields"):
         pack_loader.validate_manifest_v2(_with_sections(node))
+
+
+# --- `element` on a string array: who may write it over MCP -------------------
+#
+# The amendment that made the format able to hold what ships. Eleven entities in
+# the shipped packs write into a bare-string array -- `personality_trait` into
+# `personality_traits`, `work_skill` into work_experience's `skills` -- and v2 as
+# first specified had nowhere to say so: `strings` had eight keys and none of them
+# named an entity. Those entities existed only in the authored `entities` block,
+# with nothing tying them to the array they write.
+
+
+def test_strings_node_with_a_writer_is_accepted():
+    manifest = _with_sections(
+        {
+            "kind": "strings",
+            "path": ["personality_traits"],
+            "title": "Personality Traits",
+            "element": {"entity": "personality_trait", "identifier": "trait"},
+        }
+    )
+    pack_loader.validate_manifest_v2(manifest)  # must not raise
+
+
+def test_strings_node_without_a_writer_is_accepted():
+    # The common case, and why `element` is optional here: preferences ships six
+    # `strings` nodes and only `response_format` is in the MCP contract.
+    pack_loader.validate_manifest_v2(
+        _with_sections({"kind": "strings", "path": ["key_decisions"], "title": "Key Decisions"})
+    )
+
+
+def test_strings_field_with_a_writer_is_accepted():
+    field = {
+        "name": "skills",
+        "type": "strings",
+        "element": {"entity": "work_skill", "identifier": "skill", "bulk": True},
+    }
+    pack_loader.validate_manifest_v2(_with_field(field))  # must not raise
+
+
+def test_a_strings_writer_may_not_declare_fields():
+    # A bare string has no named keys. Declaring fields means the array holds
+    # records, which is `type: "list"`.
+    field = {
+        "name": "skills",
+        "type": "strings",
+        "element": {"entity": "work_skill", "identifier": "skill", "fields": [{"name": "skill"}]},
+    }
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
+        pack_loader.validate_manifest_v2(_with_field(field))
+
+
+def test_a_strings_writer_needs_an_identifier():
+    # The parameter name for one string. Not derivable: `energy_peaks` takes
+    # `peak`, `response_format` takes `item`.
+    field = {"name": "skills", "type": "strings", "element": {"entity": "work_skill"}}
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
+        pack_loader.validate_manifest_v2(_with_field(field))
+
+
+def test_bulk_on_a_list_each_is_rejected():
+    # `bulk` means "the whole array may be passed under its own stored name",
+    # which is only meaningful for an array of bare strings.
+    node = copy.deepcopy(BASE["sections"][0])
+    node["element"]["bulk"] = True
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
+        pack_loader.validate_manifest_v2(_with_sections(node))
+
+
+def test_a_strings_writer_may_not_declare_variants():
+    # No shipped string array needs a second MCP name, and `coursework_topic` --
+    # the one legacy alias of this kind -- aliases a LIST, not a string array.
+    field = {
+        "name": "skills",
+        "type": "strings",
+        "element": {
+            "entity": "work_skill",
+            "identifier": "skill",
+            "variants": [{"entity": "work_technology"}],
+        },
+    }
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
+        pack_loader.validate_manifest_v2(_with_field(field))
