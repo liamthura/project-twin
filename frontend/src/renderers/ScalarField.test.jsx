@@ -142,6 +142,53 @@ describe("ScalarField", () => {
       );
       expect(screen.queryByDisplayValue("niche thing")).not.toBeInTheDocument();
     });
+
+    // The v2 spelling: fieldMeta's descriptor path sets `meta.allow_custom`
+    // from the field's own `allow_custom: true` rather than a `custom_<field>`
+    // entry in `optional` -- goals.type is the one shipped field that declares
+    // it. ScalarField has to honour both spellings, since the suite above
+    // proves the old one is still very much alive.
+    it("appears when the value is 'other' and the field is named in meta.allow_custom", () => {
+      render(
+        <ScalarField
+          field="stance"
+          value="other"
+          meta={{ valid_values: meta.valid_values, allow_custom: ["stance"] }}
+          onChange={() => {}}
+          customValue="niche thing"
+          onCustomChange={() => {}}
+        />
+      );
+      expect(screen.getByDisplayValue("niche thing")).toBeInTheDocument();
+    });
+
+    it("does not appear when the field is in meta.allow_custom but the value is not 'other'", () => {
+      render(
+        <ScalarField
+          field="stance"
+          value="like"
+          meta={{ valid_values: meta.valid_values, allow_custom: ["stance"] }}
+          onChange={() => {}}
+          customValue="niche thing"
+          onCustomChange={() => {}}
+        />
+      );
+      expect(screen.queryByDisplayValue("niche thing")).not.toBeInTheDocument();
+    });
+
+    it("does not appear from allow_custom naming a different field", () => {
+      render(
+        <ScalarField
+          field="stance"
+          value="other"
+          meta={{ valid_values: meta.valid_values, allow_custom: ["other_field"] }}
+          onChange={() => {}}
+          customValue="niche thing"
+          onCustomChange={() => {}}
+        />
+      );
+      expect(screen.queryByDisplayValue("niche thing")).not.toBeInTheDocument();
+    });
   });
 
   describe("a field in date_fields", () => {

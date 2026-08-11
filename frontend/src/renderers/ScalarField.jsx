@@ -54,8 +54,20 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
   const hint = meta.field_placeholders?.[field];
   const enums = meta.valid_values?.[field];
   if (enums) {
-    const customField = `custom_${field}`;
-    const hasCustom = (meta.optional || []).includes(customField);
+    // Two ways a field earns the free-text overflow box, because two
+    // vintages of manifest declare it differently. v2 says it once, on the
+    // field itself (`allow_custom: true`), and fieldMeta's descriptor path
+    // collects those names into `meta.allow_custom` -- `goals.type` is the
+    // one shipped case. v1, and every hand-built `meta` in this file's own
+    // test suite, has no such flag: it relies on the older convention of a
+    // `custom_<field>` entry sitting in the entity's (or node's) `optional`
+    // list, a magic prefix nothing declared, only relied on. Both still have
+    // to work -- the first is what a converted node produces, the second is
+    // everything that has not converted yet -- so this checks both rather
+    // than picking one and breaking the other's callers.
+    const hasCustom =
+      (meta.allow_custom || []).includes(field) ||
+      (meta.optional || []).includes(`custom_${field}`);
     return (
       <div className="space-y-2">
         <EnumControl options={enums} value={value} onChange={onChange} />

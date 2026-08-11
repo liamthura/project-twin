@@ -143,6 +143,7 @@
                 },
                 {
                   "name": "notes",
+                  "type": "longtext",
                   "placeholder": "Notes about this resource (optional)..."
                 }
               ]

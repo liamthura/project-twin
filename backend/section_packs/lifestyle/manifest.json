@@ -78,6 +78,7 @@
           },
           {
             "name": "notes",
+            "type": "longtext",
             "placeholder": "Additional notes about this hobby..."
           },
           {
@@ -121,6 +122,7 @@
                 },
                 {
                   "name": "notes",
+                  "type": "longtext",
                   "placeholder": "Notes about this reference (optional)..."
                 }
               ]
@@ -189,6 +191,7 @@
           },
           {
             "name": "notes",
+            "type": "longtext",
             "placeholder": "e.g. Reading Substacks, Photography"
           },
           {

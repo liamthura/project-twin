@@ -1,0 +1,180 @@
+{
+ "profile": {
+  "Personal Information": {
+   "name": "text",
+   "preferred_name": "text",
+   "current_role": "text",
+   "organisation": "text",
+   "location": "text",
+   "nationality": "text",
+   "bio": "longtext"
+  },
+  "Education": {
+   "institution": "text",
+   "degree_level": "text",
+   "field_of_study": "text",
+   "start_year": "text",
+   "end_year": "text",
+   "status": "enum"
+  },
+  "Education > Coursework / Modules": {
+   "name": "text",
+   "topics": "array"
+  },
+  "Education > Clubs & Societies": {
+   "name": "text",
+   "activities_involved": "array"
+  },
+  "Work Experience": {
+   "company": "text",
+   "role": "text",
+   "type": "text",
+   "period": "text",
+   "location": "text",
+   "description": "longtext"
+  },
+  "Contact & Links > Emails": {
+   "address": "text",
+   "purpose": "text"
+  },
+  "Contact & Links > Links": {
+   "label": "text",
+   "url": "text"
+  },
+  "Languages": {
+   "name": "text",
+   "fluency": "enum"
+  }
+ },
+ "goals": {
+  "goals": {
+   "title": "text",
+   "target_date": "date",
+   "why": "longtext",
+   "notes": "longtext",
+   "type": "enum+custom",
+   "status": "enum"
+  }
+ },
+ "knowledge": {
+  "Skills & Domains": {
+   "name": "text",
+   "level": "enum",
+   "notes": "longtext"
+  },
+  "Skills & Domains > References": {
+   "name": "text",
+   "url": "text",
+   "notes": "longtext"
+  },
+  "Mental Tabs": {
+   "title": "text",
+   "notes": "longtext",
+   "tags": "array",
+   "status": "enum"
+  },
+  "Mental Tabs > References": {
+   "name": "text",
+   "url": "text",
+   "notes": "longtext"
+  }
+ },
+ "preferences": {
+  "Communication > Default Communication Style": {
+   "tone": "text",
+   "locale": "text",
+   "detail_level": "longtext"
+  },
+  "Communication > When I'm feeling...": {
+   "mood": "text",
+   "tone": "text",
+   "detail_level": "longtext"
+  },
+  "Likes & Dislikes": {
+   "item": "text",
+   "stance": "enum"
+  }
+ },
+ "projects": {
+  "Top of Mind": {
+   "idea": "text",
+   "note": "text"
+  },
+  "Projects": {
+   "name": "text",
+   "description": "longtext",
+   "notes": "longtext",
+   "tags": "array",
+   "highlights": "array",
+   "status": "enum"
+  },
+  "Projects > References": {
+   "name": "text",
+   "url": "text",
+   "notes": "longtext"
+  }
+ },
+ "lifestyle": {
+  "Hobbies & Activities": {
+   "name": "text",
+   "notes": "longtext",
+   "specifics": "array",
+   "skill_level": "enum",
+   "status": "enum"
+  },
+  "Hobbies & Activities > References & URLs": {
+   "name": "text",
+   "url": "text",
+   "notes": "longtext"
+  },
+  "Interests": {
+   "name": "text",
+   "notes": "longtext",
+   "kind": "enum"
+  },
+  "Wellness > Sleep — weekdays": {
+   "bedtime": "time",
+   "wakeup": "time"
+  },
+  "Wellness > Sleep — weekends": {
+   "bedtime": "time",
+   "wakeup": "time"
+  }
+ },
+ "media": {
+  "items": {
+   "title": "text",
+   "url": "text",
+   "notes": "longtext",
+   "tags": "array",
+   "kind": "enum",
+   "status": "enum",
+   "reaction": "enum"
+  }
+ },
+ "aesthetics": {
+  "Styles": {
+   "name": "text",
+   "notes": "longtext",
+   "references": "array",
+   "domain": "enum",
+   "stance": "enum"
+  }
+ },
+ "circle": {
+  "connections": {
+   "name": "text",
+   "relationship": "text",
+   "traits": "array",
+   "notes": "longtext"
+  }
+ },
+ "learning_log": {
+  "entries": {
+   "topic": "text",
+   "details": "longtext",
+   "source": "text",
+   "tags": "array"
+  }
+ }
+}

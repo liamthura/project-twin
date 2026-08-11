@@ -40,7 +40,8 @@
             "name": "url"
           },
           {
-            "name": "notes"
+            "name": "notes",
+            "type": "longtext"
           },
           {
             "name": "tags",

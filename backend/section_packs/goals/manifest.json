@@ -48,10 +48,12 @@
             "type": "date"
           },
           {
-            "name": "why"
+            "name": "why",
+            "type": "longtext"
           },
           {
-            "name": "notes"
+            "name": "notes",
+            "type": "longtext"
           },
           {
             "name": "type",

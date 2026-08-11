@@ -429,6 +429,31 @@ describe("SectionRenderer", () => {
       pack: goalsPack, listKey: "goals", data: goalsData,
       exclusions: { id: MACHINE_ID },
     });
+
+    // goals.type is the one shipped field with `allow_custom: true` -- the
+    // whole reason fieldMeta's descriptor path exposes an `allow_custom` list
+    // instead of relying on the `custom_<field>` entry the old `optional`
+    // convention needed. This exercises the real manifest end to end, not a
+    // hand-built meta object, so a regression in either fieldMeta or the
+    // ScalarField check that reads it would show up here.
+    it("offers a free-text box for goals.type once 'other' is picked", async () => {
+      const { user } = renderSection({ pack: goalsPack, initial: goalsData });
+      await user.click(screen.getByText("Ship MyGist v3"));
+
+      // Seven values (career/learning/personal/health/financial/creative/
+      // other) is past SEGMENTED_MAX, so this renders as a dropdown, not
+      // segmented buttons -- same rule ScalarField.test.jsx's enum describe
+      // block pins for any field with more than four options.
+      const combo = screen.getAllByRole("combobox").find((el) => el.textContent === "career");
+      expect(combo).toBeTruthy();
+
+      await user.click(combo);
+      await user.click(screen.getByRole("option", { name: "other" }));
+
+      const custom = screen.getByPlaceholderText("Custom type…");
+      await user.type(custom, "sabbatical");
+      expect(custom).toHaveValue("sabbatical");
+    });
   });
 
   // Media and aesthetics are the only packs with array_fields, field_defaults

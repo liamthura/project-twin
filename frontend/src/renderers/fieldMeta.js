@@ -4,14 +4,32 @@
 // precedence rules below live in one place rather than in two copies that
 // drift.
 //
-// The rule throughout: a NODE-level key wins over the entity's vocabulary. A
-// section whose manifest field names are not its storage keys declares the
-// difference on the node, and that override is the whole reason ScalarField
-// takes a pre-resolved meta instead of an entity.
+// Two paths, because two vintages of node describe a field's properties
+// differently.
+//
+// A descriptor-shaped node (`node.element.fields` present -- the shim in
+// v2Node.js passes `element` through untouched alongside the flat arrays it
+// also builds) has exactly ONE source for everything below: the field's own
+// descriptor. There is no entity to fall back to and no node-level override to
+// prefer, because v2 states a field's vocabulary, default and placeholder once,
+// on the field, and nowhere else -- the whole point of the format change was
+// deleting the second copy. `fromDescriptors` below reads that one place.
+//
+// Everything else -- a hand-built v1 node (of which this file's own tests
+// construct many) and any node the shim has not yet touched -- still resolves
+// the OLD way, and that old way still needs its precedence documented: a
+// NODE-level key wins over the entity's vocabulary. A section whose manifest
+// field names are not its storage keys declares the difference on the node,
+// and that override is the whole reason ScalarField takes a pre-resolved meta
+// instead of an entity. This path is not dead: Task 9 deletes the flat arrays
+// (and the node keys that feed this branch) only after every renderer reads
+// descriptors directly, which is not yet true of every node kind this file
+// serves.
 import { SEGMENTED_MAX } from "@/components/controls";
 import { LONG_TEXT_FIELDS } from "./ScalarField";
 
 export function buildFieldMeta(node, entity) {
+  if (node.element?.fields) return fromDescriptors(node.element.fields);
   return {
     valid_values: node.enum ?? entity?.valid_values,
     optional: node.optional ?? entity?.optional ?? [],
@@ -32,6 +50,67 @@ export function buildFieldMeta(node, entity) {
     // placeholder is a presentation choice about one binding, not part of the
     // tool contract -- the same field on two nodes can want different hints.
     field_placeholders: node.field_placeholders ?? {},
+  };
+}
+
+// One field descriptor can describe a control this node does not draw at all:
+// a labelled `strings`/`list` field (`{name: "highlights", type: "strings",
+// label: "Highlights", ...}`) is v1Shape's cue to lift it into its own child
+// block instead of an inline chip control on this row -- see `childNode` in
+// v2Node.js. Its vocabulary, default and placeholder belong to that child, not
+// to this node's own fields, exactly as v1Shape's `expandFields` withholds them
+// (the `isChild` branch there). Getting this wrong is not cosmetic:
+// ListRenderer spreads `meta.array_fields` wholesale into its search index
+// (`searchFields`), so a leaked "highlights" would make profile's Education
+// list search inside a field it renders nowhere near the row.
+//
+// `write_only` and a pinned field are excluded the same way v1Shape excludes
+// them from every array and map it builds -- neither renders a control here
+// (write_only renders nowhere at all; a pinned field is drawn as the star that
+// claims the slot), so neither should seed one through a stray lookup either.
+function isChildField(field) {
+  return Boolean(field.label) && (field.type === "strings" || field.type === "list");
+}
+
+function fromDescriptors(fields) {
+  const valid_values = {};
+  const field_defaults = {};
+  const field_placeholders = {};
+  // A Set for the reason documented at ScalarField.jsx:42 -- every reader of
+  // `long_text` calls `.has()`, ScalarField's own defensive normalisation
+  // included, so building anything else here would just move that work into
+  // every caller instead of doing it once.
+  const long_text = new Set();
+  const date_fields = [];
+  const time_fields = [];
+  const bool_fields = [];
+  const array_fields = [];
+  // Which fields earn the free-text overflow box below their enum control.
+  // Replaces the `custom_<field>` naming convention `optional` used to carry
+  // for this purpose -- see the meta_schema.json `$comment` on `allow_custom`
+  // and the comment in ScalarField.jsx where this is read.
+  const allow_custom = [];
+
+  for (const field of fields) {
+    if (field.write_only || field.pin) continue;
+    const isChild = isChildField(field);
+
+    if (!isChild) {
+      if ("values" in field) valid_values[field.name] = field.values;
+      if ("default" in field) field_defaults[field.name] = field.default;
+      if ("placeholder" in field) field_placeholders[field.name] = field.placeholder;
+      if (field.type === "longtext") long_text.add(field.name);
+      if (field.type === "date") date_fields.push(field.name);
+      if (field.type === "time") time_fields.push(field.name);
+      if (field.type === "bool") bool_fields.push(field.name);
+      if (field.type === "strings") array_fields.push(field.name);
+    }
+    if (field.allow_custom) allow_custom.push(field.name);
+  }
+
+  return {
+    valid_values, field_defaults, field_placeholders,
+    long_text, date_fields, time_fields, bool_fields, array_fields, allow_custom,
   };
 }
 

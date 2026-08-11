@@ -63,6 +63,17 @@ export function v1Shape(node) {
   const { element, ...rest } = node;
   const out = { ...rest };
   delete out.$comment;
+  // Additive, not lossy: `fieldMeta.buildFieldMeta` (Task 8) resolves a
+  // descriptor-shaped node straight from `element.fields` instead of the flat
+  // arrays this function builds below, and it cannot do that if the shim
+  // deletes the one thing it needs to read. Carrying `element` through
+  // unchanged, alongside every array this function still produces, is what
+  // lets both readers work off the same shimmed node during the migration --
+  // Task 9 deletes the arrays once every renderer reads `element` instead,
+  // and this line goes with them. Safe to leak: `element.description` never
+  // lands on `out` (destructured away above), and no renderer besides
+  // `fieldMeta` looks at `node.element`.
+  out.element = element;
 
   // Two renames, and that is all a `strings` node needs: its `element` names
   // the entity the array's members write to, which is a fact about the tool

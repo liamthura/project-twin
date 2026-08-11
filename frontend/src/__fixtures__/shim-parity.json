@@ -62,7 +62,8 @@
        ]
       },
       {
-       "name": "notes"
+       "name": "notes",
+       "type": "longtext"
       },
       {
        "name": "tags"
@@ -198,7 +199,8 @@
        ]
       },
       {
-       "name": "notes"
+       "name": "notes",
+       "type": "longtext"
       },
       {
        "name": "references",
@@ -443,10 +445,12 @@
        "type": "date"
       },
       {
-       "name": "why"
+       "name": "why",
+       "type": "longtext"
       },
       {
-       "name": "notes"
+       "name": "notes",
+       "type": "longtext"
       },
       {
        "name": "type",
@@ -822,6 +826,7 @@
          },
          {
           "name": "notes",
+          "type": "longtext",
           "placeholder": "Notes"
          }
         ]
@@ -910,6 +915,7 @@
          },
          {
           "name": "notes",
+          "type": "longtext",
           "placeholder": "Notes"
          }
         ]
@@ -1532,6 +1538,7 @@
       },
       {
        "name": "notes",
+       "type": "longtext",
        "placeholder": "Additional notes about this hobby..."
       },
       {
@@ -1575,6 +1582,7 @@
          },
          {
           "name": "notes",
+          "type": "longtext",
           "placeholder": "Notes about this reference (optional)..."
          }
         ]
@@ -1643,6 +1651,7 @@
       },
       {
        "name": "notes",
+       "type": "longtext",
        "placeholder": "e.g. Reading Substacks, Photography"
       },
       {
@@ -1911,7 +1920,8 @@
        "name": "url"
       },
       {
-       "name": "notes"
+       "name": "notes",
+       "type": "longtext"
       },
       {
        "name": "tags",
@@ -3770,6 +3780,7 @@
          },
          {
           "name": "notes",
+          "type": "longtext",
           "placeholder": "Notes about this resource (optional)..."
          }
         ]

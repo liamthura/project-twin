@@ -183,6 +183,48 @@ def _carry_comment(out: dict, node: dict, entities: dict, entity_name: str | Non
 # --- the field list -------------------------------------------------------
 
 
+# Transcribed from ScalarField.jsx:16's `LONG_TEXT_FIELDS = new Set(["notes",
+# "why", "description"])`. Ten shipped v1 nodes render a textarea for one of
+# these names WITHOUT declaring `long_text` at all -- the renderer's fallback
+# supplies it by name whenever the node says nothing. v1 could get away with
+# that because the heuristic and the manifest lived in the same runtime; v2
+# states a field's type once, on the field, so the heuristic has to be
+# transcribed into the conversion INSTEAD of carried forward as a second,
+# undeclared source of truth in the renderer. See fieldMeta.js's `fromDescriptors`,
+# which deliberately does NOT re-add this fallback -- a name heuristic there
+# would silently override a future field that is genuinely `type: "text"` and
+# happens to be called `notes`. This dict is where the heuristic dies: every
+# converted manifest says `type: "longtext"` outright, and nothing downstream
+# ever again decides "is this long text" by looking at a field's name.
+_LONG_TEXT_NAME_HEURISTIC = frozenset({"notes", "why", "description"})
+
+
+def _check_long_text_agreement(node: dict, order: list, pack: str) -> None:
+    """The heuristic above only applies when the node declares NO `long_text`
+    at all -- `node.long_text ? new Set(node.long_text) : LONG_TEXT_FIELDS` in
+    ScalarField.jsx is a fork on PRESENCE, not on whether the name is covered.
+    So a node that declares `long_text` and ALSO renders an undeclared
+    `notes`/`why`/`description` field would have the two rules disagree about
+    that one field -- the declaration says plain text, the name heuristic
+    says textarea. No shipped manifest does this (checked by hand across
+    every pack before writing this function), and this raises rather than
+    silently picking a side if a future manifest ever does.
+    """
+    declared = node.get("long_text")
+    if declared is None:
+        return
+    undeclared = (set(order) & _LONG_TEXT_NAME_HEURISTIC) - set(declared)
+    if undeclared:
+        raise ValueError(
+            f"{pack}/{node.get('title') or node.get('path')}: declares long_text="
+            f"{declared!r} but also renders undeclared field(s) {sorted(undeclared)} "
+            "whose name matches the old ScalarField.jsx heuristic (notes/why/"
+            "description) -- the declaration and the name heuristic disagree about "
+            "whether these render as a textarea. Add them to long_text (or rename "
+            "the field) before converting."
+        )
+
+
 def _fields_for(
     node: dict, pack: str, entity_name: str, entity: dict, entities: dict, bound: set
 ) -> list:
@@ -197,6 +239,7 @@ def _fields_for(
     # the field list at the point they were declared.
     children = {c["path"][-1]: c for c in node.get("children") or []}
     order = _reading_order(node, children, pack)
+    _check_long_text_agreement(node, order, pack)
 
     fields = [
         _descriptor(name, node, pack, entity_name, entity, entities, bound, children)
@@ -428,7 +471,18 @@ def _type_of(name: str, node: dict, entity: dict, child: dict | None) -> str:
         return "strings" if child["kind"] == "strings" else "list"
     if name in (node.get("array_fields") or []):
         return "strings"
-    if name in (node.get("long_text") or []):
+    # A declared `long_text` wins outright when the node has one -- even an
+    # EMPTY declared list, because `[] ? x : y` is still the truthy branch in
+    # JS, so `long_text: []` in a v1 node means "no field here is long text",
+    # not "fall through to the name heuristic". Only the true ABSENCE of the
+    # key (`node.get("long_text") is None`) falls through to the name
+    # heuristic below -- see `_LONG_TEXT_NAME_HEURISTIC`'s comment for why
+    # that heuristic has to be transcribed here at all.
+    declared_long_text = node.get("long_text")
+    if declared_long_text is not None:
+        if name in declared_long_text:
+            return "longtext"
+    elif name in _LONG_TEXT_NAME_HEURISTIC:
         return "longtext"
     if name in (node.get("date_fields") or []):
         return "date"

@@ -43,7 +43,10 @@ describe("v1Shape", () => {
     // draws `node.description`, so leaking it would put tool-facing copy on
     // screen -- the exact collision that put `element` on `fields` nodes.
     expect(shimmed.description).toBeUndefined();
-    expect(shimmed.element).toBeUndefined();
+    // Task 8 turns the shim additive: fieldMeta.buildFieldMeta reads
+    // `element.fields` directly for a descriptor-shaped node, so it has to
+    // survive the shim rather than being deleted alongside `description`.
+    expect(shimmed.element).toBe(KITCHEN_SINK.element);
   });
 
   it("renames search to searchable and passes the rest of the node through", () => {
@@ -97,13 +100,15 @@ describe("v1Shape", () => {
     // ListRenderer reads `node.badges || []`, so [] and absent behave alike --
     // but the parity gate below compares against manifests that simply have no
     // key, and a shim that invents `badges: []` everywhere would fail it.
-    const bare = v1Shape({
-      kind: "list", path: ["xs"],
-      element: { entity: "x", identifier: "n", fields: [{ name: "n", role: "title" }] },
-    });
+    const element = { entity: "x", identifier: "n", fields: [{ name: "n", role: "title" }] };
+    const bare = v1Shape({ kind: "list", path: ["xs"], element });
     expect(bare).toEqual({
       kind: "list", path: ["xs"], entity: "x",
       title_field: "n", detail_fields: ["n"],
+      // The shim is additive now (Task 8): `element` rides along unchanged
+      // beside the arrays this test is actually about, rather than being
+      // deleted.
+      element,
     });
   });
 
@@ -148,22 +153,20 @@ describe("v1Shape", () => {
   });
 
   it("hoists a fields node's element the same way, and recurses through a group", () => {
+    const element = {
+      entity: "sleep", identifier: "day_type",
+      fields: [{ name: "bedtime", type: "time" }, { name: "wakeup", type: "time" }],
+    };
     const group = v1Shape({
       kind: "group",
       title: "Wellness",
-      sections: [
-        {
-          kind: "fields", path: ["sleep"], title: "Sleep",
-          element: {
-            entity: "sleep", identifier: "day_type",
-            fields: [{ name: "bedtime", type: "time" }, { name: "wakeup", type: "time" }],
-          },
-        },
-      ],
+      sections: [{ kind: "fields", path: ["sleep"], title: "Sleep", element }],
     });
     expect(group.sections[0]).toEqual({
       kind: "fields", path: ["sleep"], title: "Sleep", entity: "sleep",
       fields: ["bedtime", "wakeup"], time_fields: ["bedtime", "wakeup"],
+      // Additive, same as above: fieldMeta needs this node's `element` intact.
+      element,
     });
   });
 
@@ -184,9 +187,9 @@ describe("the shim's parity with what shipped", () => {
   // against the v1 node the renderers read today. `shim-parity.json` freezes
   // both sides, so this compares the shim to what shipped and not to itself.
   //
-  // Four keys are normalised away first, each because the renderers cannot tell
-  // the difference -- and one, `enum`/`field_defaults`, is compared separately
-  // and more strictly below.
+  // Six keys are normalised away first, each because the renderers cannot tell
+  // the difference -- and three, `enum`/`field_defaults`/`long_text`, are
+  // compared separately and more strictly below.
   const IGNORED = new Set([
     "$comment", // authoring prose, read by nobody
     // Backend-only: v1's cross-check used it to excuse a field the entity did
@@ -198,6 +201,23 @@ describe("the shim's parity with what shipped", () => {
     // duplication being removed.
     "enum",
     "field_defaults",
+    // The shim is additive now (Task 8): v1 never had this key, and the v2
+    // side always does, so a structural diff would fail on presence alone
+    // for every node in every pack. `element`'s own contents (vocabulary,
+    // defaults, placeholders) are exactly what `enum`/`field_defaults` above
+    // already compare as effective values in the test below.
+    "element",
+    // Also EFFECTIVE, not structural, and for the same reason as `enum` --
+    // except here the two sides can name the SAME field and still disagree on
+    // paper: ten v1 nodes render a textarea for `notes`/`why`/`description`
+    // via ScalarField.jsx's LONG_TEXT_FIELDS fallback while declaring no
+    // `long_text` key at all, so the converter now states `type: "longtext"`
+    // on those fields outright (see `_LONG_TEXT_NAME_HEURISTIC` in
+    // manifest_v1_to_v2.py) and the shimmed v2 side carries a `long_text` key
+    // the v1 side never had. Structurally that is a diff; on screen it is the
+    // same textarea it always was, which is exactly what the effective check
+    // below asserts instead.
+    "long_text",
   ]);
 
   // v1 named the title field in `detail_fields` in some packs and not others,
@@ -236,7 +256,7 @@ describe("the shim's parity with what shipped", () => {
       expect(pack.v2.map(v1Shape).map(strip)).toEqual(pack.v1.map(strip));
     });
 
-    it(`resolves the same vocabulary and defaults for every ${key} field`, () => {
+    it(`resolves the same vocabulary, defaults and long-text control for every ${key} field`, () => {
       // The precedence `fieldMeta` and `ListRenderer` apply: a node-level key
       // replaces the entity's outright. What has to hold is that every field a
       // control is drawn for resolves to the same options and the same seeded
@@ -257,6 +277,22 @@ describe("the shim's parity with what shipped", () => {
           expect({ field, default: (shimmed.field_defaults ?? {})[field] }).toEqual({
             field,
             default: (v1Node.field_defaults ?? entity.field_defaults ?? {})[field],
+          });
+          // Same shape as the two above, but the v1 side of the comparison is
+          // ScalarField.jsx's OWN fallback rule rather than a second declared
+          // value: `node.long_text ? new Set(node.long_text) : LONG_TEXT_FIELDS`.
+          // A v1 node that declares `long_text` (even `[]`) uses ONLY that list;
+          // one that declares nothing gets the name heuristic. The v2 side
+          // never has a heuristic to fall back on -- the converter already
+          // resolved it into `type: "longtext"` -- so this is the check that
+          // catches a converter regression on exactly the ten fields that
+          // motivated `_LONG_TEXT_NAME_HEURISTIC`.
+          const isLongTextV1 = v1Node.long_text
+            ? v1Node.long_text.includes(field)
+            : ["notes", "why", "description"].includes(field);
+          expect({ field, longText: (shimmed.long_text ?? []).includes(field) }).toEqual({
+            field,
+            longText: isLongTextV1,
           });
         }
         const kids = shimmed.children ?? [];
