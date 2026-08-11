@@ -5,21 +5,53 @@ import userEvent from "@testing-library/user-event";
 import ListRenderer from "./ListRenderer";
 
 // Shapes mirror the real "aesthetics" pack (frontend/src/__fixtures__/packs.json
-// and frontend/src/__fixtures__/data/aesthetics.json): a title field, two
-// badges (one enum with a VALUE_META icon, one without), a long-text detail
-// field, an array detail field, suggestions, and an entity with valid_values,
-// optional custom_* fields and field_defaults.
+// and frontend/src/__fixtures__/data/aesthetics.json): a title field with
+// suggestions, two badges (one enum with a VALUE_META icon, one without), a
+// long-text field, an array field, and a per-field default.
+//
+// Every node in this file is a format v2 node: a field's type, vocabulary,
+// default, suggestions and positions are stated ON the field, in
+// `element.fields`, rather than spread across `title_field`, `badges`,
+// `detail_fields`, `array_fields`, `long_text`, `enum`, `field_defaults` and
+// `suggestions` on the node. Two consequences worth knowing while reading:
+//
+//   - `notes` declares `type: "longtext"`. v1 got its textarea from a name
+//     heuristic (ScalarField's LONG_TEXT_FIELDS), and that heuristic silently
+//     turning into nothing is how six declared textareas became one-line inputs
+//     the first time the descriptor path shipped -- see controlCensus.js.
+//   - `show` defaults to ["form"], so a field with nothing said about it is an
+//     ordinary control in the expanded row and in the Add dialog.
 const node = {
   kind: "list",
   path: ["styles"],
-  entity: "aesthetic",
-  title_field: "name",
-  badges: ["domain", "stance"],
-  detail_fields: ["notes", "references"],
-  array_fields: ["references"],
-  suggestions: { name: ["Minimalist", "Scandinavian"] },
+  element: {
+    entity: "aesthetic",
+    identifier: "name",
+    fields: [
+      { name: "name", role: "title", suggestions: ["Minimalist", "Scandinavian"] },
+      { name: "notes", type: "longtext" },
+      { name: "references", type: "strings" },
+      { name: "domain", type: "enum", values: ["interior", "graphic"], show: ["badge"] },
+      {
+        name: "stance", type: "enum", values: ["love", "like", "avoid"],
+        default: "like", show: ["badge"],
+      },
+    ],
+  },
 };
 
+// Rebuilds `node` with one field's descriptor merged or added, so a test that
+// varies one field does not have to restate the other four.
+function withFields(...fields) {
+  const byName = new Map(node.element.fields.map((f) => [f.name, f]));
+  for (const f of fields) byName.set(f.name, { ...byName.get(f.name), ...f });
+  return { ...node, element: { ...node.element, fields: [...byName.values()] } };
+}
+
+// Reachable only through `buildFieldMeta`'s pre-v2 branch now, and kept as the
+// prop it always was so these tests pass what renderNode passes. Nothing in it is
+// read while the node carries descriptors -- which two tests below assert
+// outright rather than leaving to inference.
 const entity = {
   valid_values: { domain: ["interior", "graphic"], stance: ["love", "like", "avoid"] },
   optional: ["custom_stance"],
@@ -34,6 +66,21 @@ const scandinavian = {
   notes: "Light wood, muted tones.",
   references: ["Kinfolk magazine"],
 };
+
+// A minimal v2 list node: a `role: "title"` field, plus whatever else the test
+// is about. Written as a helper because the descriptor for a title field is the
+// same three keys every time, and a dozen tests below care about one row, one
+// column, or one label rather than about the node.
+const listNode = (path, titleField, fields = [], extra = {}) => ({
+  kind: "list",
+  path,
+  element: {
+    entity: extra.entity ?? "thing",
+    identifier: titleField,
+    fields: [{ name: titleField, role: "title" }, ...fields],
+  },
+  ...extra.node,
+});
 
 // ListRenderer is controlled (items in, onItems reports a replacement array
 // out), so any test that needs a real add/remove round-trip renders it
@@ -73,7 +120,7 @@ const emptyPanel = () => screen.getByText(/Nothing here yet/).parentElement;
 const panelAdd = () => within(emptyPanel()).getByRole("button", { name: /^Add / });
 
 describe("ListRenderer", () => {
-  it("renders each row's title, and badges for fields listed in node.badges", () => {
+  it("renders each row's title, and badges for fields that take the badge position", () => {
     render(
       <ListRenderer node={node} entity={entity} items={[scandinavian]} onItems={() => {}} />
     );
@@ -158,15 +205,19 @@ describe("ListRenderer", () => {
   });
 
   it("names an untitled, entityless node's trigger after nothing it does not have", () => {
-    // `node.entity ?? node.title ?? "item"`, the same fallback chain the empty
-    // panel's button uses -- an accessible name of "Add undefined" would be
-    // worse than the bare "Add" this replaced.
-    const entityless = { kind: "list", path: ["goals"], title_field: "title" };
+    // `node.element.entity ?? node.title ?? "item"`, the same fallback chain the
+    // empty panel's button uses -- an accessible name of "Add undefined" would be
+    // worse than the bare "Add" this replaced. This element names no entity, which
+    // is the case the chain exists for.
+    const entityless = {
+      kind: "list", path: ["goals"],
+      element: { identifier: "title", fields: [{ name: "title", role: "title" }] },
+    };
     render(<ListRenderer node={entityless} items={[{ title: "Ship it" }]} onItems={() => {}} />);
     expect(screen.getByRole("button", { name: "Add item" })).toBeInTheDocument();
   });
 
-  it("merges entity.field_defaults into a new item added via the dialog", async () => {
+  it("merges a field's declared default into a new item added via the dialog", async () => {
     const { user, latest } = renderStateful([scandinavian]);
 
     await user.click(headerAdd());
@@ -207,8 +258,8 @@ describe("ListRenderer", () => {
     await user.type(titleInput, "Scandinavian");
 
     // Index 1: title Input is index 0; domain/stance are EnumControls (no
-    // textbox role); notes is the next textbox (a Textarea, "notes" is in
-    // the default long-text set).
+    // textbox role); notes is the next textbox (a Textarea, because `notes`
+    // declares type: "longtext").
     const notesInput = within(dialog).getAllByRole("textbox")[1];
     await user.type(notesInput, "met at a conference");
 
@@ -239,14 +290,16 @@ describe("ListRenderer", () => {
     expect(latest()[0]).toMatchObject({ name: "Minimalist", stance: "like" });
   });
 
-  // A schema-valid node need not carry `entity` at all -- waves 3-6 author
-  // exactly such nodes for sections whose storage keys diverge from any
-  // entity's manifest names. Before this fix, the Add dialog heading did
-  // `node.entity.replace(...)` unconditionally and threw on click with no
-  // error boundary anywhere in the app to catch it (see ListRenderer.jsx and
-  // the crash this guarded against).
+  // An element that names no entity. v2's schema requires one on a list element,
+  // so this guards a hand-built node rather than a shipped shape -- but the crash
+  // is real and the guard is cheap: the Add dialog heading did
+  // `node.entity.replace(...)` unconditionally and threw on click, with no error
+  // boundary anywhere in the app to catch it.
   it("does not throw and shows a sensible Add dialog heading when the node has no entity", async () => {
-    const entitylessNode = { kind: "list", path: ["goals"], title_field: "title" };
+    const entitylessNode = {
+      kind: "list", path: ["goals"],
+      element: { identifier: "title", fields: [{ name: "title", role: "title" }] },
+    };
     const user = userEvent.setup();
     render(
       <ListRenderer node={entitylessNode} entity={undefined} items={[]} onItems={() => {}} />
@@ -267,11 +320,14 @@ describe("ListRenderer", () => {
     expect(screen.getByRole("heading", { name: "Add to Aesthetic style" })).toBeInTheDocument();
   });
 
-  it("uses node.long_text (array form) over the default long-text set to render a textarea", async () => {
-    // "summary" has no enum, isn't an array field, and isn't in ScalarField's
-    // default LONG_TEXT_FIELDS set, so this only renders a Textarea if the
-    // node-declared long_text is honoured.
-    const longTextNode = { ...node, detail_fields: ["summary"], long_text: ["summary"] };
+  it('renders a textarea for a field declaring type: "longtext", whatever it is called', async () => {
+    // Was "uses node.long_text (array form) over the default long-text set". v2
+    // deleted that node-level array along with the name heuristic it overrode: a
+    // field says it is long text or it is not. "summary" is not in ScalarField's
+    // default LONG_TEXT_FIELDS set, so this still only renders a Textarea if the
+    // declaration is honoured -- the assertion whose absence let six declared
+    // textareas become one-line inputs.
+    const longTextNode = withFields({ name: "summary", type: "longtext" });
     const item = { ...scandinavian, summary: "A short summary" };
     const user = userEvent.setup();
     render(<ListRenderer node={longTextNode} entity={entity} items={[item]} onItems={() => {}} />);
@@ -282,15 +338,15 @@ describe("ListRenderer", () => {
     expect(el.tagName).toBe("TEXTAREA");
   });
 
-  it("gives node.optional precedence over entity.optional for the custom_* overflow input", async () => {
-    // entity.optional lists custom_stance, but this node declares its own
-    // inline enum with no custom_* override -- node.optional (empty) must
-    // win, so no custom input appears for value "other".
-    const inlineEnumNode = {
-      ...node,
-      enum: { stance: ["love", "like", "avoid", "other"] },
-      optional: [],
-    };
+  it("draws no custom_* overflow input for an enum that does not declare allow_custom, whatever the entity's optional list says", async () => {
+    // Was "gives node.optional precedence over entity.optional". Both halves of
+    // that precedence are gone: v2 says `allow_custom: true` on the field, which
+    // replaced the `custom_<field>` naming convention a renderer used to match on
+    // inside the entity's `optional` list. `entity.optional` still lists
+    // custom_stance, and it must now buy nothing.
+    const inlineEnumNode = withFields({
+      name: "stance", type: "enum", values: ["love", "like", "avoid", "other"],
+    });
     const user = userEvent.setup();
     render(
       <ListRenderer
@@ -312,7 +368,7 @@ describe("ListRenderer", () => {
     // alongside the array, the stale key (1) points at nothing and the
     // fresh key (0) was never set, so the row collapses even though the
     // user never touched it.
-    const simpleNode = { kind: "list", path: ["items"], title_field: "name", detail_fields: ["note"] };
+    const simpleNode = listNode(["items"], "name", [{ name: "note" }]);
     const items = [
       { name: "First", note: "note-1" },
       { name: "Second", note: "note-2" },
@@ -338,7 +394,7 @@ describe("ListRenderer", () => {
     // so the row the user had open at index 0 is now at index 1 -- if
     // `expanded` isn't remapped alongside it, the stale key (0) addresses the
     // brand-new row instead, and the row the user was reading collapses.
-    const simpleNode = { kind: "list", path: ["items"], title_field: "name", detail_fields: ["note"] };
+    const simpleNode = listNode(["items"], "name", [{ name: "note" }]);
     function Harness() {
       const [state, setState] = useState([
         { name: "React Server Components", note: "note-1" },
@@ -363,7 +419,7 @@ describe("ListRenderer", () => {
 
   it('falls back to a neutral "Untitled entry" confirmation instead of "Remove undefined?" for a row with no title', async () => {
     const onShowConfirmation = vi.fn();
-    const titlelessNode = { kind: "list", path: ["items"], title_field: "name" };
+    const titlelessNode = listNode(["items"], "name");
     const user = userEvent.setup();
     render(
       <ListRenderer
@@ -396,14 +452,15 @@ describe("ListRenderer", () => {
   });
 });
 
-describe("@now in field_defaults", () => {
-  const node = {
-    kind: "list",
-    path: ["entries"],
-    title_field: "topic",
-    detail_fields: ["source"],
-    field_defaults: { source: "manual", timestamp: "@now" },
-  };
+describe("@now in a field's declared default", () => {
+  // `timestamp` declares a default and NO position (`show: []`, the same way
+  // knowledge's `created_at` is written): the token has to reach `addItem`
+  // through the defaults without any control ever rendering for it, which is the
+  // whole reason it needs resolving after the draft is merged.
+  const node = listNode(["entries"], "topic", [
+    { name: "source", default: "manual" },
+    { name: "timestamp", default: "@now", show: [], ui_only: true },
+  ]);
 
   it("resolves @now to an ISO timestamp when an item is added", async () => {
     const onItems = vi.fn();
@@ -439,7 +496,7 @@ describe("@now in field_defaults", () => {
     const user = userEvent.setup();
     render(
       <ListRenderer
-        node={{ ...node, field_defaults: { source: "@channel" } }}
+        node={listNode(["entries"], "topic", [{ name: "source", default: "@channel" }])}
         items={[]}
         onItems={onItems}
       />
@@ -477,13 +534,11 @@ describe("@now in field_defaults", () => {
 });
 
 describe("sort", () => {
-  const node = {
-    kind: "list",
-    path: ["entries"],
-    title_field: "topic",
-    detail_fields: ["source"],
-    sort: { field: "timestamp", dir: "desc" },
-  };
+  // `sort` stays a node key in v2 -- it is display order for the whole list, not
+  // a property of one field.
+  const node = listNode(["entries"], "topic", [{ name: "source" }], {
+    node: { sort: { field: "timestamp", dir: "desc" } },
+  });
   const items = [
     { topic: "Oldest", source: "a", timestamp: "2026-01-01T00:00:00.000Z" },
     { topic: "Newest", source: "b", timestamp: "2026-06-01T00:00:00.000Z" },
@@ -544,13 +599,9 @@ describe("sort", () => {
   });
 
   it("compares numeric sort fields numerically, not lexicographically", () => {
-    const numericNode = {
-      kind: "list",
-      path: ["entries"],
-      title_field: "topic",
-      detail_fields: ["source"],
-      sort: { field: "priority", dir: "asc" },
-    };
+    const numericNode = listNode(["entries"], "topic", [{ name: "source" }], {
+      node: { sort: { field: "priority", dir: "asc" } },
+    });
     const numericItems = [
       { topic: "Ten", source: "a", priority: 10 },
       { topic: "Two", source: "b", priority: 2 },
@@ -582,17 +633,19 @@ describe("sort", () => {
 });
 
 describe("search", () => {
-  const node = {
-    kind: "list", path: ["items"], title_field: "name",
-    detail_fields: ["relationship"], array_fields: ["traits"], searchable: true,
-  };
+  // `search: true`, not v1's `searchable`: the manifest key and the renderer key
+  // are now the same word. `traits` is a `strings` field, which is what puts its
+  // entries in the search index.
+  const node = listNode(["items"], "name", [
+    { name: "relationship" }, { name: "traits", type: "strings" },
+  ], { node: { search: true } });
   const items = [
     { name: "Ada Lovelace", relationship: "Mentor", traits: ["maths"] },
     { name: "Grace Hopper", relationship: "Colleague", traits: ["compilers"] },
   ];
 
   it("is absent when the node does not opt in", () => {
-    render(<ListRenderer node={{ ...node, searchable: false }} items={items} onItems={vi.fn()} />);
+    render(<ListRenderer node={{ ...node, search: false }} items={items} onItems={vi.fn()} />);
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
   });
 
@@ -706,11 +759,9 @@ describe("search", () => {
 });
 
 describe("search combined with sort", () => {
-  const node = {
-    kind: "list", path: ["entries"], title_field: "topic",
-    detail_fields: ["source"], searchable: true,
-    sort: { field: "priority", dir: "asc" },
-  };
+  const node = listNode(["entries"], "topic", [{ name: "source" }], {
+    node: { search: true, sort: { field: "priority", dir: "asc" } },
+  });
   const items = [
     { topic: "Zeta task", source: "z", priority: 3 },
     { topic: "Alpha task", source: "a", priority: 1 },
@@ -742,15 +793,15 @@ describe("search combined with sort", () => {
   });
 });
 
-describe("display_fields", () => {
-  const node = {
-    kind: "list",
-    path: ["entries"],
-    title_field: "topic",
-    detail_fields: ["details"],
-    display_fields: ["timestamp"],
-    display_formats: { timestamp: "datetime" },
-  };
+describe('the "row" position -- read-only values on the collapsed row', () => {
+  // v1's `display_fields` + `display_formats`, said once per field: `show:
+  // ["row"]` puts the value on the row, `format` says how to render it.
+  const dated = (format) =>
+    listNode(["entries"], "topic", [
+      { name: "details" },
+      ...(format === undefined ? [] : [{ name: "timestamp", show: ["row"], format, ui_only: true }]),
+    ]);
+  const node = dated("datetime");
   const iso = "2026-01-15T09:30:00.000Z";
   // Formatting is local-time, so derive the expectation the same way rather
   // than hardcoding a string that breaks in another timezone.
@@ -769,11 +820,7 @@ describe("display_fields", () => {
 
   it("renders date-only when the format says so", () => {
     render(
-      <ListRenderer
-        node={{ ...node, display_formats: { timestamp: "date" } }}
-        items={items}
-        onItems={vi.fn()}
-      />
+      <ListRenderer node={dated("date")} items={items} onItems={vi.fn()} />
     );
     expect(screen.getByText(expected.slice(0, 10))).toBeInTheDocument();
   });
@@ -792,13 +839,7 @@ describe("display_fields", () => {
       // assertion below is only as strong as whoever's timezone ran it.
       expect(new Date("2026-01-12").getDate()).toBe(11);
 
-      render(
-        <ListRenderer
-          node={{ ...node, display_formats: { timestamp: "date" } }}
-          items={dateOnly}
-          onItems={vi.fn()}
-        />
-      );
+      render(<ListRenderer node={dated("date")} items={dateOnly} onItems={vi.fn()} />);
       expect(screen.getByText("2026-01-12")).toBeInTheDocument();
       expect(screen.queryByText("2026-01-11")).not.toBeInTheDocument();
     });
@@ -806,7 +847,7 @@ describe("display_fields", () => {
     it("does not roll a new-year date back into the previous year", () => {
       render(
         <ListRenderer
-          node={{ ...node, display_formats: { timestamp: "date" } }}
+          node={dated("date")}
           items={[{ topic: "NY", timestamp: "2026-01-01" }]}
           onItems={vi.fn()}
         />
@@ -817,11 +858,7 @@ describe("display_fields", () => {
 
     it("shows no invented midnight under the datetime format either", () => {
       render(
-        <ListRenderer
-          node={{ ...node, display_formats: { timestamp: "datetime" } }}
-          items={dateOnly}
-          onItems={vi.fn()}
-        />
+        <ListRenderer node={dated("datetime")} items={dateOnly} onItems={vi.fn()} />
       );
       // There is no time in the stored value, so there is none to display.
       expect(screen.getByText("2026-01-12")).toBeInTheDocument();
@@ -855,10 +892,9 @@ describe("display_fields", () => {
     expect(screen.getByText("next spring")).toBeInTheDocument();
   });
 
-  it("renders nothing extra for a node that declares no display_fields", () => {
+  it("renders nothing extra for a node with no field in the row position", () => {
     const { container } = render(
-      <ListRenderer node={{ ...node, display_fields: undefined, display_formats: undefined }}
-        items={items} onItems={vi.fn()} />
+      <ListRenderer node={dated(undefined)} items={items} onItems={vi.fn()} />
     );
     expect(screen.queryByText(expected)).not.toBeInTheDocument();
     expect(container.querySelectorAll(".font-mono")).toHaveLength(0);
@@ -883,14 +919,16 @@ describe("display_fields", () => {
 // trimming a trailing "s" (reference/tag/highlight), so that's what's tested
 // below rather than an invented irregular noun.
 // ---------------------------------------------------------------------------
-describe("count_badges", () => {
-  const node = {
-    kind: "list",
-    path: ["entries"],
-    title_field: "topic",
-    detail_fields: ["notes"],
-    count_badges: ["references", "tags", "highlights"],
-  };
+describe('the "count" position -- "N <field>" chips', () => {
+  // v1's `count_badges`. Each of the three declares `show: ["count"]` and so
+  // takes no form position: the chip is the whole of its rendering, which is what
+  // the read-only assertions below are about.
+  const counted = (...names) =>
+    listNode(["entries"], "topic", [
+      { name: "notes", type: "longtext" },
+      ...names.map((name) => ({ name, type: "strings", show: ["count"] })),
+    ]);
+  const node = counted("references", "tags", "highlights");
 
   it("renders 'N <field>' for a field with multiple entries", () => {
     const items = [{ topic: "RSC", references: ["a", "b", "c"] }];
@@ -937,7 +975,7 @@ describe("count_badges", () => {
     expect(screen.getByText("RSC")).toBeInTheDocument();
   });
 
-  it("is read-only -- expanding the row exposes no control bound to it beyond what detail_fields declares", async () => {
+  it("is read-only -- expanding the row exposes no control bound to it beyond what the form position declares", async () => {
     const items = [{ topic: "RSC", notes: "n", references: ["a", "b"] }];
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
@@ -948,33 +986,28 @@ describe("count_badges", () => {
     // `notes` proves the row really expanded.
     expect(screen.getByDisplayValue("n")).toBeInTheDocument();
     // No control anywhere shows the raw array value or field name as an
-    // editable input -- only detail_fields (here, "notes") get a control.
+    // editable input -- only a field in the form position (here, "notes").
     expect(screen.queryByDisplayValue("a,b")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^references$/i)).not.toBeInTheDocument();
   });
 
-  it("renders nothing extra for a node that declares no count_badges", () => {
+  it("renders nothing extra for a node with no field in the count position", () => {
     const items = [{ topic: "RSC", references: ["a", "b", "c"] }];
-    render(
-      <ListRenderer node={{ ...node, count_badges: undefined }} items={items} onItems={vi.fn()} />
-    );
+    render(<ListRenderer node={counted()} items={items} onItems={vi.fn()} />);
     expect(screen.queryByText(/references|tags|highlights/)).not.toBeInTheDocument();
   });
 });
 
-describe("title field also listed in detail_fields", () => {
-  // Step 9 of wave 3 task 8 put the title field into detail_fields so it
-  // renders editable in the expanded row -- but editFields is badges union
-  // detail_fields, and the Add dialog already renders a dedicated title
+describe("title field also taking the form position", () => {
+  // Step 9 of wave 3 task 8 gave the title field a form position so it renders
+  // editable in the expanded row -- but editFields is the badge and form
+  // positions unioned, and the Add dialog already renders a dedicated title
   // Label+Input (with suggestion chips and Enter-to-submit) above its
-  // editFields.map loop. Without excluding the title field from that loop,
-  // the Add dialog shows the same field twice.
-  const node = {
-    kind: "list",
-    path: ["entries"],
-    title_field: "topic",
-    detail_fields: ["topic", "source"],
-  };
+  // editFields.map loop. Without excluding the title field from that loop, the
+  // Add dialog shows the same field twice. In v2 this is the DEFAULT shape: a
+  // title field with nothing said about its position takes `form`, so every list
+  // node in every shipped pack is now this case.
+  const node = listNode(["entries"], "topic", [{ name: "source" }]);
   const items = [{ topic: "RSC", source: "conversation" }];
 
   it("shows exactly one control for the title field in the Add dialog", async () => {
@@ -1010,7 +1043,7 @@ describe("row delete button naming", () => {
     const user = userEvent.setup();
     render(
       <ListRenderer
-        node={{ kind: "list", path: ["items"], title_field: "name" }}
+        node={listNode(["items"], "name")}
         items={[{ name: "Ada" }]}
         onItems={vi.fn()}
         onShowConfirmation={onShowConfirmation}
@@ -1027,7 +1060,7 @@ describe("row delete button naming", () => {
 });
 
 describe("detail-grid column spans", () => {
-  const base = { kind: "list", path: ["items"], title_field: "name" };
+  const base = (...fields) => listNode(["items"], "name", fields);
   const item = { name: "Row", status: "want", stance: "love", notes: "n", tags: ["t"] };
 
   function cellFor(label) {
@@ -1036,11 +1069,10 @@ describe("detail-grid column spans", () => {
   }
 
   it("gives a four-option segmented enum the full row", async () => {
-    const node = {
-      ...base,
-      detail_fields: ["status"],
-      enum: { status: ["want", "in_progress", "finished", "dropped"] },
-    };
+    const node = base({
+      name: "status", type: "enum",
+      values: ["want", "in_progress", "finished", "dropped"],
+    });
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[item]} onItems={vi.fn()} />);
     await user.click(screen.getByText("Row"));
@@ -1049,11 +1081,7 @@ describe("detail-grid column spans", () => {
   });
 
   it("leaves a three-option enum in its column, where it already fits", async () => {
-    const node = {
-      ...base,
-      detail_fields: ["stance"],
-      enum: { stance: ["love", "like", "avoid"] },
-    };
+    const node = base({ name: "stance", type: "enum", values: ["love", "like", "avoid"] });
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[item]} onItems={vi.fn()} />);
     await user.click(screen.getByText("Row"));
@@ -1062,13 +1090,10 @@ describe("detail-grid column spans", () => {
   });
 
   it("leaves a large enum in its column, because it renders as a compact dropdown", async () => {
-    const node = {
-      ...base,
-      detail_fields: ["kind"],
-      enum: {
-        kind: ["book", "article", "podcast", "show", "film", "game", "video", "music"],
-      },
-    };
+    const node = base({
+      name: "kind", type: "enum",
+      values: ["book", "article", "podcast", "show", "film", "game", "video", "music"],
+    });
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[{ ...item, kind: "book" }]} onItems={vi.fn()} />);
     await user.click(screen.getByText("Row"));
@@ -1077,7 +1102,7 @@ describe("detail-grid column spans", () => {
   });
 
   it("still gives long text and array fields the full row", async () => {
-    const node = { ...base, detail_fields: ["notes", "tags"], array_fields: ["tags"] };
+    const node = base({ name: "notes", type: "longtext" }, { name: "tags", type: "strings" });
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[item]} onItems={vi.fn()} />);
     await user.click(screen.getByText("Row"));
@@ -1088,13 +1113,16 @@ describe("detail-grid column spans", () => {
 });
 
 // ---------------------------------------------------------------------------
-// children -- nested child lists (wave 4, Task 2)
+// block fields -- nested child lists (wave 4, Task 2)
 //
-// A `ui` list node may carry `children[]`, each child another node whose
-// `path` resolves against the LIST ITEM rather than the section root. All the
-// tests below expand the parent row first: a child list only exists inside an
-// expanded row, so an assertion made against a collapsed row cannot fail for
-// the reason it claims.
+// A list node's element may declare a `type: "list"` field with a `label`, which
+// renders as its own titled block under the row: its `path` is the field's name
+// and resolves against the LIST ITEM rather than the section root. v1 spelled
+// this as a nested `children[]` array of whole nodes, which is the ambiguity v2
+// deleted -- a child bound against the row while a group's children bound
+// against the section root, from the same key. All the tests below expand the
+// parent row first: a block only exists inside an expanded row, so an assertion
+// made against a collapsed row cannot fail for the reason it claims.
 //
 // Selector note: with a nested list there are now delete buttons and Add
 // buttons at two levels, and neither accessible name is namespaced by level.
@@ -1110,22 +1138,34 @@ describe("detail-grid column spans", () => {
 // way such a test could fail is if someone made the names distinct, i.e. it
 // would block the very improvement it describes.
 // ---------------------------------------------------------------------------
-describe("children", () => {
-  const childNode = {
-    kind: "list",
-    path: ["references"],
-    entity: "reference",
-    title: "References",
-    title_field: "name",
-    detail_fields: ["url", "notes"],
+describe("block fields", () => {
+  // The block: an array-of-objects field with a label to sit under. `show: []`
+  // because the block IS its rendering -- it takes no position on the row, the
+  // same way profile's `clubs` does. `notes` declares longtext, which is where v1
+  // got a textarea from the field's name alone.
+  const referencesField = {
+    name: "references",
+    type: "list",
+    label: "References",
+    show: [],
+    element: {
+      entity: "reference",
+      identifier: "name",
+      fields: [
+        { name: "name", role: "title" },
+        { name: "url" },
+        { name: "notes", type: "longtext" },
+      ],
+    },
   };
   const parentNode = {
     kind: "list",
     path: ["projects"],
-    entity: "project",
-    title_field: "name",
-    detail_fields: ["status"],
-    children: [childNode],
+    element: {
+      entity: "project",
+      identifier: "name",
+      fields: [{ name: "name", role: "title" }, { name: "status" }, referencesField],
+    },
   };
   const entities = {
     project: { optional: [] },
@@ -1150,8 +1190,8 @@ describe("children", () => {
   };
   const items = [alpha, beta];
 
-  // The wrapper a child list renders inside, located by the child's own
-  // title label rather than by DOM position.
+  // The wrapper a block renders inside, located by the block's own title label
+  // rather than by DOM position.
   // The child's label now sits in its own heading row (label + optional info
   // button) inside the child block, so the block is two levels up rather than
   // one. Explicit rather than a class selector: if the structure changes
@@ -1180,7 +1220,7 @@ describe("children", () => {
     return { ...utils, user: userEvent.setup(), latest: () => seen };
   }
 
-  it("renders a child list inside an expanded row, and not inside a collapsed one", async () => {
+  it("renders a block inside an expanded row, and not inside a collapsed one", async () => {
     const user = userEvent.setup();
     render(
       <ListRenderer
@@ -1364,7 +1404,7 @@ describe("children", () => {
   });
 
   it("edits the right child while a search filter is active", async () => {
-    const searchable = { ...parentNode, searchable: true };
+    const searchable = { ...parentNode, search: true };
     const onItems = vi.fn();
     const before = JSON.stringify(items);
     const user = userEvent.setup();
@@ -1403,42 +1443,22 @@ describe("children", () => {
     expect(next[0]).toBe(alpha);
   });
 
-  it("logs a child node of an unsupported kind (naming the pack) and still renders the parent row's own fields", async () => {
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    // "table" is deliberately a kind nothing implements. This test is about
-    // the fallback for an UNSUPPORTED kind, so it must not name one the
-    // renderer has since grown (it used to say "fields", which wave 5 added).
-    //
-    // No `path` either: an unsupported kind carries no guarantee of a
-    // well-formed path, and neither the value read nor the React key may
-    // assume one.
-    const node = { ...parentNode, children: [{ kind: "table", title: "Meta" }] };
-    const user = userEvent.setup();
-    render(
-      <ListRenderer
-        node={node}
-        entities={entities}
-        entity={entities.project}
-        packKey="wave4_test"
-        items={[alpha]}
-        onItems={vi.fn()}
-      />
-    );
+  // DELETED with the format change: "logs a child node of an unsupported kind
+  // (naming the pack) and still renders the parent row's own fields".
+  //
+  // It built `children: [{kind: "table", title: "Meta"}]` -- a whole node, of a
+  // kind nothing implements, with no path. A block is no longer a node the
+  // manifest writes: it is projected from a field whose `name` is required and
+  // whose `type` decides the kind (`list` or `strings`, nothing else), so
+  // ListRenderer cannot be handed a block of an unsupported kind or without a
+  // path. There is nothing left here to construct.
+  //
+  // renderNode's guards themselves are unchanged and still covered, directly, by
+  // renderNode.test.jsx: "returns null and logs for an unsupported kind, naming
+  // the kind and pack" and "logs and returns null for a list node with no valid
+  // path, naming the pack".
 
-    await user.click(screen.getByText("Alpha"));
-
-    // The parent row is intact.
-    expect(screen.getByDisplayValue("active")).toBeInTheDocument();
-    // Nothing was rendered for the rejected child -- not even its heading.
-    expect(screen.queryByText("Meta")).not.toBeInTheDocument();
-    expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining('unsupported node kind "table"')
-    );
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("wave4_test"));
-    spy.mockRestore();
-  });
-
-  it("renders an empty child list, without logging, for an item that has no value at the child path", async () => {
+  it("renders an empty block, without logging, for an item that has no value at the block's path", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     const gamma = { id: "p3", name: "Gamma", status: "idea" };
     const user = userEvent.setup();
@@ -1462,7 +1482,7 @@ describe("children", () => {
     spy.mockRestore();
   });
 
-  it("writes into a parent item that has no key at the child path at all, without disturbing its other keys", async () => {
+  it("writes into a parent item that has no key at the block's path at all, without disturbing its other keys", async () => {
     const gamma = { id: "p3", name: "Gamma", status: "idea" };
     const { user, latest } = renderStatefulParent([gamma]);
 
@@ -1494,18 +1514,18 @@ describe("children", () => {
 // yet to collide with.
 // ---------------------------------------------------------------------------
 describe("facets", () => {
-  const facetNode = {
-    kind: "list",
-    path: ["projects"],
-    title_field: "name",
-    detail_fields: ["status", "notes"],
-    searchable: true,
-    facets: ["status"],
-    // Deliberately different from entity.valid_values below -- proves the
-    // facet resolves options with node.enum taking precedence, the same
-    // precedence ScalarField uses (node.enum ?? entity?.valid_values).
-    enum: { status: ["active", "paused", "completed"] },
-  };
+  // The entity below declares deliberately wrong options: the facet resolves its
+  // chips from the same `meta` ScalarField reads, which is the field's own
+  // `values` and nothing else.
+  const facetNode = listNode(
+    ["projects"],
+    "name",
+    [
+      { name: "status", type: "enum", values: ["active", "paused", "completed"] },
+      { name: "notes", type: "longtext" },
+    ],
+    { node: { search: true, facets: ["status"] } }
+  );
   const entity = { valid_values: { status: ["wrong_one", "wrong_two"] } };
   const items = [
     { name: "Alpha", status: "active", notes: "team review" },
@@ -1517,7 +1537,7 @@ describe("facets", () => {
     return screen.getByRole("group", { name: "Filter by status" });
   }
 
-  it("renders one option per enum value plus an All, using node.enum in preference to entity.valid_values", () => {
+  it("renders one option per declared value plus an All, ignoring the entity's valid_values", () => {
     render(
       <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
     );
@@ -1671,12 +1691,7 @@ describe("row identity for a title edit when the row has no stored id", () => {
   }
 
   it("keeps every keystroke, not just the first, typed into a top-level row's title field", async () => {
-    const node = {
-      kind: "list",
-      path: ["entries"],
-      title_field: "topic",
-      detail_fields: ["topic", "source"],
-    };
+    const node = listNode(["entries"], "topic", [{ name: "source" }]);
     // No `id` -- the shape addItem itself produces, and the shape every
     // id-less real-pack row has.
     const { user } = renderStatefulGeneric(node, [{ topic: "RSC", source: "conversation" }]);
@@ -1688,21 +1703,29 @@ describe("row identity for a title edit when the row has no stored id", () => {
   });
 
   it("keeps every keystroke typed into a child reference row's name field, mirroring project_reference/domain_reference/mental_tab_reference -- all permanently id-less", async () => {
-    const childNode = {
-      kind: "list",
-      path: ["references"],
-      entity: "project_reference",
-      title: "References",
-      title_field: "name",
-      detail_fields: ["name", "url", "notes"],
+    const referencesField = {
+      name: "references",
+      type: "list",
+      label: "References",
+      show: [],
+      element: {
+        entity: "project_reference",
+        identifier: "name",
+        fields: [
+          { name: "name", role: "title" },
+          { name: "url" },
+          { name: "notes", type: "longtext" },
+        ],
+      },
     };
     const parentNode = {
       kind: "list",
       path: ["projects"],
-      entity: "project",
-      title_field: "name",
-      detail_fields: ["status"],
-      children: [childNode],
+      element: {
+        entity: "project",
+        identifier: "name",
+        fields: [{ name: "name", role: "title" }, { name: "status" }, referencesField],
+      },
     };
     const entities = { project: { optional: [] }, project_reference: { optional: [] } };
     const alpha = {
@@ -1750,7 +1773,7 @@ describe("row identity for a title edit when the row has no stored id", () => {
 // projects, knowledge, circle and learning_log -- which is every pack that has
 // no suggestions.
 describe("empty state offers a way in", () => {
-  const node = { kind: "list", path: ["items"], title_field: "name", entity: "thing" };
+  const node = listNode(["items"], "name");
 
   it("offers an Add action inside the empty panel, naming what it adds", async () => {
     const user = userEvent.setup();
@@ -1765,7 +1788,7 @@ describe("empty state offers a way in", () => {
   });
 
   it("seeds field_defaults identically whether opened from the panel or the header", async () => {
-    const withDefaults = { ...node, detail_fields: ["stance"], field_defaults: { stance: "like" } };
+    const withDefaults = listNode(["items"], "name", [{ name: "stance", default: "like" }]);
     const user = userEvent.setup();
     const seeded = () => within(screen.getByRole("dialog")).getByDisplayValue("like");
 
@@ -1788,13 +1811,15 @@ describe("empty state offers a way in", () => {
   });
 
   it("does mention them when the node has some", () => {
-    const withSuggestions = { ...node, suggestions: { name: ["Minimalist"] } };
+    const withSuggestions = listNode(["items"], "name", [], {
+      node: { element: { ...node.element, fields: [{ name: "name", role: "title", suggestions: ["Minimalist"] }] } },
+    });
     render(<ListRenderer node={withSuggestions} items={[]} onItems={vi.fn()} />);
     expect(screen.getByText(/tap a suggestion below/)).toBeInTheDocument();
   });
 
   it("shows the no-matches wording instead when a search hides every row", async () => {
-    const searchable = { ...node, searchable: true };
+    const searchable = { ...node, search: true };
     const user = userEvent.setup();
     render(<ListRenderer node={searchable} items={[{ name: "Alpha" }]} onItems={vi.fn()} />);
 
@@ -1820,10 +1845,9 @@ describe("empty state offers a way in", () => {
 // asserted below: reopening from the panel after an Escape showed no defaults,
 // and Cancel left the abandoned draft in the fields.
 describe("the Add dialog's draft across repeated opens", () => {
-  const node = {
-    kind: "list", path: ["items"], title: "Mental tab", title_field: "name",
-    entity: "thing", detail_fields: ["stance"], field_defaults: { stance: "like" },
-  };
+  const node = listNode(["items"], "name", [{ name: "stance", default: "like" }], {
+    node: { title: "Mental tab" },
+  });
 
   const titleInput = () => within(screen.getByRole("dialog")).getAllByRole("textbox")[0];
 
@@ -1865,15 +1889,15 @@ describe("the Add dialog's draft across repeated opens", () => {
 // `display_fields` as datetime/date, which today is exactly one shipped node
 // (learning_log/entries).
 describe("sort control", () => {
-  const sortNode = {
-    kind: "list",
-    path: ["entries"],
-    title_field: "topic",
-    detail_fields: ["details"],
-    display_fields: ["timestamp"],
-    display_formats: { timestamp: "datetime" },
-    sort: { field: "timestamp", dir: "desc" },
-  };
+  const sortNode = listNode(
+    ["entries"],
+    "topic",
+    [
+      { name: "details" },
+      { name: "timestamp", show: ["row"], format: "datetime", ui_only: true },
+    ],
+    { node: { sort: { field: "timestamp", dir: "desc" } } }
+  );
   // Stored deliberately out of order, so a passing assertion cannot be an
   // accident of the array's own sequence. Titles are Greek rather than
   // "Newest"/"Oldest" on purpose: those words are the CONTROL's own labels,
@@ -1916,12 +1940,10 @@ describe("sort control", () => {
     // two write paths disagree -- one local time labelled UTC, one real UTC --
     // so ordering by it would be wrong by the offset for half the entries.
     // Sourcing the rule from display_fields is what keeps it out.
-    const hidden = {
-      ...sortNode,
-      display_fields: [],
-      display_formats: { created_at: "datetime" },
-      sort: undefined,
-    };
+    const hidden = listNode(["entries"], "topic", [
+      { name: "details" },
+      { name: "created_at", show: [], format: "datetime", ui_only: true },
+    ]);
     render(<ListRenderer node={hidden} items={entries} onItems={vi.fn()} />);
 
     expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
@@ -1997,7 +2019,7 @@ describe("sort control", () => {
   it("leaves a lone count unpushed, having nothing to sit opposite", () => {
     // No facets, no date field: the row is the count by itself, and shoving it
     // against the right edge would just look like a mistake.
-    const plain = { kind: "list", path: ["entries"], title_field: "topic" };
+    const plain = listNode(["entries"], "topic");
     render(<ListRenderer node={plain} items={[{ topic: "Alpha" }]} onItems={vi.fn()} />);
 
     expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();

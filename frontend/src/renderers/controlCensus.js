@@ -11,11 +11,19 @@
 // So this is the missing half of that freeze. It records the CHOICE, not the
 // name, for exactly the fields a form draws a control for.
 //
-// It mirrors ScalarField's branch ORDER rather than its markup, and the order is
-// load-bearing: an enum wins over everything, and a field that is both `date`
-// and long text renders a picker. Keeping the order here in step with
-// ScalarField is the one maintenance cost, and `controlCensus.test.js` renders
-// real packs through the real component to prove they still agree.
+// `controlFor` below mirrors ScalarField's branch ORDER rather than its markup,
+// and the order is load-bearing: an enum wins over everything, and a field that
+// is both `date` and long text renders a picker. That mirroring is a hand-written
+// copy, so it is the one thing here that can rot, and a copy compared only
+// against itself proves nothing -- an earlier version of this comment claimed a
+// render-based check that did not exist, and a review found it by reversing the
+// chain and watching every test stay green.
+//
+// `controlCensus.render.test.jsx` is the real check: it renders ScalarField,
+// reads the control kind back out of the DOM by markup alone, and asserts the two
+// agree -- including for metas that match TWO branches at once, which is what
+// makes the order observable. No shipped field is ambiguous like that, which is
+// why the ambiguous cases have to be constructed.
 //
 // The value-dependent fallbacks in ScalarField are deliberately NOT modelled: a
 // `date` field holding "next spring" renders a text input instead of a picker,
@@ -23,6 +31,7 @@
 // describes what the manifest asks for.
 import { LONG_TEXT_FIELDS } from "./ScalarField";
 import { buildFieldMeta } from "./fieldMeta";
+import { elementShape, blockNode } from "./elementShape";
 import { normalizeUi } from "./paths";
 
 // ScalarField's branches, in the order it tests them.
@@ -44,15 +53,13 @@ export function controlFor(meta, field) {
 }
 
 // Every field a node draws a control for, which is what `meta` is consulted
-// about. `title_field` leads because ListRenderer prepends it whether or not the
-// node names it in the form -- see the comment at its `bodyEditFields`.
-export function controlledFields(node) {
-  const names = [
-    node.title_field,
-    ...(node.detail_fields ?? node.fields ?? []),
-    ...(node.badges ?? []),
-  ].filter(Boolean);
-  return [...new Set(names)];
+// about. The title field leads because ListRenderer prepends it whether or not
+// it declares the `form` position -- see the comment at its `bodyEditFields`.
+// Takes the shape rather than the node so a caller that already has one does not
+// pay for a second pass, and so the census can be asked about a block node built
+// by `blockNode`.
+export function controlledFields(shape) {
+  return [...new Set([shape.titleField, ...shape.form, ...shape.badges].filter(Boolean))];
 }
 
 export function controlCensus(pack) {
@@ -64,13 +71,17 @@ export function controlCensus(pack) {
         visit(node.sections, `${label} > `);
         continue;
       }
+      const shape = elementShape(node);
+      // A `strings` node stores bare strings, so it has no named keys to draw
+      // controls for and no `meta` to consult -- its one presentation choice
+      // (chips or rows) is the node's `control`, not a field's.
       if (node.kind !== "strings") {
-        const meta = buildFieldMeta(node, pack.entities?.[node.entity]);
+        const meta = buildFieldMeta(node, pack.entities?.[node.element?.entity]);
         out[label] = Object.fromEntries(
-          controlledFields(node).map((f) => [f, controlFor(meta, f)])
+          controlledFields(shape).map((f) => [f, controlFor(meta, f)])
         );
       }
-      visit(node.children, `${label} > `);
+      visit(shape.blocks.map(blockNode), `${label} > `);
     }
   };
   visit(normalizeUi(pack).sections, "");

@@ -4,7 +4,6 @@
 //
 // No React import, no DOM access, no side effects. Later renderer waves
 // depend on that purity, so keep it that way.
-import { v1Shape } from "./v2Node";
 
 /**
  * Reads the value at `path` inside `obj`. Returns `undefined` if any
@@ -181,16 +180,16 @@ export function outline(pack) {
 }
 
 export function normalizeUi(pack) {
-  // A pack declares its nodes at the top level. `ui.sections` is the shape the
-  // manifests used before format v2 and the shape most of the renderer tests
-  // still construct by hand, so both are read; the wrapper goes in Phase B with
-  // the shim, when there is one shape left to read.
+  // A pack declares its nodes at the top level. `ui.sections` is the wrapper the
+  // manifests used before format v2, and the shape a handful of hand-built test
+  // packs still use, so both are read; the wrapper itself goes in Task 10, along
+  // with the legacy flat map below.
   const explicit = pack?.sections ?? pack?.ui?.sections;
-  // Every node leaves here in the shape the renderers consume, whichever format
-  // it arrived in. `v1Shape` passes an already-v1 node through untouched, so the
-  // hand-built test packs are unaffected; the line is dead once Phase B teaches
-  // the renderers to read descriptors directly.
-  if (Array.isArray(explicit)) return { sections: explicit.map(v1Shape) };
+  // Passed through untouched. The shim that used to sit on this line rebuilt
+  // v1's parallel arrays from each node's field descriptors so the renderers
+  // did not have to change in the same commit the manifests did; every renderer
+  // now reads the descriptors, so there is one shape and nothing to translate.
+  if (Array.isArray(explicit)) return { sections: explicit };
 
   const ui = pack?.ui;
   if (!ui) return { sections: [] };

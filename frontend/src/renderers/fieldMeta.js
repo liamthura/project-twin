@@ -7,26 +7,25 @@
 // Two paths, because two vintages of node describe a field's properties
 // differently.
 //
-// A descriptor-shaped node (`node.element.fields` present -- the shim in
-// v2Node.js passes `element` through untouched alongside the flat arrays it
-// also builds) has exactly ONE source for everything below: the field's own
-// descriptor. There is no entity to fall back to and no node-level override to
-// prefer, because v2 states a field's vocabulary, default and placeholder once,
-// on the field, and nowhere else -- the whole point of the format change was
-// deleting the second copy. `fromDescriptors` below reads that one place.
+// A descriptor-shaped node (`node.element.fields` present) has exactly ONE
+// source for everything below: the field's own descriptor. There is no entity to
+// fall back to and no node-level override to prefer, because v2 states a field's
+// vocabulary, default and placeholder once, on the field, and nowhere else --
+// the whole point of the format change was deleting the second copy.
+// `fromDescriptors` below reads that one place, and it is the branch every
+// shipped node takes.
 //
-// Everything else -- a hand-built v1 node (of which this file's own tests
-// construct many) and any node the shim has not yet touched -- still resolves
-// the OLD way, and that old way still needs its precedence documented: a
-// NODE-level key wins over the entity's vocabulary. A section whose manifest
-// field names are not its storage keys declares the difference on the node,
-// and that override is the whole reason ScalarField takes a pre-resolved meta
-// instead of an entity. This path is not dead: Task 9 deletes the flat arrays
-// (and the node keys that feed this branch) only after every renderer reads
-// descriptors directly, which is not yet true of every node kind this file
-// serves.
+// The other branch is for a hand-built v1 node, of which this file's own tests
+// construct many, and its precedence still needs documenting: a NODE-level key
+// wins over the entity's vocabulary, which is the whole reason ScalarField takes
+// a pre-resolved meta instead of an entity. Nothing in the manifests, in
+// `normalizeUi` or in any renderer produces such a node any more -- the shim
+// that did was deleted with the parallel arrays it rebuilt -- so this branch and
+// the node keys that feed it (`enum`, `long_text`, `optional`, `bool_fields`)
+// are Task 10's to remove.
 import { SEGMENTED_MAX } from "@/components/controls";
 import { LONG_TEXT_FIELDS } from "./ScalarField";
+import { isBlockField } from "./elementShape";
 
 export function buildFieldMeta(node, entity) {
   if (node.element?.fields) return fromDescriptors(node.element.fields);
@@ -53,25 +52,24 @@ export function buildFieldMeta(node, entity) {
   };
 }
 
-// One field descriptor can describe a control this node does not draw at all:
-// a labelled `strings`/`list` field (`{name: "highlights", type: "strings",
-// label: "Highlights", ...}`) is v1Shape's cue to lift it into its own child
-// block instead of an inline chip control on this row -- see `childNode` in
-// v2Node.js. Its vocabulary, default and placeholder belong to that child, not
-// to this node's own fields, exactly as v1Shape's `expandFields` withholds them
-// (the `isChild` branch there). Getting this wrong is not cosmetic:
-// ListRenderer spreads `meta.array_fields` wholesale into its search index
-// (`searchFields`), so a leaked "highlights" would make profile's Education
-// list search inside a field it renders nowhere near the row.
+// One field descriptor can describe a control this node does not draw at all: a
+// labelled `strings`/`list` field (`{name: "highlights", type: "strings",
+// label: "Highlights", ...}`) is lifted into its own titled block under the row
+// instead of an inline chip control inside it -- see `isBlockField` and
+// `blockNode` in elementShape.js, which own that rule so this file and the
+// renderers cannot answer it differently. Such a field's vocabulary, default and
+// placeholder belong to the BLOCK, which gets them back through the node
+// `blockNode` builds; they must not also reach the parent row's `meta`.
 //
-// `write_only` and a pinned field are excluded the same way v1Shape excludes
-// them from every array and map it builds -- neither renders a control here
-// (write_only renders nowhere at all; a pinned field is drawn as the star that
-// claims the slot), so neither should seed one through a stray lookup either.
-function isChildField(field) {
-  return Boolean(field.label) && (field.type === "strings" || field.type === "list");
-}
-
+// Getting this wrong is not cosmetic: ListRenderer spreads `meta.array_fields`
+// wholesale into its search index (`searchFields`), so a leaked "highlights"
+// would make profile's Education list search inside a field it renders nowhere
+// near the row.
+//
+// `write_only` and a pinned field are excluded for the same reason -- neither
+// renders a control here (write_only renders nowhere at all; a pinned field is
+// drawn as the star that claims the slot), so neither should seed one through a
+// stray lookup either.
 function fromDescriptors(fields) {
   const valid_values = {};
   const field_defaults = {};
@@ -93,7 +91,7 @@ function fromDescriptors(fields) {
 
   for (const field of fields) {
     if (field.write_only || field.pin) continue;
-    const isChild = isChildField(field);
+    const isChild = isBlockField(field);
 
     if (!isChild) {
       if ("values" in field) valid_values[field.name] = field.values;

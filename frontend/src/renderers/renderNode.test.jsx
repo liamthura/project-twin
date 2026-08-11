@@ -7,7 +7,18 @@ import { renderNode } from "./renderNode";
 // directly, without a Card or a pack, which is exactly the call shape a child
 // node needs and the old inline dispatch could not offer.
 describe("renderNode", () => {
-  const listNode = { kind: "list", path: ["items"], title_field: "name", detail_fields: ["note"] };
+  // Descriptors: `name` is the title by `role`, `note` takes the default `form`
+  // position, and the entity name lives inside `element` where renderNode looks
+  // it up.
+  const listNode = {
+    kind: "list",
+    path: ["items"],
+    element: {
+      entity: "thing",
+      identifier: "name",
+      fields: [{ name: "name", role: "title" }, { name: "note" }],
+    },
+  };
 
   it("renders a list node against the value it is handed, not a section root", () => {
     renderResult({ node: listNode, value: [{ name: "Row", note: "n" }] });
@@ -26,19 +37,35 @@ describe("renderNode", () => {
     expect(onValue.mock.calls.at(-1)[0]).toEqual([{ name: "Row", note: "nX" }]);
   });
 
-  it("resolves its entity from the entities map it is given", async () => {
+  it("renders a field's enum from its own descriptor, whatever the entities map says", async () => {
+    // Was "resolves its entity from the entities map it is given", which could
+    // only be observed through the entity's `valid_values` -- the second copy v2
+    // deleted. renderNode still resolves the entity (see the threading suite),
+    // but no renderer reads a vocabulary out of it, so the observable claim here
+    // is now the descriptor's: an `enum` field renders as buttons, and an entity
+    // offering a different vocabulary changes nothing.
     const user = userEvent.setup();
-    const node = { ...listNode, entity: "thing", detail_fields: ["stance"] };
+    const node = {
+      ...listNode,
+      element: {
+        ...listNode.element,
+        fields: [
+          { name: "name", role: "title" },
+          { name: "stance", type: "enum", values: ["love", "like"] },
+        ],
+      },
+    };
     renderResult({
       node,
       value: [{ name: "Row", stance: "love" }],
-      entities: { thing: { valid_values: { stance: ["love", "like"] } } },
+      entities: { thing: { valid_values: { stance: ["wrong_one", "wrong_two"] } } },
     });
-    // detail_fields only render once the row is expanded -- same as every
-    // other renderResult test here that inspects a detail field.
+    // Form fields only render once the row is expanded -- same as every
+    // other renderResult test here that inspects one.
     await user.click(screen.getByText("Row"));
     // An enum renders as a pressed segmented button, not a text input.
     expect(screen.getByRole("button", { name: "love", pressed: true })).toBeInTheDocument();
+    expect(screen.queryByText("wrong_one")).not.toBeInTheDocument();
   });
 
   it("returns null and logs for an unsupported kind, naming the kind and pack", () => {
@@ -161,7 +188,10 @@ describe("renderNode", () => {
     const fieldsNode = {
       kind: "fields",
       path: ["communication", "default"],
-      fields: ["tone", "locale"],
+      element: {
+        entity: "communication_default",
+        fields: [{ name: "tone" }, { name: "locale" }],
+      },
     };
 
     it("renders a fields node without logging an unsupported-kind error", () => {
@@ -177,7 +207,10 @@ describe("renderNode", () => {
       // The non-empty-path rule is conditional on kind: "list" in
       // meta_schema.json precisely so this shape stays legal.
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-      renderResult({ node: { kind: "fields", path: [], fields: ["name"] }, value: { name: "Ada" } });
+      renderResult({
+        node: { kind: "fields", path: [], element: { entity: "basic_info", fields: [{ name: "name" }] } },
+        value: { name: "Ada" },
+      });
 
       expect(screen.getByLabelText("Name")).toHaveValue("Ada");
       expect(spy).not.toHaveBeenCalled();
@@ -187,7 +220,7 @@ describe("renderNode", () => {
     it("logs and renders nothing for a fields node with no path at all", () => {
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
       const { container } = renderResult({
-        node: { kind: "fields", fields: ["tone"] },
+        node: { kind: "fields", element: { entity: "x", fields: [{ name: "tone" }] } },
         packKey: "preferences",
       });
 
@@ -196,14 +229,24 @@ describe("renderNode", () => {
       spy.mockRestore();
     });
 
-    it("resolves its entity from the entities map, so enums render", () => {
+    it("renders a fields node's enum from the field's own descriptor", () => {
+      // Was "resolves its entity from the entities map, so enums render". Same
+      // reason as the list case above: the entity is still resolved and handed
+      // over, but a vocabulary now comes from the field and from nowhere else.
       renderResult({
-        node: { ...fieldsNode, entity: "communication_default" },
+        node: {
+          ...fieldsNode,
+          element: {
+            ...fieldsNode.element,
+            fields: [{ name: "tone", type: "enum", values: ["warm", "direct"] }, { name: "locale" }],
+          },
+        },
         value: {},
-        entities: { communication_default: { valid_values: { tone: ["warm", "direct"] } } },
+        entities: { communication_default: { valid_values: { tone: ["wrong"] } } },
       });
 
       expect(screen.getByRole("button", { name: "warm" })).toBeInTheDocument();
+      expect(screen.queryByText("wrong")).not.toBeInTheDocument();
     });
 
     it("reports edits through onValue as the merged object", async () => {

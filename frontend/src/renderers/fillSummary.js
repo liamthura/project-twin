@@ -12,8 +12,14 @@
 // Pure, and in its own file rather than inside the card, because "what counts
 // as filled" is exactly the kind of rule that gets re-answered differently in
 // a second place.
+import { elementShape } from "./elementShape";
+
 export function fillSummary(node, value) {
-  const fields = node?.fields ?? [];
+  // The same list FieldsRenderer draws, from the same pass: the count is
+  // "how many of the controls below are answered", so a denominator that
+  // counted anything the card does not render would be a promise the screen
+  // cannot keep.
+  const fields = node ? elementShape(node).form : [];
   // A path never written reads back as undefined, and an MCP client can leave
   // any shape behind -- FieldsRenderer already renders empty controls for a
   // non-object rather than throwing, so this reports the same emptiness rather

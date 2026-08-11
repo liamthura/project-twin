@@ -5,10 +5,10 @@
 // is stored is the string, not an object with a key. So unlike ListRenderer
 // this takes no `entity` and builds no field meta.
 //
-// Two presentations, chosen per node by `item_control`, because the retired
-// editors used both and the difference is not cosmetic:
+// Two presentations, chosen by `control`, because the retired editors used both
+// and the difference is not cosmetic:
 //
-//   "tag" (default) -- ArrayInput's chips. Right for short, word-like values
+//   "chips" (default) -- ArrayInput's chips. Right for short, word-like values
 //     you add and remove but never revise: "integrity", "Python", "Docker".
 //     Editing means deleting and retyping, which is cheap for one word.
 //
@@ -17,6 +17,14 @@
 //     education highlights ("Reduced processing time by 40%"). ProfileEditor
 //     rendered these as editable rows for exactly that reason, and binding
 //     them as chips was a real loss of function, not just of styling.
+//
+// `control` sits on the NODE for a top-level `strings` node and on the FIELD for
+// an array-valued field rendered as a block under a row -- the same key, the
+// same meaning, and `blockNode` carries the field's copy onto the node it builds
+// so this file only ever has one place to look. v1 spelled the node-level key
+// `item_control` and its default "tag"; v2 spells the default "chips", which is
+// what ArrayInput actually renders, and no shipped pack declares it (all five
+// declarations are "input"), so nothing depends on the old spelling.
 import { Plus, Trash2 } from "lucide-react";
 
 import { ArrayInput } from "@/components/ArrayInput";
@@ -41,7 +49,7 @@ export function StringsRenderer({ node, items, onItems }) {
 
   // `node.description` is deliberately NOT rendered here: SectionRenderer draws
   // it under the node's heading, for every kind.
-  if (node.item_control !== "input") {
+  if (node.control !== "input") {
     return (
       <ArrayInput
         items={list}

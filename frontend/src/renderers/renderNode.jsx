@@ -6,6 +6,14 @@
 // The seam is a plain function, not a component, so a caller can decide where
 // its output goes -- inside a Card, inside a row, or nowhere.
 //
+// The entity is resolved HERE, out of the pack's map, so no renderer has to
+// carry the map around: a node names its entity inside its `element` (v1 put the
+// name on the node itself, which is why a `fields` node's on-screen description
+// and its entity's MCP-facing description collided on one key). Every renderer
+// below gets the resolved object or `undefined`, and none of them reads a
+// field's vocabulary or default from it any more -- see the note on
+// `buildFieldMeta`'s two branches in fieldMeta.js.
+//
 // A node with no valid `path` array logs loudly and renders nothing,
 // rather than silently falling back to an empty, unwritable list -- see the
 // guard below. This is one deliberate departure from pure byte-parity with
@@ -59,7 +67,7 @@ export function renderNode({ node, value, onValue, entities, packKey, onShowConf
     return (
       <FieldsRenderer
         node={node}
-        entity={entities?.[node.entity]}
+        entity={entities?.[node.element?.entity]}
         value={value}
         onValue={onValue}
         packKey={packKey}
@@ -92,7 +100,7 @@ export function renderNode({ node, value, onValue, entities, packKey, onShowConf
   return (
     <ListRenderer
       node={node}
-      entity={entities?.[node.entity]}
+      entity={entities?.[node.element?.entity]}
       entities={entities}
       packKey={packKey}
       items={Array.isArray(value) ? value : []}

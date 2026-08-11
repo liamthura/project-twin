@@ -7,9 +7,21 @@
 //   - takes a pre-resolved `entity` spec object (or undefined)
 //   - delegates every field control to ScalarField via a `meta` built from
 //     `node` and `entity`
-//   - `node.enum` and `node.field_defaults` take precedence over the
-//     entity's, for sections whose manifest field names are not their
-//     storage keys (unused by today's packs, needed by waves 3-6)
+//
+// WHERE THE FIELDS COME FROM. Everything this file used to read off nine
+// parallel arrays on the node (`title_field`, `badges`, `detail_fields`,
+// `display_fields`, `count_badges`, `display_formats`, `suggestions`,
+// `field_defaults`, `pinned`) now comes from `element.fields` -- one descriptor
+// per field, saying its own type, vocabulary, default and positions. See
+// elementShape.js for the pass that reads them, and meta_schema.json for what
+// each key means. The arrays are gone from the manifests, from the schema and
+// from here; nothing translates between the two shapes any more.
+//
+// The pre-resolved `entity` is no longer consulted for anything this file
+// renders: v2 states a field's vocabulary and default on the field, so there is
+// no second copy on the entity to prefer or fall back to. It is still passed to
+// `buildFieldMeta`, whose pre-v2 branch is Task 10's to delete along with the
+// last node keys that feed it.
 import { useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Trash2, ChevronDown, Star } from "lucide-react";
@@ -21,18 +33,18 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { InfoButton } from "@/components/ui/info-button";
 import { VALUE_META, FOCUS_RING, ValueIcon, EnumControl } from "@/components/controls";
 import { ScalarField, ISO_DATE } from "./ScalarField";
 import { buildFieldMeta, needsFullRow as fieldNeedsFullRow } from "./fieldMeta";
+import { elementShape, blockNode } from "./elementShape";
 import { buildOrder, filterVisible, applyFacets } from "./listPipeline";
 import { getAt } from "./paths";
 import { useListItems } from "./useListItems";
 import { AddEntryDialog } from "./AddEntryDialog";
 import { HeaderActionSlotContext, useHeaderActionSlot } from "./headerActionSlot";
 // Circular by construction: renderNode imports ListRenderer to dispatch a
-// "list" node, and ListRenderer imports renderNode to dispatch a node's
-// `children` against one of its own items.
+// "list" node, and ListRenderer imports renderNode to dispatch a row's block
+// fields (an array-valued field with a `label`) against one of its own items.
 //
 // The rule that actually matters: neither module may dereference the other's
 // export at module-initialisation time, and today neither does -- both sides
@@ -77,10 +89,10 @@ function formatDisplay(value, format) {
 }
 
 // `entities` (the whole map) and `packKey` are passed straight back into
-// renderNode when dispatching `node.children` against a row's item, the same
-// way SectionRenderer dispatches a section's own top-level nodes -- the child
-// resolves its own entity out of the map, and packKey names the pack in any
-// log the child's dispatch emits. `entity` stays the pre-resolved object it
+// renderNode when dispatching a row's block fields against that row's item, the
+// same way SectionRenderer dispatches a section's own top-level nodes -- the
+// block resolves its own entity out of the map, and packKey names the pack in
+// any log the block's dispatch emits. `entity` stays the pre-resolved object it
 // always was, for every existing call site and test.
 export default function ListRenderer({
   node, entity, entities, packKey, items, onItems, onShowConfirmation,
@@ -104,10 +116,22 @@ export default function ListRenderer({
   // key and adds nothing to the storage-keys reference.
   const [sortDir, setSortDir] = useState(null);
   const sortId = useId();
-  const titleField = node.title_field;
-  const badges = node.badges || [];
-  const detailFields = node.detail_fields || [];
-  const suggestions = node.suggestions?.[titleField] || [];
+  const meta = buildFieldMeta(node, entity);
+  // Every position this node's fields occupy, in declaration order, from one
+  // pass over `element.fields`. `blocks` and `pinned` are the two that are not
+  // just names -- see elementShape.js.
+  const {
+    titleField, badges, form: detailFields, row: displayFields, count: countBadges,
+    blocks, pinned, suggestions, formats,
+    // Fields at most one row may hold as true, declared by the field itself
+    // (`exclusive: true`). Setting one clears every other row's copy -- see
+    // useListItems -- so the invariant holds however the user gets there:
+    // `aesthetics.primary` decides which entry rides into the minimal context
+    // scope, and two primaries would make that a coin toss. v1 read this off the
+    // entity's `exclusive_fields`, which is now DERIVED from this flag rather
+    // than declared beside it.
+    exclusive: exclusiveFields,
+  } = elementShape(node);
   const existingTitles = new Set(items.map((i) => (i[titleField] || "").toLowerCase()));
   // A node may lift ONE row out of the list and render it above, as the
   // section's answer to a question the list as a whole cannot answer --
@@ -115,30 +139,33 @@ export default function ListRenderer({
   // the list below rather than shown twice, and every remaining row gets a
   // star to claim the slot. The flag itself never appears as a field control:
   // a labelled switch inside a detail grid is a poor way to say "this one is
-  // THE one".
-  const pinnedField = node.pinned?.field;
+  // THE one" -- which is why elementShape gives a pinned field no position at
+  // all, and why nothing below has to filter it back out.
+  const pinnedField = pinned?.field;
   const pinnedIdx = pinnedField
     ? items.findIndex((i) => i && i[pinnedField] === true)
     : -1;
-  const editFields = [...new Set([...badges, ...detailFields])].filter(
-    (f) => f !== pinnedField
-  );
+  const editFields = [...new Set([...badges, ...detailFields])];
   // What the expanded row actually offers a control for. The title field leads
-  // whether or not the manifest named it in detail_fields: it is the one field
-  // every row has, the Add dialog has always given it its own input, and three
-  // shipped nodes (goals, media, aesthetics) omitted it -- so an entry could be
-  // named once and never renamed. Making it a renderer guarantee stops the
-  // omission recurring in the next manifest, which naming it in three
-  // manifests would not.
-  const bodyEditFields = [...new Set([titleField, ...editFields])].filter(
-    (f) => f && f !== pinnedField
-  );
-  const fieldDefaults = node.field_defaults ?? entity?.field_defaults ?? {};
+  // whether or not it declares the `form` position: it is the one field every
+  // row has, the Add dialog has always given it its own input, and three
+  // shipped nodes (goals, media, aesthetics) left it out of v1's detail_fields
+  // -- so an entry could be named once and never renamed. Making it a renderer
+  // guarantee stops the omission recurring in the next manifest, which naming
+  // it in three manifests would not.
+  const bodyEditFields = [...new Set([titleField, ...editFields])].filter(Boolean);
+  // Declared per field (`default`), collected by fieldMeta in the same pass that
+  // withholds a block's own default from its parent. No entity fallback: v2
+  // states a default once, and the entity's copy is DERIVED from these
+  // descriptors minus anything marked `off_contract` -- so preferring it would
+  // silently drop education's `status: "current"`, which the form applies and
+  // the MCP contract deliberately does not.
+  const fieldDefaults = meta.field_defaults ?? {};
   // What this list holds, for the Add affordances. Was inline in the dialog
   // heading only; the header button said a bare "Add", which reads fine beside
   // a populated list and says nothing on an empty screen where it is the only
   // thing to act on.
-  const addLabel = (node.entity ?? node.title ?? "item").replace(/_/g, " ");
+  const addLabel = (node.element?.entity ?? node.title ?? "item").replace(/_/g, " ");
   // Opens the dialog from outside Radix's trigger, for the empty-state panel
   // below. AddEntryDialog seeds its own draft from `fieldDefaults` off the
   // `open` prop -- deliberately, because a change made here is invisible to
@@ -146,17 +173,10 @@ export default function ListRenderer({
   // points, this one and the header's DialogTrigger, seed identically by
   // construction rather than by two call sites agreeing.
   const openAdd = () => setAddOpen(true);
-  const meta = buildFieldMeta(node, entity);
 
   // See needsFullRow in fieldMeta.js -- shared so this list's edit form and a
   // `fields` node lay out the same field identically.
   const needsFullRow = (f) => fieldNeedsFullRow(meta, f);
-
-  // Fields at most one row may hold as true, declared on the entity. Setting
-  // one clears every other row's copy, so the invariant holds however the user
-  // gets there -- `aesthetics.primary` decides which entry rides into the
-  // minimal context scope, and two primaries would make that a coin toss.
-  const exclusiveFields = entity?.exclusive_fields || [];
 
   // The list-editing rules live in useListItems: index-shifting on add and
   // remove, the "@now" resolution order, exclusive-field clearing, and the
@@ -175,18 +195,17 @@ export default function ListRenderer({
     onShowConfirmation,
   });
 
-  // The one field this list can offer to re-order by: a display field the
-  // manifest formats as a date. Sourced from `display_formats` rather than
+  // The one field this list can offer to re-order by: a field shown on the row
+  // that declares a date `format`. Sourced from that declaration rather than
   // from any key that merely looks like a date, which is what keeps
   // `knowledge`'s `created_at` out of it -- that manifest records that its two
   // write paths disagree (one local time labelled UTC, one real UTC), so any
-  // ordering by it would be wrong by the offset for half the entries. It is
-  // not a display field, and this rule only ever reads display fields.
+  // ordering by it would be wrong by the offset for half the entries. It takes
+  // no `row` position (its `show` is empty), and this rule only ever reads the
+  // fields the row shows.
   //
   // Today exactly one shipped node qualifies: learning_log/entries.
-  const sortField = (node.display_fields || []).find((f) =>
-    ["datetime", "date"].includes(node.display_formats?.[f]),
-  );
+  const sortField = displayFields.find((f) => ["datetime", "date"].includes(formats[f]));
   // What the control shows. Falls back to the declared direction when the
   // section declares one on this same field, so learning_log opens on
   // "Newest" -- the order it already had.
@@ -218,12 +237,14 @@ export default function ListRenderer({
   // Facets narrow the search box's own output -- same stored indexes in,
   // same stored indexes out -- so the two compose instead of racing: a query
   // and an active facet both hide a row, neither can un-hide what the other
-  // excluded. `facetOptions` resolves per field with the same precedence
-  // ScalarField uses (node.enum wins over the entity's), so a node with an
-  // inline enum still gets a facet instead of one silently rendering no
-  // options. A facet field with no resolvable options is skipped entirely
-  // below rather than narrowing on a value that could never be selected.
-  const facetOptions = (field) => node.enum?.[field] ?? entity?.valid_values?.[field];
+  // excluded. `facetOptions` reads the very `meta` ScalarField is handed, so a
+  // facet's chips and the row's own control for that field can never offer
+  // different vocabularies -- v1 resolved the two separately and had to be told
+  // to agree. A facet field with no resolvable options is skipped entirely
+  // below rather than narrowing on a value that could never be selected; the
+  // loader only accepts a facet naming a declared enum, so that is a guard
+  // against a hand-built node rather than a shipped one.
+  const facetOptions = (field) => meta.valid_values?.[field];
   const visible = applyFacets(searched, items, node.facets, facetValues)
     .filter((idx) => idx !== pinnedIdx);
   // Whether the header's "N of M" count needs to account for something
@@ -294,7 +315,7 @@ export default function ListRenderer({
           on an empty state that tells them to "clear the search" with nothing
           left to clear it with. Still absent when there's genuinely nothing
           to search (no items, no active query). */}
-      {node.searchable && (items.length > 0 || q) && (
+      {node.search && (items.length > 0 || q) && (
         <Input
           type="search"
           aria-label="Search"
@@ -415,10 +436,10 @@ export default function ListRenderer({
       {pinnedField && (
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground">
-            {node.pinned.title}
+            {pinned.title}
           </p>
           {pinnedIdx === -1 ? (
-            <EmptyState>{node.pinned.empty}</EmptyState>
+            <EmptyState>{pinned.empty}</EmptyState>
           ) : (
             <div className="rounded-md border border-primary/40 bg-primary/[0.03]">
               {renderRow(pinnedIdx)}
@@ -477,7 +498,7 @@ export default function ListRenderer({
     const item = items[idx];
     // Only the fields this row actually carries a value for -- a blank line
     // labelled "timestamp" is worse than no line.
-    const bodyDisplayFields = (node.display_fields || []).filter(
+    const bodyDisplayFields = displayFields.filter(
       (f) => item[f] != null && item[f] !== ""
     );
     return (
@@ -511,11 +532,11 @@ export default function ListRenderer({
                 <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
                 <span className="block truncate text-sm font-medium">{item[titleField]}</span>
                 <span className="mt-1 flex flex-wrap items-center gap-1.5 sm:mt-0 sm:flex-1 sm:flex-nowrap">
-                  {(node.display_fields || [])
+                  {displayFields
                     .filter((f) => item[f] != null && item[f] !== "")
                     .map((f) => (
                       <Badge key={f} variant="secondary" className="gap-1 text-[10px] font-mono">
-                        {formatDisplay(item[f], node.display_formats?.[f])}
+                        {formatDisplay(item[f], formats[f])}
                       </Badge>
                     ))}
                   {/* count_badges: opt-in "N <field>" chips for array-valued
@@ -531,7 +552,7 @@ export default function ListRenderer({
                       actually names (references/tags/highlights); a plural
                       that doesn't just add "s" (e.g. an irregular noun) would
                       read oddly singular, but no such field exists yet. */}
-                  {(node.count_badges || [])
+                  {countBadges
                     .filter((f) => Array.isArray(item[f]) && item[f].length > 0)
                     .map((f) => {
                       const n = item[f].length;
@@ -567,8 +588,8 @@ export default function ListRenderer({
                     }`}
                     aria-label={
                       idx === pinnedIdx
-                        ? `${item[titleField] || "Untitled entry"} is ${node.pinned.noun}`
-                        : `Make ${item[titleField] || "Untitled entry"} ${node.pinned.noun}`
+                        ? `${item[titleField] || "Untitled entry"} is ${pinned.noun}`
+                        : `Make ${item[titleField] || "Untitled entry"} ${pinned.noun}`
                     }
                     aria-pressed={idx === pinnedIdx}
                     disabled={idx === pinnedIdx}
@@ -600,7 +621,7 @@ export default function ListRenderer({
                       <div key={f}>
                         <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
                         <p className="font-mono text-xs text-muted-foreground">
-                          {formatDisplay(item[f], node.display_formats?.[f])}
+                          {formatDisplay(item[f], formats[f])}
                         </p>
                       </div>
                     ))}
@@ -625,50 +646,64 @@ export default function ListRenderer({
                     </div>
                   ))}
                 </div>
-                {/* Child nodes, dispatched through the same seam the section
-                    root uses -- but bound to THIS item: the child's `path`
-                    resolves against `item`, and its writes go back through
-                    `updateItemAt(idx, ...)`. `idx` is the row's own stored
-                    index (from `visible`), never a display position: `order`
-                    and `visible` mean the row on screen is not the row at
-                    that array position. */}
-                {/* A child list is a descendant of THIS one, so it would
+                {/* Block fields, dispatched through the same seam the section
+                    root uses -- but bound to THIS item: the block's `path` is
+                    `[field.name]` and resolves against `item`, and its writes go
+                    back through `updateItemAt(idx, ...)`. `idx` is the row's own
+                    stored index (from `visible`), never a display position:
+                    `order` and `visible` mean the row on screen is not the row
+                    at that array position.
+
+                    This is what v1 spelled as a nested `children` array, and the
+                    reason v2 does not: a child bound against the ROW while a
+                    group's children bound against the SECTION ROOT, from the
+                    same key. As a field inside `element.fields` there is only
+                    one reading available -- an array-valued key ON this row --
+                    which is exactly what `updateItemAt` writes. */}
+                {/* A block list is a descendant of THIS one, so it would
                     otherwise read the very header slot this list just claimed
                     and portal its own Add up there too -- two triggers in the
-                    section header, none beside the child rows. Handing
-                    descendants `null` sends a child list down the inline
+                    section header, none beside the block's rows. Handing
+                    descendants `null` sends a block list down the inline
                     branch, which is where a nested Add belongs: its own
                     heading is a Label inside the row, not a section header. */}
                 <HeaderActionSlotContext.Provider value={null}>
-                {(node.children || []).map((child, ci) => {
-                  // Only a well-formed path can be read or written. A child of
-                  // an unsupported kind carries no such guarantee, and getAt
-                  // throws on a non-iterable path -- so guard before reading,
-                  // exactly as SectionRenderer guards at the root.
-                  const hasPath = Array.isArray(child.path);
+                {blocks.map((field, ci) => {
+                  // A field's `name` is required and its `type` decides the kind,
+                  // so unlike a hand-authored v1 child there is no such thing
+                  // here as a block with no path or an unsupported kind -- see
+                  // blockNode in elementShape.js. renderNode's own guards still
+                  // hold that line for a node arriving from anywhere else.
+                  const child = blockNode(field);
                   const rendered = renderNode({
                     node: child,
-                    value: hasPath ? getAt(item, child.path) : undefined,
+                    value: getAt(item, child.path),
                     onValue: (next) => updateItemAt(idx, child.path, next),
                     entities,
                     packKey,
                     onShowConfirmation,
                   });
                   // renderNode returns null (after logging) for a node it
-                  // rejects. Bail before the wrapper so a rejected child
+                  // rejects. Bail before the wrapper so a rejected block
                   // contributes nothing -- not an empty div, and not a
                   // heading floating over nothing.
                   if (!rendered) return null;
                   return (
                     <div
-                      key={`${ci}:${hasPath ? child.path.join(".") : ""}`}
+                      key={`${ci}:${child.path.join(".")}`}
                       data-ui-node={child.title}
                       className="space-y-2 px-4 pb-3 sm:px-9"
                     >
+                      {/* The heading row keeps its flex wrapper even though it
+                          now holds one child: a field descriptor carries no
+                          `info` -- the dialog belongs to a NODE, and a v1 child
+                          could hold one where a block field cannot -- so the
+                          InfoButton that sat here always rendered null for every
+                          child in every shipped pack, and there is nothing left
+                          for it to draw. */}
                       {child.title && (
                         <div className="flex items-center gap-1.5">
                           <Label className="text-xs capitalize">{child.title}</Label>
-                          <InfoButton info={child.info} title={child.title} />
                         </div>
                       )}
                       {rendered}

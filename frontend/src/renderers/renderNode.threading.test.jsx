@@ -27,7 +27,14 @@ import ListRenderer from "./ListRenderer";
 import { renderNode } from "./renderNode";
 
 describe("renderNode threading entities/packKey into ListRenderer", () => {
-  const node = { kind: "list", path: ["items"], title_field: "name", entity: "thing" };
+  // Descriptors, and the entity name inside `element` -- which is where
+  // renderNode resolves it from, so `props.entity` below still lands on
+  // `entities.thing`.
+  const node = {
+    kind: "list",
+    path: ["items"],
+    element: { entity: "thing", identifier: "name", fields: [{ name: "name", role: "title" }] },
+  };
 
   // No global clearMocks -- clear this suite's own mock explicitly so a
   // second test's toHaveBeenCalledTimes(1) isn't counting the first test's

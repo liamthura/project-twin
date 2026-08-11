@@ -7,8 +7,6 @@ import { describe, expect, it } from "vitest";
 
 import { buildFieldMeta } from "./fieldMeta";
 import { LONG_TEXT_FIELDS } from "./ScalarField";
-import { v1Shape } from "./v2Node";
-import parity from "@/__fixtures__/shim-parity.json";
 
 // Every assertion here pins a precedence rule that already shipped in
 // ListRenderer. The point of the extraction is that FieldsRenderer resolves
@@ -100,12 +98,12 @@ describe("buildFieldMeta", () => {
   });
 });
 
-// A descriptor-shaped node -- `node.element.fields` present, the shape
-// v2Node.js's shim now passes through additively -- takes an entirely
-// different path through buildFieldMeta: every value below comes from the
-// field's own descriptor, and `entity` is never consulted. These pin that
-// path down the same way the suite above pins the old one, field by field
-// rather than by trusting one big fixture.
+// A descriptor-shaped node -- `node.element.fields` present, which is every node
+// in every shipped pack -- takes an entirely different path through
+// buildFieldMeta: every value below comes from the field's own descriptor, and
+// `entity` is never consulted. These pin that path down the same way the suite
+// above pins the old one, field by field rather than by trusting one big
+// fixture.
 describe("buildFieldMeta with a descriptor-shaped node", () => {
   const node = (fields) => ({ kind: "list", path: ["xs"], element: { entity: "x", identifier: "n", fields } });
 
@@ -160,10 +158,11 @@ describe("buildFieldMeta with a descriptor-shaped node", () => {
 
   it("withholds a labelled array field's vocabulary from the parent -- it renders as a child block, not a row control", () => {
     // Same shape as profile.education's `highlights`: a `strings` field with a
-    // `label`. v1Shape lifts it into `node.children` instead of this node's
-    // own row, and ListRenderer spreads `meta.array_fields` wholesale into its
-    // search index -- a leaked entry here would make the parent list search a
-    // field it draws no control for.
+    // `label`. It renders as its own titled block under the row rather than as a
+    // control inside it (see isBlockField in elementShape.js), and ListRenderer
+    // spreads `meta.array_fields` wholesale into its search index -- a leaked
+    // entry here would make the parent list search a field it draws no control
+    // for.
     const meta = buildFieldMeta(node([
       { name: "highlights", type: "strings", label: "Highlights", placeholder: "e.g. ..." },
     ]));
@@ -171,7 +170,7 @@ describe("buildFieldMeta with a descriptor-shaped node", () => {
     expect(meta.field_placeholders).toEqual({});
   });
 
-  it("withholds a write_only field and a pinned field the same way v1Shape does", () => {
+  it("withholds a write_only field and a pinned field, neither of which draws a control", () => {
     const meta = buildFieldMeta(node([
       { name: "hidden", type: "strings", write_only: true },
       { name: "primary", type: "bool", pin: { title: "Primary", empty: "None", noun: "primary" } },
@@ -181,10 +180,11 @@ describe("buildFieldMeta with a descriptor-shaped node", () => {
   });
 
   it("takes this path over the old one even when the node also carries flat v1 arrays", () => {
-    // The shape v1Shape actually hands renderers post-shim: both the
-    // descriptor and the flat arrays it was expanded into are present on the
-    // same node. The descriptor wins outright -- there is one source now --
-    // so a stale or mismatched flat array is never consulted.
+    // A node carrying both: the descriptor AND a leftover flat array naming the
+    // same field. Nothing produces this shape any more -- the shim that did is
+    // deleted -- but an un-migrated `_template` or a hand-built node still can,
+    // and the descriptor must win outright rather than the two being merged into
+    // a vocabulary neither declares.
     const shimmed = {
       kind: "list", path: ["xs"], entity: "x",
       element: { entity: "x", identifier: "n", fields: [{ name: "status", type: "enum", values: ["fresh"] }] },
@@ -195,101 +195,24 @@ describe("buildFieldMeta with a descriptor-shaped node", () => {
   });
 });
 
-// The regression this section exists to catch: `fromDescriptors` reads
-// `long_text` off exactly ONE signal, `type === "longtext"` on the field --
-// it deliberately does not re-add ScalarField.jsx's LONG_TEXT_FIELDS name
-// fallback (see the comment at the top of this file and at
-// `_LONG_TEXT_NAME_HEURISTIC` in backend/tools/manifest_v1_to_v2.py for why a
-// name heuristic here would be a second, silently-overriding source of
-// truth). That makes this file's correctness depend entirely on the
-// CONVERTER having resolved the heuristic into `type: "longtext"` at
-// conversion time. Ten shipped fields relied on the v1 fallback and declared
-// no `long_text` key at all -- a converter that forgot even one of them
-// would silently turn a textarea into a one-line input, and neither the
-// frozen field census nor the v2Node parity fixtures would catch it, because
-// both record field NAMES, not control types. This walks every real node of
-// every real pack (via `shim-parity.json`, the same frozen fixture
-// `v2Node.test.js` compares against) and asserts what ScalarField actually
-// receives: `buildFieldMeta(node, entity).long_text.has(field)` agrees with
-// the pre-conversion v1 rule -- declared `long_text` if the node has one,
-// else the notes/why/description heuristic -- for every field the node
-// renders.
-describe("long_text agrees with the pre-conversion v1 render, for every shipped field", () => {
-  const isLongTextV1 = (v1Node, field) =>
-    v1Node.long_text
-      ? v1Node.long_text.includes(field)
-      : ["notes", "why", "description"].includes(field);
+// DELETED with the shim: "long_text agrees with the pre-conversion v1 render,
+// for every shipped field" -- ten `it`s, one per pack, plus a spot-check naming
+// the ten fields that used to get their textarea from ScalarField's
+// LONG_TEXT_FIELDS name heuristic rather than from a declaration.
+//
+// It walked `shim-parity.json`, which held both shapes of every shipped node
+// side by side, and asserted that `buildFieldMeta(node).long_text.has(field)`
+// agreed with the v1 rule -- the node's declared `long_text` if it had one, else
+// the notes/why/description heuristic. The fixture and the v1 side of every node
+// in it are gone, so there is nothing left to compare against.
+//
+// What replaced it is `frontend/src/__fixtures__/control-census-v1.json`, which
+// freezes the CONTROL each field renders rather than its name, and which records
+// all ten of those fields as "longtext": goals.why, goals.notes, Hobbies &
+// Activities.notes, Hobbies & Activities > References & URLs.notes,
+// Interests.notes, media items.notes, aesthetics Styles.notes, knowledge's two
+// References.notes and Projects > References.notes. `controlCensus.test.js`
+// compares the real packs against it on every run, so a textarea that quietly
+// becomes a one-line input still fails a test -- which is the one thing this
+// block was here to guarantee.
 
-  // Recorded rather than assumed, so the "confirm all ten" claim below is
-  // checked, not asserted by fiat -- a future pack could add an eleventh
-  // heuristic field or remove one of these, and this list would drift out
-  // of sync with reality if it were hand-maintained instead of collected.
-  const foundLongTextFields = [];
-
-  // Walks the SHIMMED tree, not the raw v2 one -- a nested list/strings field
-  // has no separate "v2 form" of its own to re-shim (childNode in v2Node.js
-  // already built it in v1 shape), so `shimmed.children`/`shimmed.sections`
-  // are what the next level down actually is. This mirrors exactly how
-  // v2Node.test.js's own "resolves the same vocabulary..." test recurses.
-  function walk(v1Node, shimmed, entities, trail) {
-    const label = `${trail}${v1Node.title ?? v1Node.path?.join(".") ?? "?"}`;
-    const entity = entities[v1Node.entity] ?? null;
-    const meta = buildFieldMeta(shimmed, entity);
-    const rendered = [
-      v1Node.title_field,
-      ...(v1Node.detail_fields ?? v1Node.fields ?? []),
-      ...(v1Node.badges ?? []),
-      ...(v1Node.display_fields ?? []),
-    ].filter(Boolean);
-
-    for (const field of new Set(rendered)) {
-      const expected = isLongTextV1(v1Node, field);
-      if (expected) foundLongTextFields.push(`${label}.${field}`);
-      expect({ field: `${label}.${field}`, longText: meta.long_text.has(field) }).toEqual({
-        field: `${label}.${field}`,
-        longText: expected,
-      });
-    }
-
-    const kids = shimmed.children ?? [];
-    (v1Node.children ?? []).forEach(
-      (child, i) => kids[i] && walk(child, kids[i], entities, `${label} > `)
-    );
-    const subs = shimmed.sections ?? [];
-    (v1Node.sections ?? []).forEach(
-      (sub, i) => subs[i] && walk(sub, subs[i], entities, `${label} > `)
-    );
-  }
-
-  for (const [key, pack] of Object.entries(parity)) {
-    it(`draws a textarea for exactly the fields that were textareas before, in ${key}`, () => {
-      pack.v1.forEach((node, i) => walk(node, v1Shape(pack.v2[i]), pack.entities, ""));
-    });
-  }
-
-  it("confirms the ten shipped fields the name heuristic used to cover are still textareas", () => {
-    // One assertion per node named in the coordinator's report, so a future
-    // regression names exactly which one broke instead of failing the walk
-    // above at whichever field happens to iterate first. Not an exhaustive
-    // list of every long-text field in every pack -- `foundLongTextFields`
-    // also collects the ones that were ALREADY declared via `long_text` in
-    // v1 (circle, learning_log, preferences, profile, projects), which never
-    // depended on the heuristic and were never at risk from this bug.
-    const expected = [
-      "goals.why", "goals.notes",
-      "Hobbies & Activities.notes",
-      "Hobbies & Activities > References & URLs.notes",
-      "Interests.notes",
-      "items.notes", // media
-      "Styles.notes", // aesthetics
-      "Skills & Domains > References.notes", // knowledge
-      "Mental Tabs > References.notes", // knowledge
-      "Projects > References.notes",
-    ];
-    for (const name of expected) {
-      expect(foundLongTextFields, `expected ${name} among the fields found long-text`).toContain(
-        name
-      );
-    }
-  });
-});

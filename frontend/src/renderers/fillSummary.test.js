@@ -5,7 +5,13 @@ import { describe, expect, it } from "vitest";
 
 import { fillSummary } from "./fillSummary";
 
-const node = { kind: "fields", fields: ["tone", "detail_level", "locale"] };
+// Descriptors, not a flat `fields` array: a node states its key set once, in
+// `element.fields`, and fillSummary counts the same list FieldsRenderer draws.
+const fieldsNode = (...names) => ({
+  kind: "fields",
+  element: { entity: "communication_default", fields: names.map((name) => ({ name })) },
+});
+const node = fieldsNode("tone", "detail_level", "locale");
 
 describe("fillSummary", () => {
   it("counts the declared keys that hold a value", () => {
@@ -26,14 +32,14 @@ describe("fillSummary", () => {
       filled: 0,
       total: 3,
     });
-    expect(fillSummary({ kind: "fields", fields: ["a"] }, { a: [] })).toEqual({
+    expect(fillSummary(fieldsNode("a"), { a: [] })).toEqual({
       filled: 0,
       total: 1,
     });
   });
 
   it("counts false and 0 as filled, because a switch that is off is answered", () => {
-    expect(fillSummary({ kind: "fields", fields: ["a", "b"] }, { a: false, b: 0 })).toEqual({
+    expect(fillSummary(fieldsNode("a", "b"), { a: false, b: 0 })).toEqual({
       filled: 2,
       total: 2,
     });

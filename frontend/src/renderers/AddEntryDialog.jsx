@@ -1,8 +1,16 @@
 // The Add dialog, lifted out of ListRenderer so that one component owns the
 // draft lifecycle, the copy, and the footer -- and so the section card header
 // can mount the same dialog the empty-state panel mounts. Both entry points
-// must seed `field_defaults` identically or a manifest default would apply
-// invisibly on one route and visibly on the other.
+// must seed the manifest's declared defaults identically, or a default would
+// apply invisibly on one route and visibly on the other.
+//
+// The fields it offers are the node's own `element.fields`, read through the
+// same `elementShape` pass ListRenderer's expanded row reads -- which is the
+// point: the dialog and the row are one layout described once, so a field
+// cannot appear in the row and be missing from the dialog the way it could
+// while each read its own array. The only difference is the title field, which
+// the dialog gives a dedicated input (with suggestion chips and
+// Enter-to-submit) and therefore drops from the generic loop.
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,16 +21,16 @@ import {
 } from "@/components/ui/dialog";
 import { FOCUS_RING } from "@/components/controls";
 import { buildFieldMeta } from "./fieldMeta";
+import { elementShape } from "./elementShape";
 import { ScalarField } from "./ScalarField";
 
 export function AddEntryDialog({ node, entity, items, onAdd, open, onOpenChange, trigger }) {
-  const titleField = node.title_field;
-  const badges = node.badges ?? [];
-  const detailFields = node.detail_fields ?? [];
-  const pinnedField = node.pinned?.field;
-  const fieldDefaults = node.field_defaults ?? entity?.field_defaults ?? {};
-  const suggestions = node.suggestions?.[titleField] || [];
+  const { titleField, badges, form: detailFields, suggestions } = elementShape(node);
   const meta = buildFieldMeta(node, entity);
+  // Per-field `default`, resolved exactly as ListRenderer resolves it -- from
+  // the descriptors, with no entity fallback. Both must agree or the dialog
+  // would preselect one set of values and `addItem` would write another.
+  const fieldDefaults = meta.field_defaults ?? {};
 
   const [draft, setDraft] = useState({});
 
@@ -59,8 +67,11 @@ export function AddEntryDialog({ node, entity, items, onAdd, open, onOpenChange,
   const titleCollides =
     !!draft[titleField] && existingTitles.has(draft[titleField].toLowerCase());
 
-  // `pinned.field` never renders as an editable control, per meta_schema.json.
-  const editFields = [...new Set([...badges, ...detailFields])].filter((f) => f !== pinnedField);
+  // Same union, same order, as the expanded row's grid. A pinned field is not
+  // filtered out here because it never arrives: `pin` IS its rendering, so
+  // elementShape gives it no position -- per meta_schema.json, "the field never
+  // renders as an editable control or appears in the Add dialog".
+  const editFields = [...new Set([...badges, ...detailFields])];
 
   const submit = () => { onAdd(draft); onOpenChange(false); setDraft({}); };
 
@@ -72,7 +83,7 @@ export function AddEntryDialog({ node, entity, items, onAdd, open, onOpenChange,
   // an entity-only node has no list name to offer, and "Add one entry to this
   // list." under a heading reading "Add mental tab" named the same dialog two
   // different ways.
-  const entityNoun = (node.entity ?? "item").replace(/_/g, " ");
+  const entityNoun = (node.element?.entity ?? "item").replace(/_/g, " ");
   const heading = node.title ? `Add to ${node.title}` : `Add ${entityNoun}`;
   const description =
     node.description ??

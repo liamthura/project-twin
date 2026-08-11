@@ -17,6 +17,13 @@ import profileData from "@/__fixtures__/data/profile.json";
 import { renderSection } from "@/test/harness";
 import { SEGMENTED_MAX } from "@/components/controls";
 import { normalizeUi, outline } from "@/renderers/paths";
+// The guards below read a node's fields the way the renderers do -- through the
+// descriptor pass and the resolved `meta` -- rather than off the parallel arrays
+// v1 hung on the node. A guard that derived the field list a second way could
+// pass while the screen showed something else, which is the whole failure mode
+// it exists to catch.
+import { elementShape, blockNode } from "@/renderers/elementShape";
+import { buildFieldMeta } from "@/renderers/fieldMeta";
 
 const goalsPack = packs.find((p) => p.key === "goals");
 const mediaPack = packs.find((p) => p.key === "media");
@@ -38,6 +45,21 @@ const profilePack = packs.find((p) => p.key === "profile");
 // is closed: its submit button reads a bare "Add" too.
 const headerAdd = (scope = screen) => scope.getByText("Add", { selector: "button" });
 
+// A one-field list node, for the hand-built packs below. Spelled as a helper
+// because format v2 states a field's identity on the field -- so even a node
+// this small carries an `element` with a `role: "title"` descriptor in it, and
+// nine of these built inline would bury what each test is actually about.
+const listNode = (path, titleField, extra = {}) => ({
+  kind: "list",
+  path,
+  element: {
+    entity: extra.entity ?? "goal",
+    identifier: titleField,
+    fields: [{ name: titleField, role: "title" }],
+  },
+  ...(extra.title ? { title: extra.title } : {}),
+});
+
 // Shared reasons for the two exclusion entries nearly every pack needs --
 // spelled out once so every call site's exclusion map still requires a real,
 // non-empty reason (the check in describeGuards below) without retyping the
@@ -54,16 +76,15 @@ const LINK_GRAPH =
 // consolidation has to avoid; a renderer that mutates its `data` prop or
 // drops a field it doesn't model would corrupt or lose data on every edit.
 //
-// "covered" comes from the pack's own ui spec (badges + detail_fields), not a
-// hand-copied list, so a renderer that stops wiring up a field fails this
-// even if nobody updates the test. But that only checks the renderer against
-// the manifest -- it says nothing about whether the manifest itself still
-// names every key the fixture actually stores. Deleting a field from
-// detail_fields shrinks `covered` right along with it, so this half of the
-// guard would still pass with the field gone. `exclusions` below is the other
-// half: it checks the manifest against the DATA, so removing a field from
-// detail_fields (or never having added it) fails loudly instead of shrinking
-// the guard's own expectations to match.
+// "covered" comes from the pack's own field descriptors (the `badge` and `form`
+// positions), not a hand-copied list, so a renderer that stops wiring up a field
+// fails this even if nobody updates the test. But that only checks the renderer
+// against the manifest -- it says nothing about whether the manifest itself still
+// names every key the fixture actually stores. Dropping a field's `form` position
+// shrinks `covered` right along with it, so this half of the guard would still
+// pass with the field gone. `exclusions` below is the other half: it checks the
+// manifest against the DATA, so unbinding a field (or never having declared it)
+// fails loudly instead of shrinking the guard's own expectations to match.
 //
 // `exclusions` is required (pass `{}` if truly nothing is deliberately
 // unbound) and maps each fixture key that is NOT bound by the ui block to a
@@ -86,8 +107,9 @@ function uiNode(title) {
 //
 // `keys` is a path of `path[0]` segments. One segment addresses a top-level
 // list; two address a list nested inside a row of the first, which is how
-// education's `coursework`/`clubs` and the four `references` lists are
-// declared. Until wave 10 this function took a single string and had no way to
+// education's `coursework`/`clubs` and the four `references` lists are declared
+// -- as `type: "list"` FIELDS carrying a label, which render as blocks under the
+// row. Until wave 10 this function took a single string and had no way to
 // name a child node -- so six entity-bearing nested lists had neither the
 // coverage guard nor the round-trip guard, including `hobby_reference`, whose
 // declared-versus-stored divergence wave 5 had to record by hand.
@@ -119,7 +141,9 @@ function resolveChain(pack, keys, data) {
       );
     }
     chain.push({ node, rows });
-    nodes = node.children || [];
+    // A nested level is a labelled array field on this node's element, projected
+    // into the node it renders as -- the same projection ListRenderer dispatches.
+    nodes = elementShape(node).blocks.map(blockNode);
   }
   return chain;
 }
@@ -132,21 +156,22 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   const chain = resolveChain(pack, keys, data);
   const ancestors = chain.slice(0, -1);
   const { node, rows } = chain[chain.length - 1];
-  // Resolved exactly as ListRenderer resolves it -- via node.entity, which
-  // SectionRenderer sets from `pack.entities?.[node.entity]` -- not by
-  // re-deriving it from legacy list-matching rules. Those rules live inside
-  // normalizeUi already; re-implementing them here made this guard
+  // Resolved exactly as renderNode resolves it -- via the element's entity name
+  // -- not by re-deriving it from legacy list-matching rules. Those rules live
+  // inside normalizeUi already; re-implementing them here made this guard
   // consistent with ListRenderer only by coincidence.
-  const entity = pack.entities?.[node.entity];
-  const arrayFields = node.array_fields || [];
-  const covered = [...new Set([...(node.badges || []), ...(node.detail_fields || [])])];
+  const entity = pack.entities?.[node.element?.entity];
+  const shape = elementShape(node);
+  const meta = buildFieldMeta(node, entity);
+  const arrayFields = meta.array_fields;
+  const covered = [...new Set([...shape.badges, ...shape.form])];
   const item = rows[0];
 
   // A nested node only renders once its ancestors' rows are expanded, so every
   // guard below opens the chain before it looks for anything.
   const openChain = async (user) => {
     for (const link of ancestors) {
-      await user.click(screen.getByText(link.rows[0][link.node.title_field]));
+      await user.click(screen.getByText(link.rows[0][elementShape(link.node).titleField]));
     }
   };
 
@@ -156,20 +181,21 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   // chip control throws "Objects are not valid as a React child" on them. Every
   // test passed while the crash was never exercised.
   //
-  // So: an array-valued key a node declares in `array_fields` must actually
-  // hold strings in the fixture. If it holds objects, the node is the wrong
-  // kind -- it wants a nested list, not a chip control.
-  for (const field of node.array_fields || []) {
+  // So: an array-valued key a node renders as chips -- a `type: "strings"` field
+  // with no label of its own -- must actually hold strings in the fixture. If it
+  // holds objects, the field has the wrong type: it wants `type: "list"` with an
+  // `element` describing one row, not a chip control.
+  for (const field of arrayFields) {
     const value = item[field];
     if (!Array.isArray(value)) continue;
     const objects = value.filter((v) => v !== null && typeof v === "object");
     if (objects.length) {
       throw new Error(
-        `${pack.key}/${label}: node declares array_fields: ["${field}"], which ` +
+        `${pack.key}/${label}: "${field}" is declared type: "strings", which ` +
           `renders each entry as a chip -- but the fixture holds ${objects.length} ` +
           `OBJECT entr${objects.length === 1 ? "y" : "ies"} there, which React ` +
-          `cannot render as a child. This field wants a nested list node, not ` +
-          `array_fields.`
+          `cannot render as a child. This field wants type: "list" with its own ` +
+          `element, not "strings".`
       );
     }
   }
@@ -197,10 +223,10 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   function expectFieldOnScreen(field) {
     const value = item[field];
     if (value === undefined) return;
-    // Same precedence ListRenderer gives an inline node.enum over the
-    // entity's valid_values -- a plain `entity.valid_values?.[field]` read
-    // would classify a wave-3 node's inline enum as a plain input.
-    const options = (node.enum ?? entity?.valid_values)?.[field];
+    // The one vocabulary there is, read from the same `meta` ScalarField gets --
+    // a field declares its own `values` or renders as free text, and the entity's
+    // copy is derived from that declaration rather than being a source for it.
+    const options = meta.valid_values?.[field];
     if (options) {
       // Enums render via EnumControl, not plain inputs, so getByDisplayValue
       // can't find them. EnumControl picks its control by option count:
@@ -243,30 +269,29 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   it(`exposes every detail field of an expanded item (${pack.key}/${label})`, async () => {
     const { user } = renderSection({ pack, initial: data });
     await openChain(user);
-    await user.click(screen.getByText(item[node.title_field]));
+    await user.click(screen.getByText(item[shape.titleField]));
     for (const field of covered) expectFieldOnScreen(field);
   });
 
   // Catches drop-on-write: an edit that quietly discards fields the renderer
-  // does not know about (badges/detail_fields don't cover every key -- id,
+  // does not know about (the badge and form positions don't cover every key -- id,
   // the title field itself, and any unmodeled field like `related` all have
   // to survive an edit untouched too).
   it(`preserves every other field when one is edited (${pack.key}/${label})`, async () => {
     const { user, latest, initial } = renderSection({ pack, initial: data });
     await openChain(user);
-    await user.click(screen.getByText(item[node.title_field]));
+    await user.click(screen.getByText(item[shape.titleField]));
 
-    // Pick a field that is genuinely a free-text input, using the same
-    // precedence ListRenderer does. Reading entity.valid_values directly would
-    // miss a node's inline enum, and a date field renders as
-    // <input type="date">, which ignores typed characters -- either would make
-    // the edit below a silent no-op and turn this guard into a coin flip.
-    const dateFields = node.date_fields || [];
+    // Pick a field that is genuinely a free-text input, from the same resolved
+    // `meta` the control itself reads: a `date` field renders as
+    // <input type="date">, which ignores typed characters, and an enum renders as
+    // buttons -- either would make the edit below a silent no-op and turn this
+    // guard into a coin flip.
     const editableField = covered.find(
       (f) =>
-        !(node.enum ?? entity?.valid_values)?.[f] &&
+        !meta.valid_values?.[f] &&
         !arrayFields.includes(f) &&
-        !dateFields.includes(f) &&
+        !meta.date_fields.includes(f) &&
         item[f]
     );
     if (!editableField) {
@@ -294,7 +319,7 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   // against the MANIFEST (does every field the manifest names actually make
   // it onto the screen), never the MANIFEST against the DATA (does the
   // manifest still name every field the data actually carries). Deleting a
-  // real, editable stored key from detail_fields shrinks `covered` right
+  // real, editable stored key out of the manifest shrinks `covered` right
   // along with the deletion, so the tests above keep passing -- this is the
   // one that would have caught task-6's `mental_tab.status` omission.
   //
@@ -304,14 +329,14 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   // domains[1], and a check scoped to domains[0] would never see it.
   it(`accounts for every stored key on every fixture item -- bound by the ui block or explicitly excluded (${pack.key}/${label})`, () => {
     const bound = new Set([
-      node.title_field,
-      ...(node.badges || []),
-      ...(node.detail_fields || []),
-      // display_fields and count_badges render read-only, but they DO render
-      // -- a badge showing a date, or a "N references" chip -- so a fixture
-      // key named there is reachable on screen and is not an omission.
-      ...(node.display_fields || []),
-      ...(node.count_badges || []),
+      shape.titleField,
+      ...shape.badges,
+      ...shape.form,
+      // The `row` and `count` positions render read-only, but they DO render --
+      // a badge showing a date, or a "N references" chip -- so a fixture key in
+      // one of them is reachable on screen and is not an omission.
+      ...shape.row,
+      ...shape.count,
     ]);
     const allFixtureKeys = new Set();
     for (const row of rows) {
@@ -333,10 +358,10 @@ describe("SectionRenderer", () => {
   // ---------------------------------------------------------------------------
   // wave 12: the title field is a renderer guarantee, not a manifest opt-in
   //
-  // `editFields` came from badges + detail_fields, so a node that omitted its
-  // own title_field from detail_fields offered no control for it: the Add
-  // dialog (which has always given the title its own input) could name a row,
-  // and nothing could ever rename it. Three shipped nodes did exactly that --
+  // `editFields` is the badge and form positions, so a node whose title field
+  // takes neither offers no control for it: the Add dialog (which has always
+  // given the title its own input) could name a row, and nothing could ever
+  // rename it. Three shipped nodes did exactly that --
   // goals, media, aesthetics. Fixing it in the renderer rather than in three
   // manifests is what stops the fourth one happening.
   // ---------------------------------------------------------------------------
@@ -392,7 +417,7 @@ describe("SectionRenderer", () => {
         ],
       };
       const node = normalizeUi(omits).sections[0];
-      expect(node.detail_fields || []).not.toContain("title");
+      expect(elementShape(node).form).not.toContain("title");
 
       const { user } = renderSection({
         pack: omits,
@@ -409,9 +434,10 @@ describe("SectionRenderer", () => {
       expect(latest().goals.map((g) => g.title)).toContain("Ship MyGist v3!");
     });
 
-    it("does not render the title twice when detail_fields DOES name it", async () => {
-      // learning_log names `topic` in detail_fields. The title must lead the
-      // body, not appear once from the guarantee and once from detail_fields.
+    it("does not render the title twice when the title field DOES take the form position", async () => {
+      // learning_log's `topic` is an ordinary form field as well as its list's
+      // title. The title must lead the body, not appear once from the guarantee
+      // and once from the form position.
       const { user } = renderSection({ pack: learningLogPack, initial: learningLogData });
       await user.click(screen.getByText("React Server Components"));
       expect(screen.getAllByDisplayValue("React Server Components")).toHaveLength(1);
@@ -836,8 +862,9 @@ describe("SectionRenderer", () => {
       const node = normalizeUi(projectsPack).sections.find(
         (s) => s.path[0] === "projects"
       );
-      expect(node.display_fields).toEqual(["added_date"]);
-      expect(node.display_formats?.added_date).toBeUndefined();
+      const shape = elementShape(node);
+      expect(shape.row).toEqual(["added_date"]);
+      expect(shape.formats.added_date).toBeUndefined();
     });
 
     it("is read-only about `added_date` -- expanding a row exposes no control bound to it", async () => {
@@ -1009,7 +1036,7 @@ describe("SectionRenderer", () => {
       const added = latest().mental_tabs[0];
       expect(added.created_at).not.toBe("@now");
       expect(Number.isNaN(Date.parse(added.created_at))).toBe(false);
-      expect(tabsNode().field_defaults).toEqual({ created_at: "@now" });
+      expect(buildFieldMeta(tabsNode()).field_defaults).toEqual({ created_at: "@now" });
     });
 
     // Mirrors circle's `contact` guard and projects' `item` guard. A wrongly
@@ -1041,7 +1068,7 @@ describe("SectionRenderer", () => {
       await user.click(screen.getByText("Places to eat in Newcastle"));
       expect(screen.queryByDisplayValue(stamp)).not.toBeInTheDocument();
       expect(within(mentalTabsBlock()).queryByText(/^created at$/i)).not.toBeInTheDocument();
-      expect(tabsNode().display_fields).toBeUndefined();
+      expect(elementShape(tabsNode()).row).toEqual([]);
     });
 
     // ---- the legacy `topic` entry ----
@@ -1081,23 +1108,21 @@ describe("SectionRenderer", () => {
     });
 
     // The on-screen assertions above cannot fail if the manifest quietly
-    // started binding `topic` somewhere that does not render a labelled
-    // control (long_text, sort, display_fields...), so assert the block's own
-    // shape too.
+    // started binding `topic` somewhere that does not render a labelled control
+    // (a longtext type, a sort key, a read-only row position...), so assert the
+    // block's own shape too. In v1 that meant enumerating a dozen arrays and
+    // maps and hoping none was forgotten; a field is now named in exactly one
+    // place, so naming `topic` anywhere at all means declaring a descriptor for
+    // it -- which is what this checks.
     it("binds `title` and names the legacy `topic` in no construct at all", () => {
       const node = tabsNode();
-      expect(node.title_field).toBe("title");
-      const named = [
-        ...(node.badges || []), ...(node.detail_fields || []),
-        ...(node.array_fields || []), ...(node.long_text || []),
-        ...(node.facets || []), ...(node.count_badges || []),
-        ...(node.display_fields || []), ...(node.date_fields || []),
-        ...Object.keys(node.field_defaults || {}),
-        ...Object.keys(node.enum || {}),
-        node.title_field, node.sort?.field,
-      ].filter(Boolean);
-      expect(named).not.toContain("topic");
-      expect(named).not.toContain("name");
+      expect(elementShape(node).titleField).toBe("title");
+      const declared = node.element.fields.map((f) => f.name);
+      expect(declared).toContain("title");
+      expect(declared).not.toContain("topic");
+      expect(declared).not.toContain("name");
+      expect(node.facets ?? []).not.toContain("topic");
+      expect(node.sort?.field).not.toBe("topic");
     });
 
     // ---- two stored shapes in one `domains` list ----
@@ -1138,9 +1163,9 @@ describe("SectionRenderer", () => {
       // wave 4 Task 5 fixed it -- declaring a format here would still be
       // asking for a conversion that has no meaning, so the manifest declares
       // none. This assertion is the half that can fail in any timezone.
-      const node = domainsNode();
-      expect(node.display_fields).toEqual(["added_date", "last_updated"]);
-      expect(node.display_formats).toBeUndefined();
+      const shape = elementShape(domainsNode());
+      expect(shape.row).toEqual(["added_date", "last_updated"]);
+      expect(shape.formats).toEqual({});
     });
 
     it("is read-only about the domain dates -- expanding a row exposes no control bound to them", async () => {
@@ -1267,7 +1292,7 @@ describe("SectionRenderer", () => {
       entities: { goal: { list: "goals" } },
       ui: {
         sections: [
-          { kind: "list", path: ["goals"], entity: "goal", title: "Goals", title_field: "title" },
+          listNode(["goals"], "title", { title: "Goals" }),
         ],
       },
     };
@@ -1309,17 +1334,9 @@ describe("SectionRenderer", () => {
   // static per-pack section lists happens to trigger it yet.
   describe("sibling nodes sharing a path", () => {
     const entities = { goal: { list: "goals" }, misc: { list: "other" } };
-    const nodeOther = {
-      kind: "list", path: ["other"], entity: "misc", title: "Other", title_field: "label",
-    };
-    const nodeFirst = {
-      kind: "list", path: ["goals"], entity: "goal",
-      title: "First", title_field: "title", detail_fields: ["title"],
-    };
-    const nodeSecond = {
-      kind: "list", path: ["goals"], entity: "goal",
-      title: "Second", title_field: "title", detail_fields: ["title"],
-    };
+    const nodeOther = listNode(["other"], "label", { title: "Other", entity: "misc" });
+    const nodeFirst = listNode(["goals"], "title", { title: "First" });
+    const nodeSecond = listNode(["goals"], "title", { title: "Second" });
     const data = { goals: [{ title: "Ship it" }], other: [{ label: "X" }] };
     const packBefore = {
       key: "reorder_shared_path", title: "Reorder", description: "",
@@ -1384,7 +1401,7 @@ describe("SectionRenderer", () => {
         ui: {
           sections: [
             { kind: "table", path: ["profile"] },
-            { kind: "list", path: ["goals"], entity: "goal", title_field: "title" },
+            listNode(["goals"], "title"),
           ],
         },
       };
@@ -1416,7 +1433,7 @@ describe("SectionRenderer", () => {
         ui: {
           sections: [
             { kind: "table", path: ["profile"], title: "Basics" },
-            { kind: "list", path: ["goals"], entity: "goal", title_field: "title" },
+            listNode(["goals"], "title"),
           ],
         },
       };
@@ -1447,7 +1464,7 @@ describe("SectionRenderer", () => {
         ui: {
           sections: [
             { kind: "table" },
-            { kind: "list", path: ["goals"], entity: "goal", title_field: "title" },
+            listNode(["goals"], "title"),
           ],
         },
       };
@@ -1477,8 +1494,10 @@ describe("SectionRenderer", () => {
           {
             kind: "fields",
             path: ["wellness", "sleep", "weekday"],
-            entity: "sleep",
-            fields: ["bedtime", "wakeup"],
+            element: {
+              entity: "sleep",
+              fields: [{ name: "bedtime" }, { name: "wakeup" }],
+            },
             title: "Weekday",
           },
           {
@@ -1553,7 +1572,7 @@ describe("SectionRenderer", () => {
       description: "",
       entities: { goal: { list: "goals" } },
       ui: {
-        sections: [{ kind: "list", path: ["goals"], entity: "goal", title_field: "title" }],
+        sections: [listNode(["goals"], "title")],
       },
     };
     const data = { goals: "not a list" };
@@ -2248,7 +2267,7 @@ describe("section headings and info placement", () => {
       // Chips, not editable rows: skills are short, word-like values you add
       // and drop but never revise, and chips show many at a glance. A
       // highlight is a sentence where a typo means retyping the lot, which is
-      // why that one is item_control: "input".
+      // why that one declares control: "input".
       const { user } = renderSection({ pack: profilePack, initial: profileData });
       await user.click(screen.getByText("Acme"));
 
@@ -2259,7 +2278,7 @@ describe("section headings and info placement", () => {
       // copy is wording, and a test that pins wording turns every copy edit
       // into a failing test for no behavioural reason.
       const node = normalizeUi(profilePack)
-        .sections.flatMap((n) => n.children ?? [])
+        .sections.flatMap((n) => elementShape(n).blocks.map(blockNode))
         .find((n) => n.title === "Skills");
       expect(within(skills).getByPlaceholderText(node.placeholder)).toBeInTheDocument();
     });
@@ -2746,7 +2765,10 @@ describe("the fields count in a card header", () => {
           kind: "fields",
           path: ["comm"],
           title: "Default style",
-          fields: ["tone", "detail_level", "locale"],
+          element: {
+            entity: "communication_default",
+            fields: [{ name: "tone" }, { name: "detail_level" }, { name: "locale" }],
+          },
         },
       ],
     },
