@@ -272,10 +272,10 @@ The schema lands beside the old one and validates nothing shipped yet, so this t
 
 The 11 rules from the spec, each raising `PackError` and naming the pack, the node and the offending key. Rules 1–8 and 10 are new; every one describes a mistake that is silent today.
 
-- [ ] **Step 1: Write one failing test per rule**, on synthetic v2 manifests, asserting both that it raises and that the message names the thing at fault. A test that only asserts `pytest.raises(PackError)` passes for the wrong reason as soon as two rules overlap.
-- [ ] **Step 2: Run them, watch all 11 fail.**
-- [ ] **Step 3: Implement `_cross_check(manifest)`**, called from `validate_manifest_v2` after schema validation so a shape error is reported before a semantic one.
-- [ ] **Step 4: Green, commit.**
+- [x] **Step 1: Write one failing test per rule**, on synthetic v2 manifests, asserting both that it raises and that the message names the thing at fault. A test that only asserts `pytest.raises(PackError)` passes for the wrong reason as soon as two rules overlap.
+- [x] **Step 2: Run them, watch all 11 fail.**
+- [x] **Step 3: Implement `_cross_check(manifest)`**, called from `validate_manifest_v2` after schema validation so a shape error is reported before a semantic one.
+- [x] **Step 4: Green, commit.**
 
 ---
 

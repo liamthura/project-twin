@@ -24,6 +24,14 @@ import pack_loader
 
 # A minimal, valid v2 manifest. Every test below is this, with one thing changed,
 # so that what is under test is the diff and nothing else.
+#
+# `id_lists` is deliberately EMPTY. `validate_manifest_v2` runs the loader's
+# cross-checks after schema validation, and one of them requires every id_lists
+# entry to be bound by a top-level list node -- so a fixture that replaces
+# `sections` with a group or a fields node would be rejected by THAT rule, not by
+# the schema. Four accept-tests here failed that way, and two reject-tests passed
+# that way, which is worse. id_lists is exercised properly in
+# test_pack_cross_checks.py.
 BASE = {
     "key": "goals",
     "title": "Goals",
@@ -31,7 +39,7 @@ BASE = {
     "core": True,
     "position": 30,
     "defaults": {"goals": []},
-    "id_lists": [["goals", "goal"]],
+    "id_lists": [],
     "sections": [
         {
             "kind": "list",
@@ -44,6 +52,14 @@ BASE = {
         }
     ],
 }
+
+
+# Every reject-test below asserts the SCHEMA is what rejected the manifest. The
+# loader's cross-checks raise PackError through the same entry point, so without
+# this a cross-check firing first would make a schema test green while the schema
+# itself had a hole -- which is exactly what happened to two tests here before
+# `id_lists` was emptied above.
+_SHAPE = "manifest schema violation"
 
 
 def _with_sections(*nodes):
@@ -99,12 +115,12 @@ def test_minimal_group_node_is_accepted():
 def test_unknown_key_on_a_node_is_rejected():
     node = copy.deepcopy(BASE["sections"][0])
     node["badges"] = ["status"]  # a real v1 key, deleted in v2
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections(node))
 
 
 def test_unknown_key_on_a_field_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field({"name": "status", "badge": True}))
 
 
@@ -120,28 +136,28 @@ def test_a_key_from_another_kind_is_rejected():
             "search": True,
         }
     )
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(manifest)
 
 
 def test_unknown_kind_is_rejected():
     node = copy.deepcopy(BASE["sections"][0])
     node["kind"] = "scalar"  # never existed; the 2026-08-04 spec said it did
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections(node))
 
 
 def test_unknown_top_level_key_is_rejected():
     manifest = copy.deepcopy(BASE)
     manifest["entities"] = {"goal": {}}  # the block v2 derives instead of authoring
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(manifest)
 
 
 def test_the_ui_wrapper_is_rejected():
     manifest = copy.deepcopy(BASE)
     manifest["ui"] = {"sections": manifest.pop("sections")}
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(manifest)
 
 
@@ -157,17 +173,17 @@ def test_group_with_a_path_is_rejected():
             "sections": [{"kind": "strings", "path": ["values"]}],
         }
     )
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(manifest)
 
 
 def test_group_without_sections_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections({"kind": "group", "title": "Wellness"}))
 
 
 def test_list_without_an_item_block_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections({"kind": "list", "path": ["goals"]}))
 
 
@@ -177,12 +193,12 @@ def test_list_with_an_empty_path_is_rejected():
     # whole stored object. Array.isArray([]) is true, so nothing downstream sees it.
     node = copy.deepcopy(BASE["sections"][0])
     node["path"] = []
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections(node))
 
 
 def test_strings_with_an_empty_path_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections({"kind": "strings", "path": []}))
 
 
@@ -196,7 +212,7 @@ def test_fields_node_with_an_empty_path_is_accepted():
 
 
 def test_fields_node_without_an_entity_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(
             _with_sections({"kind": "fields", "path": [], "fields": [{"name": "name"}]})
         )
@@ -205,21 +221,21 @@ def test_fields_node_without_an_entity_is_rejected():
 def test_item_without_an_entity_is_rejected():
     node = copy.deepcopy(BASE["sections"][0])
     del node["item"]["entity"]
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections(node))
 
 
 def test_item_without_an_identifier_is_rejected():
     node = copy.deepcopy(BASE["sections"][0])
     del node["item"]["identifier"]
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections(node))
 
 
 def test_empty_field_list_is_rejected():
     node = copy.deepcopy(BASE["sections"][0])
     node["item"]["fields"] = []
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections(node))
 
 
@@ -227,19 +243,19 @@ def test_empty_field_list_is_rejected():
 
 
 def test_field_without_a_name_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field({"label": "Status", "type": "text"}))
 
 
 def test_values_without_enum_type_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(
             _with_field({"name": "status", "values": ["current", "done"]})
         )
 
 
 def test_enum_type_without_values_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field({"name": "status", "type": "enum"}))
 
 
@@ -258,7 +274,7 @@ def test_well_formed_enum_is_accepted():
 
 
 def test_list_type_without_an_item_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field({"name": "coursework", "type": "list"}))
 
 
@@ -268,7 +284,7 @@ def test_item_on_a_non_list_field_is_rejected():
         "type": "strings",
         "item": {"entity": "coursework", "identifier": "name", "fields": [{"name": "name"}]},
     }
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field(field))
 
 
@@ -292,7 +308,7 @@ def test_nested_list_field_is_accepted():
 
 def test_empty_show_is_rejected():
     # A field that renders nowhere says write_only: true. One way to say one thing.
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field({"name": "status", "show": []}))
 
 
@@ -303,17 +319,17 @@ def test_write_only_field_is_accepted():
 
 
 def test_unknown_show_position_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field({"name": "status", "show": ["chip"]}))
 
 
 def test_unknown_type_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field({"name": "notes", "type": "long_text"}))
 
 
 def test_allow_custom_on_a_non_enum_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field({"name": "type", "allow_custom": True}))
 
 
@@ -332,7 +348,7 @@ def test_pin_on_a_non_bool_field_is_rejected():
         "name": "primary",
         "pin": {"title": "Your design language", "empty": "None yet", "noun": "primary"},
     }
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field(field))
 
 
@@ -347,7 +363,7 @@ def test_pin_on_a_bool_field_is_accepted():
 
 
 def test_unknown_role_is_rejected():
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_field({"name": "status", "role": "subtitle"}))
 
 
@@ -365,7 +381,7 @@ def test_variant_that_redeclares_fields_is_rejected():
     # more and it is a second item, not a variant of this one.
     node = copy.deepcopy(BASE["sections"][0])
     node["item"]["variants"] = [{"entity": "dislike", "fields": [{"name": "item"}]}]
-    with pytest.raises(pack_loader.PackError):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE):
         pack_loader.validate_manifest_v2(_with_sections(node))
 
 
@@ -378,5 +394,5 @@ def test_the_error_names_the_offending_key():
     # the node dispatcher is allOf/if/then rather than oneOf. Keep it that way.
     node = copy.deepcopy(BASE["sections"][0])
     node["detail_fields"] = ["title"]
-    with pytest.raises(pack_loader.PackError, match="detail_fields"):
+    with pytest.raises(pack_loader.PackError, match=_SHAPE + ".*detail_fields"):
         pack_loader.validate_manifest_v2(_with_sections(node))
