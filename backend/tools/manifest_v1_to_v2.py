@@ -745,10 +745,23 @@ def v1_manifests() -> dict:
     return json.loads(V1_CORPUS.read_text())
 
 
+# `_template` stops being generated output at Task 11, which rewrote it BY HAND as
+# the genuine minimum a pack can be -- one list node, three fields, nothing
+# optional, and a `$comment` pointing at docs/CONTRIBUTING-PACKS.md. The converter
+# still has a v1 `_template` in the corpus and still converts it (the tests below
+# assert that its output validates and is idempotent, which is free coverage), but
+# it must not WRITE it: converting a made-up demo pack produced a manifest full of
+# keys a first-time author does not need, and re-running this file would revert the
+# hand-written one silently while `--check` reported a diff nobody caused.
+_NOT_GENERATED = {"_template"}
+
+
 def _main(argv: list) -> int:
     check = "--check" in argv
     changed = []
     for name, v1 in sorted(v1_manifests().items()):
+        if name in _NOT_GENERATED:
+            continue
         path = pack_loader.PACKS_DIR / name / "manifest.json"
         v2 = json.dumps(convert(v1), indent=2, ensure_ascii=False) + "\n"
         if not path.exists() or v2 != path.read_text():

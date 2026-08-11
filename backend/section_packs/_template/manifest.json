@@ -10,46 +10,22 @@
     "items": []
   },
   "id_lists": [
-    [
-      "items",
-      "example"
-    ]
+    ["items", "example"]
   ],
-  "scope_contributions": {
-    "personal": [
-      "items"
-    ]
-  },
   "sections": [
     {
       "kind": "list",
-      "path": [
-        "items"
-      ],
+      "path": ["items"],
       "element": {
         "entity": "example_item",
         "identifier": "name",
-        "list": "items",
         "fields": [
-          {
-            "name": "name",
-            "required": true,
-            "role": "title",
-            "suggestions": [
-              "Example 1",
-              "Example 2",
-              "Example 3"
-            ]
-          },
-          {
-            "name": "notes",
-            "type": "longtext"
-          },
-          {
-            "name": "tags"
-          }
+          { "name": "name", "role": "title", "required": true },
+          { "name": "notes" },
+          { "name": "tags" }
         ]
-      }
+      },
+      "$comment": "The whole format is in this node: `kind` states the shape of the value at `path`, so a `list` binds an array of objects and `element` describes ONE of them. Every optional key is left out deliberately -- node titles, `description`, `info`, `search`, `facets`, `sort`, field types, labelled string and nested-list blocks, aliases, and the read scopes in `scope_contributions` are all in docs/CONTRIBUTING-PACKS.md, which is also where to read what the MCP contract derived from these three fields looks like (you never write one). Two optional keys are kept because leaving them out would be wrong rather than minimal: `default_enabled: false`, because a contributed pack ships opt-in, and `required: true` on the field `identifier` names, because a row whose identifier may be absent cannot be updated or removed by any client. Rename the directory, `key`, `entity`, the `items` path and the `example` id prefix together: entity names and id prefixes are unique across every pack."
     }
   ]
 }
