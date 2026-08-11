@@ -198,14 +198,30 @@ Every behavioural assertion that exists today survives untouched. One mechanical
 change to existing tests is unavoidable, and it is worth being exact about which
 kind it is.
 
-**Nine call sites in `ListRenderer.test.jsx` reach the remove control directly**
-(`:164`, `:387`, `:434`, `:451`, `:581`, `:752`, `:753`, `:1075`, `:1363`), each
-via `getByRole("button", { name: "Remove <title>" })`. Behind a menu that control
-does not exist until the trigger is clicked, and a Radix menu item has role
-`menuitem`, not `button`. So each site gains a step that opens that row's `⋯` and
-changes the role it queries.
+**Twelve call sites depend on the remove control's accessible name, in two
+different ways.**
 
-What those tests assert does not change: removal still routes through
+*Nine, all in `ListRenderer.test.jsx`* (`:164`, `:387`, `:434`, `:451`, `:581`,
+`:752`, `:753`, `:1075`, `:1363`), click it to remove a row via
+`getByRole("button", { name: "Remove <title>" })`. Behind a menu that control does
+not exist until the trigger is clicked, and a Radix menu item has role `menuitem`,
+not `button`. Each gains a step that opens the row's `⋯` and changes the role it
+queries.
+
+*Three, all in `SectionRenderer.test.jsx`* (`:1091`, `:1888`, `:2316`), never
+remove anything. They use the button's accessible name as the only unique per-row
+handle in the markup, then walk up to the row and scope `within(row)` queries to
+it. `:1091` says so in a comment: the row has no title text, so "it is reachable
+only through the remove button's generated label". These need the new trigger's
+name and nothing else — the DOM traversal is unaffected, because
+`DropdownMenuTrigger asChild` clones the button rather than wrapping it, so it
+stays the same child of the same parent at the same depth.
+
+`StringsRenderer.test.jsx:117` also matches `name: "Remove …"` and must **not**
+change: its `Remove highlight 2` comes from `StringsRenderer.jsx:82`, a different
+component removing a bare string from an array.
+
+What any of these tests assert does not change: removal still routes through
 `onShowConfirmation`, `onItems` is still not called until the confirm callback
 runs, the dialog copy is still `"Remove Scandinavian?"` / `"This can't be
 undone."`. Only the path to the control changes. No assertion is weakened, and no
