@@ -37,8 +37,10 @@
 | `src/components/ArrayInput.jsx` | **Modify.** Add `onPaste`; `onKeyPress` → `onKeyDown`. | 3 |
 | `src/components/ArrayInput.test.jsx` | **Create.** The component has no test file today. | 3 |
 | `src/renderers/ListRenderer.jsx:322` | **Modify.** Search threshold. | 4 |
+| `src/globals.css` | **Modify.** Define `.headline-3` once, in a new `@layer components`. | 5 |
 | `src/renderers/FieldsRenderer.jsx:72` | **Modify.** Label to `headline-3`. | 5 |
 | `src/renderers/ListRenderer.jsx:639` | **Modify.** Expanded-row editable label to `headline-3`. `:626` stays muted. | 5 |
+| `src/renderers/SectionRenderer.jsx:362` | **Modify.** Adopt the new class; it was the one inline spelling of the token. | 5 |
 
 Tasks 3, 4 and 5 are independent of each other and of 1–2. Task 2 consumes Task 1.
 
@@ -131,6 +133,10 @@ describe("DropdownMenu", () => {
     expect(screen.queryByRole("menuitem", { name: "Remove" })).toBeNull();
   });
 
+  // `text-destructive` is a real design token (tailwind.config.js:35), so this
+  // asserts the token by name -- not the same thing as restating a multi-class
+  // incantation, which is why Task 5 defines `headline-3` instead of asserting
+  // its three classes here.
   it("marks a destructive item with the destructive token", async () => {
     const user = userEvent.setup();
     render(<Menu />);
@@ -883,20 +889,47 @@ Facets are untouched. They are declared per node and shown independently.
 
 ---
 
-### Task 5: Editable field labels read as labels
+### Task 5: `headline-3` becomes a real class, and editable labels use it
 
 **Files:**
+- Modify: `frontend/src/globals.css`
 - Modify: `frontend/src/renderers/FieldsRenderer.jsx:72`
 - Modify: `frontend/src/renderers/ListRenderer.jsx:639`
+- Modify: `frontend/src/renderers/SectionRenderer.jsx:362`
 - Test: `frontend/src/renderers/FieldsRenderer.test.jsx`
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: no new exports.
+- Produces: a `headline-3` CSS class, available to any component.
 
-`headline-3` is 14/600, written in this codebase as `text-sm font-semibold text-foreground` — see `SectionRenderer.jsx:362`, where the token is named in a comment. There is no utility class for it.
+**Ruled by the owner, 2026-08-12.** The first draft of this task changed three
+Tailwind classes at each site and asserted all three in the test. Defining the
+token once as a real class and asserting that one name is less brittle and says
+what it means. It does widen the slice into the token layer, which the spec did
+not ask for, and that was the trade accepted.
 
-**`ListRenderer.jsx:626` is deliberately excluded.** Those are `bodyDisplayFields` (`:505`), the fields claiming the `row` position, drawn as a label above a mono `<p>`. That is a readout, not a control, so its label annotates a value rather than labelling an input. The exclusion rests on that rendering, not on who writes the field: in today's packs all four `row`-position fields happen to be `ui_only` server-written timestamps, which is an observation and not the rule.
+`headline-3` is 14/600 — `text-sm font-semibold text-foreground`. The name comes
+from the design specs; before this task it appeared nowhere in the code except a
+comment at `SectionRenderer.jsx:355`.
+
+**There is no asymmetry to worry about.** The sibling tokens (`featured-3`,
+`headline-2`, `caption-1`, `caption-2`) appear nowhere in `frontend/src` at all —
+not as classes, not as comments. So this is the first token utility rather than
+the odd one out, and the others stay in the specs until something needs them.
+Do not define them here.
+
+**`SectionRenderer.jsx:362` must adopt it too.** It is the one place that already
+spells `text-sm font-semibold text-foreground` inline. Defining a utility and
+leaving that site as-is would put two spellings of one token in the codebase,
+which is the exact defect the manifest migration spent twelve tasks removing. No
+test asserts those classes (checked), so adopting it is safe.
+
+**`ListRenderer.jsx:626` is deliberately excluded.** Those are `bodyDisplayFields`
+(`:505`), the fields claiming the `row` position, drawn as a label above a mono
+`<p>`. That is a readout, not a control, so its label annotates a value rather
+than labelling an input. The exclusion rests on that rendering, not on who writes
+the field: in today's packs all four `row`-position fields happen to be `ui_only`
+server-written timestamps, which is an observation and not the rule.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -904,20 +937,20 @@ Add to `frontend/src/renderers/FieldsRenderer.test.jsx`:
 
 ```jsx
   // The parent spec's complaint was that `text-xs text-muted-foreground` reads
-  // as helper text rather than as a label. `headline-3` is 14/600 --
-  // `text-sm font-semibold text-foreground`, as SectionRenderer.jsx:362 spells
-  // it. Asserted on the class because there is no utility for the token and
-  // nothing else distinguishes a label from helper text in the DOM.
+  // as helper text rather than as a label. `headline-3` is the design specs'
+  // name for 14/600, and globals.css is where it is defined -- so this asserts
+  // the token by name rather than restating its three Tailwind classes here.
   it("draws an editable field's label at headline-3", () => {
     renderFields();
     const label = screen.getByText("Tone");
-    expect(label.className).toContain("text-sm");
-    expect(label.className).toContain("font-semibold");
+    expect(label.className).toContain("headline-3");
     expect(label.className).not.toContain("text-muted-foreground");
   });
 ```
 
-`renderFields` is the file's own helper at `FieldsRenderer.test.jsx:29`, and `Tone` is the title-cased label of the `tone` descriptor its `node` declares at `:15` — the same label `:38`'s existing test queries. Nothing new to declare.
+`renderFields` is the file's own helper at `FieldsRenderer.test.jsx:29`, and
+`Tone` is the title-cased label of the `tone` descriptor its `node` declares at
+`:15` — the same label `:38`'s existing test queries. Nothing new to declare.
 
 - [ ] **Step 2: Run it and watch it fail**
 
@@ -925,60 +958,132 @@ Run: `cd frontend && npx vitest run --project unit src/renderers/FieldsRenderer.
 
 Expected: FAIL — the class is `text-xs text-muted-foreground`.
 
-- [ ] **Step 3: Change both editable-label sites**
+- [ ] **Step 3: Define the token**
+
+`frontend/src/globals.css` has `@layer base` blocks at `:14` and `:117` and no
+`@layer components`. Add one after the `@layer base` block that ends around
+`:150`, before the reduced-motion section:
+
+```css
+/* The design specs name a small typographic scale -- featured-3, headline-2,
+   headline-3, caption-1, caption-2 -- and until now none of it existed in the
+   code except as Tailwind classes spelled out at each site, with a comment
+   naming the token if you were lucky.
+   
+   `headline-3` is defined here because three call sites need it and a label's
+   weight is the whole point of the change, so it needs a name a test can assert
+   and a reader can find. The other four are not defined: nothing uses them yet,
+   and an unused class is a thing to maintain and to get wrong.
+   
+   In `components` rather than `utilities` so a one-off `text-base` on a call
+   site still wins. */
+@layer components {
+  .headline-3 {
+    @apply text-sm font-semibold text-foreground;
+  }
+}
+```
+
+Write the class as a literal string at every call site. Tailwind's content
+scanner reads the JSX to decide what to keep, so a dynamically assembled name
+(`` `headline-${n}` ``) would be purged from the production build and pass every
+jsdom test, which asserts strings and never loads CSS.
+
+- [ ] **Step 4: Use it at all three sites**
 
 `frontend/src/renderers/FieldsRenderer.jsx:72`:
 
 ```jsx
-            <Label htmlFor={id} className="text-sm font-semibold text-foreground">
+            <Label htmlFor={id} className="headline-3">
 ```
 
 `frontend/src/renderers/ListRenderer.jsx:639`:
 
 ```jsx
-                      <Label className="text-sm font-semibold text-foreground">
+                      <Label className="headline-3">
 ```
 
-`capitalize` goes with the class it sat in. Both sites already resolve their text through `meta.field_labels[f] ?? f.replace(/_/g, " ")`, and `FieldsRenderer`'s own `labelFor` title-cases in JS precisely so the label is not CSS-capitalised — keeping a CSS capitalise on one site and not the other is how the two came to differ.
+`frontend/src/renderers/SectionRenderer.jsx:362` — the site that already spelled
+the token inline:
 
-**Do not touch `ListRenderer.jsx:626.`** Leave its `text-xs capitalize` exactly as it is.
+```jsx
+      <Heading className="headline-3">{title}</Heading>
+```
 
-- [ ] **Step 4: Run and watch it pass**
+`capitalize` goes with the class it sat in at the two renderer label sites. Both
+already resolve their text through `meta.field_labels[f] ?? f.replace(/_/g, " ")`,
+and `FieldsRenderer`'s own `labelFor` title-cases in JS precisely so the label is
+not CSS-capitalised — keeping a CSS capitalise on one site and not the other is
+how the two came to differ.
+
+Update the comment at `SectionRenderer.jsx:355`, which currently names the token
+in prose because it had nowhere else to live. It can now point at the class.
+
+**Do not touch `ListRenderer.jsx:626.`** Leave its `text-xs capitalize` exactly
+as it is.
+
+- [ ] **Step 5: Run and watch it pass**
 
 Run: `cd frontend && npx vitest run --project unit src/renderers/FieldsRenderer.test.jsx`
 
 Expected: PASS.
 
-- [ ] **Step 5: Confirm the readout labels did not move**
+- [ ] **Step 6: Confirm the readout labels did not move**
 
-Run: `git diff frontend/src/renderers/ListRenderer.jsx | grep -n "text-xs capitalize"`
+Run: `git diff frontend/src/renderers/ListRenderer.jsx | grep "text-xs capitalize"`
 
 Expected: no `-` line removing it. `:626` must survive untouched.
 
-- [ ] **Step 6: Full suite and the fixtures**
+- [ ] **Step 7: Confirm the token has exactly one definition**
+
+Run: `grep -rn "text-sm font-semibold text-foreground" frontend/src/`
+
+Expected: exactly one hit, in `globals.css`. Any hit in a `.jsx` file is a second
+spelling of the token and defeats the point of this task.
+
+- [ ] **Step 8: Full suite, the build, and the fixtures**
 
 Run: `cd frontend && npx vitest run --project unit`
 
 Expected: **861 passing** (860 + 1), all files.
 
+Run: `cd frontend && npm run build`
+
+Expected: succeeds. This is the step that catches an `@apply` of a class Tailwind
+cannot resolve — jsdom tests never load CSS, so a broken `@layer components`
+block passes every test and ships a label with no styling.
+
 Run: `git status --short frontend/src/__fixtures__/`
 
-Expected: no output. Neither frozen census records a CSS class, so a change here would mean something else moved.
+Expected: no output. Neither frozen census records a CSS class.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add frontend/src/renderers/FieldsRenderer.jsx frontend/src/renderers/ListRenderer.jsx \
+git add frontend/src/globals.css frontend/src/renderers/FieldsRenderer.jsx \
+        frontend/src/renderers/ListRenderer.jsx frontend/src/renderers/SectionRenderer.jsx \
         frontend/src/renderers/FieldsRenderer.test.jsx
-git commit -m "fix(editor): an editable field's label reads as a label
+git commit -m "fix(editor): headline-3 becomes a real class, and labels use it
 
-text-xs text-muted-foreground reads as helper text. Both sites that label an
-editable control go to headline-3 -- text-sm font-semibold text-foreground, as
-SectionRenderer.jsx:362 spells the token.
+text-xs text-muted-foreground reads as helper text, not as a label. Both sites
+that label an editable control now carry headline-3.
 
-Both sites, not just the one the parent spec named: the same field rendered a
-strong label in a fields card and a faint one in an expanded list row, and the
-complaint applies equally to each.
+The token got a definition rather than three more inline classes. The design
+specs name a small scale -- featured-3, headline-2, headline-3, caption-1,
+caption-2 -- and none of it existed in the code except as Tailwind classes
+spelled out per site. headline-3 has three call sites and a test that needs to
+assert it, so it is defined once in globals.css. The other four are not:
+nothing uses them, and an unused class is a thing to get wrong.
+
+SectionRenderer:362 adopts it too. It was the one place already spelling
+text-sm font-semibold text-foreground inline, and defining a utility while
+leaving it there would put two spellings of one token in the tree -- the exact
+defect the manifest migration spent twelve tasks removing. A grep for the
+inline form now returns exactly one hit, in globals.css.
+
+Both label sites, not just the one the parent spec named: the same field
+rendered a strong label in a fields card and a faint one in an expanded list
+row, and the complaint applies equally to each.
 
 ListRenderer:626 is left alone. Those are the row-position fields, drawn as a
 label above a mono readout rather than as a control, so the label annotates a
@@ -987,14 +1092,9 @@ about who writes the field -- all four row-position fields in the shipped packs
 happen to be ui_only server-written timestamps, which is an observation and not
 the rule.
 
-`capitalize` goes with the class it sat in: both sites already resolve their
-text through field_labels, and FieldsRenderer's labelFor title-cases in JS so
-the label is not CSS-capitalised.
-
-861 frontend tests pass."
+861 frontend tests pass, and npm run build succeeds -- the check that matters
+for a CSS change, since jsdom never loads a stylesheet."
 ```
-
----
 
 ## Verification, end of slice
 
@@ -1003,11 +1103,12 @@ the label is not CSS-capitalised.
 - [ ] **Step 3:** `git status --short frontend/src/__fixtures__/` → empty. Neither frozen census moved.
 - [ ] **Step 4:** `cd backend && python3 -m pytest -q` → **1001 passed, 1 skipped**. Nothing here touches the backend, so a failure means something unrelated leaked in.
 - [ ] **Step 5:** `git diff --stat main...HEAD -- frontend/src/renderers/useListItems.js` → empty output. The Global Constraint says this file does not change; this is the check.
-- [ ] **Step 6:** Rebuild the preview and drive all four by hand — `./scripts/local-preview.sh`, then at `http://127.0.0.1:8100`: paste `a, b, c` into a chip field; confirm Preferences' Likes & Dislikes (7+ rows) shows a search box and a short list does not; open a row's `⋯` and confirm Remove raises the dialog; and check a `fields` card's labels against an expanded list row's, which should now match. **Owner's step, not claimed by the implementer.**
+- [ ] **Step 6:** `cd frontend && npm run build` → succeeds, and `grep -rn "text-sm font-semibold text-foreground" frontend/src/` returns exactly one hit, in `globals.css`. A CSS change is invisible to jsdom, so the build is the only automated check that `@layer components` resolves.
+- [ ] **Step 7:** Rebuild the preview and drive all four by hand — `./scripts/local-preview.sh`, then at `http://127.0.0.1:8100`: paste `a, b, c` into a chip field; confirm Preferences' Likes & Dislikes (7+ rows) shows a search box and a short list does not; open a row's `⋯` and confirm Remove raises the dialog; and check a `fields` card's labels against an expanded list row's, which should now match. **Owner's step, not claimed by the implementer.**
 
 ## Self-review
 
-- **Spec coverage.** §1 chip paste → Task 3. §2 search past six → Task 4. §3 overflow menu → Tasks 1 and 2, with the dependency §3 identified as its own task because it is a `package.json` change a reviewer could reject on its own. §4 labels → Task 5. The spec's Testing section maps onto the test steps in each task, including the nine call sites named in Task 2 Step 4. Out-of-scope items appear in no task: no undo, no soft delete, no chip dedupe, no `ScalarField` control changes.
+- **Spec coverage.** §1 chip paste → Task 3. §2 search past six → Task 4. §3 overflow menu → Tasks 1 and 2, with the dependency §3 identified as its own task because it is a `package.json` change a reviewer could reject on its own. §4 labels → Task 5, widened by an owner ruling to define `headline-3` as a real class rather than restating its three Tailwind classes at each site; that pulled in `globals.css` and `SectionRenderer.jsx:362`, the one existing inline spelling. The spec's Testing section maps onto the test steps in each task, including the nine call sites named in Task 2 Step 4. Out-of-scope items appear in no task: no undo, no soft delete, no chip dedupe, no `ScalarField` control changes.
 - **The `element.list` trap does not apply here.** Nothing in this slice reads the manifest, so the frozen censuses should not move — which is why two tasks check them explicitly rather than assuming.
 - **Type consistency.** `DropdownMenu` / `DropdownMenuTrigger` / `DropdownMenuContent` / `DropdownMenuItem` are the four names Task 1 exports and the four Task 2 imports. `removeRow(user, title)` is defined once in Task 2 Step 1 and used in Step 5. `handlePaste` and `DELIMITED` are defined and wired within Task 3.
 - **Test counts are cumulative and stated per task** (837 → 841 → 844 → 856 → 860 → 861). If a task's actual number differs, the difference is the thing to explain before committing — most likely a test elsewhere that reached for the search box with fewer than seven rows (Task 4 Step 4 anticipates exactly that).
