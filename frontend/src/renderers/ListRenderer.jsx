@@ -319,13 +319,18 @@ export default function ListRenderer({
         <div className="flex items-center justify-end">{addDialog}</div>
       )}
 
-      {/* Keep the box mounted whenever a query is active, even if it filtered
+      {/* Six rows or fewer need no filter: the box is chrome with nothing to
+          do, and the eye beats it. Counts TOTAL items, not filtered ones, so
+          the box does not vanish from under the cursor as a query narrows the
+          list past the threshold.
+
+          Keep the box mounted whenever a query is active, even if it filtered
           every row out of existence -- otherwise deleting the last match(es)
           unmounts the only control that can clear `query`, stranding the user
           on an empty state that tells them to "clear the search" with nothing
-          left to clear it with. Still absent when there's genuinely nothing
-          to search (no items, no active query). */}
-      {node.search && (items.length > 0 || q) && (
+          left to clear it with. The threshold makes that reachable a second
+          way: delete a seventh row while a query is live. */}
+      {node.search && (items.length > 6 || q) && (
         <Input
           type="search"
           aria-label="Search"

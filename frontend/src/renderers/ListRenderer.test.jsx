@@ -674,9 +674,20 @@ describe("search", () => {
   const node = listNode(["items"], "name", [
     { name: "relationship" }, { name: "traits", type: "strings" },
   ], { node: { search: true } });
+  // Seven rows, not two: the search box only renders past six (see
+  // ListRenderer's threshold comment), and several tests below grab the box
+  // before typing into it. "Filler N" rows 3-7 carry no field content and no
+  // role in any assertion -- they exist only to clear the threshold, and are
+  // named to avoid colliding with the substrings ("a", "ada", "grace",
+  // "mentor", "compilers", "zzzz") the tests below search for.
   const items = [
     { name: "Ada Lovelace", relationship: "Mentor", traits: ["maths"] },
     { name: "Grace Hopper", relationship: "Colleague", traits: ["compilers"] },
+    { name: "Filler 3" },
+    { name: "Filler 4" },
+    { name: "Filler 5" },
+    { name: "Filler 6" },
+    { name: "Filler 7" },
   ];
 
   it("is absent when the node does not opt in", () => {
@@ -794,14 +805,70 @@ describe("search", () => {
   });
 });
 
+describe("search box visibility threshold", () => {
+  // "Past six" is seven or more. At six and below the box is chrome with
+  // nothing to do.
+  const sixRows = Array.from({ length: 6 }, (_, i) => ({ name: `Row ${i + 1}` }));
+  const sevenRows = Array.from({ length: 7 }, (_, i) => ({ name: `Row ${i + 1}` }));
+
+  it("hides the search box at six rows", () => {
+    render(
+      <ListRenderer node={{ ...node, search: true }} entity={entity}
+        items={sixRows} onItems={vi.fn()} />
+    );
+    expect(screen.queryByRole("searchbox", { name: "Search" })).toBeNull();
+  });
+
+  it("shows the search box at seven rows", () => {
+    render(
+      <ListRenderer node={{ ...node, search: true }} entity={entity}
+        items={sevenRows} onItems={vi.fn()} />
+    );
+    expect(screen.getByRole("searchbox", { name: "Search" })).toBeInTheDocument();
+  });
+
+  it("keeps the box mounted while a query is active even below the threshold", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ListRenderer node={{ ...node, search: true }} entity={entity}
+        items={sevenRows} onItems={vi.fn()} />
+    );
+    await user.type(screen.getByRole("searchbox", { name: "Search" }), "Row 1");
+    // Falling to six with a live query must not unmount the only control that
+    // can clear it -- otherwise the user is stranded on a filtered list.
+    rerender(
+      <ListRenderer node={{ ...node, search: true }} entity={entity}
+        items={sixRows} onItems={vi.fn()} />
+    );
+    expect(screen.getByRole("searchbox", { name: "Search" })).toBeInTheDocument();
+  });
+
+  it("never shows a box for a node that does not declare search, at any count", () => {
+    render(
+      <ListRenderer node={{ ...node, search: false }} entity={entity}
+        items={sevenRows} onItems={vi.fn()} />
+    );
+    expect(screen.queryByRole("searchbox", { name: "Search" })).toBeNull();
+  });
+});
+
 describe("search combined with sort", () => {
   const node = listNode(["entries"], "topic", [{ name: "source" }], {
     node: { search: true, sort: { field: "priority", dir: "asc" } },
   });
+  // Seven rows because the search box only renders past six; see
+  // ListRenderer's threshold. The four padding rows below (Gamma..Theta) are
+  // appended after the three the assertions care about, so stored indices
+  // 0-2 are untouched; their topics deliberately don't contain "task" so
+  // they drop out of the "task" query the tests below filter on.
   const items = [
     { topic: "Zeta task", source: "z", priority: 3 },
     { topic: "Alpha task", source: "a", priority: 1 },
     { topic: "Beta note", source: "b", priority: 2 },
+    { topic: "Gamma review", source: "g", priority: 4 },
+    { topic: "Delta review", source: "d", priority: 5 },
+    { topic: "Epsilon review", source: "e", priority: 6 },
+    { topic: "Theta review", source: "t", priority: 7 },
   ];
 
   it("keeps filtered rows in sorted order", async () => {
@@ -1463,6 +1530,17 @@ describe("block fields", () => {
   it("edits the right child while a search filter is active", async () => {
     const searchable = { ...parentNode, search: true };
     const onItems = vi.fn();
+    // Seven rows because the search box only renders past six; see
+    // ListRenderer's threshold. Shadows the describe block's `items` (which
+    // stays at two rows for the ~15 sibling tests above, pinned to it).
+    // "Row 3".."Row 7" are minimal padding -- name only, no `references` --
+    // so they add no field the assertions below touch, and they don't match
+    // the "beta" query typed at the filter step.
+    const items = [
+      alpha, beta,
+      { name: "Row 3" }, { name: "Row 4" }, { name: "Row 5" },
+      { name: "Row 6" }, { name: "Row 7" },
+    ];
     const before = JSON.stringify(items);
     const user = userEvent.setup();
     render(
@@ -1486,6 +1564,11 @@ describe("block fields", () => {
     await user.type(screen.getByDisplayValue("https://b2"), "!");
 
     const [[next]] = onItems.mock.calls;
+    // Exhaustive on purpose: proves both that the edit landed on Beta (still
+    // stored at index 1 despite being the only row on screen) and that no
+    // sibling -- including the five padding rows -- moved or changed. The
+    // padding rows restate that second half of the claim over a bigger
+    // fixture; they don't relax what's being checked.
     expect(next).toEqual([
       alpha,
       {
@@ -1495,6 +1578,8 @@ describe("block fields", () => {
           { name: "Ref B2", url: "https://b2!" },
         ],
       },
+      { name: "Row 3" }, { name: "Row 4" }, { name: "Row 5" },
+      { name: "Row 6" }, { name: "Row 7" },
     ]);
     expect(JSON.stringify(items)).toBe(before); // replaced, never mutated
     expect(next[0]).toBe(alpha);
@@ -1622,6 +1707,20 @@ describe("facets", () => {
 
   it("composes with the search box -- both active narrows further than either alone", async () => {
     const user = userEvent.setup();
+    // Shadows the describe block's `items` (which stays at three rows for
+    // the sibling facet tests above, pinned to that exact "All"/status
+    // count). Seven rows here because the search box only renders past six;
+    // see ListRenderer's threshold. Padding notes avoid "team" so the "team"
+    // query below still isolates Alpha and Bravo.
+    const items = [
+      { name: "Alpha", status: "active", notes: "team review" },
+      { name: "Bravo", status: "paused", notes: "team retro" },
+      { name: "Charlie", status: "active", notes: "solo work" },
+      { name: "Delta", status: "completed", notes: "solo build" },
+      { name: "Echo", status: "completed", notes: "solo build" },
+      { name: "Foxtrot", status: "paused", notes: "solo build" },
+      { name: "Golf", status: "paused", notes: "solo build" },
+    ];
     render(
       <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
     );
@@ -1878,7 +1977,13 @@ describe("empty state offers a way in", () => {
   it("shows the no-matches wording instead when a search hides every row", async () => {
     const searchable = { ...node, search: true };
     const user = userEvent.setup();
-    render(<ListRenderer node={searchable} items={[{ name: "Alpha" }]} onItems={vi.fn()} />);
+    // Seven rows because the search box only renders past six; see
+    // ListRenderer's threshold. None of them match "zzz" below.
+    const items = [
+      { name: "Alpha" }, { name: "Bravo" }, { name: "Charlie" }, { name: "Delta" },
+      { name: "Echo" }, { name: "Foxtrot" }, { name: "Golf" },
+    ];
+    render(<ListRenderer node={searchable} items={items} onItems={vi.fn()} />);
 
     await user.type(screen.getByRole("searchbox"), "zzz");
 
