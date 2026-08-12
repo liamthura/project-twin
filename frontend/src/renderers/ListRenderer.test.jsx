@@ -475,15 +475,18 @@ describe("ListRenderer", () => {
     );
   });
 
-  it("gives the row delete button an accessible name derived from the row's title", () => {
+  it("gives the row's overflow trigger an accessible name derived from the row's title", () => {
     render(
       <ListRenderer node={node} entity={entity} items={[scandinavian]} onItems={() => {}} />
     );
     // Icon-only (no visible text), but must be announced as more than
     // "button" -- and named after this row specifically, not a generic label
-    // every row would share.
-    const deleteButton = screen.getByRole("button", { name: "More actions for Scandinavian" });
-    expect(deleteButton.textContent).toBe("");
+    // every row would share. Since Task 2 the row-named control is the OVERFLOW
+    // TRIGGER; the Remove item inside the menu is deliberately not row-named,
+    // because only one menu is open at a time and the click that opened it has
+    // already established which row is meant.
+    const overflowTrigger = screen.getByRole("button", { name: "More actions for Scandinavian" });
+    expect(overflowTrigger.textContent).toBe("");
   });
 });
 
@@ -755,7 +758,7 @@ describe("search", () => {
     // Regression: onItems prepends the new item to the stored array, but
     // `visible` re-filters on the unchanged query -- a name that doesn't
     // match "grace" would render nowhere, with only the header count
-    // ("1 of 2" -> "1 of 3") hinting anything happened at all.
+    // ("1 of 7" -> "1 of 8") hinting anything happened at all.
     function Harness() {
       const [state, setState] = useState(items);
       return <ListRenderer node={node} items={state} onItems={setState} />;
@@ -781,8 +784,27 @@ describe("search", () => {
     // both rows and deleting them both drops items to 0, unmounting the box
     // while `query` survives in state -- leaving the empty state stuck on
     // "Clear the search" with no control left to do it.
+    //
+    // LOCAL fixture, and it has to be. The describe-level `items` grew to seven
+    // rows so the box would clear its own visibility threshold, but five of
+    // those rows are "Filler N" and do not match "a" -- so removing Ada and
+    // Grace left `items.length` at 5, and the buggy `items.length > 0` gate this
+    // test exists to catch would have stayed green forever. Every row here
+    // matches the query instead, so removing all of them genuinely reaches zero
+    // stored items with a live query, which is the only state that discriminates
+    // the fix from the bug. Seven of them because the box has a six-row
+    // threshold and the test has to be able to type in it to begin with.
+    const allMatching = [
+      { name: "Ada Lovelace", relationship: "Mentor" },
+      { name: "Grace Hopper", relationship: "Colleague" },
+      { name: "Alan Turing" },
+      { name: "Barbara Liskov" },
+      { name: "Katherine Johnson" },
+      { name: "Margaret Hamilton" },
+      { name: "Anita Borg" },
+    ];
     function Harness() {
-      const [state, setState] = useState(items);
+      const [state, setState] = useState(allMatching);
       return <ListRenderer node={node} items={state} onItems={setState} />;
     }
     const user = userEvent.setup();
@@ -792,11 +814,12 @@ describe("search", () => {
     expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
     expect(screen.getByText("Grace Hopper")).toBeInTheDocument();
 
-    // Both rows are visible under the "a" filter, in stored order -- select
+    // All seven rows are visible under the "a" filter, in stored order -- select
     // each row's overflow menu by its accessible name rather than position.
-    // Each removeRow opens a fresh menu, so these stay two calls.
-    await removeRow(user, "Ada Lovelace");
-    await removeRow(user, "Grace Hopper");
+    // Each removeRow opens a fresh menu, so these stay seven calls.
+    for (const title of allMatching.map((i) => i.name)) {
+      await removeRow(user, title);
+    }
 
     expect(screen.getByText(/no matches/i)).toBeInTheDocument();
     // The box is still here, still holding the query that stranded the user --
@@ -1155,14 +1178,58 @@ describe("a field's own `label` overrides the derived one", () => {
     expect(screen.getByText("Where it came from")).toBeInTheDocument();
     expect(screen.queryByText(/^source$/i)).not.toBeInTheDocument();
   });
+
+  // A declared label is authored copy, so nothing may re-case it. These assert
+  // the CLASS rather than the rendered glyphs because jsdom applies no
+  // stylesheet: `text-transform` is invisible to it, and the class is the only
+  // observable difference. The bug being pinned is real and shipped --
+  // learning_log declares "Follow-up Items", and CSS `capitalize` breaks on the
+  // hyphen, so it rendered as "Follow-Up Items".
+  it("does not offer a declared label to CSS capitalize", async () => {
+    const node = listNode(["entries"], "topic", [
+      { name: "source", label: "Follow-up Items" },
+    ]);
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[{ topic: "RSC", source: "x" }]} onItems={vi.fn()} />);
+
+    await user.click(screen.getByText("RSC"));
+
+    expect(screen.getByText("Follow-up Items").className).not.toMatch(/capitalize/);
+  });
+
+  it("still capitalises a derived name, which has no other source of case", async () => {
+    const node = listNode(["entries"], "topic", [{ name: "detail_level" }]);
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[{ topic: "RSC", detail_level: "x" }]} onItems={vi.fn()} />);
+
+    await user.click(screen.getByText("RSC"));
+
+    // Lowercase in the DOM: the CSS transform is the only thing that cases it,
+    // which is exactly why it must stay for this branch.
+    expect(screen.getByText("detail level").className).toMatch(/capitalize/);
+  });
+
+  // A block heading is ALWAYS a declared label -- `isBlockField` requires one --
+  // so this site needs no conditional, and had no business capitalising.
+  it("does not offer a block heading to CSS capitalize either", async () => {
+    const node = listNode(["entries"], "topic", [
+      { name: "followup_items", type: "strings", label: "Follow-up Items" },
+    ]);
+    const user = userEvent.setup();
+    render(<ListRenderer node={node} items={[{ topic: "RSC", followup_items: [] }]} onItems={vi.fn()} />);
+
+    await user.click(screen.getByText("RSC"));
+
+    expect(screen.getByText("Follow-up Items").className).not.toMatch(/capitalize/);
+  });
 });
 
-describe("row delete button naming", () => {
-  // Both the row delete and (before it moved to the heading) the info button
-  // were icon-only with empty textContent, so a selector like
+describe("row overflow trigger naming", () => {
+  // Both the row's overflow trigger and (before it moved to the heading) the
+  // info button were icon-only with empty textContent, so a selector like
   // getAllByRole("button").find(b => b.textContent === "") could silently
   // grab the wrong one. Selecting by accessible name must land on the row.
-  it("names a row's delete button after the row", async () => {
+  it("names a row's overflow trigger after the row, and removal through it confirms against that row", async () => {
     const onShowConfirmation = vi.fn();
     const user = userEvent.setup();
     render(
@@ -1248,11 +1315,13 @@ describe("detail-grid column spans", () => {
 // parent row first: a block only exists inside an expanded row, so an assertion
 // made against a collapsed row cannot fail for the reason it claims.
 //
-// Selector note: with a nested list there are now delete buttons and Add
+// Selector note: with a nested list there are now overflow triggers and Add
 // buttons at two levels, and neither accessible name is namespaced by level.
-// `Remove <title>` names the row's title, so a child item whose title equals
-// its parent's yields TWO buttons named `Remove Alpha` -- a nested test must
-// use distinct titles or scope by row, never select by name alone. Same for
+// `More actions for <title>` names the row's title, so a child item whose title
+// equals its parent's yields TWO buttons named `More actions for Alpha` -- a
+// nested test must use distinct titles or scope by row, never select by name
+// alone. (`Remove` itself is no longer a per-row handle: since Task 2 it is a
+// menuitem inside whichever menu is open, and only one is open at a time.) Same for
 // `Add` (the parent's and the expanded row's child list both have one) and,
 // if both levels are `searchable`, for `searchbox`. The child's Add button is
 // scoped below through the child's own `title` label, whose parent element is

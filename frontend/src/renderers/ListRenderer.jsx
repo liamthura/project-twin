@@ -98,6 +98,30 @@ function formatDisplay(value, format) {
   return format === "date" ? date : `${date} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+// A field's label, and whether CSS may capitalise it.
+//
+// Two different kinds of string end up in a Label here, and only one of them
+// wants `text-transform: capitalize`:
+//
+//   - a DERIVED name, `detail_level` -> "detail level". Lowercase, because
+//     nothing title-cases it in JS, so without the CSS transform it renders as
+//     "detail level". This is the case the transform exists for.
+//   - a DECLARED `label` from the manifest, which is authored copy and already
+//     cased the way its author wanted it.
+//
+// Applying the transform to declared copy is not merely redundant, it corrupts
+// it: CSS `capitalize` breaks on punctuation, so learning_log's declared
+// "Follow-up Items" rendered as "Follow-Up Items". Nothing in the pack format
+// lets an author opt out, and nothing told them why their label changed.
+//
+// So the transform follows the fallback, never the declaration.
+function fieldLabel(meta, f) {
+  const declared = meta.field_labels?.[f];
+  return declared !== undefined
+    ? { text: declared, capitalize: "" }
+    : { text: f.replace(/_/g, " "), capitalize: " capitalize" };
+}
+
 // `entities` (the whole map) and `packKey` are passed straight back into
 // renderNode when dispatching a row's block fields against that row's item, the
 // same way SectionRenderer dispatches a section's own top-level nodes -- the
@@ -650,8 +674,10 @@ export default function ListRenderer({
                   <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 pb-2 sm:px-9">
                     {bodyDisplayFields.map((f) => (
                       <div key={f}>
-                        <Label className="text-xs capitalize">
-                          {meta.field_labels[f] ?? f.replace(/_/g, " ")}
+                        {/* See fieldLabel: capitalize follows the derived name,
+                            not a declared label. */}
+                        <Label className={`text-xs${fieldLabel(meta, f).capitalize}`}>
+                          {fieldLabel(meta, f).text}
                         </Label>
                         <p className="font-mono text-xs text-muted-foreground">
                           {formatDisplay(item[f], formats[f])}
@@ -663,12 +689,15 @@ export default function ListRenderer({
                 <div className="grid gap-3 px-4 pb-3 sm:grid-cols-2 sm:px-9">
                   {bodyEditFields.map((f) => (
                     <div key={f} className={needsFullRow(f) ? "sm:col-span-2" : ""}>
-                      {/* capitalize stays here: unlike FieldsRenderer's labelFor,
-                          this text comes from a raw `replace` with no JS
-                          title-casing, so the CSS transform is what capitalises
-                          it. Dropping it would render e.g. "detail level". */}
-                      <Label className="headline-3 capitalize">
-                        {meta.field_labels[f] ?? f.replace(/_/g, " ")}
+                      {/* capitalize stays here, but conditionally: unlike
+                          FieldsRenderer's labelFor, a DERIVED name comes from a
+                          raw `replace` with no JS title-casing, so the CSS
+                          transform is what capitalises it -- dropping it
+                          entirely would render e.g. "detail level". A DECLARED
+                          label is authored copy and must be left alone. See
+                          fieldLabel for what the transform corrupted. */}
+                      <Label className={`headline-3${fieldLabel(meta, f).capitalize}`}>
+                        {fieldLabel(meta, f).text}
                       </Label>
                       <ScalarField
                         field={f}
@@ -740,9 +769,16 @@ export default function ListRenderer({
                           InfoButton that sat here always rendered null for every
                           child in every shipped pack, and there is nothing left
                           for it to draw. */}
+                      {/* No `capitalize` on a block heading, and there is no
+                          conditional to make: `blockNode` sets `title` from the
+                          field's `label`, and `isBlockField` requires a label to
+                          be a block at all -- so this string is ALWAYS authored
+                          copy and never a derived name. This is the site that
+                          actually rendered learning_log's "Follow-up Items" as
+                          "Follow-Up Items"; see fieldLabel. */}
                       {child.title && (
                         <div className="flex items-center gap-1.5">
-                          <Label className="text-xs capitalize">{child.title}</Label>
+                          <Label className="text-xs">{child.title}</Label>
                         </div>
                       )}
                       {rendered}
