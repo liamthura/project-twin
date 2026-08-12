@@ -53,7 +53,17 @@ export function ArrayInput({ items = [], onChange, placeholder }) {
           {items.map((item, index) => (
             <Badge key={index} variant="secondary" className="gap-1 pr-1">
               {item}
+              {/* `type="button"` because a Badge can sit inside a form, where a
+                  bare <button> defaults to type="submit" and removing a chip
+                  would submit the form.
+
+                  Named after its own chip, not "Remove": the control is
+                  icon-only, so without a label a screen reader announces bare
+                  "button", and a paste of twenty values now makes twenty of
+                  them in a row -- identical, and unidentifiable. */}
               <button
+                type="button"
+                aria-label={`Remove ${item}`}
                 onClick={() => removeItem(index)}
                 className="ml-1 hover:text-destructive transition-colors"
               >
@@ -68,8 +78,18 @@ export function ArrayInput({ items = [], onChange, placeholder }) {
           value={newItem}
           onChange={(e) => setNewItem(e.target.value)}
           onPaste={handlePaste}
+          // The isComposing guard is what makes onKeyDown safe for an IME.
+          // This was `onKeyPress` until the paste work, and `keypress` does not
+          // fire for the Enter that ACCEPTS an IME candidate -- `keydown` does,
+          // with `isComposing: true`. Without the guard a CJK user typing a
+          // candidate and pressing Enter to accept it commits a chip out of
+          // half-composed text and clears the input, so the word they were
+          // writing is both wrong and gone. `nativeEvent` because React's
+          // synthetic event does not carry `isComposing`.
           onKeyDown={(e) =>
-            e.key === "Enter" && (e.preventDefault(), addItem())
+            e.key === "Enter" &&
+            !e.nativeEvent.isComposing &&
+            (e.preventDefault(), addItem())
           }
           placeholder={placeholder}
           className="flex-1"
