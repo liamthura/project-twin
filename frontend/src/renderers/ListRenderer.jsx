@@ -663,7 +663,11 @@ export default function ListRenderer({
                 <div className="grid gap-3 px-4 pb-3 sm:grid-cols-2 sm:px-9">
                   {bodyEditFields.map((f) => (
                     <div key={f} className={needsFullRow(f) ? "sm:col-span-2" : ""}>
-                      <Label className="headline-3">
+                      {/* capitalize stays here: unlike FieldsRenderer's labelFor,
+                          this text comes from a raw `replace` with no JS
+                          title-casing, so the CSS transform is what capitalises
+                          it. Dropping it would render e.g. "detail level". */}
+                      <Label className="headline-3 capitalize">
                         {meta.field_labels[f] ?? f.replace(/_/g, " ")}
                       </Label>
                       <ScalarField
