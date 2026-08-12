@@ -21,7 +21,7 @@
 - **The two frozen fixtures are untouched:** `frontend/src/__fixtures__/field-census-v1.json` and `control-census-v1.json`. Neither records a CSS class or a control's DOM position, so nothing here should move them. If either changes, stop.
 - **Design tokens only.** `bg-popover`, `text-popover-foreground`, `bg-accent`, `text-destructive` are all defined in `tailwind.config.js:35-49` and `src/globals.css` for both themes. Do not introduce a raw colour.
 - Test command: `npx vitest run --project unit` from `frontend/`. Bare `npm test` also runs the storybook project.
-- Full green before every commit: **837 passing** at the start of this plan, in 43 files.
+- Full green before every commit. **Two counts, and they are not the same number:** `npx vitest run --project unit` starts at **835 passing in 42 files**; bare `npm test` adds the Storybook browser project and starts at **837 in 43**. Every per-task figure below is the UNIT-ONLY count, because that is the command each task runs. (Corrected 2026-08-12: the first draft of this plan quoted the two-project total against the unit-only command, so every expected figure was 2 high.)
 
 ## File Structure
 
@@ -243,7 +243,7 @@ If the open tests hang or throw from inside Radix, revisit Step 1 — a missing 
 
 Run: `cd frontend && npx vitest run --project unit`
 
-Expected: **841 passing** (837 + 4), 44 files.
+Expected: **839 passing** (835 + 4), 43 files.
 
 ```bash
 git add frontend/package.json frontend/package-lock.json \
@@ -262,7 +262,7 @@ expand handler.
 The jsdom polyfills a Radix menu needs (hasPointerCapture, scrollIntoView,
 ResizeObserver) were already in src/test/setup.js for Radix's Select.
 
-841 frontend tests pass."
+839 frontend unit tests pass (835 + 4)."
 ```
 
 ---
@@ -475,7 +475,7 @@ Expected: `ListRenderer.test.jsx` PASS with 2 more tests than before, and `Secti
 
 Run: `cd frontend && npx vitest run --project unit`
 
-Expected: **844 passing** (841 + 3: two in `ListRenderer.test.jsx`, one in `realWorldShapes.test.jsx`), 44 files. In particular `useListItems.test.jsx` must be untouched and green — it is the evidence that list semantics did not move.
+Expected: **842 passing** (839 + 3: two in `ListRenderer.test.jsx`, one in `realWorldShapes.test.jsx`), 43 files. In particular `useListItems.test.jsx` must be untouched and green — it is the evidence that list semantics did not move.
 
 - [ ] **Step 8: Verify the fixtures did not move**
 
@@ -510,7 +510,7 @@ a menu that control does not exist until the trigger opens, and a Radix item is
 a menuitem rather than a button, so all nine now go through one removeRow
 helper. Every assertion in them is unchanged.
 
-844 frontend tests pass."
+842 frontend unit tests pass."
 ```
 
 ---
@@ -716,7 +716,7 @@ Expected: PASS, 12 tests.
 
 Run: `cd frontend && npx vitest run --project unit`
 
-Expected: **856 passing** (844 + 12), 45 files.
+Expected: **854 passing** (842 + 12), 44 files.
 
 `ArrayInput` backs every `strings` field and `ScalarField`'s `strings` branch, so watch `StringsRenderer.test.jsx`, `ScalarField.test.jsx` and `controlCensus.render.test.jsx` in particular. A failure there means the `onKeyDown` swap changed Enter's behaviour.
 
@@ -749,7 +749,7 @@ ArrayInput had no test file. It has 12 now, three of which pin the Enter
 behaviour that already worked, because that is what the handler swap could
 break silently.
 
-856 frontend tests pass."
+854 frontend unit tests pass."
 ```
 
 ---
@@ -867,7 +867,7 @@ Any OTHER test in this file that fails here is a test whose fixture has 1-6 rows
 
 Run: `cd frontend && npx vitest run --project unit`
 
-Expected: **860 passing** (856 + 4).
+Expected: **858 passing** (854 + 4).
 
 ```bash
 git add frontend/src/renderers/ListRenderer.jsx frontend/src/renderers/ListRenderer.test.jsx
@@ -884,7 +884,7 @@ list with no way to clear it.
 
 Facets are untouched. They are declared per node and shown independently.
 
-860 frontend tests pass."
+858 frontend unit tests pass."
 ```
 
 ---
@@ -1045,7 +1045,7 @@ spelling of the token and defeats the point of this task.
 
 Run: `cd frontend && npx vitest run --project unit`
 
-Expected: **861 passing** (860 + 1), all files.
+Expected: **859 passing** (858 + 1), all files.
 
 Run: `cd frontend && npm run build`
 
@@ -1092,13 +1092,13 @@ about who writes the field -- all four row-position fields in the shipped packs
 happen to be ui_only server-written timestamps, which is an observation and not
 the rule.
 
-861 frontend tests pass, and npm run build succeeds -- the check that matters
+859 frontend unit tests pass, and npm run build succeeds -- the check that matters
 for a CSS change, since jsdom never loads a stylesheet."
 ```
 
 ## Verification, end of slice
 
-- [ ] **Step 1:** `cd frontend && npx vitest run --project unit` → **861 passing**, no skips.
+- [ ] **Step 1:** `cd frontend && npx vitest run --project unit` → **859 passing** in 44 files, no skips.
 - [ ] **Step 2:** `cd frontend && npm test` → both projects green, including the storybook project the unit runs skip.
 - [ ] **Step 3:** `git status --short frontend/src/__fixtures__/` → empty. Neither frozen census moved.
 - [ ] **Step 4:** `cd backend && python3 -m pytest -q` → **1001 passed, 1 skipped**. Nothing here touches the backend, so a failure means something unrelated leaked in.
@@ -1111,6 +1111,6 @@ for a CSS change, since jsdom never loads a stylesheet."
 - **Spec coverage.** §1 chip paste → Task 3. §2 search past six → Task 4. §3 overflow menu → Tasks 1 and 2, with the dependency §3 identified as its own task because it is a `package.json` change a reviewer could reject on its own. §4 labels → Task 5, widened by an owner ruling to define `headline-3` as a real class rather than restating its three Tailwind classes at each site; that pulled in `globals.css` and `SectionRenderer.jsx:362`, the one existing inline spelling. The spec's Testing section maps onto the test steps in each task, including the nine call sites named in Task 2 Step 4. Out-of-scope items appear in no task: no undo, no soft delete, no chip dedupe, no `ScalarField` control changes.
 - **The `element.list` trap does not apply here.** Nothing in this slice reads the manifest, so the frozen censuses should not move — which is why two tasks check them explicitly rather than assuming.
 - **Type consistency.** `DropdownMenu` / `DropdownMenuTrigger` / `DropdownMenuContent` / `DropdownMenuItem` are the four names Task 1 exports and the four Task 2 imports. `removeRow(user, title)` is defined once in Task 2 Step 1 and used in Step 5. `handlePaste` and `DELIMITED` are defined and wired within Task 3.
-- **Test counts are cumulative and stated per task** (837 → 841 → 844 → 856 → 860 → 861). If a task's actual number differs, the difference is the thing to explain before committing — most likely a test elsewhere that reached for the search box with fewer than seven rows (Task 4 Step 4 anticipates exactly that).
+- **Test counts are cumulative and stated per task** (835 → 839 → 842 → 854 → 858 → 859, unit-only). If a task's actual number differs, the difference is the thing to explain before committing — most likely a test elsewhere that reached for the search box with fewer than seven rows (Task 4 Step 4 anticipates exactly that).
 - **The riskiest task is 2**, not because the component change is hard but because twelve existing tests move — nine change their interaction path and three change the anchor they locate a row by. The rules that keep it honest are in the Global Constraints: every `expect` survives verbatim, and `useListItems.test.jsx` stays untouched and green.
 - **The count of affected tests was wrong twice while writing this plan**, which is why Task 2 Step 4 names all twelve line numbers rather than a total. The first pass grepped only `ListRenderer.test.jsx` and found nine; the second found four more across the suite; one of those four (`StringsRenderer.test.jsx:117`) turned out to be a different component removing a bare string, and is called out as a must-not-change so it does not get "fixed" by mistake.
