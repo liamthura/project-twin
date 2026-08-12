@@ -220,9 +220,28 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
    and a reader can find. The other four are not defined: nothing uses them yet,
    and an unused class is a thing to maintain and to get wrong.
 
-   In `components` rather than `utilities` so a one-off `text-base` on a call
-   site still wins. */
-@layer components {
+   In `utilities`, and it has to be: every call site puts this class on `Label`,
+   whose own base is `text-sm font-medium leading-none` (components/ui/label.jsx).
+   Those are utilities, `font-medium` and `font-semibold` have equal specificity,
+   and Tailwind emits `components` BEFORE `utilities` -- so from `components` this
+   class lost the weight to `font-medium` at every one of its call sites, which is
+   the whole point of the token. `twMerge` cannot rescue it either: it has no way
+   to know `headline-3` conflicts with `font-medium`, so both survive into the
+   rendered class string and the cascade decides.
+
+   Measured in the built CSS, not reasoned about -- jsdom never loads a
+   stylesheet, so no test in this repo can see this. The check is:
+
+     npm run build && python3 - <<'PY'
+     import glob
+     s = open(glob.glob('dist/assets/*.css')[0]).read()
+     print(s.find('.headline-3') > s.find('.font-medium'))
+     PY
+
+   The cost of `utilities` is that a one-off `text-base` on a call site no longer
+   beats it; none of the three call sites does that, and a site that needs to can
+   reach for `!text-base`. */
+@layer utilities {
   .headline-3 {
     @apply text-sm font-semibold text-foreground;
   }
