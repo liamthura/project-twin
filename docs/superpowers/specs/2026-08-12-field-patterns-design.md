@@ -65,10 +65,27 @@ does not commit a chip. Someone pasting `React` may be pasting a fragment they
 intend to finish typing, and committing it would make the input unusable for
 that. Only a paste that *contains* a delimiter commits anything.
 
-**A paste that does not end in a delimiter leaves its last piece in the input.**
-`"React, Vue, Sve"` gives chips `React` and `Vue`, and leaves `Sve` in the input
-to finish. This is what tag inputs conventionally do, and it is the difference
-between pasting a list and pasting a list you were midway through writing.
+**A delimited paste commits every piece and clears the input.**
+`"React, Vue, Svelte"` gives three chips and an empty input, whether or not it
+ended on a delimiter.
+
+> **Corrected 2026-08-12, by owner ruling.** This section first said the last
+> piece stays in the input unless the paste ends on a delimiter, so that
+> `"React, Vue, Sve"` left `Sve` to finish. That rule and the rule above are
+> inconsistent about identical input — `"React, Vue, Svelte"` and
+> `"React, Vue, Sve"` are both three pieces with no trailing delimiter — and the
+> plan built from this spec asserted both, which made five of its twelve tests
+> unsatisfiable. Task 3's implementer found it by transcribing the handler and
+> the tests verbatim and reporting that they disagreed.
+>
+> Committing everything won on the merits, not just to resolve the clash: pasting
+> a finished list is the common case, and withholding its last value put an extra
+> Enter in the way of it. The "still writing" case is already served by the
+> no-delimiter fall-through above, which is the rule that actually earns its keep.
+
+Text already typed in the input becomes the first value rather than being
+discarded, since the input is cleared on a delimited paste and leaving it out
+would silently lose it.
 
 **No deduplication.** `addItem` does `onChange([...items, newItem.trim()])` — it
 does not dedupe on Enter today. Adding dedupe on the paste path only would make

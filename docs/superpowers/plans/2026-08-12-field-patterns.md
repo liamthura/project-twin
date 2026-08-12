@@ -585,13 +585,24 @@ describe("ArrayInput paste", () => {
     expect(onChange).toHaveBeenCalledWith(["React", "Vue"]);
   });
 
-  it("leaves the last piece in the input when the paste does not end in a delimiter", async () => {
+  it("commits every piece and clears the input, delimiter at the end or not", async () => {
     const { onChange, user, input } = setup();
     await user.click(input);
     await user.paste("React, Vue, Sve");
-    // "Sve" is a fragment the user is still writing, not a value.
-    expect(onChange).toHaveBeenCalledWith(["React", "Vue"]);
-    expect(input).toHaveValue("Sve");
+    // No special case for the final piece: a delimited paste is a list, and
+    // withholding its last value only put an extra Enter in the way.
+    expect(onChange).toHaveBeenCalledWith(["React", "Vue", "Sve"]);
+    expect(input).toHaveValue("");
+  });
+
+  it("keeps text already typed, as its own value ahead of the pasted ones", async () => {
+    const { onChange, user, input } = setup();
+    await user.type(input, "Angular");
+    await user.paste("React, Vue");
+    // The input is cleared on a delimited paste, so "Angular" has to go
+    // somewhere or it is silently lost.
+    expect(onChange).toHaveBeenCalledWith(["Angular", "React", "Vue"]);
+    expect(input).toHaveValue("");
   });
 
   it("leaves the input empty when the paste ends in a delimiter", async () => {
@@ -660,30 +671,30 @@ In `frontend/src/components/ArrayInput.jsx`, add the handler after `removeItem`:
   // keeps the input usable for assembling a value from two sources -- paste
   // "Sve", type "lte".
   //
-  // The final piece stays in the input unless the paste ended on a delimiter,
-  // which is the difference between pasting a finished list and pasting one you
-  // were midway through. "React, Vue, Sve" gives two chips and leaves "Sve".
+  // Every piece is committed and the input is cleared. Withholding the last one
+  // unless the paste ended on a delimiter was the first design, and it is
+  // inconsistent about identical input -- "React, Vue, Svelte" and
+  // "React, Vue, Sve" are both three pieces with no trailing delimiter. It also
+  // penalised the common case, pasting a finished list, with an extra Enter.
+  // Owner ruling, 2026-08-12. `DELIMITED` lives at module scope, above the
+  // component: no `g` flag, so `.test()` carries no lastIndex between calls.
   //
   // No dedupe: addItem does not dedupe on Enter, and doing it on one route only
   // is how the two would come to disagree. See the spec's §1.
-  const DELIMITED = /[,\n]/;
-
   const handlePaste = (e) => {
     const text = e.clipboardData.getData("text");
     if (!DELIMITED.test(text)) return;   // fall through to the normal paste
     e.preventDefault();
 
-    const pieces = text.split(DELIMITED).map((s) => s.trim());
-    const trailing = pieces.pop();       // "" when the paste ended on a delimiter
-    const committed = pieces.filter(Boolean);
-
-    // Anything already typed leads the first pasted value, so pasting into a
-    // half-written entry does not silently drop it.
+    const pieces = text.split(DELIMITED).map((s) => s.trim()).filter(Boolean);
+    // Anything already typed becomes the first value rather than being
+    // discarded: the input is about to be cleared, so leaving it out would
+    // silently lose it.
     const lead = newItem.trim();
-    const additions = lead ? [lead, ...committed] : committed;
+    const additions = lead ? [lead, ...pieces] : pieces;
 
     if (additions.length > 0) onChange([...items, ...additions]);
-    setNewItem(trailing);
+    setNewItem("");
   };
 ```
 
@@ -710,13 +721,13 @@ Then wire it, and swap the deprecated handler:
 
 Run: `cd frontend && npx vitest run --project unit src/components/ArrayInput.test.jsx`
 
-Expected: PASS, 12 tests.
+Expected: PASS, 13 tests.
 
 - [ ] **Step 5: Full suite**
 
 Run: `cd frontend && npx vitest run --project unit`
 
-Expected: **854 passing** (842 + 12), 44 files.
+Expected: **855 passing** (842 + 13), 44 files.
 
 `ArrayInput` backs every `strings` field and `ScalarField`'s `strings` branch, so watch `StringsRenderer.test.jsx`, `ScalarField.test.jsx` and `controlCensus.render.test.jsx` in particular. A failure there means the `onKeyDown` swap changed Enter's behaviour.
 
@@ -749,7 +760,7 @@ ArrayInput had no test file. It has 12 now, three of which pin the Enter
 behaviour that already worked, because that is what the handler swap could
 break silently.
 
-854 frontend unit tests pass."
+855 frontend unit tests pass."
 ```
 
 ---
@@ -867,7 +878,7 @@ Any OTHER test in this file that fails here is a test whose fixture has 1-6 rows
 
 Run: `cd frontend && npx vitest run --project unit`
 
-Expected: **858 passing** (854 + 4).
+Expected: **859 passing** (855 + 4).
 
 ```bash
 git add frontend/src/renderers/ListRenderer.jsx frontend/src/renderers/ListRenderer.test.jsx
@@ -884,7 +895,7 @@ list with no way to clear it.
 
 Facets are untouched. They are declared per node and shown independently.
 
-858 frontend unit tests pass."
+859 frontend unit tests pass."
 ```
 
 ---
@@ -1045,7 +1056,7 @@ spelling of the token and defeats the point of this task.
 
 Run: `cd frontend && npx vitest run --project unit`
 
-Expected: **859 passing** (858 + 1), all files.
+Expected: **860 passing** (859 + 1), all files.
 
 Run: `cd frontend && npm run build`
 
@@ -1092,13 +1103,13 @@ about who writes the field -- all four row-position fields in the shipped packs
 happen to be ui_only server-written timestamps, which is an observation and not
 the rule.
 
-859 frontend unit tests pass, and npm run build succeeds -- the check that matters
+860 frontend unit tests pass, and npm run build succeeds -- the check that matters
 for a CSS change, since jsdom never loads a stylesheet."
 ```
 
 ## Verification, end of slice
 
-- [ ] **Step 1:** `cd frontend && npx vitest run --project unit` → **859 passing** in 44 files, no skips.
+- [ ] **Step 1:** `cd frontend && npx vitest run --project unit` → **860 passing** in 44 files, no skips.
 - [ ] **Step 2:** `cd frontend && npm test` → both projects green, including the storybook project the unit runs skip.
 - [ ] **Step 3:** `git status --short frontend/src/__fixtures__/` → empty. Neither frozen census moved.
 - [ ] **Step 4:** `cd backend && python3 -m pytest -q` → **1001 passed, 1 skipped**. Nothing here touches the backend, so a failure means something unrelated leaked in.
@@ -1111,6 +1122,6 @@ for a CSS change, since jsdom never loads a stylesheet."
 - **Spec coverage.** §1 chip paste → Task 3. §2 search past six → Task 4. §3 overflow menu → Tasks 1 and 2, with the dependency §3 identified as its own task because it is a `package.json` change a reviewer could reject on its own. §4 labels → Task 5, widened by an owner ruling to define `headline-3` as a real class rather than restating its three Tailwind classes at each site; that pulled in `globals.css` and `SectionRenderer.jsx:362`, the one existing inline spelling. The spec's Testing section maps onto the test steps in each task, including the nine call sites named in Task 2 Step 4. Out-of-scope items appear in no task: no undo, no soft delete, no chip dedupe, no `ScalarField` control changes.
 - **The `element.list` trap does not apply here.** Nothing in this slice reads the manifest, so the frozen censuses should not move — which is why two tasks check them explicitly rather than assuming.
 - **Type consistency.** `DropdownMenu` / `DropdownMenuTrigger` / `DropdownMenuContent` / `DropdownMenuItem` are the four names Task 1 exports and the four Task 2 imports. `removeRow(user, title)` is defined once in Task 2 Step 1 and used in Step 5. `handlePaste` and `DELIMITED` are defined and wired within Task 3.
-- **Test counts are cumulative and stated per task** (835 → 839 → 842 → 854 → 858 → 859, unit-only). If a task's actual number differs, the difference is the thing to explain before committing — most likely a test elsewhere that reached for the search box with fewer than seven rows (Task 4 Step 4 anticipates exactly that).
+- **Test counts are cumulative and stated per task** (835 → 839 → 842 → 855 → 859 → 860, unit-only). If a task's actual number differs, the difference is the thing to explain before committing — most likely a test elsewhere that reached for the search box with fewer than seven rows (Task 4 Step 4 anticipates exactly that).
 - **The riskiest task is 2**, not because the component change is hard but because twelve existing tests move — nine change their interaction path and three change the anchor they locate a row by. The rules that keep it honest are in the Global Constraints: every `expect` survives verbatim, and `useListItems.test.jsx` stays untouched and green.
 - **The count of affected tests was wrong twice while writing this plan**, which is why Task 2 Step 4 names all twelve line numbers rather than a total. The first pass grepped only `ListRenderer.test.jsx` and found nine; the second found four more across the suite; one of those four (`StringsRenderer.test.jsx:117`) turned out to be a different component removing a bare string, and is called out as a must-not-change so it does not get "fixed" by mistake.
