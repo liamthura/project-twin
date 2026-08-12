@@ -120,6 +120,20 @@ const headerAdd = (scope = screen) => scope.getByText("Add", { selector: "button
 const emptyPanel = () => screen.getByText(/Nothing here yet/).parentElement;
 const panelAdd = () => within(emptyPanel()).getByRole("button", { name: /^Add / });
 
+// Removal is two interactions now: open the row's overflow menu, then choose
+// Remove. Every call site below went through this helper rather than repeating
+// the pair, because there are nine of them and they all mean the same thing.
+//
+// The trigger is identified per row ("More actions for Scandinavian") and the
+// item is not ("Remove"), which is deliberate: only one menu is open at a time,
+// so the row is already established by the click that opened it.
+async function removeRow(user, title) {
+  await user.click(
+    screen.getByRole("button", { name: `More actions for ${title}` })
+  );
+  await user.click(await screen.findByRole("menuitem", { name: "Remove" }));
+}
+
 describe("ListRenderer", () => {
   it("renders each row's title, and badges for fields that take the badge position", () => {
     render(
@@ -158,11 +172,9 @@ describe("ListRenderer", () => {
       />
     );
 
-    // The delete button is icon-only (no visible text), but carries an
-    // aria-label naming this row -- select by that accessible name rather
-    // than by empty textContent.
-    const deleteButton = screen.getByRole("button", { name: "Remove Scandinavian" });
-    await user.click(deleteButton);
+    // Remove is behind the row's overflow menu now, not a bare icon button --
+    // open it by the trigger's per-row accessible name, then choose Remove.
+    await removeRow(user, "Scandinavian");
 
     expect(onShowConfirmation).toHaveBeenCalledTimes(1);
     expect(onShowConfirmation).toHaveBeenCalledWith(
@@ -178,6 +190,29 @@ describe("ListRenderer", () => {
 
     expect(onItems).toHaveBeenCalledTimes(1);
     expect(onItems).toHaveBeenCalledWith([]);
+  });
+
+  it("keeps Remove out of the row body until the overflow menu is opened", () => {
+    render(
+      <ListRenderer node={node} entity={entity} items={[scandinavian]} onItems={vi.fn()} />
+    );
+    // The row offers a way IN to the destructive action, but not the action.
+    expect(
+      screen.getByRole("button", { name: "More actions for Scandinavian" })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Remove" })).toBeNull();
+  });
+
+  it("marks the Remove item destructive", async () => {
+    const user = userEvent.setup();
+    render(
+      <ListRenderer node={node} entity={entity} items={[scandinavian]} onItems={vi.fn()} />
+    );
+    await user.click(
+      screen.getByRole("button", { name: "More actions for Scandinavian" })
+    );
+    const item = await screen.findByRole("menuitem", { name: "Remove" });
+    expect(item.className).toMatch(/text-destructive/);
   });
 
   // Every test in this file renders ListRenderer on its own, with no
@@ -384,7 +419,7 @@ describe("ListRenderer", () => {
     expect(screen.getByDisplayValue("note-2")).toBeInTheDocument();
 
     // Remove "First" (index 0). "Second" shifts to index 0 and must stay open.
-    await user.click(screen.getByRole("button", { name: "Remove First" }));
+    await removeRow(user, "First");
     rerender(<ListRenderer node={simpleNode} items={current} onItems={vi.fn()} />);
 
     expect(screen.getByDisplayValue("note-2")).toBeInTheDocument();
@@ -431,8 +466,7 @@ describe("ListRenderer", () => {
       />
     );
 
-    const deleteButton = screen.getByRole("button", { name: "Remove Untitled entry" });
-    await user.click(deleteButton);
+    await removeRow(user, "Untitled entry");
 
     expect(onShowConfirmation).toHaveBeenCalledWith(
       "Remove Untitled entry?",
@@ -448,7 +482,7 @@ describe("ListRenderer", () => {
     // Icon-only (no visible text), but must be announced as more than
     // "button" -- and named after this row specifically, not a generic label
     // every row would share.
-    const deleteButton = screen.getByRole("button", { name: "Remove Scandinavian" });
+    const deleteButton = screen.getByRole("button", { name: "More actions for Scandinavian" });
     expect(deleteButton.textContent).toBe("");
   });
 });
@@ -578,7 +612,7 @@ describe("sort", () => {
     // "Newest" displays first (sorted) despite being stored at index 1 --
     // select it by its accessible name, which names the row rather than
     // its position.
-    await user.click(screen.getByRole("button", { name: "Remove Newest" }));
+    await removeRow(user, "Newest");
 
     const [[next]] = onItems.mock.calls;
     expect(next.map((i) => i.topic)).toEqual(["Oldest", "Middle"]);
@@ -748,9 +782,10 @@ describe("search", () => {
     expect(screen.getByText("Grace Hopper")).toBeInTheDocument();
 
     // Both rows are visible under the "a" filter, in stored order -- select
-    // each delete button by its row's accessible name rather than position.
-    await user.click(screen.getByRole("button", { name: "Remove Ada Lovelace" }));
-    await user.click(screen.getByRole("button", { name: "Remove Grace Hopper" }));
+    // each row's overflow menu by its accessible name rather than position.
+    // Each removeRow opens a fresh menu, so these stay two calls.
+    await removeRow(user, "Ada Lovelace");
+    await removeRow(user, "Grace Hopper");
 
     expect(screen.getByText(/no matches/i)).toBeInTheDocument();
     // The box is still here, still holding the query that stranded the user --
@@ -1072,7 +1107,7 @@ describe("row delete button naming", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "Remove Ada" }));
+    await removeRow(user, "Ada");
     expect(onShowConfirmation).toHaveBeenCalledWith(
       "Remove Ada?",
       "This can't be undone.",
@@ -1360,7 +1395,7 @@ describe("block fields", () => {
     );
 
     await user.click(screen.getByText("Beta"));
-    await user.click(screen.getByRole("button", { name: "Remove Ref B1" }));
+    await removeRow(user, "Ref B1");
 
     // The child's delete went through the parent's confirmation prop, not
     // straight to the data.

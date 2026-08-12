@@ -1087,8 +1087,8 @@ describe("SectionRenderer", () => {
       expect(screen.queryByText("Old bookmarks")).not.toBeInTheDocument();
 
       // The row has no title text to click, which is the whole problem -- it
-      // is reachable only through the remove button's generated label.
-      const row = screen.getByRole("button", { name: "Remove Untitled entry" })
+      // is reachable only through the trigger's generated label.
+      const row = screen.getByRole("button", { name: "More actions for Untitled entry" })
         .parentElement;
       await user.click(row);
       await user.type(
@@ -1882,10 +1882,10 @@ describe("section headings and info placement", () => {
       await user.click(screen.getByText("worked examples"));
       // `stance` is also a facet, so the filter bar renders its own "stance"
       // label and its own like/dislike buttons. Scope to this row via its
-      // remove button, whose accessible name carries the row's title -- the
+      // overflow trigger, whose accessible name carries the row's title -- the
       // one handle in the markup that is unique per row.
       const row = screen
-        .getByRole("button", { name: "Remove worked examples" })
+        .getByRole("button", { name: "More actions for worked examples" })
         .closest("div").parentElement;
       await user.click(within(row).getByRole("button", { name: "dislike" }));
 
@@ -2313,7 +2313,7 @@ describe("section headings and info placement", () => {
       const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
       await user.click(screen.getByText("Welsh"));
 
-      const row = screen.getByRole("button", { name: "Remove Welsh" }).closest("div").parentElement;
+      const row = screen.getByRole("button", { name: "More actions for Welsh" }).closest("div").parentElement;
       await user.click(within(row).getByRole("button", { name: "fluent" }));
 
       expect(latest().languages_spoken[1]).toEqual({ name: "Welsh", fluency: "fluent" });

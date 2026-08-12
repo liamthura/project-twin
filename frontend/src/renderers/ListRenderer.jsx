@@ -28,13 +28,19 @@
 // renderNode.threading.test.jsx.
 import { useId, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Trash2, ChevronDown, Star } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Star, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { VALUE_META, FOCUS_RING, ValueIcon, EnumControl } from "@/components/controls";
@@ -601,11 +607,27 @@ export default function ListRenderer({
                     <Star className={`h-3.5 w-3.5 ${idx === pinnedIdx ? "fill-current" : ""}`} />
                   </Button>
                 )}
-                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0"
-                  aria-label={`Remove ${item[titleField] || "Untitled entry"}`}
-                  onClick={(e) => { e.stopPropagation(); removeItem(idx); }}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <DropdownMenu>
+                  {/* stopPropagation because this trigger sits INSIDE the row
+                      header, whose own onClick toggles `expanded` -- opening a
+                      menu must not also expand the row. The menu content needs
+                      no such guard: it is portalled out of this subtree. */}
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0"
+                      aria-label={`More actions for ${item[titleField] || "Untitled entry"}`}
+                      onClick={(e) => e.stopPropagation()}>
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => removeItem(idx)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Remove
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               {expanded[idx] && (
                 <>
