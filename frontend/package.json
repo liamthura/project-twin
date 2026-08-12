@@ -35,6 +35,13 @@
     "tailwind-merge": "^2.2.0",
     "tailwindcss-animate": "^1.0.7"
   },
+  "overrides": {
+    "@radix-ui/react-focus-scope": "1.1.16",
+    "@radix-ui/react-dismissable-layer": "1.1.19",
+    "@radix-ui/react-presence": "1.1.10",
+    "@radix-ui/react-portal": "1.1.17",
+    "@radix-ui/react-primitive": "2.1.10"
+  },
   "devDependencies": {
     "@storybook/addon-vitest": "^10.5.5",
     "@storybook/react-vite": "^10.5.5",
