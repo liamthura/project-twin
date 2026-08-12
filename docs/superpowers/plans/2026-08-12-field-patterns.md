@@ -1114,8 +1114,16 @@ for a CSS change, since jsdom never loads a stylesheet."
 - [ ] **Step 3:** `git status --short frontend/src/__fixtures__/` → empty. Neither frozen census moved.
 - [ ] **Step 4:** `cd backend && python3 -m pytest -q` → **1001 passed, 1 skipped**. Nothing here touches the backend, so a failure means something unrelated leaked in.
 - [ ] **Step 5:** `git diff --stat main...HEAD -- frontend/src/renderers/useListItems.js` → empty output. The Global Constraint says this file does not change; this is the check.
-- [ ] **Step 6:** `cd frontend && npm run build` → succeeds, and `grep -rn "text-sm font-semibold text-foreground" frontend/src/` returns exactly one hit, in `globals.css`. A CSS change is invisible to jsdom, so the build is the only automated check that `@layer components` resolves.
-- [ ] **Step 7:** Rebuild the preview and drive all four by hand — `./scripts/local-preview.sh`, then at `http://127.0.0.1:8100`: paste `a, b, c` into a chip field; confirm Preferences' Likes & Dislikes (7+ rows) shows a search box and a short list does not; open a row's `⋯` and confirm Remove raises the dialog; and check a `fields` card's labels against an expanded list row's, which should now match. **Owner's step, not claimed by the implementer.**
+- [ ] **Step 6:** `cd frontend && npm run build` → succeeds, and `grep -rn "text-sm font-semibold text-foreground" frontend/src/` returns exactly one hit, in `globals.css`. A CSS change is invisible to jsdom, so the build is the only automated check available. Checking that the layer *resolves* is not enough and was the bug: `headline-3` shipped in `@layer components`, which Tailwind emits BEFORE `@layer utilities`, so it lost the weight to `Label`'s own `font-medium` at every call site. The check is that it now WINS in the built CSS, by byte offset:
+      ```
+      cd frontend && python3 - <<'PY'
+      import glob
+      s = open(glob.glob('dist/assets/*.css')[0]).read()
+      h, m = s.find('.headline-3'), s.find('.font-medium')
+      print('headline-3', h, '| font-medium', m, '|', 'WINS' if h > m else 'STILL LOSES')
+      PY
+      ```
+- [ ] **Step 7:** Rebuild the preview and drive all four by hand — `./scripts/local-preview.sh`, then at `http://127.0.0.1:8100`: paste `a, b, c` into a chip field; confirm **Knowledge → Mental Tabs** shows a search box once it holds **seven** rows and shows none at six (a title alone makes a row there, so seven are quick to add; Preferences' Likes & Dislikes cannot be used for this — `preferences/manifest.json` declares `search` on no node at all, and `likes_dislikes` declares only `facets: ["stance"]`); open a row's `⋯` and confirm Remove raises the dialog **and that the page still takes clicks afterwards**; and check a `fields` card's labels against an expanded list row's, which should now match. **Owner's step, not claimed by the implementer.**
 
 ## Self-review
 

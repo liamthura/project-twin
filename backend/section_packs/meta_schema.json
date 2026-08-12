@@ -295,7 +295,7 @@
         },
         "search": {
           "type": "boolean",
-          "description": "Optional, default false. Shows a filter box over the rows."
+          "description": "Optional, default false. Shows a filter box over the rows, but ONLY once the node holds more than six rows -- at six or fewer the editor ignores this declaration entirely and renders no box, because a filter over six rows is chrome the eye beats. Declaring it on a node that never grows past six therefore has no effect. The box also stays mounted once a query is active, even if filtering drops the row count back below the threshold, so that clearing the query remains possible."
         },
         "facets": {
           "type": "array",

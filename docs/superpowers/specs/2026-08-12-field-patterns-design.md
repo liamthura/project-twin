@@ -279,14 +279,27 @@ class, so neither moves.
 
 | Area | Cases |
 |---|---|
-| `ArrayInput` (new file) | delimiter-free paste falls through and commits nothing; comma-delimited paste commits chips; newline-delimited likewise; mixed delimiters; trailing delimiter leaves the input empty; no trailing delimiter leaves the last piece in the input; whitespace-only pieces dropped; a duplicate is accepted, matching Enter; Enter still commits after the `onKeyDown` swap |
+| `ArrayInput` (new file) | delimiter-free paste falls through and commits nothing; comma-delimited paste commits chips; newline-delimited likewise; mixed delimiters; a delimited paste commits every piece and leaves the input empty, delimiter at the end or not; whitespace-only pieces dropped; a duplicate is accepted, matching Enter; Enter still commits after the `onKeyDown` swap; Enter mid-IME-composition commits nothing, and the Enter after composition ends does; each chip's remove button is named after its chip |
 | `ListRenderer` search | hidden at exactly 6, shown at 7; hidden at 6 but shown when a query is active; a node without `search` never shows a box at any count; facets unaffected at 6 |
 | `ListRenderer` menu | Remove is inside the `⋯` menu and absent from the row body until it opens; it still reaches `onShowConfirmation` with the same title and body; the menu item is destructive; the pin star is still inline and outside the menu; the trigger has an accessible name naming its row |
 | `useListItems` | unchanged, and its 2 confirmation tests must still pass untouched — the proof that this slice did not disturb list semantics |
 
+> **Corrected 2026-08-12, fix wave.** The `ArrayInput` row above listed "no
+> trailing delimiter leaves the last piece in the input". That rule was retracted
+> by the owner ruling recorded in §1 (`907489c`), which fixed §1 and the plan and
+> missed this table — so the table contradicted both §1 and the shipped handler
+> for five commits. The row now states the surviving rule, and gains the IME and
+> accessible-name cases the fix wave added.
+
 The menu trigger needs an accessible name per row (`More actions for
 <title>`-shaped), because nine tests and every screen-reader user need to tell one
 row's menu from another's.
+
+The `ListRenderer` menu row above is necessary but was not sufficient: every case
+in it passes with `onShowConfirmation` stubbed, and the one claim it cannot reach —
+that a real confirmation Dialog can actually open from the menu — was the claim
+that turned out false. See `rowRemovalConfirmation.test.jsx`, which is the
+integration test that covers it.
 
 ## Out of scope
 

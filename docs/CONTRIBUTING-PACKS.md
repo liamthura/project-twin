@@ -87,7 +87,8 @@ complete key sets.
 // `identifier` and `fields` live inside `element`.
 { "kind": "list", "path": ["education"],
   "title": "Education", "description": "…", "info": {…},
-  "search": true,                        // optional, default false: a filter box
+  "search": true,                        // optional, default false: a filter box,
+                                         // but only past SIX rows -- see below
   "facets": ["status"],                  // optional: filter chips; enum fields only
   "sort": { "field": "timestamp", "dir": "desc" },   // optional, display order only
   "element": {
@@ -180,6 +181,26 @@ What the derivation does with each descriptor:
 
 `ui_only` fields are dropped from the contract entirely. `write_only` fields are
 in it and render nowhere. `$comment` is never shipped to a client.
+
+### `search` only appears past six rows
+
+`"search": true` asks for a filter box over the rows, and the editor grants it
+only once the node actually holds **more than six** rows. At six or fewer it
+renders no box and your declaration has no effect — a filter over six rows is
+chrome the eye beats.
+
+This is worth knowing before you declare it, because the count is a property of
+the user's data rather than of your pack: a node that never grows past six will
+never show a box no matter what the manifest says. Nine shipped nodes declare
+`search`, and each of them is a list a real user fills up.
+
+Two details, so the behaviour is not surprising when you meet it:
+
+- the threshold counts TOTAL rows, not filtered ones, so the box does not vanish
+  from under the cursor as a query narrows the list.
+- once a query is active the box stays mounted even if filtering drops the
+  visible rows to zero — otherwise deleting the last match would remove the only
+  control that could clear the query.
 
 ### `list`, the wart
 
