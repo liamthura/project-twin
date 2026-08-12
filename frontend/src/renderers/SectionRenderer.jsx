@@ -352,14 +352,15 @@ export function toRuns(nodes) {
   return runs;
 }
 
-// A title past the card tier: `headline-3`, in the document outline at the level
-// the manifest's nesting implies. h5 and h6 look alarming in a component and are
-// correct here -- the visual tier is capped at two, the outline is not.
+// A title past the card tier: the `headline-3` class (globals.css), in the
+// document outline at the level the manifest's nesting implies. h5 and h6
+// look alarming in a component and are correct here -- the visual tier is
+// capped at two, the outline is not.
 function NodeLabel({ title, depth, info }) {
   const Heading = depth >= 3 ? "h6" : "h5";
   return (
     <div className="flex items-center gap-1.5">
-      <Heading className="text-sm font-semibold text-foreground">{title}</Heading>
+      <Heading className="headline-3">{title}</Heading>
       <InfoButton info={info} title={title} />
     </div>
   );

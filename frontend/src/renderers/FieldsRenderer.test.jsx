@@ -58,6 +58,17 @@ describe("FieldsRenderer", () => {
     expect(screen.queryByLabelText(/mood/i)).not.toBeInTheDocument();
   });
 
+  // The parent spec's complaint was that `text-xs text-muted-foreground` reads
+  // as helper text rather than as a label. `headline-3` is the design specs'
+  // name for 14/600, and globals.css is where it is defined -- so this asserts
+  // the token by name rather than restating its three Tailwind classes here.
+  it("draws an editable field's label at headline-3", () => {
+    renderFields();
+    const label = screen.getByText("Tone");
+    expect(label.className).toContain("headline-3");
+    expect(label.className).not.toContain("text-muted-foreground");
+  });
+
   it("shows the stored value for each field", () => {
     renderFields({ value: { tone: "warm", locale: "British English" } });
     expect(screen.getByLabelText("Tone")).toHaveValue("warm");

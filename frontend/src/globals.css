@@ -210,6 +210,24 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   animation: save-tick-in var(--duration-medium) var(--ease-decelerate);
 }
 
+/* The design specs name a small typographic scale -- featured-3, headline-2,
+   headline-3, caption-1, caption-2 -- and until now none of it existed in the
+   code except as Tailwind classes spelled out at each site, with a comment
+   naming the token if you were lucky.
+
+   `headline-3` is defined here because three call sites need it and a label's
+   weight is the whole point of the change, so it needs a name a test can assert
+   and a reader can find. The other four are not defined: nothing uses them yet,
+   and an unused class is a thing to maintain and to get wrong.
+
+   In `components` rather than `utilities` so a one-off `text-base` on a call
+   site still wins. */
+@layer components {
+  .headline-3 {
+    @apply text-sm font-semibold text-foreground;
+  }
+}
+
 /* Reduced motion, collapsed centrally rather than opted into per component --
    a component cannot forget what it never had to remember.
 

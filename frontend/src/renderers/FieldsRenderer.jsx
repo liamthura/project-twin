@@ -69,7 +69,7 @@ export function FieldsRenderer({ node, entity, value, onValue, packKey }) {
             key={field}
             className={`space-y-1.5 ${needsFullRow(meta, field) ? "sm:col-span-2" : ""}`}
           >
-            <Label htmlFor={id} className="text-xs text-muted-foreground">
+            <Label htmlFor={id} className="headline-3">
               {meta.field_labels[field] ?? labelFor(field)}
             </Label>
             <ScalarField
