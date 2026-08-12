@@ -176,9 +176,19 @@ no utility class for it.
 
 | Location | Today | After |
 |---|---|---|
-| `FieldsRenderer.jsx:72` | `text-xs text-muted-foreground` | `text-sm font-semibold text-foreground` |
-| `ListRenderer.jsx:639` — expanded row, editable fields | `text-xs capitalize` | `text-sm font-semibold text-foreground` |
-| `ListRenderer.jsx:626` — expanded row, read-only machine-written fields | `text-xs capitalize` | unchanged |
+| `FieldsRenderer.jsx:72` | `text-xs text-muted-foreground` | `headline-3` |
+| `ListRenderer.jsx` — expanded row, editable fields | `text-xs capitalize` | `headline-3 capitalize` |
+| `ListRenderer.jsx` — expanded row, read-only machine-written fields | `text-xs capitalize` | unchanged |
+| `SectionRenderer.jsx` — node label | `text-sm font-semibold text-foreground` | `headline-3` |
+
+Line numbers are deliberately omitted: Tasks 1-4 shifted them, and the brief that
+quoted the pre-task numbers sent its implementer to the wrong lines. The sites are
+identified by what they render — `bodyEditFields` against `bodyDisplayFields` —
+which does not move.
+
+`headline-3` is defined once, in `globals.css` under `@layer components`, rather
+than spelled as three Tailwind classes at each site. Owner ruling, 2026-08-12: one
+name a test can assert and a reader can find.
 
 The parent spec names only `FieldsRenderer`, and its reasoning was that
 `text-xs text-muted-foreground` "reads as helper text rather than as a label".
@@ -203,11 +213,28 @@ label, because the body is not where that field is edited.
 
 Decided 2026-08-12 by the owner.
 
-`capitalize` is dropped along with the class it sits in: both sites already
-resolve their text through `meta.field_labels[f] ?? f.replace(/_/g, " ")`, and
-`FieldsRenderer`'s `labelFor` title-cases in JS precisely so the label is not
-CSS-capitalised. Keeping a CSS capitalise on one site and not the other is how
-they came to differ.
+**`capitalize` stays on the list-row label and not on the `fields` one**, and the
+asymmetry is deliberate. The two sites derive their text differently:
+`FieldsRenderer` goes through `labelFor`, which title-cases in JS
+(`detail_level` → `Detail level`), so a CSS transform there would be redundant.
+`ListRenderer`'s editable label renders
+`meta.field_labels[f] ?? f.replace(/_/g, " ")` raw, with no JS casing at all, so
+`capitalize` is what capitalises it.
+
+> **Corrected 2026-08-12.** This paragraph first said `capitalize` should be
+> dropped from both sites because "both sites already resolve their text through
+> `f.replace`" and `labelFor` covers it. The second clause is false of
+> `ListRenderer`, which never calls `labelFor`. The plan carried the error into a
+> brief, and dropping `capitalize` there rendered `detail_level` as
+> **`detail level`**, lowercase. Task 5's implementer followed the instruction as
+> written, spotted the visual consequence, and reported it; `capitalize` was
+> restored in a follow-up commit with a comment at the site saying why it stays.
+>
+> The pre-existing casing difference this exposes — `Detail level` in a `fields`
+> card against `Detail Level` in a list row — is real and out of scope here.
+> Sharing `labelFor` between the two files would fix it and remove the second way
+> of deriving label text, but it changes rendered copy, so it is an owner
+> decision rather than a side effect of a font-weight change. Deferred.
 
 ## Testing
 
