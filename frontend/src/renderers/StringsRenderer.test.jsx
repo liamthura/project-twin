@@ -80,11 +80,13 @@ describe("StringsRenderer", () => {
   });
 
 
-  describe('item_control: "input"', () => {
+  // `control`, not v1's node-level `item_control`: one key, spelled the same on
+  // a strings node and on the array field a block is built from.
+  describe('control: "input"', () => {
     // Sentence-like values. The retired ProfileEditor gave each highlight its
     // own editable row; chips would mean deleting and retyping a whole
     // achievement to fix one word.
-    const rows = { ...node, title: "Highlights", item_control: "input" };
+    const rows = { ...node, title: "Highlights", control: "input" };
 
     it("renders one editable input per stored string", () => {
       render(<StringsRenderer node={rows} items={["Led the migration", "Halved latency"]} onItems={() => {}} />);

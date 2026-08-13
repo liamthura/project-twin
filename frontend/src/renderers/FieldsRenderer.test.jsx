@@ -4,13 +4,27 @@ import userEvent from "@testing-library/user-event";
 
 import { FieldsRenderer } from "./FieldsRenderer";
 
+// The three fields are descriptors on `element` rather than a flat `fields`
+// array, and the entity moves inside it -- the node's own `description` is
+// on-screen text, the element's is what an MCP client reads.
 const node = {
   kind: "fields",
   path: ["communication", "default"],
-  entity: "communication_default",
-  fields: ["tone", "detail_level", "locale"],
+  element: {
+    entity: "communication_default",
+    fields: [{ name: "tone" }, { name: "detail_level" }, { name: "locale" }],
+  },
 };
 const entity = { optional: ["tone", "detail_level", "locale"] };
+
+// One field's descriptor replaced, by name, leaving the rest of the node alone.
+const withField = (name, extra) => ({
+  ...node,
+  element: {
+    ...node.element,
+    fields: node.element.fields.map((f) => (f.name === name ? { ...f, ...extra } : f)),
+  },
+});
 
 function renderFields(props = {}) {
   return render(
@@ -26,9 +40,33 @@ describe("FieldsRenderer", () => {
     expect(screen.getByLabelText("Locale")).toBeInTheDocument();
   });
 
+  it("prefers a field's own `label` over the title-cased name", () => {
+    // meta_schema.json's `label` promises exactly this: "declare it only where
+    // [the title-cased default] reads wrong." Before this, only a block field's
+    // title ever consulted `label` -- a scalar field's was accepted by the
+    // schema and then silently dropped, so this pins the fix rather than the
+    // schema's mere promise.
+    const labelledNode = withField("detail_level", { label: "How much detail" });
+    render(<FieldsRenderer node={labelledNode} entity={entity} value={{}} onValue={() => {}} />);
+
+    expect(screen.getByLabelText("How much detail")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Detail level")).not.toBeInTheDocument();
+  });
+
   it("renders nothing for a field the node does not declare", () => {
     renderFields({ value: { mood_overrides: [] } });
     expect(screen.queryByLabelText(/mood/i)).not.toBeInTheDocument();
+  });
+
+  // The parent spec's complaint was that `text-xs text-muted-foreground` reads
+  // as helper text rather than as a label. `headline-3` is the design specs'
+  // name for 14/600, and globals.css is where it is defined -- so this asserts
+  // the token by name rather than restating its three Tailwind classes here.
+  it("draws an editable field's label at headline-3", () => {
+    renderFields();
+    const label = screen.getByText("Tone");
+    expect(label.className).toContain("headline-3");
+    expect(label.className).not.toContain("text-muted-foreground");
   });
 
   it("shows the stored value for each field", () => {
@@ -65,14 +103,24 @@ describe("FieldsRenderer", () => {
   it("renders an enum field as an enum control, not a text input", () => {
     // Pins that buildFieldMeta is actually wired in -- without it every field
     // would fall through to a plain Input.
-    const enumNode = { ...node, enum: { tone: ["warm", "neutral", "direct"] } };
+    // The vocabulary is the field's own `values` now, not a node-level `enum` map.
+    const enumNode = withField("tone", {
+      type: "enum",
+      values: ["warm", "neutral", "direct"],
+    });
     render(<FieldsRenderer node={enumNode} entity={entity} value={{}} onValue={() => {}} />);
 
     expect(screen.getByRole("button", { name: "warm" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "neutral" })).toBeInTheDocument();
   });
 
-  it("takes the entity's valid_values when the node declares no enum", () => {
+  it("ignores an entity's valid_values -- the field's own descriptor is the only vocabulary", () => {
+    // Was "takes the entity's valid_values when the node declares no enum".
+    // v2 deleted that fallback along with the second copy it read: a field
+    // declares its vocabulary or has none, and the entity's `valid_values` is
+    // DERIVED from that declaration rather than being a source for it. An entity
+    // that disagrees (here, one offering options for a plain text field) must
+    // change nothing on screen.
     render(
       <FieldsRenderer
         node={node}
@@ -81,12 +129,13 @@ describe("FieldsRenderer", () => {
         onValue={() => {}}
       />
     );
-    expect(screen.getByRole("button", { name: "warm" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "warm" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Tone")).toHaveValue("");
   });
 
   it("writes the value an enum control reports", async () => {
     const onValue = vi.fn();
-    const enumNode = { ...node, enum: { tone: ["warm", "neutral"] } };
+    const enumNode = withField("tone", { type: "enum", values: ["warm", "neutral"] });
     render(
       <FieldsRenderer node={enumNode} entity={entity} value={{ locale: "en" }} onValue={onValue} />
     );
@@ -132,7 +181,7 @@ describe("FieldsRenderer", () => {
     expect(() =>
       render(
         <FieldsRenderer
-          node={{ kind: "fields", path: [], fields: ["name"] }}
+          node={{ kind: "fields", path: [], element: { entity: "basic_info", fields: [{ name: "name" }] } }}
           entity={undefined}
           value={{ name: "Ada" }}
           onValue={() => {}}

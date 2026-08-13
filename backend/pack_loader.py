@@ -41,27 +41,382 @@ def _validator() -> jsonschema.Draft202012Validator:
 
 
 def validate_manifest(manifest: dict) -> None:
-    """Schema + intra-pack cross-reference checks. Raises PackError."""
+    """Schema validation plus the semantic cross-checks. Raises PackError.
+
+    The semantic rules JSON Schema cannot state live in `_cross_check`, called
+    from here AFTER schema validation so a shape error is always reported before
+    a semantic one -- a cross-check reading a malformed node reports a confusing
+    consequence of the real mistake. Two rules the spec listed as cross-checks
+    turned out to be statable structurally and live in the schema instead:
+    `values` iff `type: "enum"`, and `element` on the two array types.
+    """
     error = best_match(_validator().iter_errors(manifest))
-    # best_match descends into a `oneOf`/`anyOf` branch's own errors instead of
-    # reporting the top-level "not valid under any of the given schemas" --
-    # e.g. a `ui` list node missing `entity` fails both `$defs.ui` branches, so
-    # the plain-first-by-path error used to name `ui` and dump the whole block
-    # without ever saying `entity` is what's missing. This is purely about
+    # best_match descends into a failing branch's own errors rather than reporting
+    # the top-level "not valid under any of the given schemas". The node dispatcher
+    # is allOf/if/then on `kind` for the same purpose -- a node whose kind is
+    # `list` is measured against the list branch alone, so the error names the
+    # offending key rather than dumping the node four times. This is purely about
     # which error is reported; it changes nothing about what validates.
     if error is not None:
         where = "/".join(str(p) for p in error.path) or "<root>"
         raise PackError(f"manifest schema violation at {where}: {error.message}")
 
+    _cross_check(manifest)
+
+
+# Keys of a field descriptor that the derived entity schema is built from. Rule 8
+# compares two declarations of one entity over THESE and nothing else, so the
+# check means exactly "the derived entity is the same either way" -- which lets
+# two nodes over one entity differ in `title`, `placeholder`, `show` or
+# `$comment` (lifestyle's weekday/weekend sleep pair differs in title and
+# $comment alone) while still rejecting a divergence that would make the
+# derivation silently pick one of two answers.
+_DERIVED_FIELD_KEYS = (
+    "name",
+    "type",
+    "values",
+    "default",
+    "required",
+    "role",
+    "alias",
+    "exclusive",
+    "allow_custom",
+    "write_only",
+    "element",
+)
+
+
+def _derivation_signature(element: dict) -> str:
+    """A canonical form of everything `build_entity_schema` reads from an `element`."""
+
+    def field_sig(field: dict) -> dict:
+        out = {}
+        for key in _DERIVED_FIELD_KEYS:
+            if key not in field:
+                continue
+            out[key] = _derivation_signature(field[key]) if key == "element" else field[key]
+        return out
+
+    return json.dumps(
+        {
+            "identifier": element.get("identifier"),
+            "actions": element.get("actions"),
+            "description": element.get("description"),
+            "variants": element.get("variants"),
+            "bulk": element.get("bulk"),
+            "fields": [field_sig(f) for f in element.get("fields", [])],
+        },
+        sort_keys=True,
+    )
+
+
+def _cross_check(manifest: dict) -> None:
+    """The semantic rules of format v2. Raises PackError naming the pack and node.
+
+    Every rule here describes a mistake that is SILENT in v1, and silent for the
+    same reason in each case: the two halves of the rule lived in different
+    blocks. `facets: ["level"]` sat on the node while `level`'s vocabulary sat in
+    the entity's `valid_values`, so no single reader ever saw both. v2 puts them
+    in one declaration, which is what makes them checkable at all.
+
+    Numbering follows the spec's list of eleven. Three of the eleven are enforced
+    somewhere else, which is why the inline `Rule N` comments below skip 4, 5
+    and 11:
+
+      1   `identifier` names a declared field                        here
+      2   exactly one `role: "title"`, and a list row needs one      here
+      3   `facets` are enum fields; `sort.field` is a declared one   here
+      4   `values` iff `type: "enum"`                                schema
+      5   `element` on the two array types and nowhere else          schema
+      6   no duplicate `name`, no colliding `alias`                  here
+      7   at most one `pin` per element                              here
+          (`pin` only on a `bool` field, the other half)             schema
+      8   an entity name is unique unless both declarations agree    here
+      9   `id_lists` resolve to `defaults` AND a top-level list      here
+      10  `scope_contributions` name real scopes and `defaults` keys here
+      11  `key` equals the directory name                            load_packs
+
+    Rule 11 sits in `load_packs` because that is the only caller that knows the
+    directory a manifest was read from.
+
+    Three further rules are enforced here and are NOT among the spec's eleven.
+    They came out of reviewing the migration (commit c9d7b6b), each a declaration
+    the format permitted and the code silently discarded:
+
+      - `show: []` is legal only with `ui_only` or a `label`
+      - a labelled `strings`/`list` field may not claim the `form` position
+      - a nested element's `parent` must name the enclosing row's identifier
+
+    They are deliberately unnumbered. Calling them 12, 13 and 14 would read as
+    the spec having grown, and it has not -- the spec is the frozen record of what
+    the format was designed to be, and these are things the implementation found.
+
+    `docs/CONTRIBUTING-PACKS.md` numbers TWELVE rules, and its numbers are not
+    these. It is written for a pack author, so it lists only what a manifest can
+    be rejected for: 4 and 5 move into its "the schema states the rest
+    structurally" paragraph, and the three above are folded into the list at 6, 7
+    and 8. So its Rule 8 is the nested-`parent` rule where this file's Rule 8 is
+    entity uniqueness. A `Rule N` in this file is a pointer into the spec, which
+    is where each rule's rationale was argued; it is not a pointer into the doc.
+    """
+    pack = manifest["key"]
+    seen_entities: dict[str, tuple[str, str]] = {}  # name -> (signature, where)
+
+    def fail(where: str, message: str) -> None:
+        raise PackError(f"{pack}: {where}: {message}")
+
+    def label(node: dict) -> str:
+        return node.get("title") or ".".join(node.get("path") or []) or node["kind"]
+
+    def claim_entity(name: str, signature: str | None, where: str) -> None:
+        """Rule 8, scoped. The spec said entity names are unique across a pack, but
+        `lifestyle` declares `sleep` on two `fields` nodes and today's single
+        `sleep` entity serves both. So: a name may be declared twice only if both
+        declarations derive the SAME entity. A variant passes signature=None,
+        because a variant is a bare name and can never agree with anything."""
+        if name not in seen_entities:
+            seen_entities[name] = (signature, where)
+            return
+        prior_signature, prior_where = seen_entities[name]
+        if signature is None or prior_signature is None or signature != prior_signature:
+            fail(
+                where,
+                f"entity '{name}' is already declared at {prior_where} and the two "
+                f"declarations do not agree, so the derived entity would depend on "
+                f"which node was read last",
+            )
+
+    def check_strings_element(element: dict, where: str) -> None:
+        """A string array's writer. No fields, so most of the rules do not apply.
+
+        `identifier` is the parameter name for one string, not a field name, so
+        rule 1 has nothing to check it against -- there are no fields. All this
+        can do is claim the entity name.
+        """
+        claim_entity(element["entity"], _derivation_signature(element), where)
+
+    def check_element(element: dict, where: str, *, is_list_row: bool) -> None:
+        fields = element["fields"]
+
+        # Rule 6, first half: one stored key per field.
+        names: dict[str, dict] = {}
+        for field in fields:
+            name = field["name"]
+            if name in names:
+                fail(where, f"two fields share the name '{name}'")
+            names[name] = field
+
+        # Rule 6, second half. Checked after every name is known, so a collision
+        # is caught wherever the two fields sit relative to each other.
+        claimed_aliases: dict[str, str] = {}
+        for field in fields:
+            for alias in field.get("alias", []):
+                if alias in names:
+                    fail(
+                        where,
+                        f"field '{field['name']}' declares the alias '{alias}', which "
+                        f"is already the stored name of another field in this element",
+                    )
+                if alias in claimed_aliases:
+                    fail(
+                        where,
+                        f"fields '{claimed_aliases[alias]}' and '{field['name']}' both "
+                        f"declare the alias '{alias}'",
+                    )
+                claimed_aliases[alias] = field["name"]
+
+        # Rule 2. A list row must have a title; a `fields` node is one record with
+        # no collapsed row for a title to name, so for it the rule is at-most-one.
+        titled = [f["name"] for f in fields if f.get("role") == "title"]
+        if len(titled) > 1:
+            fail(where, f"fields {titled} all carry role 'title'; exactly one may")
+        if is_list_row and not titled:
+            fail(where, "no field carries role 'title', so a row would have no name")
+
+        # Rule 1.
+        identifier = element.get("identifier")
+        if identifier is not None and identifier not in names:
+            fail(where, f"identifier '{identifier}' names no declared field")
+
+        # Rule 7, second half. The schema already confines `pin` to a bool field.
+        pinned = [f["name"] for f in fields if "pin" in f]
+        if len(pinned) > 1:
+            fail(where, f"fields {pinned} all declare `pin`; at most one may")
+
+        # Unnumbered rule: `show: []` needs `ui_only` or a `label`.
+        #
+        # An empty `show` claims no position in the form or on the row. Two fields
+        # can honestly want that: a labelled collection, which draws its own block
+        # below the row, and a field the app stores without ever showing it -- which
+        # is only coherent outside the tool vocabulary, because anything the
+        # vocabulary names and the screen omits is `write_only`. Anything else with
+        # an empty `show` is a field nothing can read or write.
+        for field in fields:
+            if field.get("show") != []:
+                continue
+            if not field.get("label") and not field.get("ui_only"):
+                fail(
+                    where,
+                    f"field '{field['name']}' claims no position (`show: []`) and has "
+                    f"no `label` to draw a block of its own; if the app stores it "
+                    f"without showing it say `ui_only`, and if the tools know it and "
+                    f"the screen omits it say `write_only`",
+                )
+
+        # Unnumbered rule: a labelled block may not claim the `form` position.
+        #
+        # A labelled `strings`/`list` field (a BLOCK: elementShape.js's
+        # `isBlockField`) draws its own titled control under the row -- that
+        # control IS the field's input, so a `form` position on it would draw a
+        # text box over an array beside it. elementShape.js already skips `form`
+        # for a block (`if (isBlock && position === "form") continue`), one line
+        # with nothing stating the rule it encodes -- so until now
+        # meta_schema.json happily accepted `{label, type: "strings", show:
+        # ["form"]}` and the renderer silently threw the position away. Reject the
+        # declaration instead of letting the renderer eat it quietly.
+        for field in fields:
+            if (
+                field.get("label")
+                and field.get("type") in ("strings", "list")
+                and "form" in field.get("show", [])
+            ):
+                fail(
+                    where,
+                    f"field '{field['name']}' is a labelled {field['type']} -- it draws "
+                    f"its own block under the row, and may not also claim the 'form' "
+                    f"position there",
+                )
+
+        # Rule 8.
+        claim_entity(element["entity"], _derivation_signature(element), where)
+        for variant in element.get("variants", []):
+            claim_entity(variant["entity"], None, f"{where} (variant)")
+
+        # Descend into nested arrays, or every nested list is unchecked -- which is
+        # most of profile. A `strings` field's `element` has no fields, so it takes
+        # the other branch: all that can be checked there is the entity name. This
+        # is also where a nested element's `parent` is checked against the row it
+        # actually sits under -- see the comment just below.
+        enclosing_entity = element["entity"]
+        for field in fields:
+            nested = field.get("element")
+            if nested is None:
+                continue
+            sub_where = f"{where} > {field['name']}"
+
+            # Unnumbered rule: a nested element's `parent` names the enclosing row.
+            #
+            # A nested element's `parent` must name the ROW IT SITS UNDER -- this
+            # element, not some other row elsewhere in the pack. Nothing checked
+            # that before: each nested entity supplies its own `parent`, so a
+            # WRONG one still produces a manifest that is internally consistent
+            # and passes every other rule here. That is exactly how it shipped
+            # wrong once: profile's Education block declared `work_highlight`
+            # (parent `company`, work experience's identifier) and Work
+            # Experience declared `education_highlight` (parent `institution`,
+            # education's identifier) -- SWAPPED -- and no test, gate or schema
+            # rule noticed, because each block's own entity and parent still
+            # agreed with each other, just not with the row it actually sat
+            # under. Two spellings are legal: the enclosing element's bare
+            # identifier (`education_highlight`'s parent is `institution`, and
+            # `education`'s identifier is `institution`) or that identifier
+            # prefixed by the enclosing entity's name (`project_tag`'s parent is
+            # `project_name`, and `project`'s identifier is `name`).
+            parent = nested.get("parent")
+            if parent is not None:
+                legal = {identifier, f"{enclosing_entity}_{identifier}"} if identifier else set()
+                if parent not in legal:
+                    fail(
+                        sub_where,
+                        f"parent '{parent}' does not name the enclosing element -- "
+                        f"'{enclosing_entity}' identifies its rows by '{identifier}', so "
+                        f"the legal spellings are '{identifier}' or "
+                        f"'{enclosing_entity}_{identifier}'",
+                    )
+
+            if field.get("type") == "strings":
+                check_strings_element(nested, sub_where)
+            else:
+                check_element(nested, sub_where, is_list_row=True)
+
+        return names
+
+    top_level_lists: set[str] = set()
+
+    def visit(nodes: list, trail: str) -> None:
+        for node in nodes:
+            where = f"{trail}{label(node)}"
+            kind = node["kind"]
+            if kind == "group":
+                visit(node["sections"], f"{where} > ")
+                continue
+            if kind == "strings":
+                if "element" in node:
+                    check_strings_element(node["element"], where)
+                continue
+            if kind == "fields":
+                check_element(node["element"], where, is_list_row=False)
+                continue
+            # list
+            if len(node["path"]) == 1:
+                top_level_lists.add(node["path"][0])
+            names = check_element(node["element"], where, is_list_row=True)
+            # Rule 3. `facets` needs a closed vocabulary to build its chips from,
+            # which is what makes the enum requirement more than pedantry.
+            for facet in node.get("facets", []):
+                if facet not in names:
+                    fail(where, f"facet '{facet}' names no declared field")
+                if names[facet].get("type") != "enum":
+                    fail(where, f"facet '{facet}' is not an enum field, so it has no values to filter by")
+            if "sort" in node and node["sort"]["field"] not in names:
+                fail(where, f"sort field '{node['sort']['field']}' names no declared field")
+
+    visit(manifest["sections"], "")
+
+    # Rule 9. v1 checked only the `defaults` half, so an id_lists entry could name
+    # a key with a seeded default and no editor at all.
     defaults = manifest["defaults"]
     for list_key, _prefix in manifest["id_lists"]:
         if not isinstance(defaults.get(list_key), list):
             raise PackError(
-                f"id_lists references '{list_key}' which is not a list in defaults"
+                f"{pack}: id_lists references '{list_key}' which is not a list in defaults"
             )
-    for scope in manifest.get("scope_contributions", {}):
+        if list_key not in top_level_lists:
+            raise PackError(
+                f"{pack}: id_lists references '{list_key}', which no top-level list node binds"
+            )
+
+    # Rule 10. These are top-level keys of the STORED FILE, selected for context
+    # output at server.py:313 alongside `default.keys()` -- so `defaults` is the
+    # authority, not the node tree. The spec said "paths that exist in the tree",
+    # which no shipped pack satisfies: profile names `bio` and `current_role`
+    # (fields of a `path: []` node, not nodes of their own) and lifestyle names
+    # `wellness` (a storage prefix only a group sits over). A name that is in
+    # neither place contributes nothing to context output, silently.
+    #
+    # `full` is a real scope name -- it is in GLOBAL_SCOPE_NAMES because that set
+    # mirrors sections.SCOPES, which is what a client may ASK for. It is not a
+    # scope a pack can contribute to. `_resolve_scope_fields` (server.py:297)
+    # returns "all" for it before it reads any pack, so an entry under `full` is
+    # the same kind of mistake as a key that is not in `defaults` -- a declaration
+    # with no effect, written by an author who thought it had one.
+    for scope, keys in manifest.get("scope_contributions", {}).items():
         if scope not in GLOBAL_SCOPE_NAMES:
-            raise PackError(f"unknown scope '{scope}' in scope_contributions")
+            raise PackError(f"{pack}: unknown scope '{scope}' in scope_contributions")
+        if scope == "full":
+            raise PackError(
+                f"{pack}: scope_contributions declares 'full', which can contribute "
+                f"nothing -- get_context(scope: \"full\") returns every enabled "
+                f"section's whole file regardless, so the resolver returns before it "
+                f"reads a single pack's contributions. Name the scopes this section "
+                f"belongs in instead."
+            )
+        for key in keys:
+            if key not in defaults:
+                raise PackError(
+                    f"{pack}: scope_contributions['{scope}'] names '{key}', which is not "
+                    f"a key in defaults, so it would contribute nothing"
+                )
 
 
 def load_packs(packs_dir: Path = PACKS_DIR, strict: bool = False) -> dict[str, dict]:
@@ -115,7 +470,10 @@ def load_packs(packs_dir: Path = PACKS_DIR, strict: bool = False) -> dict[str, d
     seen_entities: dict[str, str] = {}
     seen_prefixes: dict[str, str] = {}
     for m in loaded:
-        for entity in m["entities"]:
+        # Derived, not read: a pack's entities are whatever its `sections` declare,
+        # so this is the same set `build_entity_schema` will hand to MCP. Deriving
+        # twice is cheap and keeps `load_packs` a pure function of the files.
+        for entity in derive_entities(m):
             if entity in seen_entities:
                 raise PackError(
                     f"entity '{entity}' defined by both '{seen_entities[entity]}' and '{m['key']}'"
@@ -156,16 +514,176 @@ def _reset_cache() -> None:
 def build_entity_schema(packs: dict[str, dict]) -> dict[str, dict]:
     """{section_key: entities} in pack order — server.ENTITY_SCHEMA shape.
 
-    `$comment` is dropped here rather than left to each reader. ENTITY_SCHEMA is
-    what `get_schema` hands to MCP clients, so an authoring note left in it would
-    be shipped as part of the tool contract — and the meta-schema promises the
-    opposite: `description` is the client-facing text, `$comment` is for the next
-    author. Nothing else is filtered; unknown keys are the pack's business.
+    Every entity is DERIVED from the pack's `sections` by `derive_entities`; no
+    manifest declares one. `tests/test_entity_schema_frozen.py` asserts this
+    still equals the schema that was authored by hand before format v2, entity
+    for entity and key for key, which is the whole safety argument for the
+    change.
+
+    Nothing is filtered here any more. The old version stripped `$comment`,
+    because an authoring note in an authored `entities` block would have been
+    shipped to MCP clients as part of the tool contract; a derived spec is built
+    key by key from field descriptors, so there is nothing to strip.
     """
-    return {
-        key: {
-            entity: {k: v for k, v in spec.items() if k != "$comment"}
-            for entity, spec in m["entities"].items()
+    return {key: derive_entities(m) for key, m in packs.items()}
+
+
+def derive_entities(manifest: dict) -> dict:
+    """The entity schema of one v2 manifest: {entity_name: spec}, MCP's contract.
+
+    This is the function that replaces the authored `entities` block. It is the
+    whole point of format v2 -- a field's name, type, vocabulary, default and
+    requiredness are declared once, and the contract MCP clients see is computed
+    from that rather than maintained beside it. `tests/test_converter.py` asserts
+    per pack that what it computes equals the schema authored today, entity for
+    entity and key for key.
+
+    It stays a pure function of the manifest so that assertion is meaningful: no
+    file reads, no imports of sections.py or server.py, nothing cached.
+
+    The one wart, `list`, is copied rather than derived, and the `$comment` on
+    `listElement.list` in meta_schema.v2.json says why. `mcp_entities` is merged in
+    verbatim; only two entities in the shipped packs need it.
+    """
+    out: dict[str, dict] = {}
+
+    def spelling(field: dict) -> str:
+        """A field's name AS MCP SEES IT: alias[0] if it declares one, else the
+        stored name. `course` reaches clients while `name` is what is written."""
+        alias = field.get("alias")
+        return alias[0] if alias else field["name"]
+
+    def add(name: str, spec: dict, where: str) -> None:
+        if name in out:
+            # Rule 8 permits a repeat only when both derive the same entity, and
+            # _cross_check has already proved that -- so this is a no-op, not a
+            # conflict. Asserting it here would duplicate the rule; silently
+            # overwriting would hide a bug if the rule were ever relaxed.
+            if out[name] != spec:
+                raise PackError(
+                    f"{manifest['key']}: {where}: entity '{name}' derives two different "
+                    f"specs; _cross_check should have rejected this manifest"
+                )
+            return
+        out[name] = spec
+
+    def derive_element(element: dict, *, parent_identifier: str | None, where: str) -> None:
+        # `ui_only` fields are excluded outright: they render and are stored, but
+        # no client may set them, so they belong to no vocabulary. See the
+        # `$comment` on `ui_only` in meta_schema.v2.json.
+        fields = [f for f in element["fields"] if not f.get("ui_only")]
+        parent_spelling = element.get("parent", parent_identifier)
+        required = [parent_spelling] if parent_identifier else []
+        required += [spelling(f) for f in fields if f.get("required")]
+        optional = [spelling(f) for f in fields if not f.get("required")]
+
+        valid_values = {}
+        field_defaults = {}
+        exclusive = []
+        for field in fields:
+            off = field.get("off_contract", ())
+            if field.get("type") == "enum" and "values" not in off:
+                valid_values[field["name"]] = list(field["values"])
+                if field.get("allow_custom"):
+                    # Replaces the `custom_` naming convention, which ScalarField
+                    # matched on a magic prefix that nothing declared.
+                    optional.append(f"custom_{field['name']}")
+            if "default" in field and "default" not in off:
+                field_defaults[field["name"]] = field["default"]
+            if field.get("exclusive"):
+                exclusive.append(field["name"])
+
+        # `element.identifier` names a STORED field; the contract reports it under
+        # that field's MCP spelling. domain_reference stores `name` and clients say
+        # `ref_name`, so the two must not be conflated in either direction.
+        by_name = {f["name"]: f for f in element["fields"]}
+        identifier = element.get("identifier")
+        if identifier in by_name:
+            identifier = spelling(by_name[identifier])
+        spec = {
+            "actions": list(element.get("actions", ["add", "update", "remove"])),
+            "required": required,
+            "optional": optional,
+            "identifier": identifier,
         }
-        for key, m in packs.items()
-    }
+        if parent_identifier:
+            spec["parent"] = element.get("parent", parent_identifier)
+        if "description" in element:
+            spec["description"] = element["description"]
+        if valid_values:
+            spec["valid_values"] = valid_values
+        if field_defaults:
+            spec["field_defaults"] = field_defaults
+        if exclusive:
+            spec["exclusive_fields"] = exclusive
+        if "list" in element:
+            spec["list"] = element["list"]
+
+        add(element["entity"], spec, where)
+        for variant in element.get("variants", []):
+            # A variant is the same contract under another name, differing in its
+            # client-facing description only.
+            copy = dict(spec)
+            if "description" in variant:
+                copy["description"] = variant["description"]
+            add(variant["entity"], copy, f"{where} (variant)")
+
+        # A nested array's own writer. Its parent is THIS element's identifier.
+        for field in fields:
+            nested = field.get("element")
+            if nested is None:
+                continue
+            sub = f"{where} > {field['name']}"
+            if field.get("type") == "strings":
+                derive_strings(nested, field["name"], element["identifier"], sub)
+            else:
+                derive_element(nested, parent_identifier=element["identifier"], where=sub)
+
+    def derive_strings(
+        element: dict, array_name: str, parent_identifier: str | None, where: str
+    ) -> None:
+        """One entity for an array of bare strings. `required` is the parent's
+        identifier plus the singular parameter; `bulk` adds the array's own name,
+        which is the plural form a client may send instead of one string."""
+        parent_spelling = element.get("parent", parent_identifier)
+        required = [parent_spelling] if parent_identifier else []
+        required.append(element["identifier"])
+        spec = {
+            "actions": list(element.get("actions", ["add", "remove"])),
+            "required": required,
+            "optional": [array_name] if element.get("bulk") else [],
+            "identifier": element["identifier"],
+        }
+        if parent_identifier:
+            spec["parent"] = parent_spelling
+        if "description" in element:
+            spec["description"] = element["description"]
+        add(element["entity"], spec, where)
+
+    def visit(nodes: list, trail: str) -> None:
+        for node in nodes:
+            where = f"{trail}{node.get('title') or '.'.join(node.get('path') or [])}"
+            kind = node["kind"]
+            if kind == "group":
+                visit(node["sections"], f"{where} > ")
+            elif kind == "strings":
+                if "element" in node:
+                    derive_strings(node["element"], node["path"][-1], None, where)
+            elif kind == "fields":
+                # A singleton object is updated in place, never added to, and it is
+                # not one of many -- so it usually has no identifier at all:
+                # basic_info and communication_default both derive `null`.
+                # lifestyle's sleep pair is the exception (`day_type`).
+                element = node["element"]
+                derive_element(
+                    {**element, "actions": element.get("actions", ["update"])},
+                    parent_identifier=None,
+                    where=where,
+                )
+            else:
+                derive_element(node["element"], parent_identifier=None, where=where)
+
+    visit(manifest["sections"], "")
+    for name, spec in manifest.get("mcp_entities", {}).items():
+        out[name] = {k: v for k, v in spec.items() if k != "$comment"}
+    return out

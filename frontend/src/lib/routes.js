@@ -33,6 +33,30 @@ export function isAuthRoute(route) {
 }
 
 /**
+ * Split a raw route -- what `readRoute()` returns -- into its two segments.
+ *
+ * The app grew a second level: `#/preferences/communication` names a section and
+ * a band within it. This is kept separate from `readRoute()` rather than folded
+ * into it, because the auth screens read that raw string and predate the second
+ * segment; changing its contract would mean touching WelcomeAuth for no reason.
+ *
+ * `goToRoute` needs no change at all to write these: it interpolates its
+ * argument into `#/${route}`, and both that and its `readRoute() === route`
+ * guard already tolerate a slash.
+ *
+ * Pure, so it is testable without a DOM. Two deliberate leniencies:
+ *   - a trailing slash reports NO band, not an empty one, which would otherwise
+ *     fail band validation and cause a pointless correcting replaceState
+ *   - a third segment is dropped rather than an error. The shell validates the
+ *     band against `outline()` regardless, and an unknown one is already
+ *     handled: replaceState back to the bare section.
+ */
+export function parseRoute(raw) {
+  const [section = "", band] = String(raw ?? "").split("/");
+  return { section, band: band || null };
+}
+
+/**
  * Put a route in the address bar.
  *
  * `replace` is for corrections nobody navigated to -- normalising an unknown

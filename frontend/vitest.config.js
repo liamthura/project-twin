@@ -47,6 +47,14 @@ export default mergeConfig(
               headless: true,
               instances: [{ browser: "chromium" }],
             },
+            // Keep this setup file, despite the info box every run prints
+            // telling you to delete it ("addon-vitest applies these
+            // automatically since Storybook 10.3"). Tried on 2026-08-10:
+            // without it the addon falls back to its own bundled
+            // setup-file-with-project-annotations.js, which fails to import --
+            // `aria-query` at the resolved version exports no `elementRoles`.
+            // The project goes from 2 passing to 1 failed, no tests run. The
+            // advice is sound in general and wrong here; the box is noise.
             setupFiles: ["./.storybook/vitest.setup.js"],
           },
         },

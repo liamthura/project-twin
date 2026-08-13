@@ -19,63 +19,49 @@
       "connections"
     ]
   },
-  "entities": {
-    "connection": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
+  "sections": [
+    {
+      "kind": "list",
+      "path": [
+        "connections"
       ],
-      "required": [
-        "name"
-      ],
-      "optional": [
-        "relationship",
-        "traits",
-        "notes"
-      ],
-      "identifier": "name",
-      "$comment": "`contact` was listed here until wave 8, next to notes and traits, as though it were a storable field for someone's contact details. It is not: it is an INPUT SPELLING for `name` (FIELD_ALIASES[\"connection\"]), so a value sent under it either named the connection or was discarded. Aliases are input vocabulary, not stored keys, and do not belong in `optional`. Found by the stored-key audit."
-    }
-  },
-  "ui": {
-    "sections": [
-      {
-        "kind": "list",
-        "path": [
-          "connections"
-        ],
+      "info": {
+        "overview": "Track the important people in your life and your relationships with them. This helps AI understand your social context and tailor suggestions accordingly.",
+        "tips": [
+          "Name: The person's full name or preferred name.",
+          "Relationship: How you know them - e.g., 'Friend from university', 'Colleague at Google', 'Mentor', 'Family member'.",
+          "Traits: Key characteristics or tags that describe them - personality, interests, expertise, etc.",
+          "Notes: Context about your relationship, shared experiences, important details to remember."
+        ]
+      },
+      "search": true,
+      "element": {
         "entity": "connection",
-        "title_field": "name",
-        "detail_fields": [
-          "name",
-          "relationship",
-          "traits",
-          "notes"
-        ],
-        "array_fields": [
-          "traits"
-        ],
-        "long_text": [
-          "notes"
-        ],
-        "searchable": true,
-        "info": {
-          "overview": "Track the important people in your life and your relationships with them. This helps AI understand your social context and tailor suggestions accordingly.",
-          "tips": [
-            "Name: The person's full name or preferred name.",
-            "Relationship: How you know them - e.g., 'Friend from university', 'Colleague at Google', 'Mentor', 'Family member'.",
-            "Traits: Key characteristics or tags that describe them - personality, interests, expertise, etc.",
-            "Notes: Context about your relationship, shared experiences, important details to remember."
-          ]
-        },
-        "field_placeholders": {
-          "name": "Person's name",
-          "notes": "Context about your relationship, shared experiences, important details...",
-          "relationship": "e.g. Friend, Colleague, Mentor",
-          "traits": "Add trait..."
-        }
-      }
-    ]
-  }
+        "identifier": "name",
+        "fields": [
+          {
+            "name": "name",
+            "required": true,
+            "role": "title",
+            "placeholder": "Person's name"
+          },
+          {
+            "name": "relationship",
+            "placeholder": "e.g. Friend, Colleague, Mentor"
+          },
+          {
+            "name": "traits",
+            "type": "strings",
+            "placeholder": "Add trait..."
+          },
+          {
+            "name": "notes",
+            "type": "longtext",
+            "placeholder": "Context about your relationship, shared experiences, important details..."
+          }
+        ]
+      },
+      "$comment": "On the entity: `contact` was listed here until wave 8, next to notes and traits, as though it were a storable field for someone's contact details. It is not: it is an INPUT SPELLING for `name` (FIELD_ALIASES[\"connection\"]), so a value sent under it either named the connection or was discarded. Aliases are input vocabulary, not stored keys, and do not belong in `optional`. Found by the stored-key audit."
+    }
+  ]
 }

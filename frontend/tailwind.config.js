@@ -77,6 +77,12 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // radius-xl, the subsection card. Tailwind's own default xl is 0.75rem,
+        // which happens to equal the 12px the prototype measures -- so without
+        // this line the card would look right and stop looking right the moment
+        // --radius moved. The scale is concentric (a 12 card holds 8 rows holds
+        // 6 inputs), which only holds if all four derive from the same value.
+        xl: "calc(var(--radius) + 4px)",
       },
       fontFamily: {
         sans: ["Geist", "system-ui", "sans-serif"],
@@ -110,6 +116,22 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "caret-blink": "caret-blink 1.25s ease-out infinite",
+      },
+      // Motion, as `duration-medium` / `ease-standard` classes. Pointed at the
+      // custom properties rather than literal values so the reduced-motion
+      // block in globals.css can zero them in one place -- a literal here would
+      // survive that media query and keep animating.
+      transitionDuration: {
+        fast: "var(--duration-fast)",
+        medium: "var(--duration-medium)",
+        slow: "var(--duration-slow)",
+        scroll: "var(--duration-scroll)",
+      },
+      transitionTimingFunction: {
+        decelerate: "var(--ease-decelerate)",
+        accelerate: "var(--ease-accelerate)",
+        standard: "var(--ease-standard)",
+        emphasized: "var(--ease-emphasized)",
       },
     },
   },

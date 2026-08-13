@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { act, render, screen, fireEvent, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import SectionRenderer from "@/renderers/SectionRenderer";
 import packs from "@/__fixtures__/packs.json";
 import goalsData from "@/__fixtures__/data/goals.json";
@@ -14,8 +16,20 @@ import preferencesData from "@/__fixtures__/data/preferences.json";
 import profileData from "@/__fixtures__/data/profile.json";
 import { renderSection } from "@/test/harness";
 import { SEGMENTED_MAX } from "@/components/controls";
-import { normalizeUi } from "@/renderers/paths";
+import { normalizeUi, outline } from "@/renderers/paths";
+// The guards below read a node's fields the way the renderers do -- through the
+// descriptor pass and the resolved `meta` -- rather than off the parallel arrays
+// v1 hung on the node. A guard that derived the field list a second way could
+// pass while the screen showed something else, which is the whole failure mode
+// it exists to catch.
+import { elementShape, blockNode } from "@/renderers/elementShape";
+import { buildFieldMeta } from "@/renderers/fieldMeta";
 
+// Every hand-built pack below declares its nodes as a top-level `sections`
+// array. They used to wrap it as `ui: { sections: [...] }`, the pre-v2
+// manifest shape normalizeUi accepted alongside the real one -- Task 10
+// deleted that wrapper (no shipped pack used it), so these moved up one
+// level. The behaviour under test at each of those sites is unchanged.
 const goalsPack = packs.find((p) => p.key === "goals");
 const mediaPack = packs.find((p) => p.key === "media");
 const aestheticsPack = packs.find((p) => p.key === "aesthetics");
@@ -36,6 +50,21 @@ const profilePack = packs.find((p) => p.key === "profile");
 // is closed: its submit button reads a bare "Add" too.
 const headerAdd = (scope = screen) => scope.getByText("Add", { selector: "button" });
 
+// A one-field list node, for the hand-built packs below. Spelled as a helper
+// because format v2 states a field's identity on the field -- so even a node
+// this small carries an `element` with a `role: "title"` descriptor in it, and
+// nine of these built inline would bury what each test is actually about.
+const listNode = (path, titleField, extra = {}) => ({
+  kind: "list",
+  path,
+  element: {
+    entity: extra.entity ?? "goal",
+    identifier: titleField,
+    fields: [{ name: titleField, role: "title" }],
+  },
+  ...(extra.title ? { title: extra.title } : {}),
+});
+
 // Shared reasons for the two exclusion entries nearly every pack needs --
 // spelled out once so every call site's exclusion map still requires a real,
 // non-empty reason (the check in describeGuards below) without retyping the
@@ -52,16 +81,15 @@ const LINK_GRAPH =
 // consolidation has to avoid; a renderer that mutates its `data` prop or
 // drops a field it doesn't model would corrupt or lose data on every edit.
 //
-// "covered" comes from the pack's own ui spec (badges + detail_fields), not a
-// hand-copied list, so a renderer that stops wiring up a field fails this
-// even if nobody updates the test. But that only checks the renderer against
-// the manifest -- it says nothing about whether the manifest itself still
-// names every key the fixture actually stores. Deleting a field from
-// detail_fields shrinks `covered` right along with it, so this half of the
-// guard would still pass with the field gone. `exclusions` below is the other
-// half: it checks the manifest against the DATA, so removing a field from
-// detail_fields (or never having added it) fails loudly instead of shrinking
-// the guard's own expectations to match.
+// "covered" comes from the pack's own field descriptors (the `badge` and `form`
+// positions), not a hand-copied list, so a renderer that stops wiring up a field
+// fails this even if nobody updates the test. But that only checks the renderer
+// against the manifest -- it says nothing about whether the manifest itself still
+// names every key the fixture actually stores. Dropping a field's `form` position
+// shrinks `covered` right along with it, so this half of the guard would still
+// pass with the field gone. `exclusions` below is the other half: it checks the
+// manifest against the DATA, so unbinding a field (or never having declared it)
+// fails loudly instead of shrinking the guard's own expectations to match.
 //
 // `exclusions` is required (pass `{}` if truly nothing is deliberately
 // unbound) and maps each fixture key that is NOT bound by the ui block to a
@@ -84,8 +112,9 @@ function uiNode(title) {
 //
 // `keys` is a path of `path[0]` segments. One segment addresses a top-level
 // list; two address a list nested inside a row of the first, which is how
-// education's `coursework`/`clubs` and the four `references` lists are
-// declared. Until wave 10 this function took a single string and had no way to
+// education's `coursework`/`clubs` and the four `references` lists are declared
+// -- as `type: "list"` FIELDS carrying a label, which render as blocks under the
+// row. Until wave 10 this function took a single string and had no way to
 // name a child node -- so six entity-bearing nested lists had neither the
 // coverage guard nor the round-trip guard, including `hobby_reference`, whose
 // declared-versus-stored divergence wave 5 had to record by hand.
@@ -117,7 +146,9 @@ function resolveChain(pack, keys, data) {
       );
     }
     chain.push({ node, rows });
-    nodes = node.children || [];
+    // A nested level is a labelled array field on this node's element, projected
+    // into the node it renders as -- the same projection ListRenderer dispatches.
+    nodes = elementShape(node).blocks.map(blockNode);
   }
   return chain;
 }
@@ -130,21 +161,17 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   const chain = resolveChain(pack, keys, data);
   const ancestors = chain.slice(0, -1);
   const { node, rows } = chain[chain.length - 1];
-  // Resolved exactly as ListRenderer resolves it -- via node.entity, which
-  // SectionRenderer sets from `pack.entities?.[node.entity]` -- not by
-  // re-deriving it from legacy list-matching rules. Those rules live inside
-  // normalizeUi already; re-implementing them here made this guard
-  // consistent with ListRenderer only by coincidence.
-  const entity = pack.entities?.[node.entity];
-  const arrayFields = node.array_fields || [];
-  const covered = [...new Set([...(node.badges || []), ...(node.detail_fields || [])])];
+  const shape = elementShape(node);
+  const meta = buildFieldMeta(node);
+  const arrayFields = meta.array_fields;
+  const covered = [...new Set([...shape.badges, ...shape.form])];
   const item = rows[0];
 
   // A nested node only renders once its ancestors' rows are expanded, so every
   // guard below opens the chain before it looks for anything.
   const openChain = async (user) => {
     for (const link of ancestors) {
-      await user.click(screen.getByText(link.rows[0][link.node.title_field]));
+      await user.click(screen.getByText(link.rows[0][elementShape(link.node).titleField]));
     }
   };
 
@@ -154,20 +181,21 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   // chip control throws "Objects are not valid as a React child" on them. Every
   // test passed while the crash was never exercised.
   //
-  // So: an array-valued key a node declares in `array_fields` must actually
-  // hold strings in the fixture. If it holds objects, the node is the wrong
-  // kind -- it wants a nested list, not a chip control.
-  for (const field of node.array_fields || []) {
+  // So: an array-valued key a node renders as chips -- a `type: "strings"` field
+  // with no label of its own -- must actually hold strings in the fixture. If it
+  // holds objects, the field has the wrong type: it wants `type: "list"` with an
+  // `element` describing one row, not a chip control.
+  for (const field of arrayFields) {
     const value = item[field];
     if (!Array.isArray(value)) continue;
     const objects = value.filter((v) => v !== null && typeof v === "object");
     if (objects.length) {
       throw new Error(
-        `${pack.key}/${label}: node declares array_fields: ["${field}"], which ` +
+        `${pack.key}/${label}: "${field}" is declared type: "strings", which ` +
           `renders each entry as a chip -- but the fixture holds ${objects.length} ` +
           `OBJECT entr${objects.length === 1 ? "y" : "ies"} there, which React ` +
-          `cannot render as a child. This field wants a nested list node, not ` +
-          `array_fields.`
+          `cannot render as a child. This field wants type: "list" with its own ` +
+          `element, not "strings".`
       );
     }
   }
@@ -195,10 +223,10 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   function expectFieldOnScreen(field) {
     const value = item[field];
     if (value === undefined) return;
-    // Same precedence ListRenderer gives an inline node.enum over the
-    // entity's valid_values -- a plain `entity.valid_values?.[field]` read
-    // would classify a wave-3 node's inline enum as a plain input.
-    const options = (node.enum ?? entity?.valid_values)?.[field];
+    // The one vocabulary there is, read from the same `meta` ScalarField gets --
+    // a field declares its own `values` or renders as free text, and the entity's
+    // copy is derived from that declaration rather than being a source for it.
+    const options = meta.valid_values?.[field];
     if (options) {
       // Enums render via EnumControl, not plain inputs, so getByDisplayValue
       // can't find them. EnumControl picks its control by option count:
@@ -241,30 +269,29 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   it(`exposes every detail field of an expanded item (${pack.key}/${label})`, async () => {
     const { user } = renderSection({ pack, initial: data });
     await openChain(user);
-    await user.click(screen.getByText(item[node.title_field]));
+    await user.click(screen.getByText(item[shape.titleField]));
     for (const field of covered) expectFieldOnScreen(field);
   });
 
   // Catches drop-on-write: an edit that quietly discards fields the renderer
-  // does not know about (badges/detail_fields don't cover every key -- id,
+  // does not know about (the badge and form positions don't cover every key -- id,
   // the title field itself, and any unmodeled field like `related` all have
   // to survive an edit untouched too).
   it(`preserves every other field when one is edited (${pack.key}/${label})`, async () => {
     const { user, latest, initial } = renderSection({ pack, initial: data });
     await openChain(user);
-    await user.click(screen.getByText(item[node.title_field]));
+    await user.click(screen.getByText(item[shape.titleField]));
 
-    // Pick a field that is genuinely a free-text input, using the same
-    // precedence ListRenderer does. Reading entity.valid_values directly would
-    // miss a node's inline enum, and a date field renders as
-    // <input type="date">, which ignores typed characters -- either would make
-    // the edit below a silent no-op and turn this guard into a coin flip.
-    const dateFields = node.date_fields || [];
+    // Pick a field that is genuinely a free-text input, from the same resolved
+    // `meta` the control itself reads: a `date` field renders as
+    // <input type="date">, which ignores typed characters, and an enum renders as
+    // buttons -- either would make the edit below a silent no-op and turn this
+    // guard into a coin flip.
     const editableField = covered.find(
       (f) =>
-        !(node.enum ?? entity?.valid_values)?.[f] &&
+        !meta.valid_values?.[f] &&
         !arrayFields.includes(f) &&
-        !dateFields.includes(f) &&
+        !meta.date_fields.includes(f) &&
         item[f]
     );
     if (!editableField) {
@@ -292,7 +319,7 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   // against the MANIFEST (does every field the manifest names actually make
   // it onto the screen), never the MANIFEST against the DATA (does the
   // manifest still name every field the data actually carries). Deleting a
-  // real, editable stored key from detail_fields shrinks `covered` right
+  // real, editable stored key out of the manifest shrinks `covered` right
   // along with the deletion, so the tests above keep passing -- this is the
   // one that would have caught task-6's `mental_tab.status` omission.
   //
@@ -302,14 +329,14 @@ function describeGuards({ pack, listKey, data, exclusions }) {
   // domains[1], and a check scoped to domains[0] would never see it.
   it(`accounts for every stored key on every fixture item -- bound by the ui block or explicitly excluded (${pack.key}/${label})`, () => {
     const bound = new Set([
-      node.title_field,
-      ...(node.badges || []),
-      ...(node.detail_fields || []),
-      // display_fields and count_badges render read-only, but they DO render
-      // -- a badge showing a date, or a "N references" chip -- so a fixture
-      // key named there is reachable on screen and is not an omission.
-      ...(node.display_fields || []),
-      ...(node.count_badges || []),
+      shape.titleField,
+      ...shape.badges,
+      ...shape.form,
+      // The `row` and `count` positions render read-only, but they DO render --
+      // a badge showing a date, or a "N references" chip -- so a fixture key in
+      // one of them is reachable on screen and is not an omission.
+      ...shape.row,
+      ...shape.count,
     ]);
     const allFixtureKeys = new Set();
     for (const row of rows) {
@@ -331,10 +358,10 @@ describe("SectionRenderer", () => {
   // ---------------------------------------------------------------------------
   // wave 12: the title field is a renderer guarantee, not a manifest opt-in
   //
-  // `editFields` came from badges + detail_fields, so a node that omitted its
-  // own title_field from detail_fields offered no control for it: the Add
-  // dialog (which has always given the title its own input) could name a row,
-  // and nothing could ever rename it. Three shipped nodes did exactly that --
+  // `editFields` is the badge and form positions, so a node whose title field
+  // takes neither offers no control for it: the Add dialog (which has always
+  // given the title its own input) could name a row, and nothing could ever
+  // rename it. Three shipped nodes did exactly that --
   // goals, media, aesthetics. Fixing it in the renderer rather than in three
   // manifests is what stops the fourth one happening.
   // ---------------------------------------------------------------------------
@@ -345,21 +372,60 @@ describe("SectionRenderer", () => {
       ["aesthetics", aestheticsPack, aestheticsData, "styles", "name", undefined],
     ];
 
+    // The three shipped nodes no longer omit their title: format v2 states a
+    // field's positions on the field, and a title field with no position would
+    // be a manifest claiming no control renders for it -- which is false, since
+    // the guarantee below always draws one. So the conversion made all three
+    // declare `show: ["form"]`, and these cases now assert the ordinary path.
+    // The guarantee itself is tested against a synthetic node further down,
+    // where the omission can be constructed instead of waited for.
     for (const [label, pack, data, listKey, titleField] of cases) {
-      it(`renders a control for ${label}'s ${titleField}, which detail_fields omits`, async () => {
-        const node = normalizeUi(pack).sections.find(
-          (s) => Array.isArray(s.path) && s.path[0] === listKey
-        );
-        // The premise of this test: if a manifest later adds the title to
-        // detail_fields, this case is no longer testing the renderer.
-        expect(node.detail_fields || []).not.toContain(titleField);
-
+      it(`renders a control for ${label}'s ${titleField}`, async () => {
         const first = data[listKey][0];
         const { user } = renderSection({ pack, initial: data });
         await user.click(screen.getByText(first[titleField]));
         expect(screen.getByDisplayValue(first[titleField])).toBeInTheDocument();
       });
     }
+
+    it("renders a control for a title its own node gives no position", async () => {
+      // The guarantee itself, on a node built to omit the title rather than a
+      // shipped one that happens to. This is what stops the fourth manifest
+      // shipping a row that can be named once and never renamed.
+      const omits = {
+        key: "omits",
+        title: "Omits",
+        description: "A node that gives its title no position",
+        entities: {
+          thing: { actions: ["add", "update", "remove"], required: ["title"],
+                   optional: ["notes"], identifier: "title" },
+        },
+        sections: [
+          {
+            kind: "list",
+            path: ["things"],
+            title: "Things",
+            element: {
+              entity: "thing",
+              identifier: "title",
+              fields: [
+                { name: "title", role: "title", required: true, show: [] },
+                { name: "notes" },
+              ],
+            },
+          },
+        ],
+      };
+      const node = normalizeUi(omits).sections[0];
+      expect(elementShape(node).form).not.toContain("title");
+
+      const { user } = renderSection({
+        pack: omits,
+        initial: { things: [{ id: "t1", title: "Unnamed thing" }] },
+      });
+      await user.click(screen.getByText("Unnamed thing"));
+      expect(screen.getByDisplayValue("Unnamed thing")).toBeInTheDocument();
+    });
 
     it("round-trips a rename through the body control", async () => {
       const { user, latest } = renderSection({ pack: goalsPack, initial: goalsData });
@@ -368,9 +434,10 @@ describe("SectionRenderer", () => {
       expect(latest().goals.map((g) => g.title)).toContain("Ship MyGist v3!");
     });
 
-    it("does not render the title twice when detail_fields DOES name it", async () => {
-      // learning_log names `topic` in detail_fields. The title must lead the
-      // body, not appear once from the guarantee and once from detail_fields.
+    it("does not render the title twice when the title field DOES take the form position", async () => {
+      // learning_log's `topic` is an ordinary form field as well as its list's
+      // title. The title must lead the body, not appear once from the guarantee
+      // and once from the form position.
       const { user } = renderSection({ pack: learningLogPack, initial: learningLogData });
       await user.click(screen.getByText("React Server Components"));
       expect(screen.getAllByDisplayValue("React Server Components")).toHaveLength(1);
@@ -387,6 +454,31 @@ describe("SectionRenderer", () => {
     describeGuards({
       pack: goalsPack, listKey: "goals", data: goalsData,
       exclusions: { id: MACHINE_ID },
+    });
+
+    // goals.type is the one shipped field with `allow_custom: true` -- the
+    // whole reason fieldMeta's descriptor path exposes an `allow_custom` list
+    // instead of relying on the `custom_<field>` entry the old `optional`
+    // convention needed. This exercises the real manifest end to end, not a
+    // hand-built meta object, so a regression in either fieldMeta or the
+    // ScalarField check that reads it would show up here.
+    it("offers a free-text box for goals.type once 'other' is picked", async () => {
+      const { user } = renderSection({ pack: goalsPack, initial: goalsData });
+      await user.click(screen.getByText("Ship MyGist v3"));
+
+      // Seven values (career/learning/personal/health/financial/creative/
+      // other) is past SEGMENTED_MAX, so this renders as a dropdown, not
+      // segmented buttons -- same rule ScalarField.test.jsx's enum describe
+      // block pins for any field with more than four options.
+      const combo = screen.getAllByRole("combobox").find((el) => el.textContent === "career");
+      expect(combo).toBeTruthy();
+
+      await user.click(combo);
+      await user.click(screen.getByRole("option", { name: "other" }));
+
+      const custom = screen.getByPlaceholderText("Custom type…");
+      await user.type(custom, "sabbatical");
+      expect(custom).toHaveValue("sabbatical");
     });
   });
 
@@ -770,8 +862,9 @@ describe("SectionRenderer", () => {
       const node = normalizeUi(projectsPack).sections.find(
         (s) => s.path[0] === "projects"
       );
-      expect(node.display_fields).toEqual(["added_date"]);
-      expect(node.display_formats?.added_date).toBeUndefined();
+      const shape = elementShape(node);
+      expect(shape.row).toEqual(["added_date"]);
+      expect(shape.formats.added_date).toBeUndefined();
     });
 
     it("is read-only about `added_date` -- expanding a row exposes no control bound to it", async () => {
@@ -943,7 +1036,7 @@ describe("SectionRenderer", () => {
       const added = latest().mental_tabs[0];
       expect(added.created_at).not.toBe("@now");
       expect(Number.isNaN(Date.parse(added.created_at))).toBe(false);
-      expect(tabsNode().field_defaults).toEqual({ created_at: "@now" });
+      expect(buildFieldMeta(tabsNode()).field_defaults).toEqual({ created_at: "@now" });
     });
 
     // Mirrors circle's `contact` guard and projects' `item` guard. A wrongly
@@ -975,7 +1068,7 @@ describe("SectionRenderer", () => {
       await user.click(screen.getByText("Places to eat in Newcastle"));
       expect(screen.queryByDisplayValue(stamp)).not.toBeInTheDocument();
       expect(within(mentalTabsBlock()).queryByText(/^created at$/i)).not.toBeInTheDocument();
-      expect(tabsNode().display_fields).toBeUndefined();
+      expect(elementShape(tabsNode()).row).toEqual([]);
     });
 
     // ---- the legacy `topic` entry ----
@@ -994,8 +1087,8 @@ describe("SectionRenderer", () => {
       expect(screen.queryByText("Old bookmarks")).not.toBeInTheDocument();
 
       // The row has no title text to click, which is the whole problem -- it
-      // is reachable only through the remove button's generated label.
-      const row = screen.getByRole("button", { name: "Remove Untitled entry" })
+      // is reachable only through the trigger's generated label.
+      const row = screen.getByRole("button", { name: "More actions for Untitled entry" })
         .parentElement;
       await user.click(row);
       await user.type(
@@ -1015,23 +1108,21 @@ describe("SectionRenderer", () => {
     });
 
     // The on-screen assertions above cannot fail if the manifest quietly
-    // started binding `topic` somewhere that does not render a labelled
-    // control (long_text, sort, display_fields...), so assert the block's own
-    // shape too.
+    // started binding `topic` somewhere that does not render a labelled control
+    // (a longtext type, a sort key, a read-only row position...), so assert the
+    // block's own shape too. In v1 that meant enumerating a dozen arrays and
+    // maps and hoping none was forgotten; a field is now named in exactly one
+    // place, so naming `topic` anywhere at all means declaring a descriptor for
+    // it -- which is what this checks.
     it("binds `title` and names the legacy `topic` in no construct at all", () => {
       const node = tabsNode();
-      expect(node.title_field).toBe("title");
-      const named = [
-        ...(node.badges || []), ...(node.detail_fields || []),
-        ...(node.array_fields || []), ...(node.long_text || []),
-        ...(node.facets || []), ...(node.count_badges || []),
-        ...(node.display_fields || []), ...(node.date_fields || []),
-        ...Object.keys(node.field_defaults || {}),
-        ...Object.keys(node.enum || {}),
-        node.title_field, node.sort?.field,
-      ].filter(Boolean);
-      expect(named).not.toContain("topic");
-      expect(named).not.toContain("name");
+      expect(elementShape(node).titleField).toBe("title");
+      const declared = node.element.fields.map((f) => f.name);
+      expect(declared).toContain("title");
+      expect(declared).not.toContain("topic");
+      expect(declared).not.toContain("name");
+      expect(node.facets ?? []).not.toContain("topic");
+      expect(node.sort?.field).not.toBe("topic");
     });
 
     // ---- two stored shapes in one `domains` list ----
@@ -1072,9 +1163,9 @@ describe("SectionRenderer", () => {
       // wave 4 Task 5 fixed it -- declaring a format here would still be
       // asking for a conversion that has no meaning, so the manifest declares
       // none. This assertion is the half that can fail in any timezone.
-      const node = domainsNode();
-      expect(node.display_fields).toEqual(["added_date", "last_updated"]);
-      expect(node.display_formats).toBeUndefined();
+      const shape = elementShape(domainsNode());
+      expect(shape.row).toEqual(["added_date", "last_updated"]);
+      expect(shape.formats).toEqual({});
     });
 
     it("is read-only about the domain dates -- expanding a row exposes no control bound to them", async () => {
@@ -1199,11 +1290,9 @@ describe("SectionRenderer", () => {
       title: "Lifestyle",
       description: "",
       entities: { goal: { list: "goals" } },
-      ui: {
-        sections: [
-          { kind: "list", path: ["goals"], entity: "goal", title: "Goals", title_field: "title" },
-        ],
-      },
+      sections: [
+        listNode(["goals"], "title", { title: "Goals" }),
+      ],
     };
     const data = { goals: [{ title: "Ship it" }] };
 
@@ -1216,8 +1305,10 @@ describe("SectionRenderer", () => {
 
     it("adds no extra heading when node.title is absent, as with today's three generic packs", () => {
       renderSection({ pack: goalsPack, initial: goalsData });
-      // Only the Card's pack.title heading exists -- no node-level heading.
-      expect(screen.getAllByRole("heading")).toHaveLength(1);
+      // No heading of the node's OWN, which is the point -- but two now read the
+      // pack's name: the page title block (h2) and the card that node borrows it
+      // for (h3). The prototype duplicates it exactly this way, Figma 114:604.
+      expect(screen.getAllByRole("heading").map((h) => h.textContent)).toEqual(["Goals", "Goals"]);
     });
   });
 
@@ -1241,23 +1332,15 @@ describe("SectionRenderer", () => {
   // static per-pack section lists happens to trigger it yet.
   describe("sibling nodes sharing a path", () => {
     const entities = { goal: { list: "goals" }, misc: { list: "other" } };
-    const nodeOther = {
-      kind: "list", path: ["other"], entity: "misc", title: "Other", title_field: "label",
-    };
-    const nodeFirst = {
-      kind: "list", path: ["goals"], entity: "goal",
-      title: "First", title_field: "title", detail_fields: ["title"],
-    };
-    const nodeSecond = {
-      kind: "list", path: ["goals"], entity: "goal",
-      title: "Second", title_field: "title", detail_fields: ["title"],
-    };
+    const nodeOther = listNode(["other"], "label", { title: "Other", entity: "misc" });
+    const nodeFirst = listNode(["goals"], "title", { title: "First" });
+    const nodeSecond = listNode(["goals"], "title", { title: "Second" });
     const data = { goals: [{ title: "Ship it" }], other: [{ label: "X" }] };
     const packBefore = {
       key: "reorder_shared_path", title: "Reorder", description: "",
-      entities, ui: { sections: [nodeOther, nodeFirst, nodeSecond] },
+      entities, sections: [nodeOther, nodeFirst, nodeSecond],
     };
-    const packAfter = { ...packBefore, ui: { sections: [nodeFirst, nodeSecond] } };
+    const packAfter = { ...packBefore, sections: [nodeFirst, nodeSecond] };
 
     it("renders both nodes, not just one, when they share a path", () => {
       render(<SectionRenderer pack={packBefore} data={data} onChange={() => {}} />);
@@ -1313,12 +1396,10 @@ describe("SectionRenderer", () => {
         title: "Mixed",
         description: "",
         entities: { goal: { list: "goals" } },
-        ui: {
-          sections: [
-            { kind: "table", path: ["profile"] },
-            { kind: "list", path: ["goals"], entity: "goal", title_field: "title" },
-          ],
-        },
+        sections: [
+          { kind: "table", path: ["profile"] },
+          listNode(["goals"], "title"),
+        ],
       };
       const data = { profile: { name: "irrelevant" }, goals: [{ title: "Ship it" }] };
 
@@ -1345,22 +1426,21 @@ describe("SectionRenderer", () => {
         title: "Mixed",
         description: "",
         entities: { goal: { list: "goals" } },
-        ui: {
-          sections: [
-            { kind: "table", path: ["profile"], title: "Basics" },
-            { kind: "list", path: ["goals"], entity: "goal", title_field: "title" },
-          ],
-        },
+        sections: [
+          { kind: "table", path: ["profile"], title: "Basics" },
+          listNode(["goals"], "title"),
+        ],
       };
       const data = { profile: { name: "irrelevant" }, goals: [{ title: "Ship it" }] };
 
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       renderSection({ pack, initial: data });
 
-      // No heading for the rejected "fields" node -- only the Card's own
-      // pack.title heading remains (the list node here declares no title).
+      // No heading for the rejected "fields" node. Two remain, both the pack's
+      // name: the page title block, and the untitled list's card, which borrows
+      // the pack title because that card is the only header it has.
       expect(screen.queryByRole("heading", { name: "Basics" })).not.toBeInTheDocument();
-      expect(screen.getAllByRole("heading").map((h) => h.textContent)).toEqual(["Mixed"]);
+      expect(screen.getAllByRole("heading").map((h) => h.textContent)).toEqual(["Mixed", "Mixed"]);
       expect(screen.getByText("Ship it")).toBeInTheDocument();
 
       errorSpy.mockRestore();
@@ -1375,12 +1455,10 @@ describe("SectionRenderer", () => {
         title: "Mixed2",
         description: "",
         entities: { goal: { list: "goals" } },
-        ui: {
-          sections: [
-            { kind: "table" },
-            { kind: "list", path: ["goals"], entity: "goal", title_field: "title" },
-          ],
-        },
+        sections: [
+          { kind: "table" },
+          listNode(["goals"], "title"),
+        ],
       };
       const data = { goals: [{ title: "Ship it" }] };
 
@@ -1403,23 +1481,23 @@ describe("SectionRenderer", () => {
       title: "Wellness",
       description: "",
       entities: { sleep: { optional: ["bedtime", "wakeup"] } },
-      ui: {
-        sections: [
-          {
-            kind: "fields",
-            path: ["wellness", "sleep", "weekday"],
+      sections: [
+        {
+          kind: "fields",
+          path: ["wellness", "sleep", "weekday"],
+          element: {
             entity: "sleep",
-            fields: ["bedtime", "wakeup"],
-            title: "Weekday",
+            fields: [{ name: "bedtime" }, { name: "wakeup" }],
           },
-          {
-            kind: "strings",
-            path: ["wellness", "energy_peaks"],
-            title: "Energy peaks",
-            placeholder: "e.g. Early morning...",
-          },
-        ],
-      },
+          title: "Weekday",
+        },
+        {
+          kind: "strings",
+          path: ["wellness", "energy_peaks"],
+          title: "Energy peaks",
+          placeholder: "e.g. Early morning...",
+        },
+      ],
     };
     const data = {
       wellness: {
@@ -1483,9 +1561,7 @@ describe("SectionRenderer", () => {
       title: "Corrupted",
       description: "",
       entities: { goal: { list: "goals" } },
-      ui: {
-        sections: [{ kind: "list", path: ["goals"], entity: "goal", title_field: "title" }],
-      },
+      sections: [listNode(["goals"], "title")],
     };
     const data = { goals: "not a list" };
 
@@ -1806,10 +1882,10 @@ describe("section headings and info placement", () => {
       await user.click(screen.getByText("worked examples"));
       // `stance` is also a facet, so the filter bar renders its own "stance"
       // label and its own like/dislike buttons. Scope to this row via its
-      // remove button, whose accessible name carries the row's title -- the
+      // overflow trigger, whose accessible name carries the row's title -- the
       // one handle in the markup that is unique per row.
       const row = screen
-        .getByRole("button", { name: "Remove worked examples" })
+        .getByRole("button", { name: "More actions for worked examples" })
         .closest("div").parentElement;
       await user.click(within(row).getByRole("button", { name: "dislike" }));
 
@@ -1877,20 +1953,18 @@ describe("section headings and info placement", () => {
       title: "Grouped",
       description: "",
       entities: {},
-      ui: {
-        sections: [
-          {
-            kind: "group",
-            title: "Code Style",
-            description: "Languages, frameworks and tools",
-            sections: [
-              { kind: "strings", path: ["code_style", "frameworks"], title: "Frameworks" },
-              { kind: "strings", path: ["code_style", "tools"], title: "Tools" },
-            ],
-          },
-          { kind: "strings", path: ["loose"], title: "Ungrouped" },
-        ],
-      },
+      sections: [
+        {
+          kind: "group",
+          title: "Code Style",
+          description: "Languages, frameworks and tools",
+          sections: [
+            { kind: "strings", path: ["code_style", "frameworks"], title: "Frameworks" },
+            { kind: "strings", path: ["code_style", "tools"], title: "Tools" },
+          ],
+        },
+        { kind: "strings", path: ["loose"], title: "Ungrouped" },
+      ],
     };
     const data = { code_style: { frameworks: ["React"], tools: ["Docker"] }, loose: ["x"] };
 
@@ -1933,7 +2007,7 @@ describe("section headings and info placement", () => {
       // rejected node, and gets the same treatment.
       const empty = {
         ...pack,
-        ui: { sections: [{ kind: "group", title: "Hollow", sections: [] }] },
+        sections: [{ kind: "group", title: "Hollow", sections: [] }],
       };
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
       renderSection({ pack: empty, initial: {} });
@@ -1946,11 +2020,9 @@ describe("section headings and info placement", () => {
     it("renders nothing for a group whose every child is rejected", () => {
       const allBad = {
         ...pack,
-        ui: {
-          sections: [
-            { kind: "group", title: "Hollow", sections: [{ kind: "table", path: ["x"] }] },
-          ],
-        },
+        sections: [
+          { kind: "group", title: "Hollow", sections: [{ kind: "table", path: ["x"] }] },
+        ],
       };
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
       renderSection({ pack: allBad, initial: {} });
@@ -1960,72 +2032,14 @@ describe("section headings and info placement", () => {
     });
 
 
-    describe("separators", () => {
-      const sep = () => screen.queryAllByRole("separator");
-
-      it("rules between a group and whatever follows it", () => {
-        renderSection({ pack, initial: data });
-        // One group, one ungrouped node after it -> exactly one rule.
-        expect(sep()).toHaveLength(1);
-      });
-
-      it("leaves no dangling rule under a trailing group", () => {
-        // lifestyle's Wellness sits last today, so a plain "after every group"
-        // would leave a rule floating at the bottom of the card.
-        const trailing = {
-          ...pack,
-          ui: { sections: [pack.ui.sections[1], pack.ui.sections[0]] },
-        };
-        renderSection({ pack: trailing, initial: data });
-        expect(sep()).toHaveLength(0);
-      });
-
-      it("rules between consecutive groups but not after the last", () => {
-        const twoGroups = {
-          ...pack,
-          ui: {
-            sections: [
-              pack.ui.sections[0],
-              { ...pack.ui.sections[0], title: "Second", sections: [
-                { kind: "strings", path: ["loose"], title: "Loose" },
-              ] },
-            ],
-          },
-        };
-        renderSection({ pack: twoGroups, initial: data });
-        expect(sep()).toHaveLength(1);
-      });
-
-      it("rules after no ungrouped node", () => {
-        const flat = {
-          ...pack,
-          ui: {
-            sections: [
-              { kind: "strings", path: ["a"], title: "A" },
-              { kind: "strings", path: ["b"], title: "B" },
-            ],
-          },
-        };
-        renderSection({ pack: flat, initial: { a: [], b: [] } });
-        expect(sep()).toHaveLength(0);
-      });
-
-      it("does not rule before a rejected trailing node", () => {
-        // The rule is decided after rejected nodes are filtered out, so a
-        // group followed only by a node renderNode drops stays unruled.
-        const trailingBad = {
-          ...pack,
-          ui: {
-            sections: [pack.ui.sections[0], { kind: "table", path: ["x"] }],
-          },
-        };
-        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-        renderSection({ pack: trailingBad, initial: data });
-
-        expect(sep()).toHaveLength(0);
-        spy.mockRestore();
-      });
-    });
+    // The separator suite that stood here is gone with the rules themselves.
+    // A group used to be a heading inside one big card, so an `<hr>` after each
+    // one -- but only where something followed it -- was what made the boundary
+    // visible. The eyebrow band carries its own rule now and a 32px gap ends the
+    // run, so there is nothing left to place conditionally. What the deleted
+    // tests protected is covered instead by "the section's structure" below:
+    // no separator survives, one band per group, and a leaf after a group starts
+    // its own run rather than sitting under that group's label.
 
     it("draws a node's `description` for every kind, not only strings", () => {
       // It used to live in StringsRenderer alone, so the copy declared on
@@ -2036,17 +2050,15 @@ describe("section headings and info placement", () => {
         title: "Mixed",
         description: "",
         entities: {},
-        ui: {
-          sections: [
-            {
-              kind: "fields",
-              path: ["comm"],
-              title: "Default",
-              description: "always active",
-              fields: ["tone"],
-            },
-          ],
-        },
+        sections: [
+          {
+            kind: "fields",
+            path: ["comm"],
+            title: "Default",
+            description: "always active",
+            fields: ["tone"],
+          },
+        ],
       };
       renderSection({ pack: mixed, initial: {} });
       expect(screen.getByText("always active")).toBeInTheDocument();
@@ -2197,6 +2209,26 @@ describe("section headings and info placement", () => {
       expect(screen.getByText("mentoring")).toBeInTheDocument();
     });
 
+    it("keeps education's blocks in the order the manifest declares them", async () => {
+      // field-census-v1.json records a node's blocks as separate object KEYS,
+      // and `toEqual` on an object ignores key order -- so the frozen census
+      // that gates field NAMES says nothing about block ORDER. Nothing else
+      // did either: `elementShape.js`'s `shape.blocks.reverse()` leaves every
+      // existing test green. This reads the actual rendered sequence instead,
+      // via the `data-ui-node` attribute ListRenderer stamps on each block's
+      // own wrapper (see `uiNode` above) -- against the real `packs.json` and
+      // `profile.json` fixtures, not a synthetic node, because the point is to
+      // gate the shipped order rather than an order this test invented.
+      const { user } = renderSection({ pack: profilePack, initial: profileData });
+      await user.click(screen.getByText("Northumbria University"));
+
+      const educationCard = uiNode("Education");
+      const blockTitles = Array.from(educationCard.querySelectorAll("[data-ui-node]")).map(
+        (el) => el.getAttribute("data-ui-node")
+      );
+      expect(blockTitles).toEqual(["Highlights", "Coursework / Modules", "Clubs & Societies"]);
+    });
+
     it("edits a highlight in place rather than making the user retype it", async () => {
       // The retired editor gave each highlight its own input. Binding them as
       // chips meant deleting and retyping a whole sentence to fix a typo.
@@ -2237,7 +2269,7 @@ describe("section headings and info placement", () => {
       // Chips, not editable rows: skills are short, word-like values you add
       // and drop but never revise, and chips show many at a glance. A
       // highlight is a sentence where a typo means retyping the lot, which is
-      // why that one is item_control: "input".
+      // why that one declares control: "input".
       const { user } = renderSection({ pack: profilePack, initial: profileData });
       await user.click(screen.getByText("Acme"));
 
@@ -2248,7 +2280,7 @@ describe("section headings and info placement", () => {
       // copy is wording, and a test that pins wording turns every copy edit
       // into a failing test for no behavioural reason.
       const node = normalizeUi(profilePack)
-        .sections.flatMap((n) => n.children ?? [])
+        .sections.flatMap((n) => elementShape(n).blocks.map(blockNode))
         .find((n) => n.title === "Skills");
       expect(within(skills).getByPlaceholderText(node.placeholder)).toBeInTheDocument();
     });
@@ -2281,7 +2313,7 @@ describe("section headings and info placement", () => {
       const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
       await user.click(screen.getByText("Welsh"));
 
-      const row = screen.getByRole("button", { name: "Remove Welsh" }).closest("div").parentElement;
+      const row = screen.getByRole("button", { name: "More actions for Welsh" }).closest("div").parentElement;
       await user.click(within(row).getByRole("button", { name: "fluent" }));
 
       expect(latest().languages_spoken[1]).toEqual({ name: "Welsh", fluency: "fluent" });
@@ -2332,7 +2364,11 @@ describe("section headings and info placement", () => {
     renderSection({ pack: circlePack, initial: circleData });
 
     const button = screen.getByRole("button", { name: "About Circle" });
-    expect(screen.getByRole("heading", { name: /Circle/ })).toContainElement(button);
+    // Beside the heading, not inside it. The pack title used to render the "i"
+    // INSIDE its CardTitle, which put the button's own label into the heading's
+    // accessible name; every node-level heading already did it this way.
+    const cardTitle = screen.getByRole("heading", { name: "Circle", level: 3 });
+    expect(cardTitle.parentElement).toContainElement(button);
   });
 
   it("labels each Add button with the singular entity, not the plural heading", () => {
@@ -2384,13 +2420,14 @@ describe("the Add trigger and the entry count", () => {
     expect(within(nodeEl).getAllByText("Add", { selector: "button" })).toHaveLength(1);
   });
 
-  it("puts an untitled node's Add trigger in the Card's own header row, the only heading it has", () => {
-    // Same reason the untitled node's "i" already sits there: a node with no
-    // title of its own is the section's main list, so the heading that
-    // describes it is the Card's.
+  it("puts an untitled node's Add trigger in its own card's header row, the only heading it has", () => {
+    // Same reason the untitled node's "i" sits there: a node with no title of
+    // its own is the section's main list, so the heading that describes it is
+    // the one its card borrows from the pack. Scoped to level 3 because the page
+    // title block above now reads the same word at h2.
     renderSection({ pack: goalsPack, initial: goalsData });
 
-    const cardTitle = screen.getByRole("heading", { name: /Goals/ });
+    const cardTitle = screen.getByRole("heading", { name: /Goals/, level: 3 });
     const headerRow = cardTitle.parentElement.parentElement;
     expect(headerRow).toContainElement(headerAdd());
     // The row is the header's, not the whole Card's -- otherwise this would
@@ -2433,5 +2470,526 @@ describe("the Add trigger and the entry count", () => {
 
     expect(within(nodeEl).queryByRole("group", { name: "Filters" })).not.toBeInTheDocument();
     expect(within(nodeEl).getByText(/2 entries/)).toBeInTheDocument();
+  });
+});
+
+// The scroll-spy foothold, landed here in slice 1 so the rail merges with real
+// anchors under it. Slice 2 restructures what sits INSIDE these wrappers (one
+// card per subsection, under eyebrow bands); the contract the rail reads is
+// stamped now, and does not change when that happens.
+describe("scroll-spy anchors", () => {
+  it("stamps every titled top-level node with its outline id, in order", () => {
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+    const ids = [...document.querySelectorAll("[data-band]")].map((el) => el.dataset.band);
+    // Asserted against outline() rather than a hand-written list: two
+    // derivations of the same ids is the one thing this contract cannot afford.
+    expect(ids).toEqual(outline(preferencesPack).map((b) => b.id));
+    expect(ids).toEqual(["code-style", "communication", "learning-style", "likes-dislikes"]);
+  });
+
+  it("clears the sticky header, so clicking a rail item does not hide the heading under it", () => {
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+    expect(document.querySelector("[data-band]").className).toContain("scroll-mt-[60px]");
+  });
+
+  it("keeps the wrapper's own spacing class rather than replacing it", () => {
+    // The band attribute rides on the existing wrapper. Overwriting className
+    // instead of extending it would strip space-y-4 and silently reflow every
+    // grouped section in the app.
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+    expect(document.querySelector('[data-band="code-style"]').className).toContain("space-y-4");
+  });
+
+  it("stamps nothing on a section whose only node is untitled", () => {
+    render(<SectionRenderer pack={learningLogPack} data={learningLogData} onChange={vi.fn()} />);
+    expect(document.querySelectorAll("[data-band]")).toHaveLength(0);
+  });
+
+  it("does not stamp a nested title -- a card heading is not a rail destination", () => {
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+    const ids = [...document.querySelectorAll("[data-band]")].map((el) => el.dataset.band);
+    // Response Format is a `strings` node INSIDE the Communication group.
+    expect(ids).not.toContain("response-format");
+  });
+
+  it("stamps a node of every kind, not only groups", () => {
+    // profile's top level is fields, list, list, group, list -- so this fails if
+    // the stamp were attached to the group branch alone.
+    render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
+    const ids = [...document.querySelectorAll("[data-band]")].map((el) => el.dataset.band);
+    expect(ids).toEqual(outline(profilePack).map((b) => b.id));
+    expect(ids).toContain("education");
+    expect(ids).toContain("contact-links");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Migration slice 2. The section stopped being one Card holding every node
+// under nested headings: it is now a page title block, then one card per
+// subsection, with a group's cards under an eyebrow band. Two visual tiers,
+// capped -- no manifest, however deeply nested, can produce a third.
+//
+// Geometry is asserted through classes, which only proves the intent; the
+// values themselves are checked against the Figma nodes named in
+// docs/superpowers/plans/2026-08-10-section-editor.md and eyeballed in the
+// preview, because Tailwind emits nothing for a class no file mentions.
+// ---------------------------------------------------------------------------
+describe("the section's structure", () => {
+  const cards = () => [...document.querySelectorAll("[data-subsection-card]")];
+  const bands = () => [...document.querySelectorAll("[data-eyebrow-rule]")];
+
+  it("puts the section's name and description in a title block, outside every card", () => {
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+
+    const title = screen.getByRole("heading", { name: preferencesPack.title, level: 2 });
+    expect(title).toBeInTheDocument();
+    // h2, and above the h3s: the old layout titled the Card h3 and every node
+    // h3 as well, which read as a flat list of peers.
+    expect(screen.getByText(preferencesPack.description)).toBeInTheDocument();
+    for (const card of cards()) expect(card).not.toContainElement(title);
+  });
+
+  it("gives every renderable node its own card, and nests none of them", () => {
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+
+    // preferences: three groups (3 + 3 + 2 children) and one top-level list.
+    expect(cards()).toHaveLength(9);
+    for (const outer of cards()) {
+      for (const inner of cards()) {
+        if (outer !== inner) expect(outer).not.toContainElement(inner);
+      }
+    }
+  });
+
+  it("labels a group with an eyebrow band and puts its cards beneath it", () => {
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+
+    expect(screen.getByRole("heading", { name: "Code Style", level: 3 }).className).toContain(
+      "font-mono"
+    );
+    const group = uiNode("Code Style");
+    expect(group.querySelector("[data-eyebrow-rule]")).not.toBeNull();
+    expect(
+      within(group).getByRole("heading", { name: "Preferred Languages", level: 4 })
+    ).toBeInTheDocument();
+  });
+
+  it("gives an ungrouped node a card and no eyebrow of its own", () => {
+    // The umbrella spec's phrase "a top-level list renders as its own band"
+    // means it is a rail destination, not that it gets a label: the prototype
+    // shows Likes & Dislikes, and all four of profile's leaves, as bare cards.
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+
+    const likes = uiNode("Likes & Dislikes");
+    expect(likes.hasAttribute("data-subsection-card")).toBe(true);
+    expect(likes.querySelector("[data-eyebrow-rule]")).toBeNull();
+    // One band per group, and no more.
+    expect(bands()).toHaveLength(3);
+  });
+
+  it("rules nothing between anything -- the eyebrow's own rule replaced the hr", () => {
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+    expect(screen.queryAllByRole("separator")).toHaveLength(0);
+    expect(document.querySelectorAll("hr")).toHaveLength(0);
+  });
+
+  it("titles an untitled node's card with the pack's own name", () => {
+    // Figma 114:604 does exactly this -- "Goals" at 20px in the title block and
+    // again at 16px in the card header. The card is the only header that node
+    // has, and it is where its Add and its info have to live.
+    renderSection({ pack: goalsPack, initial: goalsData });
+
+    expect(screen.getByRole("heading", { name: goalsPack.title, level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: goalsPack.title, level: 3 })).toBeInTheDocument();
+    expect(cards()).toHaveLength(1);
+    expect(within(cards()[0]).getByText("Add", { selector: "button" })).toBeInTheDocument();
+  });
+
+  it("spaces runs 32px apart and cards within a run 16px", () => {
+    // A run is one group, or one consecutive stretch of ungrouped leaves.
+    render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
+
+    const column = screen.getByRole("heading", { level: 2 }).parentElement.parentElement;
+    expect(column.className).toContain("space-y-8");
+    // profile: [Personal Information, Education, Work Experience], [Contact &
+    // Links], [Languages] -- the group is its own run, and the leaf after it
+    // starts another rather than joining it.
+    expect(column.children).toHaveLength(4); // title block + three runs
+    expect(uiNode("Contact & Links").className).toContain("space-y-4");
+  });
+
+  it("starts a new run for a leaf that follows a group, rather than tucking it under the band", () => {
+    // Divergence from the file, deliberate: Figma trails Languages inside the
+    // CONTACT & LINKS frame at 16px, which reads as membership the manifest
+    // does not have and the rail does not show.
+    render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
+    expect(uiNode("Contact & Links")).not.toContainElement(uiNode("Languages"));
+  });
+
+  it("lays a group's cards two-across, except where the group holds a fields node", () => {
+    // Derived from all four groups in the file: CODE STYLE (3 strings) wraps
+    // 2+1, CONTACT & LINKS and LEARNING STYLE pair, and COMMUNICATION -- the
+    // only group with a `fields` child -- is full width throughout. A `fields`
+    // card carries its own two-column field grid and would collapse to one
+    // column in half a row.
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+
+    const grid = (title) => uiNode(title).querySelector("[data-card-grid]");
+    expect(grid("Code Style").className).toContain("lg:grid-cols-2");
+    expect(grid("Learning Style").className).toContain("lg:grid-cols-2");
+    expect(grid("Communication").className).not.toContain("grid-cols-2");
+    // lg, not md: at md the rail is already 240px of a 768px viewport, which
+    // would leave two cards about 230px wide.
+    expect(grid("Code Style").className).not.toContain("md:grid-cols-2");
+  });
+
+  it("never grids a run of ungrouped leaves", () => {
+    render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
+    const run = uiNode("Education").parentElement;
+    expect(run.className).not.toContain("grid-cols-2");
+  });
+
+  describe("the two-tier cap", () => {
+    // No shipping manifest nests a group inside a group. This is the path that
+    // stops a future one inventing a third tier, and it is why the design says
+    // a third level is a label inside a card rather than another band.
+    const nested = {
+      key: "nested",
+      title: "Nested",
+      description: "",
+      entities: {},
+      sections: [
+        {
+          kind: "group",
+          title: "Outer",
+          sections: [
+            { kind: "strings", path: ["first"], title: "First" },
+            {
+              kind: "group",
+              title: "Inner",
+              sections: [
+                { kind: "strings", path: ["second"], title: "Second" },
+                { kind: "strings", path: ["third"], title: "Third" },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const data = { first: ["a"], second: ["b"], third: ["c"] };
+
+    it("renders a nested group as a label inside a card, not as a second band", () => {
+      render(<SectionRenderer pack={nested} data={data} onChange={vi.fn()} />);
+
+      expect(bands()).toHaveLength(1);
+      const inner = uiNode("Inner");
+      expect(inner.hasAttribute("data-subsection-card")).toBe(true);
+      expect(screen.getByRole("heading", { name: "Inner", level: 4 })).toBeInTheDocument();
+      expect(inner.querySelector("[data-eyebrow-rule]")).toBeNull();
+    });
+
+    it("puts the nested group's children inside that one card, each with its own label", () => {
+      render(<SectionRenderer pack={nested} data={data} onChange={vi.fn()} />);
+
+      const inner = uiNode("Inner");
+      // One card for the whole inner group -- its children are labelled rows in
+      // it, not cards of their own.
+      expect(inner.querySelectorAll("[data-subsection-card]")).toHaveLength(0);
+      expect(within(inner).getByRole("heading", { name: "Second", level: 5 })).toBeInTheDocument();
+      expect(within(inner).getByText("b")).toBeInTheDocument();
+      expect(within(inner).getByText("c")).toBeInTheDocument();
+    });
+
+    it("keeps a nested node's path resolving against the section root", async () => {
+      const { user, latest } = renderSection({ pack: nested, initial: data });
+      await user.type(within(uiNode("Second")).getByRole("textbox"), "d{Enter}");
+      expect(latest().second).toEqual(["b", "d"]);
+      expect(latest().third).toEqual(["c"]);
+    });
+
+    it("flattens a fourth level into the same card rather than nesting further", () => {
+      const deeper = {
+        ...nested,
+        sections: [
+          {
+            kind: "group",
+            title: "Outer",
+            sections: [
+              {
+                kind: "group",
+                title: "Inner",
+                sections: [
+                  {
+                    kind: "group",
+                    title: "Deepest",
+                    sections: [{ kind: "strings", path: ["second"], title: "Second" }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      render(<SectionRenderer pack={deeper} data={data} onChange={vi.fn()} />);
+
+      expect(cards()).toHaveLength(1);
+      expect(bands()).toHaveLength(1);
+      // The heading level keeps descending even though the tier does not, so a
+      // screen reader still hears the nesting the manifest declares.
+      expect(screen.getByRole("heading", { name: "Deepest", level: 5 })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Second", level: 6 })).toBeInTheDocument();
+    });
+  });
+});
+
+// The card header's right-hand slot, decided by whether the node has a
+// denominator rather than by judgement. `fields` is the only kind that has one,
+// which is why it is the only kind with a count: the manifest fixes its key set,
+// so "6 of 7" says one key is still blank. `list` and `strings` are unbounded --
+// "3 set" would only restate the rows already on screen, and it would occupy the
+// one place in the card where the reader needs an affordance.
+describe("the fields count in a card header", () => {
+  const cardOf = (title) => document.querySelector(`[data-ui-node="${title}"]`);
+  const summaryOf = (title) => cardOf(title).querySelector("[data-fill-summary]");
+
+  const pack = {
+    key: "counted",
+    title: "Counted",
+    description: "",
+    entities: {},
+    sections: [
+      {
+        kind: "fields",
+        path: ["comm"],
+        title: "Default style",
+        element: {
+          entity: "communication_default",
+          fields: [{ name: "tone" }, { name: "detail_level" }, { name: "locale" }],
+        },
+      },
+    ],
+  };
+
+  it("reports how many of the declared keys are filled", () => {
+    render(
+      <SectionRenderer
+        pack={pack}
+        data={{ comm: { tone: "direct", detail_level: "concise", locale: "en-GB" } }}
+        onChange={vi.fn()}
+      />
+    );
+    expect(summaryOf("Default style").textContent).toBe("3 of 3");
+  });
+
+  it("counts only what is answered", () => {
+    render(<SectionRenderer pack={pack} data={{ comm: { tone: "direct" } }} onChange={vi.fn()} />);
+    expect(summaryOf("Default style").textContent).toBe("1 of 3");
+  });
+
+  it("says Nothing yet rather than 0 of 3", () => {
+    // "0 of 3" is a progress bar with no progress; the sentence says the same
+    // thing without asking the reader to do the arithmetic.
+    render(<SectionRenderer pack={pack} data={{}} onChange={vi.fn()} />);
+    expect(summaryOf("Default style").textContent).toBe("Nothing yet");
+  });
+
+  it("sets the count in Geist Regular, not mono", () => {
+    // A count is a sentence fragment. Mono is reserved for strings that really
+    // are machine output -- the build hash, the eyebrow labels -- and tracked
+    // mono is exactly what made the old onboarding summaries read as debug
+    // output.
+    render(<SectionRenderer pack={pack} data={{ comm: { tone: "direct" } }} onChange={vi.fn()} />);
+    const summary = summaryOf("Default style");
+    expect(summary.className).not.toContain("font-mono");
+    expect(summary.className).toContain("tabular-nums");
+  });
+
+  it("puts it in the header row, opposite the title", () => {
+    render(<SectionRenderer pack={pack} data={{ comm: { tone: "direct" } }} onChange={vi.fn()} />);
+    const header = cardOf("Default style").querySelector("[data-card-header]");
+    expect(header).toContainElement(summaryOf("Default style"));
+  });
+
+  it("gives a list node an Add button and no count", () => {
+    renderSection({ pack: preferencesPack, initial: preferencesData });
+    const likes = uiNode("Likes & Dislikes");
+    expect(likes.querySelector("[data-fill-summary]")).toBeNull();
+    expect(within(likes).getByText("Add", { selector: "button" })).toBeInTheDocument();
+  });
+
+  it("gives a strings node neither", () => {
+    renderSection({ pack: preferencesPack, initial: preferencesData });
+    const tools = uiNode("Tools");
+    expect(tools.querySelector("[data-fill-summary]")).toBeNull();
+    expect(within(tools).queryByText("Add", { selector: "button" })).not.toBeInTheDocument();
+  });
+
+  it("counts profile's Personal Information against its own declared key set", () => {
+    // The real case, and the one the prototype shows at 6 of 7 (114:366). It
+    // binds path [] -- the section root -- so a count computed from the whole
+    // data object rather than the node's fields would be wrong here first.
+    renderSection({ pack: profilePack, initial: profileData });
+    const summary = summaryOf("Personal Information");
+    const declared = profilePack.sections[0].element.fields.length;
+    expect(summary.textContent).toMatch(new RegExp(`^\\d+ of ${declared}$`));
+  });
+
+  it("renders nothing at all for a fields node declaring no keys", () => {
+    const empty = {
+      ...pack,
+      sections: [{ kind: "fields", path: ["comm"], title: "Default style", fields: [] }],
+    };
+    render(<SectionRenderer pack={empty} data={{}} onChange={vi.fn()} />);
+    // Not "0 of 0", and not "Nothing yet" either: there is nothing to fill.
+    expect(summaryOf("Default style")).toBeNull();
+  });
+});
+
+// The per-card save tick, which replaced a "Saved" toast per autosave flush.
+// Editing three fields in a row used to stack three toasts for something the
+// reader never doubted; toasts are for things that happened away from their
+// attention. A failure still interrupts.
+describe("the save tick", () => {
+  const tick = () => document.querySelector("[data-save-tick]");
+  const cardOf = (title) => document.querySelector(`[data-ui-node="${title}"]`);
+
+  const pack = {
+    key: "ticked",
+    title: "Ticked",
+    description: "",
+    entities: {},
+    sections: [
+      { kind: "strings", path: ["a"], title: "First" },
+      { kind: "strings", path: ["b"], title: "Second" },
+    ],
+  };
+
+  function TickHarness({ pack: p = pack, initial = { a: [], b: [] } }) {
+    const [data, setData] = useState(initial);
+    const [savedAt, setSavedAt] = useState(null);
+    return (
+      <>
+        <button onClick={() => setSavedAt(new Date())}>flush</button>
+        <SectionRenderer pack={p} data={data} onChange={setData} savedAt={savedAt} />
+      </>
+    );
+  }
+
+  it("lands on the card whose node was edited, and on no other", async () => {
+    const user = userEvent.setup();
+    render(<TickHarness />);
+
+    await user.type(within(cardOf("Second")).getByRole("textbox"), "x{Enter}");
+    await user.click(screen.getByText("flush"));
+
+    expect(cardOf("Second").querySelector("[data-save-tick]")).not.toBeNull();
+    expect(cardOf("First").querySelector("[data-save-tick]")).toBeNull();
+  });
+
+  it("moves rather than multiplying when the next edit is elsewhere", async () => {
+    const user = userEvent.setup();
+    render(<TickHarness />);
+
+    await user.type(within(cardOf("Second")).getByRole("textbox"), "x{Enter}");
+    await user.click(screen.getByText("flush"));
+    await user.type(within(cardOf("First")).getByRole("textbox"), "y{Enter}");
+    await user.click(screen.getByText("flush"));
+
+    expect(document.querySelectorAll("[data-save-tick]")).toHaveLength(1);
+    expect(cardOf("First").querySelector("[data-save-tick]")).not.toBeNull();
+  });
+
+  it("shows nothing when a save lands with no edit behind it", () => {
+    // Switching section remounts this component with App's existing lastSaved
+    // already set. A tick then would claim a save the reader did not cause.
+    render(<SectionRenderer pack={pack} data={{ a: [], b: [] }} onChange={vi.fn()} savedAt={new Date()} />);
+    expect(tick()).toBeNull();
+  });
+
+  it("holds, then fades, then goes", async () => {
+    // 200ms in, 1.2s hold, 200ms out. The hold is a JS timer because the
+    // reduced-motion block forces animation-duration to 1ms on everything -- a
+    // keyframed hold would be erased for exactly the users least able to catch
+    // a flash.
+    vi.useFakeTimers();
+    try {
+      // fireEvent, not userEvent: userEvent awaits promises that vitest's fake
+      // clock also owns, so `type` never settles here and the test times out
+      // before reaching an assertion. The edit is one keystroke and a commit,
+      // which fireEvent expresses exactly.
+      render(<TickHarness />);
+      const input = within(cardOf("First")).getByRole("textbox");
+      fireEvent.change(input, { target: { value: "x" } });
+      // The chip input commits on ArrayInput's own add button. Not Enter: that
+      // handler is bound to onKeyPress, which fireEvent.keyDown does not reach.
+      fireEvent.click(within(cardOf("First")).getByRole("button"));
+      fireEvent.click(screen.getByText("flush"));
+
+      expect(tick().className).toContain("animate-save-tick-in");
+      act(() => vi.advanceTimersByTime(1399));
+      expect(tick().className).not.toContain("opacity-0");
+      act(() => vi.advanceTimersByTime(2));
+      expect(tick().className).toContain("opacity-0");
+      act(() => vi.advanceTimersByTime(200));
+      expect(tick()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// The anchor contract, re-proved against the structure that now carries it.
+// Slice 1 stamped `data-band` on the depth-0 wrapper when that wrapper was a
+// heading block inside one big Card; slice 2 replaced every one of those
+// wrappers. The contract itself did not change, which is exactly the kind of
+// claim worth a test rather than a comment.
+describe("scroll-spy anchors, after the restructure", () => {
+  const anchors = () => [...document.querySelectorAll("[data-band]")];
+  const ids = () => anchors().map((el) => el.dataset.band);
+
+  for (const [name, pack, data] of [
+    ["profile", profilePack, profileData],
+    ["preferences", preferencesPack, preferencesData],
+    ["lifestyle", lifestylePack, lifestyleData],
+    ["knowledge", knowledgePack, knowledgeData],
+  ]) {
+    it(`stamps ${name} with exactly the ids the rail lists, in order`, () => {
+      // Against outline() rather than a hand-written list: the rail renders its
+      // sub-items from that function, and two derivations of the same ids is the
+      // one thing this contract cannot afford.
+      render(<SectionRenderer pack={pack} data={data} onChange={vi.fn()} />);
+      expect(ids()).toEqual(outline(pack).map((b) => b.id));
+    });
+  }
+
+  it("puts a group's anchor on the wrapper that holds its label, not on its cards", () => {
+    // Scrolling to a group has to land ON the eyebrow. An anchor on the grid
+    // instead would leave the label above the viewport, which reads as landing
+    // in the middle of a group.
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+
+    const anchor = document.querySelector('[data-band="code-style"]');
+    expect(anchor.querySelector("[data-eyebrow-rule]")).not.toBeNull();
+    expect(anchor.querySelectorAll("[data-subsection-card]").length).toBeGreaterThan(1);
+  });
+
+  it("puts a leaf's anchor on its own card", () => {
+    render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
+    const anchor = document.querySelector('[data-band="education"]');
+    expect(anchor.hasAttribute("data-subsection-card")).toBe(true);
+  });
+
+  it("stamps nothing inside a card -- a grouped child is not a rail destination", () => {
+    render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
+    for (const card of document.querySelectorAll("[data-subsection-card]")) {
+      // A card may BE an anchor (a top-level leaf); it may not CONTAIN one.
+      expect(card.querySelectorAll("[data-band]")).toHaveLength(0);
+    }
+  });
+
+  it("clears the sticky header from every anchor, whichever kind it is", () => {
+    render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
+    expect(anchors().length).toBeGreaterThan(0);
+    for (const el of anchors()) expect(el.className).toContain("scroll-mt-[60px]");
   });
 });

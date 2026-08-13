@@ -56,7 +56,7 @@ def test_get_settings_includes_pack_metadata(clean_database):
         "description": "Identity, work, education, contact",
         "core": True,
         "default_enabled": True,
-        "ui": sections.PACK_META["profile"]["ui"],
+        "sections": sections.PACK_META["profile"]["sections"],
         "entities": sections.PACK_META["profile"]["entities"],
         "enabled": True,
     }

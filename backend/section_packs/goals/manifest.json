@@ -28,66 +28,65 @@
       "goals"
     ]
   },
-  "entities": {
-    "goal": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
+  "sections": [
+    {
+      "kind": "list",
+      "path": [
+        "goals"
       ],
-      "required": [
-        "title"
-      ],
-      "optional": [
-        "type",
-        "custom_type",
-        "status",
-        "target_date",
-        "why",
-        "notes"
-      ],
-      "valid_values": {
-        "type": [
-          "career",
-          "learning",
-          "personal",
-          "health",
-          "financial",
-          "creative",
-          "other"
-        ],
-        "status": [
-          "active",
-          "achieved",
-          "paused",
-          "dropped"
-        ]
-      },
-      "identifier": "title"
-    }
-  },
-  "ui": {
-    "sections": [
-      {
-        "kind": "list",
-        "path": [
-          "goals"
-        ],
+      "element": {
         "entity": "goal",
-        "title_field": "title",
-        "badges": [
-          "type",
-          "status"
-        ],
-        "detail_fields": [
-          "target_date",
-          "why",
-          "notes"
-        ],
-        "date_fields": [
-          "target_date"
+        "identifier": "title",
+        "fields": [
+          {
+            "name": "title",
+            "required": true,
+            "role": "title"
+          },
+          {
+            "name": "target_date",
+            "type": "date"
+          },
+          {
+            "name": "why",
+            "type": "longtext"
+          },
+          {
+            "name": "notes",
+            "type": "longtext"
+          },
+          {
+            "name": "type",
+            "type": "enum",
+            "values": [
+              "career",
+              "learning",
+              "personal",
+              "health",
+              "financial",
+              "creative",
+              "other"
+            ],
+            "allow_custom": true,
+            "show": [
+              "badge"
+            ]
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "values": [
+              "active",
+              "achieved",
+              "paused",
+              "dropped"
+            ],
+            "show": [
+              "badge"
+            ]
+          }
         ]
       }
-    ]
-  }
+    }
+  ]
 }

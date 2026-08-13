@@ -22,11 +22,13 @@ def test_default_enabled_map_covers_all_packs(clean_database):
                if k not in ("media", "aesthetics"))
 
 
-def test_pack_meta_carries_ui_and_entities(clean_database):
+def test_pack_meta_carries_sections_and_entities(clean_database):
     meta = sections.PACK_META["goals"]
     assert meta["default_enabled"] is True
-    # goals was migrated to the explicit ui.sections form in Task 5.
-    assert meta["ui"]["sections"][0]["title_field"] == "title"
+    # The node's own declaration, and the entity DERIVED from it -- the frontend
+    # has no other source for either.
+    element = meta["sections"][0]["element"]
+    assert [f["name"] for f in element["fields"] if f.get("role") == "title"] == ["title"]
     assert "goal" in meta["entities"]
 
 

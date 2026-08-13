@@ -20,14 +20,21 @@ import { render } from "@testing-library/react";
 // the wave; the entity-resolves-to-a-segmented-button proxy the brief also
 // suggests is already covered by an existing renderNode.test.jsx case and
 // does not depend on this task's change (renderNode has always resolved
-// `entities?.[node.entity]` itself), so it is not repeated here.
+// `entities?.[node.element?.entity]` itself), so it is not repeated here.
 vi.mock("./ListRenderer", () => ({ default: vi.fn(() => null) }));
 
 import ListRenderer from "./ListRenderer";
 import { renderNode } from "./renderNode";
 
 describe("renderNode threading entities/packKey into ListRenderer", () => {
-  const node = { kind: "list", path: ["items"], title_field: "name", entity: "thing" };
+  // Descriptors, and the entity name inside `element` -- which is where
+  // renderNode resolves it from, so `props.entity` below still lands on
+  // `entities.thing`.
+  const node = {
+    kind: "list",
+    path: ["items"],
+    element: { entity: "thing", identifier: "name", fields: [{ name: "name", role: "title" }] },
+  };
 
   // No global clearMocks -- clear this suite's own mock explicitly so a
   // second test's toHaveBeenCalledTimes(1) isn't counting the first test's

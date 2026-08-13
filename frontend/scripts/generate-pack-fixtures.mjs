@@ -2,12 +2,27 @@
 // stories stay bound to the real manifests rather than a hand-copied snapshot.
 // Mirrors the shape backend/main.py serves at /api/settings.
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const packsDir = join(here, "..", "..", "backend", "section_packs");
+const backendDir = join(here, "..", "..", "backend");
+const packsDir = join(backendDir, "section_packs");
 const outFile = join(here, "..", "src", "__fixtures__", "packs.json");
+
+// The entity contract is DERIVED from each manifest's `sections`, and the
+// derivation lives in `pack_loader.derive_entities` -- so it is asked for here
+// rather than reimplemented in JS. A second implementation would be a second
+// answer to "what may an MCP client send", which is the duplication format v2
+// exists to remove; it would also drift silently, because nothing compares them.
+const derivedEntities = JSON.parse(
+  execFileSync(
+    "python3",
+    ["-c", "import json, pack_loader; print(json.dumps({k: pack_loader.derive_entities(m) for k, m in pack_loader.manifests().items()}))"],
+    { cwd: backendDir, env: { ...process.env, PYTHONPATH: "." }, encoding: "utf8" }
+  )
+);
 
 // This fixture represents the all-enabled state: `enabled` is hardcoded to
 // true for every pack. A later task that needs a disabled-pack case must
@@ -41,8 +56,10 @@ const packs = readdirSync(packsDir, { withFileTypes: true })
     core: m.core ?? false,
     default_enabled: m.default_enabled ?? true,
     enabled: true,
-    entities: m.entities ?? {},
-    ui: m.ui ?? {},
+    // Mirrors backend/sections.py's PACK_META, which is what /api/settings
+    // serves: the nodes as declared, and the entities derived from them.
+    entities: derivedEntities[m.key],
+    sections: m.sections,
     __position: m.position ?? 999,
   }))
   .sort((a, b) => a.__position - b.__position || a.key.localeCompare(b.key))

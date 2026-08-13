@@ -31,49 +31,216 @@
       "mental_tabs"
     ]
   },
-  "entities": {
-    "domain": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
+  "sections": [
+    {
+      "kind": "list",
+      "path": [
+        "domains"
       ],
-      "required": [
-        "name"
-      ],
-      "optional": [
-        "level",
-        "notes",
-        "references"
-      ],
-      "valid_values": {
-        "level": [
-          "beginner",
-          "learning",
-          "intermediate",
-          "advanced",
-          "expert"
+      "title": "Skills & Domains",
+      "info": {
+        "overview": "This section tracks your technical and professional skills. It helps AI understand what you know, how well you know it, and in what context you've applied it.",
+        "tips": [
+          "Skill Name: Be specific—use 'Python' not 'Programming', or 'React' not just 'Frontend'.",
+          "Proficiency Levels explained:",
+          "  • Beginner: Just started learning, basic understanding.",
+          "  • Learning: Actively studying, can do simple tasks.",
+          "  • Intermediate: Comfortable with common use cases, some hands-on experience.",
+          "  • Advanced: Deep knowledge, can solve complex problems independently.",
+          "  • Expert: Mastery level, can teach others and handle edge cases.",
+          "Notes: Add context about where and how you've used the skill—projects, tools, or specific experience.",
+          "References: Optional links to tutorials, documentation, or learning resources you've found helpful."
         ]
       },
-      "identifier": "name"
+      "search": true,
+      "facets": [
+        "level"
+      ],
+      "element": {
+        "entity": "domain",
+        "identifier": "name",
+        "fields": [
+          {
+            "name": "name",
+            "required": true,
+            "role": "title",
+            "placeholder": "e.g. Photography, Marketing, Python"
+          },
+          {
+            "name": "level",
+            "type": "enum",
+            "values": [
+              "beginner",
+              "learning",
+              "intermediate",
+              "advanced",
+              "expert"
+            ],
+            "show": [
+              "form",
+              "badge"
+            ]
+          },
+          {
+            "name": "notes",
+            "type": "longtext",
+            "placeholder": "Add context, projects, or experience..."
+          },
+          {
+            "name": "references",
+            "type": "list",
+            "show": [
+              "count"
+            ],
+            "label": "References",
+            "element": {
+              "entity": "domain_reference",
+              "identifier": "name",
+              "parent": "domain_name",
+              "fields": [
+                {
+                  "name": "name",
+                  "required": true,
+                  "role": "title",
+                  "placeholder": "Reference name",
+                  "alias": [
+                    "ref_name"
+                  ]
+                },
+                {
+                  "name": "url",
+                  "placeholder": "URL"
+                },
+                {
+                  "name": "notes",
+                  "type": "longtext",
+                  "placeholder": "Notes"
+                }
+              ]
+            }
+          },
+          {
+            "name": "added_date",
+            "show": [
+              "row"
+            ],
+            "ui_only": true
+          },
+          {
+            "name": "last_updated",
+            "show": [
+              "row"
+            ],
+            "ui_only": true
+          }
+        ]
+      },
+      "$comment": "Two entities write into this ONE list, with different shapes. `domain` add (server.py) writes {id,name,level,notes,references} and never a date; the `knowledge` entity, whose `category` defaults to \"domains\", writes {name,level,notes,references,added_date} with NO id, and its update writes last_updated. So `domains` legitimately holds entries with and without added_date/last_updated, and id only appears because persona_store._assign_ids backfills it on the next save. Both shapes must round-trip untouched: added_date and last_updated are read-only -- `show: [\"row\"]` and NEVER `form`, so nothing draws a control over them -- and nothing here rebuilds an item from a whitelist."
     },
-    "domain_reference": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
+    {
+      "kind": "list",
+      "path": [
+        "mental_tabs"
       ],
-      "required": [
-        "domain_name",
-        "ref_name"
+      "title": "Mental Tabs",
+      "info": {
+        "overview": "Mental Tabs are your personal knowledge snippets—random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
+        "tips": [
+          "Title: A short, memorable name for the tab.",
+          "Status: Open (still live), Closed (dealt with), Archived (kept for reference).",
+          "Notes: A brief description or context explaining what this tab is about.",
+          "Tags: Keywords to help you (and AI) find this tab later.",
+          "References: Add items with a name, optional URL, and notes.",
+          "Use Mental Tabs for: favourite restaurants, book recommendations, gift ideas, recipes, travel tips, etc.",
+          "Think of it as your personal wiki that AI can reference when helping you."
+        ]
+      },
+      "search": true,
+      "facets": [
+        "status"
       ],
-      "optional": [
-        "url",
-        "notes"
-      ],
-      "identifier": "ref_name",
-      "parent": "domain_name"
-    },
+      "element": {
+        "entity": "mental_tab",
+        "identifier": "title",
+        "description": "Saved topics and bookmarks to revisit later — a shelf, not an inbox",
+        "fields": [
+          {
+            "name": "title",
+            "required": true,
+            "role": "title",
+            "placeholder": "e.g. Git commands, Recipe ideas"
+          },
+          {
+            "name": "notes",
+            "type": "longtext",
+            "placeholder": "Your notes, code snippets, reminders..."
+          },
+          {
+            "name": "references",
+            "type": "list",
+            "show": [
+              "count"
+            ],
+            "label": "References",
+            "element": {
+              "entity": "mental_tab_reference",
+              "identifier": "name",
+              "parent": "title",
+              "fields": [
+                {
+                  "name": "name",
+                  "required": true,
+                  "role": "title",
+                  "placeholder": "Reference name",
+                  "alias": [
+                    "ref_name"
+                  ]
+                },
+                {
+                  "name": "url",
+                  "placeholder": "URL"
+                },
+                {
+                  "name": "notes",
+                  "type": "longtext",
+                  "placeholder": "Notes"
+                }
+              ]
+            }
+          },
+          {
+            "name": "tags",
+            "type": "strings",
+            "show": [
+              "form",
+              "count"
+            ],
+            "placeholder": "Add tag..."
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "values": [
+              "open",
+              "closed",
+              "archived"
+            ],
+            "show": [
+              "badge"
+            ]
+          },
+          {
+            "name": "created_at",
+            "show": [],
+            "default": "@now",
+            "ui_only": true
+          }
+        ]
+      },
+      "$comment": "The field carrying `role: \"title\"` is `title` and nothing else. FIELD_ALIASES[\"mental_tab\"] is [name, mental_tab, topic, title, subject] -- four MCP input spellings and one stored key -- and server.py writes only `title`. `topic` is the legacy key of the pair: still READ as a fallback in four places (add-dedupe, update lookup, remove lookup, and mental_tab_reference's parent lookup) and written by nothing since. It is deliberately absent from every binding below, because a control bound to it would write a key no renderer reads back. Old blobs carrying `topic` with no `title` are repaired on load by persona_store._normalize, which backfills `title` from `topic` without clobbering an existing one and without dropping `topic` -- see that function for why the repair belongs there and not here. A `topic` this node never names still survives every edit, because updateItem spreads the stored item rather than rebuilding it. `created_at` is machine-written (server.py on add, and the bespoke editor client-side); its `default` of `@now` keeps the client-side write alive under the generic renderer. Its `show` is deliberately empty: the two write paths disagree (datetime.now().isoformat()+\"Z\" is local time labelled UTC, new Date().toISOString() is real UTC), so any rendering of it would be wrong by the local offset for whichever half of the entries came from the other path."
+    }
+  ],
+  "mcp_entities": {
     "knowledge": {
       "actions": [
         "add",
@@ -91,202 +258,6 @@
       ],
       "description": "Generic knowledge entry with category support",
       "identifier": "name"
-    },
-    "mental_tab": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
-      ],
-      "required": [
-        "title"
-      ],
-      "optional": [
-        "notes",
-        "tags",
-        "status",
-        "references"
-      ],
-      "valid_values": {
-        "status": [
-          "open",
-          "closed",
-          "archived"
-        ]
-      },
-      "identifier": "title",
-      "description": "Saved topics and bookmarks to revisit later — a shelf, not an inbox"
-    },
-    "mental_tab_reference": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
-      ],
-      "required": [
-        "title",
-        "ref_name"
-      ],
-      "optional": [
-        "url",
-        "notes"
-      ],
-      "identifier": "ref_name",
-      "parent": "title"
     }
-  },
-  "ui": {
-    "sections": [
-      {
-        "kind": "list",
-        "path": [
-          "domains"
-        ],
-        "entity": "domain",
-        "title": "Skills & Domains",
-        "title_field": "name",
-        "$comment": "Two entities write into this ONE list, with different shapes. `domain` add (server.py) writes {id,name,level,notes,references} and never a date; the `knowledge` entity, whose `category` defaults to \"domains\", writes {name,level,notes,references,added_date} with NO id, and its update writes last_updated. So `domains` legitimately holds entries with and without added_date/last_updated, and id only appears because persona_store._assign_ids backfills it on the next save. Both shapes must round-trip untouched: added_date and last_updated are bound read-only via display_fields and NEVER as detail_fields, and nothing here rebuilds an item from a whitelist.",
-        "badges": [
-          "level"
-        ],
-        "detail_fields": [
-          "name",
-          "level",
-          "notes"
-        ],
-        "long_text": [
-          "notes"
-        ],
-        "facets": [
-          "level"
-        ],
-        "count_badges": [
-          "references"
-        ],
-        "display_fields": [
-          "added_date",
-          "last_updated"
-        ],
-        "searchable": true,
-        "info": {
-          "overview": "This section tracks your technical and professional skills. It helps AI understand what you know, how well you know it, and in what context you've applied it.",
-          "tips": [
-            "Skill Name: Be specific—use 'Python' not 'Programming', or 'React' not just 'Frontend'.",
-            "Proficiency Levels explained:",
-            "  • Beginner: Just started learning, basic understanding.",
-            "  • Learning: Actively studying, can do simple tasks.",
-            "  • Intermediate: Comfortable with common use cases, some hands-on experience.",
-            "  • Advanced: Deep knowledge, can solve complex problems independently.",
-            "  • Expert: Mastery level, can teach others and handle edge cases.",
-            "Notes: Add context about where and how you've used the skill—projects, tools, or specific experience.",
-            "References: Optional links to tutorials, documentation, or learning resources you've found helpful."
-          ]
-        },
-        "children": [
-          {
-            "kind": "list",
-            "path": [
-              "references"
-            ],
-            "entity": "domain_reference",
-            "title": "References",
-            "title_field": "name",
-            "detail_fields": [
-              "name",
-              "url",
-              "notes"
-            ],
-            "fields_outside_entity": [
-              "name"
-            ],
-            "field_placeholders": {
-              "name": "Reference name",
-              "notes": "Notes",
-              "url": "URL"
-            }
-          }
-        ],
-        "field_placeholders": {
-          "name": "e.g. Photography, Marketing, Python",
-          "notes": "Add context, projects, or experience..."
-        }
-      },
-      {
-        "kind": "list",
-        "path": [
-          "mental_tabs"
-        ],
-        "entity": "mental_tab",
-        "title": "Mental Tabs",
-        "title_field": "title",
-        "$comment": "title_field is `title` and nothing else. FIELD_ALIASES[\"mental_tab\"] is [name, mental_tab, topic, title, subject] -- four MCP input spellings and one stored key -- and server.py writes only `title`. `topic` is the legacy key of the pair: still READ as a fallback in four places (add-dedupe, update lookup, remove lookup, and mental_tab_reference's parent lookup) and written by nothing since. It is deliberately absent from every binding below, because a control bound to it would write a key no renderer reads back. Old blobs carrying `topic` with no `title` are repaired on load by persona_store._normalize, which backfills `title` from `topic` without clobbering an existing one and without dropping `topic` -- see that function for why the repair belongs there and not here. A `topic` this node never names still survives every edit, because updateItem spreads the stored item rather than rebuilding it. `created_at` is machine-written (server.py on add, and the bespoke editor client-side); field_defaults keeps the client-side write alive under the generic renderer. It is deliberately NOT a display_field: the two write paths disagree (datetime.now().isoformat()+\"Z\" is local time labelled UTC, new Date().toISOString() is real UTC), so any rendering of it would be wrong by the local offset for whichever half of the entries came from the other path.",
-        "badges": [
-          "status"
-        ],
-        "detail_fields": [
-          "title",
-          "notes",
-          "tags"
-        ],
-        "array_fields": [
-          "tags"
-        ],
-        "long_text": [
-          "notes"
-        ],
-        "facets": [
-          "status"
-        ],
-        "count_badges": [
-          "references",
-          "tags"
-        ],
-        "field_defaults": {
-          "created_at": "@now"
-        },
-        "searchable": true,
-        "info": {
-          "overview": "Mental Tabs are your personal knowledge snippets—random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
-          "tips": [
-            "Title: A short, memorable name for the tab.",
-            "Status: Open (still live), Closed (dealt with), Archived (kept for reference).",
-            "Notes: A brief description or context explaining what this tab is about.",
-            "Tags: Keywords to help you (and AI) find this tab later.",
-            "References: Add items with a name, optional URL, and notes.",
-            "Use Mental Tabs for: favourite restaurants, book recommendations, gift ideas, recipes, travel tips, etc.",
-            "Think of it as your personal wiki that AI can reference when helping you."
-          ]
-        },
-        "children": [
-          {
-            "kind": "list",
-            "path": [
-              "references"
-            ],
-            "entity": "mental_tab_reference",
-            "title": "References",
-            "title_field": "name",
-            "detail_fields": [
-              "name",
-              "url",
-              "notes"
-            ],
-            "fields_outside_entity": [
-              "name"
-            ],
-            "field_placeholders": {
-              "name": "Reference name",
-              "notes": "Notes",
-              "url": "URL"
-            }
-          }
-        ],
-        "field_placeholders": {
-          "notes": "Your notes, code snippets, reminders...",
-          "tags": "Add tag...",
-          "title": "e.g. Git commands, Recipe ideas"
-        }
-      }
-    ]
   }
 }

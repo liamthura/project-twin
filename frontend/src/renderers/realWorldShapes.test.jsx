@@ -224,8 +224,8 @@ describe("a record shaped like production", () => {
       renderSection({ pack: aestheticsPack, initial: later });
 
       const names = screen
-        .getAllByRole("button", { name: /^Remove / })
-        .map((b) => b.getAttribute("aria-label").replace("Remove ", ""));
+        .getAllByRole("button", { name: /^More actions for / })
+        .map((b) => b.getAttribute("aria-label").replace("More actions for ", ""));
       expect(names[0]).toBe("Playful Editorial");
     });
 
@@ -238,6 +238,16 @@ describe("a record shaped like production", () => {
       expect(after["Brutalist"]).toBe(true);
       expect(after["Playful Editorial"]).toBeUndefined();
       expect(after["Y2K"]).toBeUndefined();
+    });
+
+    it("leaves the pin star inline rather than moving it into the menu", async () => {
+      const { user } = renderSection({ pack: aestheticsPack, initial: styles });
+      // Positive, idempotent, one click. Only the destructive action moved.
+      expect(
+        screen.getByRole("button", { name: "Make Brutalist primary" })
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "More actions for Brutalist" }));
+      expect(screen.queryByRole("menuitem", { name: /primary/i })).toBeNull();
     });
 
     it("leaves the others alone when an unrelated field is edited", async () => {

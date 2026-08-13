@@ -39,13 +39,17 @@ export const HH_MM = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 // programmatic association. FieldsRenderer is the caller that needs this;
 // ListRenderer's edit grid labels its own cells and passes nothing.
 export function ScalarField({ id, field, value, meta, onChange, customValue, onCustomChange }) {
-  // meta.long_text is documented as a Set (that's what every caller inside
-  // this codebase passes), but the published schema declares the manifest's
-  // `long_text` key as a JSON array, and a node built straight from a
-  // manifest (`node.long_text`) is exactly that -- an array with no `.has`.
-  // Normalise here, at the one place that reads it, so an array-shaped
-  // long_text degrades to nothing worse than a Set-shaped one instead of
-  // silently turning every declared textarea into a one-line input.
+  // meta.long_text is documented as a Set, and every caller inside this
+  // codebase passes one -- `buildFieldMeta` (fieldMeta.js) always builds it as
+  // one, for the only path it has left after Task 10 deleted the pre-v2 branch
+  // that used to read a manifest's own `long_text` array straight off the
+  // node. That array shape is gone from the schema too (meta_schema.json
+  // declares no such key any more). Still normalised here rather than trusted,
+  // because `meta` is this component's public parameter, not something only
+  // `buildFieldMeta` may construct -- a hand-built array-shaped `long_text`
+  // (this file's own tests build one) degrades to nothing worse than a
+  // Set-shaped one instead of silently turning every declared textarea into a
+  // one-line input.
   const longText =
     meta.long_text instanceof Set ? meta.long_text : new Set(meta.long_text ?? []);
   // Manifest-declared hint for this field, if the node carries one. Undefined
@@ -54,8 +58,20 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
   const hint = meta.field_placeholders?.[field];
   const enums = meta.valid_values?.[field];
   if (enums) {
-    const customField = `custom_${field}`;
-    const hasCustom = (meta.optional || []).includes(customField);
+    // Two ways a field earns the free-text overflow box, because two
+    // vintages of manifest declare it differently. v2 says it once, on the
+    // field itself (`allow_custom: true`), and fieldMeta's descriptor path
+    // collects those names into `meta.allow_custom` -- `goals.type` is the
+    // one shipped case. v1, and every hand-built `meta` in this file's own
+    // test suite, has no such flag: it relies on the older convention of a
+    // `custom_<field>` entry sitting in the entity's (or node's) `optional`
+    // list, a magic prefix nothing declared, only relied on. Both still have
+    // to work -- the first is what a converted node produces, the second is
+    // everything that has not converted yet -- so this checks both rather
+    // than picking one and breaking the other's callers.
+    const hasCustom =
+      (meta.allow_custom || []).includes(field) ||
+      (meta.optional || []).includes(`custom_${field}`);
     return (
       <div className="space-y-2">
         <EnumControl options={enums} value={value} onChange={onChange} />

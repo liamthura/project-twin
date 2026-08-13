@@ -1,6 +1,6 @@
 ---
 title: Section packs
-description: Adding a persona section with one file and no backend code — a complete worked example.
+description: Adding a persona section with one file and no backend code, with a complete worked example.
 ---
 
 A **section pack** adds a whole persona section from a single file:
@@ -21,28 +21,44 @@ No Python. No React. One JSON file, and you get all of this:
 | A read scope of its own | Any scope assembly |
 | A toggle in the Sections manager | Any settings plumbing |
 
-Packs are declarative *only* — a pack cannot ship code, which is what makes
+Packs are declarative *only*. A pack cannot ship code, which is what makes
 accepting one from a stranger a reasonable thing to do.
 
 <Callout>
 This page is the walkthrough. [Manifest reference](/run/pack-reference) is the
-exhaustive list of every key and every UI option.
+exhaustive list of every key. `docs/CONTRIBUTING-PACKS.md` in the repository is
+the authoring guide, and `backend/section_packs/meta_schema.json` is the
+authority above all three.
 </Callout>
+
+## The one rule
+
+A node's `kind` states the shape of the value at its `path`.
+
+That is the format. A node at `path: ["education"]` with `kind: "list"` says the
+stored file holds `"education": [ {...}, {...} ]`. `kind: "fields"` says the value
+there is one object with named keys. `kind: "strings"` says it is an array of
+bare strings, with nothing inside to name. A `group` binds no value at all, so it
+takes no `path`.
+
+A `list` or `fields` node then carries an `element`, which describes one member
+of what the node binds: one row of the list, or the one object the `fields` node
+is. Everything else follows from those two sentences.
 
 ## Before you start
 
-Ask whether you actually need a new section. A new **field on an existing
-entity** is a smaller change with a smaller cost, and most ideas are that.
+Ask whether you need a new section. A new **field on an existing entity** is a
+smaller change with a smaller cost, and most ideas are that.
 
 A new section earns its place when the data is a genuinely separate area of a
-person's life — one that some users will want and others will not. That is why
+person's life, one that some users will want and others will not. That is why
 sections can be toggled, and why new ones default to off.
 
 ## A worked example
 
 We will build a **Tools** pack: the software and hardware someone works in.
-Genuinely useful context — an assistant that knows you live in Neovim and zsh
-gives different answers — and it exercises most of what a pack can do.
+Useful context, since an assistant that knows you live in Neovim and zsh gives
+different answers, and it exercises most of what a pack can do.
 
 <Steps>
 
@@ -84,7 +100,9 @@ The directory name is the section key: lowercase, `snake_case`. The manifest's
 
 <Callout>
 `$schema` points at `meta_schema.json`, so an editor with JSON schema support
-autocompletes and validates the whole file as you type. Worth having.
+autocompletes and validates the whole file as you type. Every object in a manifest
+is closed, so a mistyped key fails at boot rather than being ignored. Catching it
+in the editor is quicker.
 </Callout>
 
 </Step>
@@ -104,60 +122,75 @@ autocompletes and validates the whole file as you type. Worth having.
 ]
 ```
 
-`id_lists` pairs a list field with an id prefix. Every entry in `items` will get
-an id like `tool_a1b2c3`, which is what makes it addressable by `get_entity` and
+`id_lists` pairs a stored array with an id prefix. Every entry in `items` gets an
+id like `tool_a1b2c3`, which is what makes it addressable by `get_entity` and
 linkable by [relations](/use/relations).
 
 <Callout type="warn">
-Every field named in `id_lists` must exist in `defaults` **as a list**, and the
-prefix must be unique across every pack in the repository. Duplicate prefixes
-are rejected at boot.
+Every path named in `id_lists` must exist in `defaults` **as a list** and be
+bound by a top-level `list` node, and the prefix must be unique across every pack
+in the repository. All three are checked at boot.
 </Callout>
 
 </Step>
 
 <Step>
 
-### Declare the write vocabulary
+### Draw the section
 
-`entities` is what an AI client is allowed to say. One entity here:
+`sections` is a list of nodes. One `list` node is enough to start, and it is both
+the editor and the write vocabulary:
 
 ```json
-"entities": {
-  "tool": {
-    "actions": ["add", "update", "remove"],
-    "list": "items",
-    "required": ["name"],
-    "optional": ["kind", "role", "notes", "tags"],
-    "valid_values": {
-      "kind": ["editor", "language", "shell", "database", "hardware", "service"],
-      "role": ["daily", "occasional", "learning", "retired"]
-    },
-    "identifier": "name",
-    "field_defaults": { "role": "daily" }
+"sections": [
+  {
+    "kind": "list",
+    "path": ["items"],
+    "element": {
+      "entity": "tool",
+      "identifier": "name",
+      "fields": [
+        { "name": "name", "role": "title", "required": true },
+        { "name": "kind", "type": "enum", "show": ["form", "badge"],
+          "values": ["editor", "language", "shell", "database", "hardware", "service"] },
+        { "name": "role", "type": "enum", "show": ["form", "badge"], "default": "daily",
+          "values": ["daily", "occasional", "learning", "retired"] },
+        { "name": "notes", "type": "longtext" },
+        { "name": "tags", "type": "strings" }
+      ]
+    }
   }
-}
+]
 ```
 
-| Key | What it does |
+The stored value at `items` is an array of objects, so `kind` is `list` and
+`element` describes one tool. That gives you a list of expandable rows: `name` is
+the row title, `kind` and `role` draw as chips on the collapsed row and as
+controls in the expanded one, and expanding a row shows a `notes` textarea and a
+tag input.
+
+Each field is declared once. `name` is the stored key, and everything else about
+the field sits beside it:
+
+| Key | What it does here |
 |---|---|
-| `actions` | Which of `add` / `update` / `remove` this entity supports |
-| `list` | Which id-list it writes into. **Always declare this.** |
-| `required` | Fields an `add` must carry |
-| `optional` | Fields it may carry |
-| `valid_values` | Constrains a field to an enum. Also drives the editor's dropdowns. |
-| `identifier` | The field `update` and `remove` look entries up by |
-| `field_defaults` | Preselected on a new entry |
+| `role: "title"` | Names a row. Exactly one field per row carries it. |
+| `required: true` | An `add` must carry it. Derives the entity's `required`. |
+| `type` | `text` unless you say otherwise. `longtext` gets a textarea, `strings` a tag input. |
+| `values` | The vocabulary of an `enum`, and the options its control offers. |
+| `default` | Prefilled in the form, and applied on an MCP `add`. |
+| `show` | Where the field draws. `["form"]` if you say nothing. |
+
+`identifier` is the field an MCP client names a row by for `update` and `remove`.
+It has to name a declared field, and that field should be `required`, because a
+row whose identifier may be absent cannot be updated or removed by anyone.
 
 <Callout type="warn">
-**Declare `list` explicitly, always.** The fallback for a section with a single
-id-list has an ambiguity guard, and it declines entities rather than guessing.
-Leaving it out is the most common reason a new pack's writes silently do
-nothing.
+Nothing catches a misspelled field name. It becomes a new field in the contract
+and a control writing a key nothing reads, because the manifest is the authority
+on what the stored keys are. Read your derived contract before opening a PR, with
+the command two steps down.
 </Callout>
-
-Entity names are unique across *every* pack, so a new pack cannot shadow an
-existing entity. `tool` is free; `project` would not be.
 
 </Step>
 
@@ -171,61 +204,18 @@ existing entity. `tool` is free; `project` would not be.
 }
 ```
 
-A client asking for the `professional` scope now gets your tools. Omit a scope
-to stay out of it.
+A client asking for the `professional` scope now gets your tools. Omit a scope to
+stay out of it.
 
-Your section always gets **its own scope token for free** — `get_context(scope:
-"tools")` works whether or not it contributes to any global scope. So
+Your section always gets **its own scope token for free**. `get_context(scope:
+"tools")` works whether or not it contributes to any global scope, so
 contributing to nothing is a legitimate choice for something niche.
 
 <Callout>
 Be conservative. Everything you add to a global scope costs tokens in every
-conversation of every user who has your pack enabled. `professional` alone is
-the right answer here; adding it to `minimal` would not be.
+conversation of every user who has your pack enabled. `professional` alone is the
+right answer here; adding it to `minimal` would not be.
 </Callout>
-
-</Step>
-
-<Step>
-
-### Draw the editor
-
-`ui.sections` is a list of nodes. One list node is enough to start:
-
-```json
-"ui": {
-  "sections": [
-    {
-      "kind": "list",
-      "path": ["items"],
-      "entity": "tool",
-      "title_field": "name",
-      "badges": ["kind", "role"],
-      "detail_fields": ["notes", "tags"],
-      "array_fields": ["tags"]
-    }
-  ]
-}
-```
-
-That gives you a list of expandable rows. The name is the row title, `kind` and
-`role` render as editable chips on the collapsed row, and expanding a row shows
-notes and a tag input.
-
-`badges` fields with `valid_values` become dropdowns automatically — you do not
-list the options twice.
-
-</Step>
-
-<Step>
-
-### Nothing to declare for capture
-
-Earlier versions took a `capture_triggers` array of phrases that hinted a
-message might belong to your section. That fed a keyword matcher, retired in
-favour of [proposals](/use/capture): the agent reads the conversation and
-names the entity itself, so your section is reachable the moment its entities
-exist. There is nothing to add here.
 
 </Step>
 
@@ -247,15 +237,33 @@ appears in `get_schema`, and the editor draws it.
 
 <Step>
 
+### Read what it derived
+
+```bash
+cd backend && python3 -c "
+import json, pack_loader
+print(json.dumps(pack_loader.derive_entities(json.loads(
+    open('section_packs/tools/manifest.json').read())), indent=2))
+"
+```
+
+Every name in that output is a name you wrote. Check each one before a client
+ever sees it.
+
+</Step>
+
+<Step>
+
 ### Test it
 
 ```bash
-python -m pytest tests/test_pack_loader.py -q   # your manifest
+cd backend
+python -m pytest tests/test_pack_loader.py -q   # the loader and the schema
 python -m pytest -q                             # the mechanical guards
 ```
 
 The full suite is where the [guards](#guards-you-will-meet) live. Run it before
-opening a PR — they check things the loader does not.
+opening a PR, because they check things the loader does not.
 
 </Step>
 
@@ -263,6 +271,8 @@ opening a PR — they check things the loader does not.
 
 <Accordions>
 <Accordion title="The complete Tools manifest">
+
+Everything the rest of this page adds, in one file.
 
 ```json title="backend/section_packs/tools/manifest.json"
 {
@@ -274,52 +284,127 @@ opening a PR — they check things the loader does not.
   "default_enabled": false,
   "position": 45,
 
-  "defaults": {
-    "items": []
-  },
-  "id_lists": [
-    ["items", "tool"]
-  ],
+  "defaults": { "items": [], "environment": {} },
+  "id_lists": [["items", "tool"]],
+  "scope_contributions": { "professional": ["items"] },
 
-  "scope_contributions": {
-    "professional": ["items"]
-  },
-
-  "entities": {
-    "tool": {
-      "actions": ["add", "update", "remove"],
-      "list": "items",
-      "required": ["name"],
-      "optional": ["kind", "role", "notes", "tags"],
-      "valid_values": {
-        "kind": ["editor", "language", "shell", "database", "hardware", "service"],
-        "role": ["daily", "occasional", "learning", "retired"]
+  "sections": [
+    {
+      "kind": "list",
+      "path": ["items"],
+      "search": true,
+      "facets": ["kind", "role"],
+      "sort": { "field": "name", "dir": "asc" },
+      "info": {
+        "overview": "What you actually work in, so an assistant gives advice that fits your setup rather than a generic one.",
+        "tips": [
+          "Kind: what sort of tool it is, editor, language, shell or hardware.",
+          "Role: daily, occasional, learning, or retired.",
+          "Retired entries are worth keeping: 'I moved off X' is useful context."
+        ]
       },
-      "identifier": "name",
-      "field_defaults": { "role": "daily" }
-    }
-  },
-
-  "capture_triggers": ["I use", "switched to", "my setup", "installed"],
-
-  "ui": {
-    "sections": [
-      {
-        "kind": "list",
-        "path": ["items"],
+      "element": {
         "entity": "tool",
-        "title_field": "name",
-        "badges": ["kind", "role"],
-        "detail_fields": ["notes", "tags"],
-        "array_fields": ["tags"]
+        "identifier": "name",
+        "description": "A piece of software or hardware someone works in.",
+        "fields": [
+          { "name": "name", "role": "title", "required": true,
+            "placeholder": "e.g. Neovim, Postgres, Framework 13",
+            "suggestions": ["VS Code", "Neovim", "zsh", "Docker", "Postgres"] },
+          { "name": "kind", "type": "enum", "show": ["form", "badge"],
+            "values": ["editor", "language", "shell", "database", "hardware", "service"] },
+          { "name": "role", "type": "enum", "show": ["form", "badge"], "default": "daily",
+            "values": ["daily", "occasional", "learning", "retired"] },
+          { "name": "notes", "type": "longtext", "placeholder": "How you use it, and what for..." },
+          { "name": "tags", "type": "strings", "placeholder": "e.g. work, side-project" },
+          {
+            "name": "configs",
+            "type": "list",
+            "label": "Configs",
+            "show": ["count"],
+            "element": {
+              "entity": "tool_config",
+              "identifier": "name",
+              "actions": ["add", "remove"],
+              "description": "A dotfile or setting worth remembering, on one tool.",
+              "parent": "tool_name",
+              "fields": [
+                { "name": "name", "role": "title", "required": true, "placeholder": "e.g. init.lua" },
+                { "name": "url", "placeholder": "https://github.com/you/dotfiles" },
+                { "name": "notes", "type": "longtext" }
+              ]
+            }
+          }
+        ]
       }
-    ]
-  }
+    },
+    {
+      "kind": "group",
+      "title": "Environment",
+      "description": "Where the work actually happens",
+      "sections": [
+        {
+          "kind": "fields",
+          "path": ["environment"],
+          "title": "Machine",
+          "element": {
+            "entity": "tool_environment",
+            "description": "The one machine and shell someone works on.",
+            "fields": [
+              { "name": "os", "placeholder": "e.g. macOS 15, Fedora 41" },
+              { "name": "terminal", "placeholder": "e.g. Ghostty" }
+            ]
+          }
+        },
+        {
+          "kind": "strings",
+          "path": ["environment", "shortcuts"],
+          "title": "Shortcuts",
+          "control": "input",
+          "placeholder": "e.g. leader-f for fuzzy find"
+        }
+      ]
+    }
+  ]
 }
 ```
 
 </Accordion>
 </Accordions>
+
+## The contract you did not write
+
+There is no `entities` block. `pack_loader.derive_entities` computes the contract
+MCP clients see from the field descriptors, and `get_schema` ships the result.
+The five descriptors from step four derive this:
+
+```json
+{
+  "tool": {
+    "actions": ["add", "update", "remove"],
+    "required": ["name"],
+    "optional": ["kind", "role", "notes", "tags"],
+    "identifier": "name",
+    "valid_values": {
+      "kind": ["editor", "language", "shell", "database", "hardware", "service"],
+      "role": ["daily", "occasional", "learning", "retired"]
+    },
+    "field_defaults": { "role": "daily" }
+  }
+}
+```
+
+`required` and `optional` come from the descriptors, `identifier` from
+`element.identifier`, `valid_values` from the two enums, `field_defaults` from
+`role`'s `default`, and `actions` from the default for a list. Rename a field and
+the contract follows, which is the point. [Manifest
+reference](/run/pack-reference#the-derived-contract) has the whole mapping.
+
+Older manifests declared all of that by hand, beside a UI node that named the same
+fields again, and they also listed phrases that hinted a message might belong to
+the section. All of it is gone. The phrase matcher gave way to
+[proposals](/use/capture), so there is nothing to declare for capture either: your
+section is reachable the moment its entities exist.
 
 ## What you just got
 
@@ -327,7 +412,7 @@ Without writing a line of code, an AI client can now do this:
 
 ```text
 get_schema(entity="tool")
-  → actions, fields, valid values, a worked example per action
+  → actions, required and optional fields, valid values, a worked example per action
 
 persona_modify(
   action="add", entity="tool",
@@ -347,184 +432,184 @@ And the same data is fully editable in the browser.
 ## Making it nicer
 
 The minimal version works. These options are what separate it from the shipped
-packs, and every one is a single key.
+packs, and each is a key on the field or the node it belongs to.
 
 ### Help people fill it in
 
 ```json
-"field_placeholders": {
-  "name": "e.g. Neovim, Postgres, Framework 13",
-  "notes": "How you use it, and what for..."
-},
-"suggestions": {
-  "name": ["VS Code", "Neovim", "zsh", "Docker", "Postgres"]
-}
+{ "name": "name", "role": "title", "required": true,
+  "placeholder": "e.g. Neovim, Postgres, Framework 13",
+  "suggestions": ["VS Code", "Neovim", "zsh", "Docker", "Postgres"] }
 ```
 
-`field_placeholders` sets the greyed-out example text per field.
-`suggestions` renders tap-to-add chips on the Add dialog, which is the single
-biggest thing you can do for a section nobody knows how to start filling.
+`placeholder` sets the greyed-out example text. `suggestions` renders tap-to-add
+chips in the Add dialog, which is the single biggest thing you can do for a
+section nobody knows how to start filling. Only the title field's suggestions are
+read, since a suggestion is a proposed row rather than a proposed value for some
+other key.
 
 ### Make a long list usable
 
 ```json
-"searchable": true,
+"search": true,
 "facets": ["kind", "role"],
 "sort": { "field": "name", "dir": "asc" }
 ```
 
-`searchable` adds a filter box. `facets` turns enum fields into filter controls
-above the list. `sort` orders the rows for display — it never reorders the
-stored array.
+Three keys on the `list` node. `search` adds a filter box, `facets` turns enum
+fields into filter chips above the list, and `sort` orders the rows for display
+without ever reordering the stored array. `facets` entries must name `enum`
+fields, because the chips are built from the vocabulary.
 
 ### Explain the section
 
-```json
-"title": "Tools",
-"description": "Software and hardware you work in day to day",
-"info": {
-  "overview": "What you actually work in, so an assistant gives advice that fits your setup rather than a generic one.",
-  "tips": [
-    "Kind: what sort of tool it is — editor, language, shell, hardware.",
-    "Role: daily, occasional, learning, or retired.",
-    "Retired entries are worth keeping: 'I moved off X' is useful context."
-  ]
-}
-```
-
-`description` is one muted line under the heading. `info` is the content of the
-section's info dialog, for anything longer.
+A node's `description` is one muted line under its title. `info` is
+`{overview, tips[]}`, the content of the section's info dialog, for anything
+longer. The complete manifest above carries one on the list node.
 
 ### Show more on the collapsed row
 
-```json
-"count_badges": ["tags"],
-"display_fields": ["added_at"],
-"display_formats": { "added_at": "datetime" }
-```
+`show` is an array, because a field can hold several positions at once. The five
+are `form` (the default control), `badge` (an editable chip on the collapsed
+row), `row` (the faded secondary line), `count` (an "N tags" chip for an
+array-valued field) and `pin`, each described in the
+[reference](/run/pack-reference#show).
 
-`count_badges` renders `3 tags` style chips for array fields. `display_fields`
-shows read-only badges — right for machine-written values like a timestamp,
-which should never get an edit control.
+`kind` and `role` above say `["form", "badge"]`, so they are chips on the
+collapsed row and controls in the expanded one. Order within a position comes
+from the order of the `fields` array, so one list of descriptors fixes the form
+order and the badge order together.
+
+For a value the server writes and the user must not edit, add `ui_only: true`
+alongside a read-only position. `show: []` means stored and drawn nowhere, and
+the loader rejects it unless the field is `ui_only` or a labelled array.
 
 ### Longer text fields
 
 ```json
-"detail_fields": ["notes", "tags"],
-"long_text": ["notes"]
+{ "name": "notes", "type": "longtext" }
 ```
 
-`long_text` promotes a field from a single-line input to a textarea.
+A field that wants a textarea says so. There used to be a name heuristic, where a
+field called `notes`, `why` or `description` became a textarea whether the
+manifest said so or not, and it is gone. A `notes` field that omits the type gets
+a one-line input, silently and correctly.
 
-## Nested lists
+## Nested arrays
 
-A `list` node can carry `children`, rendered inside an expanded row. This is how
-a project's references and an education entry's coursework are edited.
-
-**A child's `path` resolves against the row's item, not the section root.**
+A nested array is a field with `type: "list"` and an `element` of its own. There
+is no separate child-node concept: a `list` field's `element` and a `list` node's
+`element` mean the same thing, and as a field inside a row's `fields` the only
+possible reading is that it binds against the row.
 
 ```json
 {
-  "kind": "list",
-  "path": ["items"],
-  "entity": "tool",
-  "title_field": "name",
-  "children": [
-    {
-      "kind": "list",
-      "path": ["configs"],
-      "entity": "tool_config",
-      "title": "Configs",
-      "title_field": "name",
-      "detail_fields": ["name", "url", "notes"]
-    }
-  ]
+  "name": "configs", "type": "list", "label": "Configs", "show": ["count"],
+  "element": {
+    "entity": "tool_config",
+    "identifier": "name",
+    "actions": ["add", "remove"],
+    "description": "A dotfile or setting worth remembering, on one tool.",
+    "parent": "tool_name",
+    "fields": [
+      { "name": "name", "role": "title", "required": true, "placeholder": "e.g. init.lua" },
+      { "name": "url", "placeholder": "https://github.com/you/dotfiles" },
+      { "name": "notes", "type": "longtext" }
+    ]
+  }
 }
 ```
 
-`["configs"]` addresses `tool.configs`, not `tools.configs`.
+A `strings` or `list` field with a `label` draws its own titled section under the
+row, with its own add and remove, and that is what makes it a block. Without a
+label it is an inline control in the detail grid. A block may not also claim the
+`form` position, since the block is the field's control, and the loader rejects
+that pair rather than letting the renderer discard the position. `show: ["count"]`
+is about the parent row, and is independent of the block.
 
-A child list is a full node, so it needs its own `entity` — which means a
-second entity, one that writes into a list belonging to a parent row:
+`parent` is the MCP parameter a client passes to say which row it means. It must
+name the enclosing element: its `identifier` bare, or that identifier prefixed by
+the enclosing entity's name. Here `tool`'s identifier is `name`, so `tool_name` is
+legal and so is `name`.
+
+<Callout type="warn">
+Get `parent` wrong and the manifest is still internally consistent, which is how
+profile once shipped Education and Work Experience with their nested entities
+swapped. Each block's entity and parent agreed with each other and only disagreed
+with the row they sat under, so nothing noticed. The loader now checks the pair
+against the enclosing element.
+</Callout>
+
+That field derives a second entity, which writes into an array belonging to a
+parent row:
 
 ```json
-"tool_config": {
-  "actions": ["add", "remove"],
-  "required": ["tool_name", "name"],
-  "optional": ["url", "notes"],
-  "identifier": "name",
-  "parent": "tool_name"
+{
+  "tool_config": {
+    "actions": ["add", "remove"],
+    "required": ["tool_name", "name"],
+    "optional": ["url", "notes"],
+    "identifier": "name",
+    "parent": "tool_name",
+    "description": "A dotfile or setting worth remembering, on one tool."
+  }
 }
 ```
-
-`parent` names the field that identifies which row to write into. That is how
-`work_highlight` finds the right job and `project_reference` finds the right
-project.
 
 <Callout>
 Nested entries have **no ids of their own**. They are addressed through their
 parent, which is why a project's references cannot be linked to directly.
 </Callout>
 
-## Grouping and non-list nodes
+For a nested array of bare strings, use `type: "strings"` and give its `element`
+an `entity` and an `identifier`, which is the parameter name for one string.
+Profile's work `highlights` and `skills` both work that way. Leave the `element`
+out and the array is editable in the app and invisible to MCP, which is what most
+string arrays want.
 
-Not everything is a list. Four node kinds exist:
+## Not everything is a list
 
-| `kind` | Binds | Renders |
+Four node kinds exist, and what each one binds is the difference between them.
+
+| `kind` | The value at `path` is | Renders |
 |---|---|---|
-| `list` | A list of objects | Expandable rows, badges, an Add dialog |
-| `fields` | Named keys of one object | A form. `path: []` addresses the section root. |
-| `strings` | A bare `string[]` | Tag chips, or one editable row per item |
-| `group` | Nothing | A heading with nested `sections` under it |
+| `list` | an array of objects | Expandable rows, badges, an Add dialog |
+| `fields` | one object with named keys | A form. `path: []` addresses the section root. |
+| `strings` | an array of bare strings | Chips, or one editable row per string |
+| `group` | nothing, since it binds no path | A heading with nested `sections` under it |
 
-A `group` is a visual container only. Unlike `children`, a nested section's
-`path` still resolves against the **section root**:
+A `group` is a visual container, and its children's `path` still resolves against
+the section root. The complete manifest above ends with one: an Environment band
+holding a `fields` node at `["environment"]` and a `strings` node at
+`["environment", "shortcuts"]`, which is why `defaults` carries an
+`"environment": {}` for them to bind into.
 
-```json
-{
-  "kind": "group",
-  "title": "Environment",
-  "description": "Where the work actually happens",
-  "sections": [
-    {
-      "kind": "fields",
-      "path": ["environment"],
-      "entity": "environment",
-      "fields": ["os", "terminal"]
-    },
-    {
-      "kind": "strings",
-      "path": ["environment", "shortcuts"],
-      "title": "Shortcuts",
-      "item_control": "input",
-      "placeholder": "e.g. leader-f for fuzzy find"
-    }
-  ]
-}
-```
+The `fields` node is one object, edited in place, so its `element` needs no
+`identifier` and its `actions` default to `["update"]` alone. The `strings` node
+has no `element`, so its array is editable in the app and no client can write it.
 
 <Callout>
-`item_control` on a `strings` node is worth getting right. The default, `"tag"`,
-renders chips — correct for short word-like values you add and remove but never
-revise. `"input"` renders one editable row per item, correct for **sentences**,
-where a typo in a chip means deleting and retyping the whole thing.
+`control` on a `strings` node or field is worth getting right. The default,
+`"chips"`, renders each string as a chip, which is correct for short word-like
+values you add and remove but never revise. `"input"` gives each string its own
+editable row, which is correct for **sentences**, where a typo in a chip means
+deleting and retyping the whole thing.
 
 Work highlights and learning-log decisions both use `"input"` for that reason.
 </Callout>
 
 ## Commenting a manifest
 
-JSON has no comment syntax, so entities and UI nodes accept a `$comment` key.
-The loader ignores it and it never reaches a client.
+JSON has no comment syntax, so nodes and fields accept a `$comment` key. The
+loader ignores it, no renderer reads it, and it never reaches a client.
 
 ```json
-"$comment": "`primary` marks the one entry that IS the user's design language,
-             as opposed to a style they merely like. Kept to a single holder by
-             the entity's exclusive_fields, which both writers honour."
+"$comment": "`primary` marks the one entry that IS the user's design language, as opposed to a style they merely like. Kept to a single holder by `exclusive: true`, which both writers honour."
 ```
 
-Use it. The shipped packs use it heavily, and it is the only place a
-non-obvious decision can live next to the thing it explains.
+Use it. The shipped packs use it heavily, and it is the only place a non-obvious
+decision can live next to the thing it explains. An `element` has no `$comment`
+of its own, so there is one place per node to look.
 
 ## Guards you will meet
 
@@ -533,43 +618,58 @@ fine to a human. Each of these exists because it caught a real defect.
 
 <Accordions>
 
-<Accordion title="Every field an entity declares must actually be stored">
+<Accordion title="Every field the contract declares must actually be stored">
 
 A field nothing writes fails the **stored-key audit**, for both `add` and
 `update`.
 
-The audit is empirical rather than declarative: it runs each action twice with
-two different values and diffs what came out. So it needs no maintenance and
-sweeps new entities automatically — including yours, the moment you add it.
+The audit is empirical rather than declarative: it runs each action twice with two
+different values and diffs what came out. So it needs no maintenance and sweeps
+new entities automatically, including yours. Since the contract is derived from
+your descriptors, every field the editor renders is a field the audit probes.
 
 If a field is genuinely a *router* the caller must send rather than something
-stored, it gets declared as such with a written reason. `sleep.day_type` is the
-standing example: it selects whether to write the weekday or weekend sub-object
-and is never itself stored.
+stored, it says `write_only: true` and carries a reason in its `$comment`.
+`sleep.day_type` is the standing example: it selects whether to write the weekday
+or weekend sub-object and is never itself stored.
 
 </Accordion>
 
 <Accordion title="An add built from exactly your required fields must succeed">
 
-If you declare `required: ["name"]` but the write path demands four fields, the
+If you declare one `required: true` field but the write path demands four, the
 contract and the implementation disagree, and a client has no way to find that
 out except by failing.
 
-The test builds an `add` from precisely what you declared and asserts it works.
+The test builds an `add` from precisely what your descriptors derived and asserts
+it works.
 
 </Accordion>
 
-<Accordion title="Every stored key must be reachable in the editor">
+<Accordion title="The derived contract must match the one that was frozen">
 
-Every stored key the fixture holds must be bound by a `ui` node, or explicitly
-excluded with a written reason.
+`tests/fixtures/entity_schema_v1.json` holds the 42 entities across 10 packs that
+`get_schema` reported before the manifest format changed, and
+`test_entity_schema_frozen.py` asserts the derivation still equals it, entity for
+entity and key for key. That is the whole safety argument for computing a schema
+that used to be copied by hand.
 
-An unbound key is unreachable in the editor and therefore unsaveable by hand,
-which usually means nobody notices it is broken for months.
+It is inert for a new pack, whose entities are not in the frozen file. On an edit
+to a shipped pack it is what tells you a rename changed the MCP contract.
 
-If your UI node's field names diverge from the entity's on purpose, declare them
-in `fields_outside_entity` — that states the divergence in the manifest rather
-than dropping your pack from a test list.
+</Accordion>
+
+<Accordion title="A rendered field must not bind an input-only spelling">
+
+`execute_modify` normalises several accepted input spellings down to one stored
+key. A control bound to one of the other spellings renders fine and its edits
+vanish on save, silently and permanently.
+
+`FIELD_ALIASES` in `server.py` is the only enumeration of those spellings, so
+`test_section_bindings.py` checks your field names against it. It is inert for an
+entity `FIELD_ALIASES` does not name, so a pass there means "no authority",
+never "verified safe". Declare an accepted spelling as `alias` on the field that
+stores it, rather than as a field of its own.
 
 </Accordion>
 
@@ -589,18 +689,19 @@ rather than passing quietly.
 
 </Accordions>
 
-These guards are strict on purpose, and the reason strings they demand are
-themselves the documentation for every exception.
+Beyond those, the loader enforces the semantic rules JSON Schema cannot state,
+each raising a `PackError` that names the pack and the node it failed on.
+`docs/CONTRIBUTING-PACKS.md` lists them.
 
 ## An invalid pack stops the server
 
 <Callout type="warn">
-A manifest that violates `meta_schema.json` raises and **halts startup**. It is
-not skipped with a warning.
+A manifest that violates `meta_schema.json` or any of the loader's rules raises
+and **halts startup**. It is not skipped with a warning.
 
 This changed deliberately. Warn-and-skip meant a single mistyped key removed an
 entire section silently: the pack vanished, and the first symptom appeared much
-later and nowhere near the cause — a client being told an entity type was
+later and nowhere near the cause, as a client being told an entity type was
 unknown. It happened twice.
 
 Failing at boot puts the error where the mistake is. Warn-and-skip survives only
@@ -611,23 +712,25 @@ for pack directories the server does not own.
 
 | Symptom | Cause |
 |---|---|
-| Writes appear to succeed but nothing is stored | The entity has no `list`, and the ambiguity guard declined it |
-| Server will not boot, `PackError` names your key | Read the message — it names the offending key |
-| A field is in `get_schema` but never saved | It fails the stored-key audit. Either wire it up or remove it. |
-| The editor shows nothing for a field | No `ui` node binds it |
-| A nested list writes to the wrong place | A child's `path` resolves against the **row**, not the section |
-| `id_lists` rejected at boot | The field is not a list in `defaults`, or the prefix is taken |
+| Server will not boot, `PackError` names your key | Read the message. It names the offending key. |
+| `additional properties not allowed` on a node | A v1 key. `entities`, `ui`, `children`, `badges`, `detail_fields` and the other parallel arrays are all gone. |
+| A field is in `get_schema` and never saved | It fails the stored-key audit. Either wire it up or remove it. |
+| A field is in `get_schema` under a name you did not write | A typo in `name`. The contract is derived from it. |
+| A nested array writes to the wrong row | The nested `element`'s `parent` names the wrong row |
+| A textarea renders as a one-line input | It needs `type: "longtext"`. Nothing infers it from the name. |
+| A labelled array is rejected | A block cannot also claim the `form` position |
+| `id_lists` rejected at boot | The path is not a list in `defaults`, no top-level `list` node binds it, or the prefix is taken |
 | Frontend tests fail after a manifest edit | `npm run fixtures` |
 
 ## Checklist before opening a PR
 
-- [ ] Directory name, `key`, and the manifest filename all agree
+- [ ] Directory name and the manifest's `key` agree
 - [ ] `default_enabled: false`, and `core` is `false`
-- [ ] Every entity declares `list`
-- [ ] Every entity name is unique across all packs
-- [ ] The id prefix is unique across all packs
+- [ ] Every `kind` matches the shape of the value actually stored at its `path`
+- [ ] Every field `name` is the key you meant, checked against the derived contract
+- [ ] Every field that wants a textarea says `type: "longtext"`
+- [ ] Entity names and the id prefix are unique across all packs
 - [ ] Scope contributions are as small as you can justify
-- [ ] Every stored key is bound by a `ui` node
 - [ ] `python -m pytest -q` passes in `backend/`
 - [ ] `npm run fixtures` produces no diff in `frontend/`
 - [ ] Non-obvious decisions carry a `$comment`
@@ -643,6 +746,6 @@ tasks. If a field would be stale next month, it probably does not belong.
 ## Next
 
 <Cards>
-  <Card title="Manifest reference" href="/run/pack-reference" description="Every key and every UI option, exhaustively." />
+  <Card title="Manifest reference" href="/run/pack-reference" description="Every key a pack manifest accepts, exhaustively." />
   <Card title="Development" href="/run/development" description="The test suite and what CI checks." />
 </Cards>

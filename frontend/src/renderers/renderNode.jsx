@@ -1,10 +1,23 @@
 // Picks a renderer for one ui node. Extracted from SectionRenderer's inline
 // CardContent.map so a node that is NOT a direct child of the section root
-// can be dispatched too: wave 4 calls this for `node.children` against a list
-// item, where the path resolves against the item rather than the section.
+// can be dispatched too: ListRenderer calls this for a row's own BLOCK fields
+// (elementShape.js's `blocks`, projected into nodes by `blockNode`), where the
+// path resolves against the row's item rather than the section.
 //
 // The seam is a plain function, not a component, so a caller can decide where
 // its output goes -- inside a Card, inside a row, or nowhere.
+//
+// The entity is resolved HERE, out of the pack's map, so no renderer has to
+// carry the map around: a node names its entity inside its `element` (v1 put the
+// name on the node itself, which is why a `fields` node's on-screen description
+// and its entity's MCP-facing description collided on one key). Every renderer
+// below gets the resolved object or `undefined`. Neither reads a field's
+// vocabulary or default from it any more -- `buildFieldMeta` (fieldMeta.js)
+// dropped its pre-v2 branch and its `entity` parameter in Task 10, since v2
+// states both on the field itself -- but the resolved object is still threaded
+// down to `ListRenderer` and `FieldsRenderer` as their own `entity` prop; see
+// renderNode.threading.test.jsx, which pins that as backwards compatibility
+// independent of what buildFieldMeta happens to do with it.
 //
 // A node with no valid `path` array logs loudly and renders nothing,
 // rather than silently falling back to an empty, unwritable list -- see the
@@ -59,7 +72,7 @@ export function renderNode({ node, value, onValue, entities, packKey, onShowConf
     return (
       <FieldsRenderer
         node={node}
-        entity={entities?.[node.entity]}
+        entity={entities?.[node.element?.entity]}
         value={value}
         onValue={onValue}
         packKey={packKey}
@@ -92,7 +105,7 @@ export function renderNode({ node, value, onValue, entities, packKey, onShowConf
   return (
     <ListRenderer
       node={node}
-      entity={entities?.[node.entity]}
+      entity={entities?.[node.element?.entity]}
       entities={entities}
       packKey={packKey}
       items={Array.isArray(value) ? value : []}

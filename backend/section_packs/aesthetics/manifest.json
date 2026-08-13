@@ -4,8 +4,8 @@
   "title": "Aesthetics",
   "description": "Visual styles, palettes, and influences you prefer or avoid",
   "core": false,
-  "position": 56,
   "default_enabled": false,
+  "position": 56,
   "defaults": {
     "styles": []
   },
@@ -23,99 +23,96 @@
       "styles"
     ]
   },
-  "entities": {
-    "aesthetic": {
-      "actions": [
-        "add",
-        "update",
-        "remove"
+  "sections": [
+    {
+      "kind": "list",
+      "path": [
+        "styles"
       ],
-      "required": [
-        "name"
-      ],
-      "optional": [
-        "domain",
-        "stance",
-        "primary",
-        "notes",
-        "references"
-      ],
-      "valid_values": {
-        "domain": [
-          "ui",
-          "graphic",
-          "typography",
-          "color",
-          "illustration",
-          "photography",
-          "fashion",
-          "interior",
-          "general"
-        ],
-        "stance": [
-          "love",
-          "like",
-          "avoid"
+      "title": "Styles",
+      "element": {
+        "entity": "aesthetic",
+        "identifier": "name",
+        "list": "styles",
+        "fields": [
+          {
+            "name": "name",
+            "required": true,
+            "role": "title",
+            "suggestions": [
+              "Minimalist",
+              "Maximalist",
+              "Brutalist",
+              "Pastel",
+              "Monochrome",
+              "Retro-futurism",
+              "Art deco",
+              "Scandinavian",
+              "Y2K",
+              "Editorial",
+              "Hand-drawn",
+              "Glassmorphism"
+            ]
+          },
+          {
+            "name": "notes",
+            "type": "longtext"
+          },
+          {
+            "name": "references",
+            "type": "strings",
+            "show": [
+              "form",
+              "count"
+            ]
+          },
+          {
+            "name": "domain",
+            "type": "enum",
+            "values": [
+              "ui",
+              "graphic",
+              "typography",
+              "color",
+              "illustration",
+              "photography",
+              "fashion",
+              "interior",
+              "general"
+            ],
+            "show": [
+              "badge"
+            ]
+          },
+          {
+            "name": "stance",
+            "type": "enum",
+            "values": [
+              "love",
+              "like",
+              "avoid"
+            ],
+            "show": [
+              "badge"
+            ],
+            "default": "like"
+          },
+          {
+            "name": "primary",
+            "show": [
+              "pin"
+            ],
+            "exclusive": true,
+            "pin": {
+              "title": "Primary aesthetic",
+              "empty": "No primary set yet. Star a style below to make it your design language.",
+              "noun": "primary"
+            },
+            "type": "bool"
+          }
         ]
       },
-      "exclusive_fields": [
-        "primary"
-      ],
-      "identifier": "name",
-      "list": "styles",
-      "field_defaults": {
-        "stance": "like"
-      }
+      "$comment": "`primary` marks the one entry that IS the user's design language, as opposed to a style they merely like. It is the only entry that rides into the `minimal` scope, so an AI client gets the governing aesthetic at conversation start without the whole list. Drawn by `show: [\"pin\"]` as the star that lifts its row above the list rather than as a field control -- a labelled switch in a detail grid is a poor way to say \"this one is THE one\" -- and kept to a single holder by `exclusive: true`, which the renderer honours directly and execute_modify honours through the `exclusive_fields` derived from it."
     }
-  },
-  "ui": {
-    "sections": [
-      {
-        "kind": "list",
-        "path": [
-          "styles"
-        ],
-        "entity": "aesthetic",
-        "title_field": "name",
-        "badges": [
-          "domain",
-          "stance"
-        ],
-        "detail_fields": [
-          "notes",
-          "references"
-        ],
-        "array_fields": [
-          "references"
-        ],
-        "suggestions": {
-          "name": [
-            "Minimalist",
-            "Maximalist",
-            "Brutalist",
-            "Pastel",
-            "Monochrome",
-            "Retro-futurism",
-            "Art deco",
-            "Scandinavian",
-            "Y2K",
-            "Editorial",
-            "Hand-drawn",
-            "Glassmorphism"
-          ]
-        },
-        "count_badges": [
-          "references"
-        ],
-        "$comment": "`primary` marks the one entry that IS the user's design language, as opposed to a style they merely like. It is the only entry that rides into the `minimal` scope, so an AI client gets the governing aesthetic at conversation start without the whole list. Rendered via `pinned` rather than as a field control -- a labelled switch in a detail grid is a poor way to say \"this one is THE one\" -- and kept to a single holder by the entity's `exclusive_fields`, which both the renderer and execute_modify honour.",
-        "title": "Styles",
-        "pinned": {
-          "field": "primary",
-          "title": "Primary aesthetic",
-          "empty": "No primary set yet. Star a style below to make it your design language.",
-          "noun": "primary"
-        }
-      }
-    ]
-  }
+  ]
 }

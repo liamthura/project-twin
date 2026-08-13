@@ -2,36 +2,53 @@
 // pack's `ui` (old flat map or new explicit `ui.sections` form) via
 // `normalizeUi`, then dispatches each node by `kind` via `renderNode`.
 //
-// Lifted from GenericSectionEditor.jsx's default export (its Card/CardHeader
-// wrapper, kept exactly as GenericSectionEditor.jsx:252-258 rendered it) with
-// these changes:
-//   - entity/list resolution goes through normalizeUi instead of a
-//     module-private entityByList loop
-//   - the per-node `kind` dispatch (and any node whose kind isn't handled
-//     logging loudly -- naming both the kind and the pack key -- rather than
-//     being silently skipped) now lives in `renderNode`, not inline here;
-//     SectionRenderer keeps only section-root concerns: the Card, the
-//     node.title heading, the React key, and binding each node's path
-//     against the section's own `data`
-//   - `kind: "group"` is handled HERE rather than in renderNode: a group
-//     binds no path and takes no value, so it has nothing renderNode's
-//     signature is built around. It is a heading with nested sections, and
-//     those sections bind against the same `data` root their ungrouped
-//     siblings do.
+// STRUCTURE, as of migration slice 2. The section used to be a single Card
+// holding every node under nested headings, which made a manifest of any size
+// read as one long form. It is now:
 //
-// It also owns one thing that is not strictly section-root: a per-node header
-// ACTION slot -- an empty container in the heading row that a list node's own
-// `+ Add` trigger is portalled into. The trigger cannot simply be built here,
-// and headerActionSlot.jsx explains at length why not.
-import { useRef, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+//   Profile                          <- title block, h2 + description, no card
+//   ┌─ card ─┐ ┌─ card ─┐            <- a run of ungrouped leaves, 16 apart
+//   CONTACT & LINKS ──────────       <- an eyebrow band: one group, one run
+//   ┌─ card ─┐ ┌─ card ─┐            <-   its children, two-across
+//
+// Two visual tiers, capped: band, then card. A group nested inside a group does
+// NOT get a second band -- it becomes a labelled block inside its parent's
+// card, and so does anything deeper. The manifest format allows arbitrary
+// nesting; the design deliberately cannot express it, so no future manifest can
+// invent a hierarchy the reader has to learn.
+//
+// A run is one group, or one consecutive stretch of ungrouped leaves. 32 between
+// runs, 16 inside one. A leaf that FOLLOWS a group starts its own run rather
+// than joining it -- the prototype trails two such cards under the previous
+// eyebrow, which reads as membership the manifest does not have and the rail
+// does not show. Recorded as a divergence in the slice 2 plan.
+//
+// What this file owns beyond the above: the React key, binding each node's path
+// against the section's own `data`, the scroll-spy anchors, and a per-node
+// header ACTION slot -- an empty container in the card header that a list node's
+// own `+ Add` trigger is portalled into. headerActionSlot.jsx explains at length
+// why the trigger cannot simply be built here.
+import { useEffect, useRef, useState } from "react";
+
 import { InfoButton } from "@/components/ui/info-button";
-import { getAt, setAt, normalizeUi } from "./paths";
+import { getAt, setAt, normalizeUi, outline } from "./paths";
 import { renderNode } from "./renderNode";
 import { HeaderActionSlotContext } from "./headerActionSlot";
+import { EyebrowBand } from "./EyebrowBand";
+import { SubsectionCard } from "./SubsectionCard";
+import { fillSummary } from "./fillSummary";
 
-export default function SectionRenderer({ pack, data, onChange, onShowConfirmation }) {
+export default function SectionRenderer({ pack, data, onChange, onShowConfirmation, savedAt }) {
   const { sections } = normalizeUi(pack);
+
+  // The rail's scroll-spy anchors, keyed by the node's index among the section's
+  // top-level children.
+  //
+  // Read from outline() rather than recomputed here on purpose. The rail renders
+  // its sub-items from the same function, and two derivations of the same id is
+  // the one thing this contract cannot afford: they would agree until a title
+  // gained an apostrophe. See the umbrella spec's anchor contract.
+  const bandById = new Map(outline(pack).map((b) => [b.index, b.id]));
 
   // The DOM element each list node's header action portals into, keyed by that
   // node's own React key. Kept in state rather than a ref because the element
@@ -61,189 +78,290 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
     }
     return slotRefs.current[key];
   };
-  // The empty container a node's trigger is portalled into. Rendered by
-  // whichever header row owns that node -- the node's own NodeHeading if it is
-  // titled, the Card's header row if it is not.
+  // The empty container a node's trigger is portalled into, in the header row of
+  // that node's own card.
   const actionSlot = (key) => (
     <div key={`slot:${key}`} ref={captureSlot(key)} className="flex items-center gap-1" />
   );
   // Only a `list` node has an action to place, so only a list node gets a slot
   // -- a `strings` or `fields` node would otherwise contribute an empty div to
-  // every heading row it renders.
+  // every card header it renders.
   const wantsSlot = (node) => node.kind === "list";
-  // A node with no title of its own is the section's main list, so the heading
-  // that describes it is the Card's (see the CardTitle comment below) -- and
-  // its Add action belongs in that same row for the same reason. Its slot is
-  // therefore created up there, keyed by the same key withSeparators derives
-  // for a top-level node: the bare index.
+
+  // Which card, if any, is showing a save tick, and where in its 200ms-in /
+  // 1.2s-hold / 200ms-out life it is. See the effect below.
+  const [tick, setTick] = useState(null);
+  const lastEditedRef = useRef(null);
+
+  // The tick lands on the card whose node last changed. `savedAt` is App's
+  // `lastSaved`, which updates on every successful write -- autosave flush or
+  // an explicit Save now -- so this fires once per save and never on a mount
+  // that merely inherited an older timestamp.
   //
-  // Kept to the top level, exactly as the CardTitle's InfoButton map is: an
-  // untitled node nested inside a group has no header row of its own AND no
-  // claim on the Card's heading, so it sees no slot and falls back to its own
-  // inline trigger. No manifest declares that shape today.
-  const cardHeaderSlotKeys = sections
-    .map((node, i) => ({ node, key: `${i}` }))
-    .filter(({ node }) => !node.title && wantsSlot(node))
-    .map(({ key }) => key);
+  // The timers live here rather than in the card so the tick can move between
+  // cards without one card's unmount cancelling another's. The hold is a timer
+  // and not a keyframe because the reduced-motion block forces
+  // animation-duration to 1ms on everything, which would erase it.
+  useEffect(() => {
+    if (!savedAt || !lastEditedRef.current) return;
+    const key = lastEditedRef.current;
+    setTick({ key, phase: "in" });
+    const out = setTimeout(() => setTick({ key, phase: "out" }), 1400);
+    const done = setTimeout(() => setTick(null), 1600);
+    return () => {
+      clearTimeout(out);
+      clearTimeout(done);
+    };
+  }, [savedAt]);
 
-  // One node, plus the heading/description/info wrapper it earns. Recursive so
-  // a group's nested sections get the identical treatment one level in --
-  // `depth` only picks the heading size, never the binding, because a nested
-  // section's path resolves against the section root exactly like a top-level
-  // one's does.
+  // The header's right-hand slot, decided by whether the node has a
+  // denominator rather than by judgement. `fields` is the only kind that has
+  // one -- the manifest fixes its key set -- so it is the only kind that gets a
+  // count. `list` and `strings` are unbounded and get `+ Add` instead;
+  // `scalar` gets nothing, because the control shows its own state.
+  //
+  // Geist Regular with tabular-nums, never mono: a count is a sentence
+  // fragment, and rendering it in tracked mono is what made the old onboarding
+  // summaries read as debug output.
+  const countFor = (node, value) => {
+    if (node.kind !== "fields") return null;
+    const { filled, total } = fillSummary(node, value);
+    if (total === 0) return null;
+    return (
+      <span data-fill-summary className="text-[13px] tabular-nums text-muted-foreground">
+        {filled === 0 ? "Nothing yet" : `${filled} of ${total}`}
+      </span>
+    );
+  };
+
+  // One node, as one card. `depth` picks the heading level (which keeps
+  // descending with the manifest even where the visual tier stops) and, past 0,
+  // means "already inside a card" -- so a nested group renders as a labelled
+  // block rather than a card of its own.
   function renderSectionNode(node, key, depth) {
-    if (node.kind === "group") {
-      if (!Array.isArray(node.sections) || node.sections.length === 0) {
-        console.error(
-          `SectionRenderer: group "${node.title}" in pack "${pack.key}" has no ` +
-            `sections -- rendering nothing rather than a heading over an empty space`
-        );
-        return null;
-      }
-      const rendered = withSeparators(node.sections, `${key}:`, depth + 1);
-      // Every child rejected: emit nothing rather than a heading over nothing,
-      // the same rule a rejected node gets below.
-      if (rendered.length === 0) return null;
-      return (
-        <div key={key} data-ui-node={node.title} className="space-y-4">
-          <NodeHeading node={node} depth={depth} />
-          <div className="space-y-4 border-l pl-4">{rendered}</div>
-        </div>
-      );
-    }
+    if (node.kind === "group") return renderNestedGroup(node, key, depth);
 
+    const value = Array.isArray(node.path) ? getAt(data, node.path) : undefined;
     const rendered = renderNode({
       node,
-      value: Array.isArray(node.path) ? getAt(data, node.path) : undefined,
-      onValue: (next) => onChange(setAt(data || {}, node.path, next)),
+      value,
+      onValue: (next) => {
+        // Which card the next successful save ticks. A ref, not state: nothing
+        // renders differently until `savedAt` moves.
+        lastEditedRef.current = key;
+        onChange(setAt(data || {}, node.path, next));
+      },
       entities: pack.entities,
       packKey: pack.key,
       onShowConfirmation,
     });
     // renderNode returns null (after logging) for a kind it doesn't support.
     // Bail out before the wrapper below so a rejected node contributes nothing
-    // to the DOM -- not an empty div, and not a heading floating over nothing.
+    // to the DOM -- not an empty card, and not a heading floating over nothing.
     if (!rendered) return null;
-    // `data-ui-node` is the stable handle a test scopes a node by. Walking up
-    // from the heading text with .parentElement broke the moment the heading
-    // gained a wrapper for `description`; this survives markup changes because
-    // it names the node rather than describing where it sits.
+
+    const content = (
+      // The node's content is rendered inside the slot context so a list node
+      // can portal its `+ Add` trigger into its own card header while keeping
+      // the add itself -- and the three invariants in useListItems -- where it
+      // already works. See headerActionSlot.jsx.
+      <HeaderActionSlotContext.Provider value={slotEls[key] ?? null}>
+        {rendered}
+      </HeaderActionSlotContext.Provider>
+    );
+
+    // Past the first tier there is no card to make: the node is a labelled
+    // block inside its ancestor's card. Its title still descends a heading
+    // level, so the outline keeps the shape the manifest declares.
+    if (depth > 1) {
+      return (
+        <div key={key} data-ui-node={node.title} className="space-y-1.5">
+          {node.title && <NodeLabel title={node.title} depth={depth} info={node.info} />}
+          {node.description && (
+            <p className="text-[13px] text-muted-foreground">{node.description}</p>
+          )}
+          {content}
+        </div>
+      );
+    }
+
+    const band = depth === 0 ? bandById.get(Number(key)) : undefined;
     return (
-      <div key={key} data-ui-node={node.title} className="space-y-3">
+      <SubsectionCard
+        key={key}
+        // A node with no title of its own is the section's main list, and the
+        // heading that names it is the pack's -- so its card borrows the pack
+        // title rather than going bare. Figma 114:604 does exactly this: "Goals"
+        // at 20px in the title block, again at 16px in the card header.
+        title={node.title || pack.title}
+        info={node.info}
+        description={node.description}
+        depth={depth}
+        action={wantsSlot(node) ? actionSlot(key) : null}
+        count={countFor(node, value)}
+        tick={tick?.key === key ? tick.phase : null}
+        data-ui-node={node.title}
+        data-band={band}
+        // Concatenated, never replacing: `scroll-mt` clears the 60px sticky
+        // header so a rail click does not land with the title underneath it.
+        className={band ? "scroll-mt-[60px]" : undefined}
+      >
+        {content}
+      </SubsectionCard>
+    );
+  }
+
+  // A group past the first tier. It gets no band and no card of its own: it is
+  // ONE card titled with the group's name, holding its children as labelled
+  // blocks. Anything deeper flattens into the same card.
+  //
+  // No shipping manifest nests a group inside a group; this is the path that
+  // stops a future one inventing a third tier.
+  function renderNestedGroup(node, key, depth) {
+    const children = groupChildren(node, key, depth + 1);
+    if (!children) return null;
+    if (depth > 1) {
+      return (
+        <div key={key} data-ui-node={node.title} className="space-y-3">
+          {node.title && <NodeLabel title={node.title} depth={depth} info={node.info} />}
+          <div className="space-y-3">{children}</div>
+        </div>
+      );
+    }
+    return (
+      <SubsectionCard
+        key={key}
+        title={node.title}
+        info={node.info}
+        description={node.description}
+        depth={depth}
+        data-ui-node={node.title}
+      >
+        <div className="space-y-3">{children}</div>
+      </SubsectionCard>
+    );
+  }
+
+  // A group's rendered children at `depth`, or null if it has nothing to show.
+  // Emitting nothing -- rather than a label over an empty space -- is the same
+  // rule a rejected node gets, and the reason both callers go through here is so
+  // an empty group is reported once, in one wording.
+  function groupChildren(node, key, depth) {
+    if (!Array.isArray(node.sections) || node.sections.length === 0) {
+      console.error(
+        `SectionRenderer: group "${node.title}" in pack "${pack.key}" has no ` +
+          `sections -- rendering nothing rather than a heading over an empty space`
+      );
+      return null;
+    }
+    const rendered = node.sections
+      .map((child, i) => renderSectionNode(child, `${key}:${i}`, depth))
+      .filter(Boolean);
+    return rendered.length > 0 ? rendered : null;
+  }
+
+  // A top-level group: the eyebrow band, then its cards.
+  function renderGroupRun(node, index) {
+    const key = `${index}`;
+    const cards = groupChildren(node, key, 1);
+    if (!cards) return null;
+
+    // Two-across, unless the group holds a `fields` node. Derived from all four
+    // groups in the prototype: CODE STYLE (3 strings) wraps 2+1, CONTACT &
+    // LINKS and LEARNING STYLE pair, and COMMUNICATION -- the only group with a
+    // `fields` child -- is full width throughout. A `fields` card carries its
+    // own two-column field grid and would collapse to one column in half a row.
+    //
+    // The rejected alternative was "grid always, and a `fields` card spans the
+    // row": it reproduces Communication's fields card but then pairs
+    // `When I'm feeling...` with `Response Format`, which the file stacks.
+    //
+    // lg and not md: at md the rail already takes 240 of 768px, which would
+    // leave two cards about 230px wide.
+    const twoUp = node.sections.every((child) => child.kind !== "fields");
+    const band = bandById.get(index);
+
+    return (
+      <div
+        key={key}
+        data-ui-node={node.title}
+        data-band={band}
+        className={`space-y-4${band ? " scroll-mt-[60px]" : ""}`}
+      >
         {node.title && (
-          <NodeHeading
-            node={node}
-            depth={depth}
-            action={wantsSlot(node) ? actionSlot(key) : null}
-          />
+          <EyebrowBand title={node.title} info={node.info} description={node.description} />
         )}
-        {/* The node's content is rendered inside the slot context so a list
-            node can portal its `+ Add` trigger into the header row above (or,
-            for an untitled node, into the Card's own header row) while keeping
-            the add itself -- and the three invariants in useListItems -- where
-            it already works. See headerActionSlot.jsx for why the trigger is
-            not simply built here instead. */}
-        <HeaderActionSlotContext.Provider value={slotEls[key] ?? null}>
-          {rendered}
-        </HeaderActionSlotContext.Provider>
+        <div data-card-grid className={`grid gap-4${twoUp ? " lg:grid-cols-2" : ""}`}>
+          {cards}
+        </div>
       </div>
     );
   }
 
-  // Render a list of sibling nodes, with a rule after each GROUP that has
-  // something rendering after it. Two things that condition buys:
-  //   - no dangling rule under the last group, which is what a plain
-  //     "separator after every group" would leave when a group sits last
-  //     (lifestyle's Wellness, today)
-  //   - a rule still lands between a group and a plain node that follows it
-  //     (preferences' Learning Style -> Likes & Dislikes), which is exactly
-  //     where the boundary is hardest to see
-  // Ungrouped siblings get none: they are single controls, and ruling between
-  // each would turn the card into a stack of boxes.
-  //
-  // `rendered` is filtered first, so a rejected trailing node cannot leave the
-  // rule before it dangling either.
-  function withSeparators(nodes, keyPrefix, depth) {
-    const rendered = (nodes || [])
-      .map((node, i) => ({ node, el: renderSectionNode(node, `${keyPrefix}${i}`, depth) }))
-      .filter((r) => r.el);
-
-    return rendered.flatMap(({ node, el }, i) =>
-      node.kind === "group" && i < rendered.length - 1
-        ? [el, <hr key={`sep:${keyPrefix}${i}`} className="border-border" />]
-        : [el]
+  // A stretch of ungrouped leaves, stacked. Never gridded: the prototype shows
+  // every ungrouped card full width, and these are the section's heaviest nodes
+  // (profile's Personal Information holds seven fields).
+  function renderLeafRun(items) {
+    const cards = items
+      .map(({ node, index }) => renderSectionNode(node, `${index}`, 0))
+      .filter(Boolean);
+    if (cards.length === 0) return null;
+    return (
+      <div key={`run:${items[0].index}`} className="space-y-4">
+        {cards}
+      </div>
     );
   }
 
+  const runs = toRuns(sections);
+
   return (
-    <Card>
-      <CardHeader>
-        {/* One row: what this section is on the left, what you can do to it on
-            the right. The action slots have to sit BESIDE the CardTitle rather
-            than inside it -- a button nested in a heading element joins that
-            heading's accessible name, so an untitled section would announce as
-            "Goals Add" to a screen reader (and read that way in every
-            heading-text assertion). */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="space-y-1.5">
-            <CardTitle className="flex items-center gap-1.5">
-              {pack.title}
-              {/* A node with no title of its own is the section's main list, so
-                  the heading that describes it is the Card's. Its "i" belongs
-                  here rather than buried in the list body -- and a section whose
-                  lists are all titled (knowledge) correctly shows none here,
-                  because each list carries its own beside its own h3. */}
-              {sections
-                .filter((n) => !n.title && n.info)
-                .map((n, i) => (
-                  <InfoButton key={i} info={n.info} title={pack.title} />
-                ))}
-            </CardTitle>
-            <CardDescription>{pack.description}</CardDescription>
-          </div>
-          {/* And, for the same reason, an untitled node's `+ Add`: this row is
-              the only header it has. One slot per such node, so two of them
-              could never end up sharing a container (no manifest ships two,
-              but keying them per node is what makes that unable to happen). */}
-          {cardHeaderSlotKeys.map((key) => actionSlot(key))}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Keys carry the index as well as the path: two sibling nodes may
-            legitimately share a path, and a bare path join collides for them.
-            withSeparators appends the index to this prefix. */}
-        {withSeparators(sections, "", 0)}
-      </CardContent>
-    </Card>
+    // space-y-8 = 32 between runs, and between the title block and the first
+    // one. An empty run returns null and contributes no element, so it cannot
+    // leave a gap behind.
+    <div className="space-y-8">
+      <div className="space-y-1">
+        <h2 className="text-xl font-semibold text-foreground">{pack.title}</h2>
+        {pack.description && (
+          <p className="text-[13px] text-muted-foreground">{pack.description}</p>
+        )}
+      </div>
+      {runs.map((run) =>
+        run.kind === "group"
+          ? renderGroupRun(run.items[0].node, run.items[0].index)
+          : renderLeafRun(run.items)
+      )}
+    </div>
   );
 }
 
-// A node's own heading row: its title, the "i" that explains it, the optional
-// action on the right, and the one muted line under all three. Shared by groups
-// and titled nodes so a description renders for every kind -- it used to be
-// StringsRenderer's alone, which silently dropped the copy on `fields` and
-// `list` nodes that declared one.
-//
-// `action` is a slot, not a rendered control: what lands in it is a bare
-// container that a list node's own `+ Add` trigger is portalled into. See
-// headerActionSlot.jsx.
-export function NodeHeading({ node, depth, action }) {
+// Each group is its own run; each consecutive stretch of leaves is its own run.
+// Exported for its own test: the partition is the whole of the page's rhythm,
+// and it is easier to state as data than to read out of the DOM.
+export function toRuns(nodes) {
+  const runs = [];
+  (nodes || []).forEach((node, index) => {
+    const last = runs[runs.length - 1];
+    const isGroup = node.kind === "group";
+    if (isGroup || !last || last.kind === "group") {
+      runs.push({ kind: isGroup ? "group" : "leaves", items: [{ node, index }] });
+    } else {
+      last.items.push({ node, index });
+    }
+  });
+  return runs;
+}
+
+// A title past the card tier: the `headline-3` class (globals.css), in the
+// document outline at the level the manifest's nesting implies. h5 and h6
+// look alarming in a component and are correct here -- the visual tier is
+// capped at two, the outline is not.
+function NodeLabel({ title, depth, info }) {
+  const Heading = depth >= 3 ? "h6" : "h5";
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          {depth === 0 ? (
-            <h3 className="text-sm font-semibold text-foreground">{node.title}</h3>
-          ) : (
-            <h4 className="text-sm font-medium text-foreground">{node.title}</h4>
-          )}
-          <InfoButton info={node.info} title={node.title} />
-        </div>
-        {action}
-      </div>
-      {node.description && (
-        <p className="text-xs text-muted-foreground">{node.description}</p>
-      )}
+    <div className="flex items-center gap-1.5">
+      <Heading className="headline-3">{title}</Heading>
+      <InfoButton info={info} title={title} />
     </div>
   );
 }

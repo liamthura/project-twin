@@ -39,10 +39,15 @@ describe("ScalarField", () => {
     expect(el.tagName).toBe("TEXTAREA");
   });
 
-  it("renders a Textarea for a field in long_text given as a plain array (the manifest/schema shape)", () => {
-    // meta_schema.json declares `long_text` as a JSON array, so a node built
-    // straight from a manifest (node.long_text) is array-shaped, not a Set.
-    // ScalarField must normalise rather than silently degrading to an Input.
+  it("renders a Textarea for a field given a plain-array long_text, not just a Set", () => {
+    // Was "the manifest/schema shape": meta_schema.json used to declare
+    // `long_text` as a JSON array read straight off a node, so a manifest-fed
+    // meta was array-shaped rather than a Set. Task 10 deleted that node key
+    // and the branch that read it -- `buildFieldMeta` only ever builds a Set
+    // now -- but `meta` is ScalarField's own public parameter, not something
+    // only `buildFieldMeta` may construct, so the normalisation (and this
+    // test of it) stays: a hand-built array must not silently degrade to an
+    // Input.
     render(
       <ScalarField
         field="notes"
@@ -135,6 +140,53 @@ describe("ScalarField", () => {
           field="stance"
           value="other"
           meta={{ valid_values: meta.valid_values, optional: [] }}
+          onChange={() => {}}
+          customValue="niche thing"
+          onCustomChange={() => {}}
+        />
+      );
+      expect(screen.queryByDisplayValue("niche thing")).not.toBeInTheDocument();
+    });
+
+    // The v2 spelling: fieldMeta's descriptor path sets `meta.allow_custom`
+    // from the field's own `allow_custom: true` rather than a `custom_<field>`
+    // entry in `optional` -- goals.type is the one shipped field that declares
+    // it. ScalarField has to honour both spellings, since the suite above
+    // proves the old one is still very much alive.
+    it("appears when the value is 'other' and the field is named in meta.allow_custom", () => {
+      render(
+        <ScalarField
+          field="stance"
+          value="other"
+          meta={{ valid_values: meta.valid_values, allow_custom: ["stance"] }}
+          onChange={() => {}}
+          customValue="niche thing"
+          onCustomChange={() => {}}
+        />
+      );
+      expect(screen.getByDisplayValue("niche thing")).toBeInTheDocument();
+    });
+
+    it("does not appear when the field is in meta.allow_custom but the value is not 'other'", () => {
+      render(
+        <ScalarField
+          field="stance"
+          value="like"
+          meta={{ valid_values: meta.valid_values, allow_custom: ["stance"] }}
+          onChange={() => {}}
+          customValue="niche thing"
+          onCustomChange={() => {}}
+        />
+      );
+      expect(screen.queryByDisplayValue("niche thing")).not.toBeInTheDocument();
+    });
+
+    it("does not appear from allow_custom naming a different field", () => {
+      render(
+        <ScalarField
+          field="stance"
+          value="other"
+          meta={{ valid_values: meta.valid_values, allow_custom: ["other_field"] }}
           onChange={() => {}}
           customValue="niche thing"
           onCustomChange={() => {}}

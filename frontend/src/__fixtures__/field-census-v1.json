@@ -1,0 +1,207 @@
+{
+  "profile": {
+    "Personal Information": [
+      "name",
+      "preferred_name",
+      "current_role",
+      "organisation",
+      "location",
+      "nationality",
+      "bio"
+    ],
+    "Education": [
+      "institution",
+      "degree_level",
+      "field_of_study",
+      "start_year",
+      "end_year",
+      "status",
+      "coursework",
+      "highlights"
+    ],
+    "Education > Highlights": [],
+    "Education > Coursework / Modules": [
+      "name",
+      "topics"
+    ],
+    "Education > Clubs & Societies": [
+      "name",
+      "activities_involved"
+    ],
+    "Work Experience": [
+      "company",
+      "role",
+      "type",
+      "period",
+      "location",
+      "description",
+      "skills",
+      "highlights"
+    ],
+    "Work Experience > Skills": [],
+    "Work Experience > Highlights": [],
+    "Contact & Links > Emails": [
+      "address",
+      "purpose"
+    ],
+    "Contact & Links > Links": [
+      "label",
+      "url"
+    ],
+    "Languages": [
+      "name",
+      "fluency"
+    ]
+  },
+  "goals": {
+    "goals": [
+      "title",
+      "target_date",
+      "why",
+      "notes",
+      "type",
+      "status"
+    ]
+  },
+  "knowledge": {
+    "Skills & Domains": [
+      "name",
+      "level",
+      "notes",
+      "added_date",
+      "last_updated",
+      "references"
+    ],
+    "Skills & Domains > References": [
+      "name",
+      "url",
+      "notes"
+    ],
+    "Mental Tabs": [
+      "title",
+      "notes",
+      "tags",
+      "status",
+      "references"
+    ],
+    "Mental Tabs > References": [
+      "name",
+      "url",
+      "notes"
+    ]
+  },
+  "preferences": {
+    "Code Style > Preferred Languages": [],
+    "Code Style > Frameworks": [],
+    "Code Style > Tools": [],
+    "Communication > Default Communication Style": [
+      "tone",
+      "locale",
+      "detail_level"
+    ],
+    "Communication > When I'm feeling...": [
+      "mood",
+      "tone",
+      "detail_level"
+    ],
+    "Communication > Response Format": [],
+    "Learning Style > Preferred Methods": [],
+    "Learning Style > Things to Avoid": [],
+    "Likes & Dislikes": [
+      "item",
+      "stance"
+    ]
+  },
+  "projects": {
+    "Top of Mind": [
+      "idea",
+      "note"
+    ],
+    "Projects": [
+      "name",
+      "description",
+      "notes",
+      "tags",
+      "highlights",
+      "status",
+      "added_date",
+      "references"
+    ],
+    "Projects > References": [
+      "name",
+      "url",
+      "notes"
+    ]
+  },
+  "lifestyle": {
+    "Hobbies & Activities": [
+      "name",
+      "notes",
+      "specifics",
+      "skill_level",
+      "status",
+      "references"
+    ],
+    "Hobbies & Activities > References & URLs": [
+      "name",
+      "url",
+      "notes"
+    ],
+    "Interests": [
+      "name",
+      "notes",
+      "kind"
+    ],
+    "Personality Traits": [],
+    "Values": [],
+    "Wellness > Sleep — weekdays": [
+      "bedtime",
+      "wakeup"
+    ],
+    "Wellness > Sleep — weekends": [
+      "bedtime",
+      "wakeup"
+    ],
+    "Wellness > Energy Peaks": [],
+    "Wellness > Stress Triggers": []
+  },
+  "media": {
+    "items": [
+      "title",
+      "url",
+      "notes",
+      "tags",
+      "kind",
+      "status",
+      "reaction"
+    ]
+  },
+  "aesthetics": {
+    "Styles": [
+      "name",
+      "notes",
+      "references",
+      "domain",
+      "stance"
+    ]
+  },
+  "circle": {
+    "connections": [
+      "name",
+      "relationship",
+      "traits",
+      "notes"
+    ]
+  },
+  "learning_log": {
+    "entries": [
+      "topic",
+      "details",
+      "source",
+      "tags",
+      "timestamp"
+    ],
+    "entries > Key Decisions": [],
+    "entries > Follow-up Items": []
+  }
+}

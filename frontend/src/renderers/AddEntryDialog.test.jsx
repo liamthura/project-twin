@@ -3,11 +3,26 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AddEntryDialog } from "./AddEntryDialog";
 
+// Descriptors: `item` is the title field by `role`, and `stance` says its own
+// type, vocabulary, default and position instead of being named in four places
+// on the node.
 const node = {
   kind: "list", path: ["likes_dislikes"], title: "Likes & Dislikes",
-  entity: "like", title_field: "item", badges: ["stance"],
-  enum: { stance: ["like", "dislike"] }, field_defaults: { stance: "like" },
+  element: {
+    entity: "like",
+    identifier: "item",
+    fields: [
+      { name: "item", role: "title" },
+      {
+        name: "stance", type: "enum", values: ["like", "dislike"],
+        default: "like", show: ["badge"],
+      },
+    ],
+  },
 };
+
+// A node like the one above with one part of its element replaced.
+const withElement = (extra) => ({ ...node, element: { ...node.element, ...extra } });
 
 describe("AddEntryDialog accessibility", () => {
   // What aria-describedby actually resolves TO, not merely that it resolves.
@@ -30,7 +45,7 @@ describe("AddEntryDialog accessibility", () => {
   });
 
   it("describes it as adding one of the entity when there is no container title", () => {
-    const untitled = { ...node, title: undefined, entity: "mental_tab" };
+    const untitled = { ...withElement({ entity: "mental_tab" }), title: undefined };
     render(
       <AddEntryDialog node={untitled} entity={undefined} items={[]}
         onAdd={vi.fn()} open onOpenChange={vi.fn()} />
@@ -56,7 +71,7 @@ describe("AddEntryDialog accessibility", () => {
   });
 
   it("says a bare 'Add <entity>' when there is no container title to add to", () => {
-    const untitled = { ...node, title: undefined, entity: "mental_tab" };
+    const untitled = { ...withElement({ entity: "mental_tab" }), title: undefined };
     render(
       <AddEntryDialog node={untitled} entity={undefined} items={[]}
         onAdd={vi.fn()} open onOpenChange={vi.fn()} />
@@ -72,9 +87,11 @@ describe("AddEntryDialog accessibility", () => {
   // reacts to the `open` prop, and this test drives `open` the way that panel
   // does: by rerendering with a new value and no event of any kind.
   it("re-seeds the draft whenever `open` turns true, including when nothing reported the close", async () => {
-    // No `enum` for stance, so it renders as a plain input whose seeded
-    // default is readable as a display value.
-    const plain = { ...node, enum: undefined, badges: [], detail_fields: ["stance"] };
+    // `stance` as plain text in the FORM position, so it renders as an input
+    // whose seeded default is readable as a display value.
+    const plain = withElement({
+      fields: [{ name: "item", role: "title" }, { name: "stance", default: "like" }],
+    });
     const props = {
       node: plain, entity: undefined, items: [],
       onAdd: vi.fn(), onOpenChange: vi.fn(),

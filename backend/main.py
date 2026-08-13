@@ -712,7 +712,7 @@ async def get_settings():
                 "description": meta["description"],
                 "core": meta["core"],
                 "default_enabled": meta["default_enabled"],
-                "ui": meta["ui"],
+                "sections": meta["sections"],
                 "entities": meta["entities"],
                 "enabled": key in enabled,
             }

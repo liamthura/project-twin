@@ -38,7 +38,7 @@ a library's default.
 
 | Question | Decision |
 |---|---|
-| Theme | MyGist tokens fed into Reshaped's `ThemeDefinition`, not Reshaped's `slate` |
+| Theme | MyGist tokens fed into Reshaped's `ThemeDefinition`, not Reshaped's `slate`. **Superseded 2026-08-10:** Reshaped is not adopted, so there is no `ThemeDefinition`; the token layer in `frontend/src/globals.css` is the theme. No code consequence — the tokens are the same either way |
 | Deliverable | Spec plus Figma prototype; code migration planned separately |
 | Section navigation | Two-level rail with live scroll-spy, one card per subsection |
 | Review | Weighted by effort — dense rows for Inbox, full cards for Observations |
@@ -387,8 +387,10 @@ a destructive toast, because a failure genuinely needs interrupting.
 
 ### Structure
 
-The two plain `Button`s become **Reshaped `Tabs` carrying counts** —
-`Inbox 3` · `Observations 2`.
+The two plain `Button`s become **`Tabs` carrying counts** —
+`Inbox 3` · `Observations 2`. (Corrected 2026-08-10: shadcn `Tabs`, the
+component the app already has at `frontend/src/components/ui/tabs.jsx`.
+Reshaped is not adopted.)
 
 **Inbox rows are one line.** Verb, entity, primary value, approve, reject,
 expand.
@@ -576,7 +578,11 @@ itself is never deleted — it is a view over fields that already exist, so
 - **AuthShell** stays a centred 400px card on `backgroundPage`. Sign in, sign up
   and forgot become three states of one card with inline validation on blur
   through `FormControl`'s error slot.
-- **OTP moves to Reshaped `PinField`**, removing the `input-otp` dependency.
+- ~~**OTP moves to Reshaped `PinField`**, removing the `input-otp` dependency.~~
+  **Cancelled 2026-08-10.** Reshaped is not adopted, so there is no `PinField`
+  and **`input-otp` stays.** Note that `frontend/src/test/setup.js` carries three
+  jsdom workarounds specifically for it (`ResizeObserver`, `elementFromPoint`,
+  and a caret-timer drain) — those stay too.
 - **InviteGate** — one field, one explanation, no chrome. The field is a
   segmented `InviteCodeField`, not a plain text input: four cells, a
   prerendered dash, four cells. See iteration round 2 below.
@@ -1080,6 +1086,8 @@ from its own hint line).
   swapping one for the other changes position and nothing else.
 - `Show icon#294:0` (BOOLEAN, default `false`) and `Icon#294:7` (INSTANCE_SWAP),
   representing Reshaped's `icon` prop. No link in the file uses it yet.
+  (2026-08-10: a Figma-only note. Reshaped is not adopted, so the prop name is
+  historical; the properties on the Figma component are unaffected.)
 
 **Where each variant is used, and why not just underline everything.** Reshaped
 recommends `underline` "to visually differentiate it from the rest of the text" —
@@ -1445,3 +1453,46 @@ The original question, kept for the reasoning:
 > state only), because the alternative is inventing two more semantic tokens
 > for one usage each. **This needs the owner's ruling and is not implemented by
 > this plan.**
+
+### Follow-up: how the code reads `04 Section editor`, 2026-08-10
+
+Recorded while implementing migration slice 2
+(`docs/superpowers/plans/2026-08-10-section-editor.md`), which built the section
+editor's structure in the shipped app. Four points where the file needed
+interpreting rather than copying — two rules it does not state, and two places
+the code deliberately departs from it.
+
+**An eyebrow band is a `group` node, and only a group.** The umbrella spec's
+anchor contract says a top-level `list`/`strings`/`fields` "renders as its own
+band", which reads as an eyebrow label. The file says otherwise: Profile's
+Personal Information, Education, Work Experience and Languages, and Preferences'
+Likes & Dislikes, are all bare cards. Both readings are right once "band" is
+split in two — a top-level leaf **is** a rail destination and carries the scroll
+anchor, it simply has no label. The code follows the file.
+
+**When cards go two-across, which the spec never says.** Derived from all four
+groups on the page: `CODE STYLE` (3 × `strings`, `109:101`) wraps 2+1,
+`CONTACT & LINKS` (`114:442`) and `LEARNING STYLE` (`110:278`) pair, and
+`COMMUNICATION` (`287:618`) — the only group holding a `fields` node — is full
+width throughout. So the rule is: **a group's cards go two-across unless the
+group holds a `fields` child**, which carries its own two-column field grid and
+would collapse to one column in half a row. Ungrouped cards are always full
+width. The obvious alternative — grid always, `fields` spans the row — pairs
+`When I'm feeling...` with `Response Format`, which the file stacks.
+
+**Divergence: a leaf that follows a group starts its own run.** The file's
+spacing pass grouped the content column into frames of gap 16 separated by 32,
+and two of those frames trail a leaf card under the previous group's eyebrow —
+`Languages` under `CONTACT & LINKS` (`287:621`) and `Likes & Dislikes` under
+`LEARNING STYLE` (`287:619`). That reads as membership the manifest does not
+have and the rail does not show, so the code puts 32 there instead of 16. Worth
+fixing in the file when it is next touched.
+
+**Divergence: node descriptions are kept, though no card in the file has one.**
+Eleven nodes across `profile`, `preferences` and `lifestyle` declare a
+`description`, and four of those are groups. The prototype's card header is title
+plus right-hand slot with no line for one. Dropping them in code would delete
+real manifest copy and re-introduce a bug already fixed once — that copy used to
+render nowhere at all for `fields` and `list` nodes — so a card carries it as a
+`caption-1` line under its header, and a band under its rule. The file has no
+component for either yet.

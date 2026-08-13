@@ -1,5 +1,12 @@
+// @vitest-environment node
+//
+// paths.js documents itself as "no React import, no DOM access, no side
+// effects", and it imports nothing. Building a jsdom environment for it costs
+// roughly 900ms of the suite's time and buys nothing -- measured at 14ms of
+// actual test time against ~700ms of environment setup. If this file ever needs
+// a DOM, the honest fix is to move that test to a file that renders something.
 import { describe, it, expect } from "vitest";
-import { getAt, setAt, removeAt, normalizeUi } from "./paths";
+import { getAt, setAt, removeAt, normalizeUi, slugify, outline } from "./paths";
 
 describe("getAt", () => {
   it("reads a nested value", () => {
@@ -99,39 +106,129 @@ describe("removeAt", () => {
   });
 });
 
+// The legacy flat `ui` map (`{ [listKey]: uiSpec }`, entity resolved by
+// matching `entity.list`) and the `ui.sections` wrapper are both gone as of
+// Task 10 -- normalizeUi reads top-level `sections` and nothing else. See the
+// comment on normalizeUi in paths.js.
 describe("normalizeUi", () => {
-  const legacyPack = {
-    entities: { goal: { identifier: "title" } },
-    ui: { goals: { title_field: "title", badges: ["status"], detail_fields: ["notes"] } },
-  };
-
-  it("converts the legacy flat map to a sections array", () => {
-    const { sections } = normalizeUi(legacyPack);
-    expect(sections).toHaveLength(1);
-    expect(sections[0]).toMatchObject({
-      kind: "list",
-      path: ["goals"],
-      entity: "goal",
-      title_field: "title",
-      badges: ["status"],
-      detail_fields: ["notes"],
-    });
-  });
-
-  it("resolves the entity by its declared list key", () => {
-    const pack = {
-      entities: { media_item: { list: "items" }, other: { list: "elsewhere" } },
-      ui: { items: { title_field: "title" } },
-    };
-    expect(normalizeUi(pack).sections[0].entity).toBe("media_item");
-  });
-
   it("passes an explicit sections array through untouched", () => {
-    const pack = { entities: {}, ui: { sections: [{ kind: "list", path: ["x"], entity: "e" }] } };
+    // Was built as `{ ui: { sections: [...] } }`, the pre-v2 wrapper shape;
+    // the behaviour under test (pass-through) is unchanged, only the pack's
+    // shape moved to top-level `sections`.
+    const pack = { entities: {}, sections: [{ kind: "list", path: ["x"], entity: "e" }] };
     expect(normalizeUi(pack).sections).toEqual([{ kind: "list", path: ["x"], entity: "e" }]);
   });
 
-  it("returns no sections for a pack without a ui block", () => {
+  it("returns no sections for a pack with no sections array", () => {
+    // Was "for a pack without a ui block" -- renamed because there is no `ui`
+    // block to speak of any more, only `sections`.
     expect(normalizeUi({ entities: {} }).sections).toEqual([]);
   });
+});
+
+describe("slugify", () => {
+  it("lowercases and hyphenates", () => {
+    expect(slugify("Code Style", 0)).toBe("code-style");
+  });
+  it("drops ampersands rather than transliterating them", () => {
+    expect(slugify("Contact & Links", 0)).toBe("contact-links");
+  });
+  it("strips apostrophes instead of turning them into separators", () => {
+    // "when-i-m-feeling" is what a naive non-alphanumeric replace produces, and
+    // it reads as three words where there are two.
+    expect(slugify("When I'm feeling...", 0)).toBe("when-im-feeling");
+    expect(slugify("When I’m feeling", 0)).toBe("when-im-feeling");
+  });
+  it("collapses an em dash and its spaces to one hyphen", () => {
+    expect(slugify("Sleep — weekdays", 0)).toBe("sleep-weekdays");
+  });
+  it("strips diacritics rather than dropping the letter", () => {
+    expect(slugify("Café Notes", 0)).toBe("cafe-notes");
+  });
+  it("falls back to the index when nothing slug-worthy survives", () => {
+    expect(slugify("...", 3)).toBe("band-3");
+    expect(slugify("", 0)).toBe("band-0");
+    expect(slugify(undefined, 7)).toBe("band-7");
+  });
+});
+
+describe("outline", () => {
+  it("returns one entry per titled top-level child, whatever its kind", () => {
+    // Was built as `{ ui: { sections: [...] } }`, the pre-v2 wrapper Task 10
+    // deleted from normalizeUi; the behaviour under test is unchanged.
+    const pack = {
+      sections: [
+        {
+          kind: "group",
+          path: [],
+          title: "Code Style",
+          sections: [{ kind: "strings", path: ["a"] }],
+        },
+        { kind: "list", path: ["likes_dislikes"], title: "Likes & Dislikes" },
+      ],
+    };
+    expect(outline(pack)).toEqual([
+      { id: "code-style", label: "Code Style", kind: "group", index: 0 },
+      { id: "likes-dislikes", label: "Likes & Dislikes", kind: "list", index: 1 },
+    ]);
+  });
+
+  it("omits untitled children, and keeps the unfiltered index on the rest", () => {
+    // The index is the position among ALL top-level children, so giving the
+    // first one a title later does not renumber this one.
+    // Shape moved to top-level `sections`; see the note above.
+    const pack = {
+      sections: [
+        { kind: "list", path: ["entries"] },
+        { kind: "list", path: ["other"], title: "Other" },
+      ],
+    };
+    expect(outline(pack)).toEqual([
+      { id: "other", label: "Other", kind: "list", index: 1 },
+    ]);
+  });
+
+  it("returns nothing for a section whose only child is untitled", () => {
+    // learning_log's shape: the Card's own header already names it, so the rail
+    // item correctly has no children. Shape moved to top-level `sections`.
+    expect(outline({ sections: [{ kind: "list", path: ["entries"] }] })).toEqual([]);
+  });
+
+  it("never descends into a group -- a card heading is not a rail destination", () => {
+    // Shape moved to top-level `sections`; see the note above.
+    const pack = {
+      sections: [
+        {
+          kind: "group",
+          path: [],
+          title: "G",
+          sections: [{ kind: "list", path: ["x"], title: "Inner" }],
+        },
+      ],
+    };
+    expect(outline(pack).map((b) => b.id)).toEqual(["g"]);
+  });
+
+  it("suffixes a duplicate title deterministically, by order", () => {
+    // Shape moved to top-level `sections`; see the note above.
+    const pack = {
+      sections: [
+        { kind: "list", path: ["a"], title: "Notes" },
+        { kind: "list", path: ["b"], title: "Notes" },
+        { kind: "list", path: ["c"], title: "Notes" },
+      ],
+    };
+    expect(outline(pack).map((b) => b.id)).toEqual(["notes", "notes-2", "notes-3"]);
+  });
+
+  it("returns nothing for a pack with no sections array", () => {
+    // Was "for a pack with no ui block" -- renamed along with normalizeUi's
+    // own shape change.
+    expect(outline({})).toEqual([]);
+  });
+
+  // DELETED: "reads through normalizeUi, so a legacy flat-map pack works too".
+  // Exercised the flat `{ [listKey]: uiSpec }` map Task 10 deleted from
+  // normalizeUi; every pack now declares top-level `sections` directly, which
+  // the tests above already cover.
 });

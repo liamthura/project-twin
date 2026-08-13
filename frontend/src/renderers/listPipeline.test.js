@@ -1,3 +1,8 @@
+// @vitest-environment node
+//
+// listPipeline.js is pure sort/filter logic and imports nothing, so the jsdom
+// environment every other file needs is dead weight here. See paths.test.js for
+// the measurement.
 import { describe, it, expect } from "vitest";
 import { buildOrder, filterVisible, applyFacets } from "./listPipeline";
 

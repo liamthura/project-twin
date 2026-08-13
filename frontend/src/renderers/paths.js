@@ -97,38 +97,85 @@ export function removeAt(obj, path) {
 }
 
 /**
- * Normalises a pack's `ui` block into `{ sections: [...] }`.
+ * Normalises a pack into `{ sections: [...] }`.
  *
- * Accepts:
- * - The new explicit form: `ui.sections` is already an array — passed
- *   through unchanged.
- * - The legacy flat map: `ui` is `{ [listKey]: uiSpec }`. Each entry becomes
- *   `{ kind: "list", path: [listKey], entity: <resolved>, ...uiSpec }`.
- * - No `ui` block at all: returns `{ sections: [] }`.
- *
- * Entity resolution for the legacy map reproduces GenericSectionEditor.jsx's
- * behaviour exactly: prefer the entity whose declared `list` equals the
- * key; if none matches and the pack has exactly one entity, fall back to
- * it; otherwise the section is skipped (no entity to bind it to).
+ * A pack declares its nodes at the top level (`pack.sections`), which is
+ * every shipped pack and every fixture -- this reads that array and nothing
+ * else. Two other shapes used to be accepted here: the `ui.sections`
+ * wrapper (the pre-v2 manifests' spelling) and a legacy flat `ui` map
+ * (`{ [listKey]: uiSpec }`, resolved to an entity by matching `entity.list`,
+ * reproducing GenericSectionEditor.jsx's behaviour). Both are gone as of
+ * Task 10 -- no shipped pack used either, and the hand-built test packs that
+ * exercised them now use `sections` directly. See paths.test.js.
  */
+/**
+ * A band id: URL-safe, readable, and derived only here.
+ *
+ * Apostrophes are removed rather than replaced, so "When I'm feeling" gives
+ * `when-im-feeling` and not the three-word-looking `when-i-m-feeling`.
+ * Everything else non-alphanumeric collapses to a single hyphen, which is what
+ * folds `&`, em dashes and runs of punctuation into one separator. Diacritics
+ * are stripped from their base letter rather than dropping the letter itself.
+ *
+ * `index` is only the fallback for a title that slugifies to nothing -- a
+ * heading of pure punctuation. It is never the identity: a sibling index would
+ * point silently at the wrong band after any manifest reorder, where a slug
+ * fails loudly. See the umbrella spec's routing contract.
+ */
+export function slugify(title, index) {
+  const slug = String(title ?? "")
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || `band-${index}`;
+}
+
+/**
+ * The rail's sub-items for one pack: its TOP-LEVEL children, whatever their
+ * kind, in manifest order, untitled ones omitted.
+ *
+ * Not "groups". `group` nodes carry `path: []`, and the prototype's rail under
+ * Preferences lists three groups plus a top-level `list` (Likes & Dislikes). A
+ * group renders as an eyebrow band with its cards beneath it; a top-level
+ * list/strings/fields node is its own band. Never descends -- a nested title is
+ * a heading inside a card, not a rail destination.
+ *
+ * Manifest-derived rather than registered by the bands themselves, and that is
+ * the load-bearing choice: `packs` arrives from /settings before any content
+ * mounts, so a cold deep link to #/preferences/communication can render a
+ * complete, correctly-marked rail immediately. A registration-based contract is
+ * empty until the content is on screen, which is exactly the deep-link case.
+ *
+ * Pure, like the rest of this file. The observing lives in useScrollSpy.
+ */
+export function outline(pack) {
+  const { sections } = normalizeUi(pack);
+  const seen = new Map();
+  const bands = [];
+  sections.forEach((node, index) => {
+    if (!node?.title) return;
+    const base = slugify(node.title, index);
+    // First occurrence keeps the bare slug; later ones take -2, -3. Iterating in
+    // order is what makes it deterministic: the same manifest always yields the
+    // same ids.
+    const nth = (seen.get(base) || 0) + 1;
+    seen.set(base, nth);
+    bands.push({
+      id: nth === 1 ? base : `${base}-${nth}`,
+      label: node.title,
+      kind: node.kind,
+      // Position among ALL top-level children, not among the titled ones, so
+      // giving an untitled sibling a title later does not renumber anyone. For
+      // ordering and diagnostics only -- never identity.
+      index,
+    });
+  });
+  return bands;
+}
+
 export function normalizeUi(pack) {
-  const ui = pack?.ui;
-  if (!ui) return { sections: [] };
-  if (Array.isArray(ui.sections)) return { sections: ui.sections };
-
-  const entities = pack.entities || {};
-  const entityByList = {};
-  for (const [entityName, espec] of Object.entries(entities)) {
-    if (espec.list) entityByList[espec.list] = entityName;
-  }
-  const entityNames = Object.keys(entities);
-
-  const sections = [];
-  for (const [listKey, uiSpec] of Object.entries(ui)) {
-    const entity =
-      entityByList[listKey] || (entityNames.length === 1 ? entityNames[0] : undefined);
-    if (entity === undefined) continue;
-    sections.push({ kind: "list", path: [listKey], entity, ...uiSpec });
-  }
-  return { sections };
+  return { sections: Array.isArray(pack?.sections) ? pack.sections : [] };
 }

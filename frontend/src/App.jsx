@@ -1,25 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  User,
-  Brain,
-  BookOpen,
-  Settings,
-  FolderKanban,
-  Heart,
-  RefreshCw,
-  WifiOff,
-  Loader2,
-  Users,
-  SlidersHorizontal,
-  Inbox,
-  Sun,
-  Moon,
-  Monitor,
-  Package,
-  Target,
-  Film,
-  Palette,
-} from "lucide-react";
+import { Settings, RefreshCw, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -29,8 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Toaster } from "@/components/ui/toaster";
@@ -53,8 +31,13 @@ import { ResetPassword } from "@/components/ResetPassword";
 import { AddEmailBanner } from "@/components/AddEmailBanner";
 import Consent from "@/components/Consent";
 import Landing from "@/landing/Landing";
-import { goToRoute, isAuthRoute, readRoute } from "@/lib/routes.js";
+import { goToRoute, isAuthRoute, parseRoute, readRoute } from "@/lib/routes.js";
 import SectionRenderer from "@/renderers/SectionRenderer";
+import { outline } from "@/renderers/paths";
+import { Header } from "@/shell/Header";
+import { Rail } from "@/shell/Rail";
+import { SectionSheet } from "@/shell/SectionSheet";
+import { useScrollSpy } from "@/shell/useScrollSpy";
 
 // Debounce hook
 function useDebounce(callback, delay) {
@@ -73,54 +56,6 @@ function useDebounce(callback, delay) {
   );
 
   return debouncedCallback;
-}
-
-const TAB_TRIGGER_CLASS =
-  "h-11 shrink-0 snap-start gap-2 rounded-full border md:h-9 md:w-full md:justify-start md:rounded-lg md:border-0 data-[state=active]:border-transparent";
-
-// Sections with a bespoke, hand-built editor. Everything else that's
-// enabled gets a generic, manifest-driven tab instead.
-const PACK_ICONS = {
-  goals: Target,
-  media: Film,
-  aesthetics: Palette,
-  circle: Users,
-  learning_log: BookOpen,
-  knowledge: Brain,
-  projects: FolderKanban,
-  lifestyle: Heart,
-  preferences: Settings,
-  profile: User,
-};
-
-// Tracks whether a horizontally scrollable element is at its start/end edge,
-// so the tab strip only fades the side that actually has more content.
-function useEdgeFade(deps) {
-  const ref = useRef(null);
-  const [edges, setEdges] = useState({ start: true, end: true });
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const update = () => {
-      const max = el.scrollWidth - el.clientWidth;
-      setEdges({
-        start: el.scrollLeft <= 1,
-        end: el.scrollLeft >= max - 1,
-      });
-    };
-    update();
-    el.addEventListener("scroll", update, { passive: true });
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => {
-      el.removeEventListener("scroll", update);
-      ro.disconnect();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-
-  return [ref, edges];
 }
 
 // Main App
@@ -184,6 +119,11 @@ export default function App() {
   const [error, setError] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
   const [isAutosaveEnabled, setIsAutosaveEnabled] = useState(true);
+  // Only meaningful with autosave OFF, which is the one state where a change
+  // sits in the page with nothing coming to collect it. It is what the header
+  // chip reads, and it is cleared only by a save that actually succeeded -- so a
+  // failed write leaves the chip honest and Save now still on offer.
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showConnectionSettings, setShowConnectionSettings] = useState(false);
 
   // Theme: "light" | "dark" | "system" (system follows the OS live)
@@ -209,14 +149,26 @@ export default function App() {
   const [disabledSections, setDisabledSections] = useState([]);
   const [packs, setPacks] = useState([]);
   const [pendingCount, setPendingCount] = useState(0);
-  // The tab lives in the URL so a refresh keeps your place. Without it, any
-  // reload drops you back on Profile, which is worst exactly when you have
-  // just been sent somewhere by a "View in ..." link.
-  const [activeTab, setActiveTab] = useState(
-    () => window.location.hash.replace(/^#\/?/, "") || "profile",
+  // Where you are lives in the URL, in two segments -- `#/preferences/code-style`
+  // -- so a refresh keeps your place down to the subsection. Without it a reload
+  // drops you on Profile, which is worst exactly when a "View in ..." link just
+  // sent you somewhere.
+  const [{ section: activeSection, band: activeBand }, setPlace] = useState(() =>
+    parseRoute(readRoute() || "profile")
   );
-  // Tab count changes when sections are toggled, so re-measure the strip then.
-  const [tabStripRef, tabStripEdges] = useEdgeFade([disabledSections, packs]);
+
+  // A band we owe a scroll to, and have not delivered yet.
+  //
+  // Seeded from the URL so a cold deep link scrolls too: the rail can render
+  // from the manifest immediately, but the anchor does not exist until
+  // SectionRenderer has mounted, so the scroll has to wait for it rather than
+  // firing once and missing.
+  const pendingBandRef = useRef(parseRoute(readRoute()).band);
+  // Until when scroll-spy's URL writes are ignored. A smooth scroll crosses the
+  // bands in between, and each one gets reported -- so without this the address
+  // bar and the marker chase the scroll backwards past every band on the way,
+  // and the click's own destination is overwritten before it arrives.
+  const spyQuietUntilRef = useRef(0);
   // Data for enabled sections WITHOUT a bespoke editor, keyed by section key.
   const [packData, setPackData] = useState({});
 
@@ -291,17 +243,47 @@ export default function App() {
     loadSettings();
   }, []);
 
-  // Controlling the tab strip means nothing re-picks a valid tab for us. Turn
-  // off the section you are looking at and `activeTab` would name a tab that
-  // no longer exists, which renders as an empty page with no way back.
-  // Must sit above the loading/error early returns -- hooks cannot be
-  // conditional.
-  const enabledKeys = packs.filter((p) => p.enabled).map((p) => p.key).join(",");
+  const dynamicPacks = packs.filter((p) => p.enabled);
+  const activePack = dynamicPacks.find((p) => p.key === activeSection);
+  // The bands of whichever section is open. Manifest-derived, so this is
+  // complete before any content mounts -- which is what lets a cold deep link
+  // render a correctly marked rail immediately.
+  const activeBands = activePack ? outline(activePack) : [];
+
+  /**
+   * Go somewhere. A deliberate move, so it PUSHES: back walks the places you
+   * chose. Scroll-spy replaces instead -- see the effect below.
+   */
+  const navigate = useCallback((section, band) => {
+    setPlace({ section, band: band ?? null });
+    goToRoute(band ? `${section}/${band}` : section);
+    // A section click means "start at the top", which is where a section change
+    // already puts you -- only a band click owes a scroll.
+    pendingBandRef.current = band ?? null;
+  }, []);
+
+  // Nothing re-picks a valid destination for us, so this does. Turn off the
+  // section you are looking at and `activeSection` would name a page that no
+  // longer exists, which renders as empty with no way back. An unknown BAND is
+  // corrected the same way, one level up: to the bare section.
+  //
+  // Both corrections replace rather than push -- they are not moves anyone made.
+  // Must sit above the loading/error early returns; hooks cannot be conditional.
+  const enabledKeys = dynamicPacks.map((p) => p.key).join(",");
+  const bandKeys = activeBands.map((b) => b.id).join(",");
   useEffect(() => {
     if (!enabledKeys) return;
     const valid = new Set([...enabledKeys.split(","), "review", "sections"]);
-    if (!valid.has(activeTab)) setActiveTab("profile");
-  }, [enabledKeys, activeTab]);
+    if (!valid.has(activeSection)) {
+      setPlace({ section: "profile", band: null });
+      goToRoute("profile", { replace: true });
+      return;
+    }
+    if (activeBand && !bandKeys.split(",").includes(activeBand)) {
+      setPlace({ section: activeSection, band: null });
+      goToRoute(activeSection, { replace: true });
+    }
+  }, [enabledKeys, activeSection, activeBand, bandKeys]);
 
   // The welcome screen owns the URL while it is up -- it writes #/signin,
   // #/signup or #/forgot. Without this guard the tab sync ran anyway and
@@ -329,17 +311,62 @@ export default function App() {
     };
   }, []);
 
+  // Which band the reader is actually looking at. The rail shows it, and the
+  // address bar follows it.
+  const spiedBand = useScrollSpy(activeBands.map((b) => b.id));
+
+  // Deliver the scroll a click (or a deep link) asked for.
+  //
+  // Runs on every render that could have produced the anchor, rather than once:
+  // clicking a band in a different section changes what is mounted, and the
+  // element does not exist on the render that handled the click. If it is still
+  // missing the request stays pending and the next render tries again.
+  useEffect(() => {
+    const band = pendingBandRef.current;
+    if (!band) return;
+    const target = document.querySelector(`[data-band="${band}"]`);
+    if (!target) return;
+    pendingBandRef.current = null;
+    // `scroll-mt-[60px]` on the anchor is what keeps the heading clear of the
+    // sticky header; `block: "start"` is what makes that margin apply.
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    target.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    // Long enough to cover --duration-scroll, after which whatever is under the
+    // header genuinely is where the reader ended up.
+    spyQuietUntilRef.current = Date.now() + 500;
+  }, [activeSection, activeBand, packData, isLoading]);
+
   useEffect(() => {
     // Nothing is decided yet while the first load is in flight, and writing a
-    // tab route here would put #/profile in the address bar for the moment
-    // before the welcome screen replaces it with #/signin.
+    // route here would put #/profile in the address bar for the moment before
+    // the welcome screen replaces it with #/signin.
     if (isLoading || showingAuth) return;
-    if (window.location.hash.replace(/^#\/?/, "") !== activeTab) {
-      // replaceState, not a hash assignment: switching tabs should not stack
-      // up history entries that the back button then has to walk through.
-      window.history.replaceState(null, "", `#/${activeTab}`);
-    }
-  }, [activeTab, showingAuth, isLoading]);
+    if (!spiedBand || spiedBand === activeBand) return;
+    // A scroll we started is still in flight: the bands it is crossing are not
+    // places the reader chose to be.
+    if (pendingBandRef.current || Date.now() < spyQuietUntilRef.current) return;
+    // replaceState: a position you scrolled to is not a place you navigated to,
+    // so it must stay invisible to the back button. Rail clicks push; this does
+    // not. Guarded on a CHANGE of band, not on every observer callback.
+    setPlace({ section: activeSection, band: spiedBand });
+    goToRoute(`${activeSection}/${spiedBand}`, { replace: true });
+  }, [spiedBand, activeBand, activeSection, showingAuth, isLoading]);
+
+  // The address bar can also change under us -- the back button, or a hand-typed
+  // hash. goToRoute pushes without firing either event, hence the sync at the
+  // call site too.
+  useEffect(() => {
+    const sync = () => {
+      if (isAuthRoute(readRoute())) return;
+      setPlace(parseRoute(readRoute() || "profile"));
+    };
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate", sync);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate", sync);
+    };
+  }, []);
 
   // The dot on the Review tab. Counted rather than listed: listing marks rows
   // seen, which is what protects them from eviction, and this polls from every
@@ -360,7 +387,7 @@ export default function App() {
     const tick = () => {
       // The panel refreshes itself while it is open, and a hidden tab has
       // nobody to tell.
-      if (document.visibilityState === "visible" && activeTab !== "review") {
+      if (document.visibilityState === "visible" && activeSection !== "review") {
         refreshPendingCount();
       }
     };
@@ -370,7 +397,7 @@ export default function App() {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", tick);
     };
-  }, [isConnected, activeTab, refreshPendingCount]);
+  }, [isConnected, activeSection, refreshPendingCount]);
 
   // Approving or promoting writes server-side, so the section it landed in is
   // stale in this page until we go and get it. We know which one changed, so
@@ -421,7 +448,13 @@ export default function App() {
         body: JSON.stringify({ data }),
       });
       setLastSaved(new Date());
-      toast({ title: "Saved", variant: "success" });
+      setHasUnsavedChanges(false);
+      // No success toast. This fires on every debounced flush, so editing three
+      // fields in a row stacked three toasts for something the reader never
+      // doubted -- and toasts are for things that happened away from their
+      // attention. The card that changed shows a tick instead (`savedAt` below),
+      // and the header chip carries the state for the whole page. A FAILURE
+      // still toasts: that genuinely needs interrupting.
     } catch (err) {
       toast({
         title: "Failed to save",
@@ -438,6 +471,10 @@ export default function App() {
   const handlePackChange = (key) => (newData) => {
     setPackData((prev) => ({ ...prev, [key]: newData }));
     if (isAutosaveEnabled) debouncedSave(key, newData);
+    // With autosave on, the flush is already on its way and the chip would
+    // flicker "Unsaved" for 1.5s per keystroke with a Save now button coming and
+    // going inside it.
+    else setHasUnsavedChanges(true);
   };
 
   const saveAll = async () => {
@@ -448,6 +485,9 @@ export default function App() {
         body: JSON.stringify(packData),
       });
       setLastSaved(new Date());
+      setHasUnsavedChanges(false);
+      // This one keeps its toast: it answers a button the user just pressed,
+      // which is the opposite case from a background flush.
       toast({ title: "All files saved", variant: "success" });
     } catch (err) {
       toast({
@@ -514,6 +554,14 @@ export default function App() {
       />
     );
   }
+
+  // Turning auto-save ON flushes immediately: the changes made while it was off
+  // are exactly the ones nobody has saved. Turning it off must NOT save, or the
+  // switch becomes an unlabelled save button.
+  const handleAutosaveChange = (next) => {
+    setIsAutosaveEnabled(next);
+    if (next) saveAll();
+  };
 
   if (isLoading) {
     return (
@@ -610,210 +658,108 @@ export default function App() {
             loadAllData();
             loadSettings();
           }}
+          isAutosaveEnabled={isAutosaveEnabled}
+          onAutosaveChange={handleAutosaveChange}
         />
       </div>
     );
   }
 
-  const dynamicPacks = packs.filter((p) => p.enabled);
-  // The Review tab's toasts link to whatever section just changed, so the tab
-  // strip has to be steerable from outside itself.
+  // Review's toasts link to whatever section just changed, so navigation has
+  // to be steerable from outside the rail.
   const sectionTitles = Object.fromEntries(packs.map((p) => [p.key, p.title]));
+
+  // The header's one chip, from the two booleans that used to feed three prose
+  // states plus a separate button.
+  //
+  // It used to read `isAutosaveEnabled ? "saved" : "unsaved"`, which meant that
+  // with autosave off the chip said "Unsaved" forever -- including immediately
+  // after a successful Save now, and before the reader had changed anything at
+  // all. What is actually unsaved is tracked instead, so the chip reports a fact
+  // rather than a preference.
+  const saveState = isSaving ? "saving" : hasUnsavedChanges ? "unsaved" : "saved";
+
+  const shellProps = {
+    packs: dynamicPacks,
+    activeSection,
+    activeBand,
+    pendingCount,
+    version: `v${__APP_VERSION__} (${__APP_COMMIT__})`,
+    onNavigate: navigate,
+  };
 
   return (
     <div className="min-h-dvh bg-background">
-      <header className="sticky top-0 z-20 border-b bg-card pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex h-[60px] max-w-6xl items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 96 96"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <circle
-                cx="45"
-                cy="40"
-                r="15"
-                fill="none"
-                stroke="hsl(var(--primary))"
-                strokeWidth="9"
-              />
-              <path
-                d="M60 40 v22 a14 14 0 0 1 -14 14 h-9"
-                fill="none"
-                stroke="hsl(var(--primary))"
-                strokeWidth="9"
-                strokeLinecap="round"
-              />
-            </svg>
-            <h1 className="text-lg font-semibold">MyGist</h1>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-4">
-            {/* Auto-save toggle */}
-            <label className="flex cursor-pointer items-center gap-2">
-              <Switch
-                checked={isAutosaveEnabled}
-                onCheckedChange={(next) => {
-                  setIsAutosaveEnabled(next);
-                  if (next) saveAll();
-                }}
-                aria-label="Auto-save"
-              />
-              <span className="hidden sm:inline text-xs font-medium text-muted-foreground">Auto-save</span>
-            </label>
-            {/* Save status */}
-            <span className="hidden sm:inline text-xs text-muted-foreground">
-              {isSaving
-                ? "Saving..."
-                : isAutosaveEnabled
-                  ? lastSaved
-                    ? "Saved just now"
-                    : "Saved"
-                  : "Unsaved changes"}
-            </span>
-            {!isAutosaveEnabled && (
-              <Button size="sm" onClick={saveAll} disabled={isSaving}>
-                Save changes
-              </Button>
-            )}
-            {!isConnected && (
-              <Badge variant="destructive" className="gap-1.5">
-                <WifiOff className="h-3 w-3" />
-                Disconnected
-              </Badge>
-            )}
-            {/* Theme toggle: light -> dark -> system */}
-            <button
-              type="button"
-              onClick={cycleTheme}
-              aria-label={`Theme: ${theme}. Click to change.`}
-              title={`Theme: ${theme}`}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border bg-card text-muted-foreground hover:text-foreground"
-            >
-              {theme === "light" ? (
-                <Sun className="h-4 w-4" />
-              ) : theme === "dark" ? (
-                <Moon className="h-4 w-4" />
-              ) : (
-                <Monitor className="h-4 w-4" />
-              )}
-            </button>
-            {/* Account chip */}
-            <button
-              type="button"
-              onClick={() => setShowConnectionSettings(true)}
-              className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[13px] font-medium hover:bg-muted/50"
-            >
-              <User className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="max-w-[128px] truncate">
-                {packData.profile?.preferred_name || packData.profile?.name || "Account"}
-              </span>
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header
+        saveState={saveState}
+        isConnected={isConnected}
+        theme={theme}
+        onCycleTheme={cycleTheme}
+        accountName={packData.profile?.preferred_name || packData.profile?.name}
+        onOpenSettings={() => setShowConnectionSettings(true)}
+        onSaveNow={saveAll}
+      />
 
       <div className="mx-auto max-w-6xl px-4 py-8">
-        {/* Above the tabs rather than in a corner: an account that cannot be
-            recovered is worth one line of the page until it can be. */}
+        {/* Above the navigation rather than in a corner: an account that cannot
+            be recovered is worth one line of the page until it can be. */}
         <div className="mb-4 empty:mb-0">
           <AddEmailBanner onAddEmail={() => setShowConnectionSettings(true)} />
         </div>
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          orientation="vertical"
-          className="flex flex-col gap-6 md:flex-row"
-        >
-          <div className="sticky top-[60px] z-10 -mx-4 border-b bg-background px-4 py-2.5 md:mx-0 md:border-0 md:px-0 md:py-0 md:sticky md:top-[84px] md:w-48 md:self-start">
-          <TabsList
-            ref={tabStripRef}
-            data-at-start={tabStripEdges.start}
-            data-at-end={tabStripEdges.end}
-            className="scrollbar-none w-full flex-nowrap overflow-x-auto snap-x snap-proximity tab-strip-fade md:flex-wrap md:overflow-visible md:h-fit md:flex-col md:items-stretch md:justify-start"
-          >
-            {dynamicPacks.map((p) => {
-              const Icon = PACK_ICONS[p.key] || Package;
-              return (
-                <TabsTrigger key={p.key} value={p.key} className={TAB_TRIGGER_CLASS}>
-                  <Icon className="h-4 w-4" />
-                  <span>{p.title}</span>
-                </TabsTrigger>
-              );
-            })}
-            <TabsTrigger value="review" className={TAB_TRIGGER_CLASS}>
-              <Inbox className="h-4 w-4" />
-              <span>Review</span>
-              {pendingCount > 0 && (
-                <>
-                  <span
-                    data-pending-dot
-                    aria-hidden="true"
-                    className="ml-auto h-2 w-2 shrink-0 rounded-full bg-primary"
-                  />
-                  {/* The dot is decoration; this is the part a screen reader
-                      can actually convey. */}
-                  <span className="sr-only">{pendingCount} waiting</span>
-                </>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="sections" className={TAB_TRIGGER_CLASS}>
-              <SlidersHorizontal className="h-4 w-4" />
-              <span>Sections</span>
-            </TabsTrigger>
-          </TabsList>
-          <p className="mt-4 hidden px-3 font-mono text-[11px] text-muted-foreground md:block">
-            {`v${__APP_VERSION__} (${__APP_COMMIT__})`}
-          </p>
-          </div>
 
+        <SectionSheet {...shellProps} />
+
+        <div className="flex flex-col gap-6 md:flex-row">
+          <Rail {...shellProps} />
+
+          {/* A plain conditional, not TabsContent. Radix Tabs mounted every
+              section's content and hid all but one, so ten SectionRenderers
+              were live at once; only the section being read is now built. */}
           <div className="min-w-0 flex-1">
-
-          {dynamicPacks.map((p) => (
-            <TabsContent key={p.key} value={p.key}>
+            {activePack && (
               <SectionRenderer
-                pack={p}
-                data={packData[p.key]}
-                onChange={handlePackChange(p.key)}
+                key={activePack.key}
+                pack={activePack}
+                data={packData[activePack.key]}
+                onChange={handlePackChange(activePack.key)}
                 onShowConfirmation={showConfirmation}
+                // Every successful write moves this, so the card the reader was
+                // editing ticks once -- autosave flush or an explicit Save now.
+                savedAt={lastSaved}
               />
-            </TabsContent>
-          ))}
-          <TabsContent value="review">
-            <ProposalsPanel
-              onViewSection={setActiveTab}
-              onSectionChanged={refreshSection}
-              onResolved={refreshPendingCount}
-              sectionTitles={sectionTitles}
-              packs={packs}
-            />
-          </TabsContent>
-          <TabsContent value="sections">
-            <Card>
-              <CardHeader className="border-b">
-                <CardTitle>Manage Sections</CardTitle>
-                <CardDescription>
-                  Turn optional sections on or off. Disabled sections are
-                  hidden from the tab bar, but their data is preserved and
-                  restored when re-enabled.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {packs.filter((p) => !p.core).length === 0 && (
-                  <EmptyState>No toggleable sections available.</EmptyState>
-                )}
-                {packs.filter((p) => !p.core).map((p) => {
-                  return (
+            )}
+
+            {activeSection === "review" && (
+              <ProposalsPanel
+                onViewSection={(section) => navigate(section, null)}
+                onSectionChanged={refreshSection}
+                onResolved={refreshPendingCount}
+                sectionTitles={sectionTitles}
+                packs={packs}
+              />
+            )}
+
+            {activeSection === "sections" && (
+              <Card>
+                <CardHeader className="border-b">
+                  <CardTitle>Manage Sections</CardTitle>
+                  <CardDescription>
+                    Turn optional sections on or off. Disabled sections are
+                    hidden from the rail, but their data is preserved and
+                    restored when re-enabled.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {packs.filter((p) => !p.core).length === 0 && (
+                    <EmptyState>No toggleable sections available.</EmptyState>
+                  )}
+                  {packs.filter((p) => !p.core).map((p) => (
                     <div
                       key={p.key}
                       className="flex items-center justify-between gap-6 border-b border-border py-4 first:pt-1 last:border-b-0 last:pb-1"
                     >
                       <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {p.title}
-                        </p>
+                        <p className="text-sm font-medium leading-none">{p.title}</p>
                         {p.description && (
                           <p className="text-xs leading-relaxed text-muted-foreground">
                             {p.description}
@@ -826,16 +772,12 @@ export default function App() {
                         aria-label={`Toggle ${p.title}`}
                       />
                     </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-            <p className="mt-4 px-1 font-mono text-[11px] text-muted-foreground md:hidden">
-              {`v${__APP_VERSION__} (${__APP_COMMIT__})`}
-            </p>
-          </TabsContent>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
-        </Tabs>
       </div>
 
       {/* Confirmation Dialog */}
@@ -864,6 +806,8 @@ export default function App() {
           loadAllData();
           loadSettings();
         }}
+        isAutosaveEnabled={isAutosaveEnabled}
+        onAutosaveChange={handleAutosaveChange}
       />
 
       <Toaster />
