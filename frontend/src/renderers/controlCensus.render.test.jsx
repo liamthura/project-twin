@@ -21,7 +21,10 @@ import { controlFor } from "./controlCensus";
 // this would be a tautology.
 function renderedKind(container) {
   if (container.querySelector("textarea")) return "longtext";
-  if (container.querySelector('input[type="date"]')) return "date";
+  // The date control is a popover trigger, not an input: Radix marks it
+  // aria-haspopup="dialog", which nothing else ScalarField renders does. It
+  // used to be `input[type="date"]`, before the native picker was replaced.
+  if (container.querySelector('button[aria-haspopup="dialog"]')) return "date";
   if (container.querySelector('input[type="time"]')) return "time";
   if (container.querySelector('[role="switch"]')) return "bool";
   // EnumControl: SegmentedControl draws one aria-pressed button per option;
