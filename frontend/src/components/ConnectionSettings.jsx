@@ -49,6 +49,7 @@ import {
   revokeConnectedApp,
 } from "@/lib/api.js";
 import { signOut } from "@/lib/session.js";
+import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
 import { EmailSettings } from "@/components/EmailSettings";
 import ConnectedApps from "@/components/ConnectedApps";
 
@@ -83,10 +84,33 @@ export function ConnectionSettings({
   // source of truth for how the app saves.
   isAutosaveEnabled = true,
   onAutosaveChange = () => {},
+  // Also App's. Needed only to write onboarding state back without clearing it:
+  // SettingsUpdate requires disabled_sections and writes what it is sent.
+  disabledSections = [],
 }) {
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState("connection");
+  // Whether the Getting-started card has been dismissed. Only read to decide
+  // whether to OFFER the restore -- there is nothing to say to someone whose
+  // card is already on screen.
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    getOnboarding()
+      .then((s) => {
+        if (!cancelled) setOnboardingDismissed(!!s.dismissed);
+      })
+      .catch(() => {
+        // Nothing to offer if we cannot tell. The card is either showing
+        // already or genuinely unavailable, and a control that might do nothing
+        // is worse than no control.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [signedInUsername, setSignedInUsername] = useState(null);
 
@@ -561,6 +585,45 @@ export function ConnectionSettings({
                 aria-label="Auto-save"
               />
             </div>
+
+            {/* Dismissing the Getting-started card is not destructive -- nothing
+                is deleted, and #/onboarding/welcome still works if typed -- so
+                this brings back a card, not data.
+
+                It lands here rather than in a new Account tab for the same
+                reason auto-save above does: slice 5 rebuilds this dialog with
+                Account / Server / Token tabs, and inventing one now would
+                prejudge that structure. The account button in the header
+                already opens this panel, which is the route the design calls
+                for. */}
+            {onboardingDismissed && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm font-medium">Getting started</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    You dismissed the setup card. Bring it back to pick up where
+                    you left off.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => {
+                    setOnboardingDismissed(false);
+                    saveOnboarding(
+                      { dismissed: false, steps: {} },
+                      disabledSections,
+                    ).catch(() => {
+                      // The offer is already gone from this panel; a lost write
+                      // costs one more click on the next visit.
+                    });
+                  }}
+                >
+                  Show getting started
+                </Button>
+              </div>
+            )}
 
             {/* Connection type */}
             <div className="space-y-2">

@@ -630,6 +630,7 @@ export default function App() {
               about which state it reads. */}
           <ConnectionSettings
             isOpen={showConnectionSettings}
+            disabledSections={disabledSections}
             onClose={() => setShowConnectionSettings(false)}
             onConnectionChange={() => {
               loadAllData();
@@ -671,6 +672,7 @@ export default function App() {
         </Card>
         <ConnectionSettings
           isOpen={showConnectionSettings}
+          disabledSections={disabledSections}
           onClose={() => setShowConnectionSettings(false)}
           onConnectionChange={() => {
             loadAllData();
@@ -854,6 +856,7 @@ export default function App() {
       {/* Connection Settings Dialog */}
       <ConnectionSettings
         isOpen={showConnectionSettings}
+        disabledSections={disabledSections}
         onClose={() => setShowConnectionSettings(false)}
         onConnectionChange={() => {
           loadAllData();
