@@ -1,6 +1,6 @@
 """The shipped agent skills must describe tools that actually exist.
 
-skills/README.md promises these are versioned with the tool surface they
+backend/skills/README.md promises these are versioned with the tool surface they
 describe. That promise is worth nothing unless something checks it -- a skill
 naming a retired tool is worse than no skill, because an agent will believe it
 and the user will never see why their persona stopped being updated.
@@ -13,7 +13,12 @@ import pytest
 import sections
 import server
 
-SKILLS_DIR = Path(__file__).resolve().parent.parent.parent / "skills"
+# backend/skills, not the repo root's skills/. The root copy diverged when PR #74
+# moved these into the image, and is deleted in the same commit as this line.
+# This directory is what the Dockerfile ships via `COPY backend/ .` and what
+# skill_resources.py serves at skill://mygist/<name>/SKILL.md, so it is the only
+# copy an agent can actually read -- which makes it the only one worth guarding.
+SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills"
 SKILL_FILES = sorted(SKILLS_DIR.rglob("*.md"))
 
 # Anything shaped like one of our tool names, so a retired one is caught by the
