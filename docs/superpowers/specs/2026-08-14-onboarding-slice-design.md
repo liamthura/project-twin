@@ -77,6 +77,16 @@ in the v2 manifests. Two notes for planning:
   walk. The reversed section listed them. They are **out of scope** unless
   planning finds them, and planning must not invent a path.
 
+  **Corrected 2026-08-14, during planning: they do resolve.** They are
+  `kind: "strings"` nodes at `["learning_style", "preferred"]` and
+  `["learning_style", "avoid"]`, inside the Learning Style **group** in
+  `preferences/manifest.json`. The original walk read
+  `sections[].element.fields` and missed them, because a group holds its
+  children under `sections` -- the same key the top level uses -- not
+  `children`. They stay out of the flow anyway, on scope grounds rather than
+  availability: `How you like answers` already carries four controls, and six
+  would make it a form rather than a step.
+
 ### The delegate offer belongs on Welcome
 
 Above everything, before any field. The divergence record shows this was
