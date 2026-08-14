@@ -372,7 +372,7 @@ Everything the rest of this page adds, in one file.
 </Accordion>
 </Accordions>
 
-## The contract you did not write
+## The generated contract
 
 There is no `entities` block. `pack_loader.derive_entities` computes the contract
 MCP clients see from the field descriptors, and `get_schema` ships the result.
@@ -406,7 +406,7 @@ the section. All of it is gone. The phrase matcher gave way to
 [proposals](/use/capture), so there is nothing to declare for capture either: your
 section is reachable the moment its entities exist.
 
-## What you just got
+## What the pack provides
 
 Without writing a line of code, an AI client can now do this:
 
@@ -429,7 +429,7 @@ search_context("neovim")
 
 And the same data is fully editable in the browser.
 
-## Making it nicer
+## Refining the section
 
 The minimal version works. These options are what separate it from the shipped
 packs, and each is a key on the field or the node it belongs to.
@@ -567,7 +567,7 @@ Profile's work `highlights` and `skills` both work that way. Leave the `element`
 out and the array is editable in the app and invisible to MCP, which is what most
 string arrays want.
 
-## Not everything is a list
+## Sections that are not lists
 
 Four node kinds exist, and what each one binds is the difference between them.
 
