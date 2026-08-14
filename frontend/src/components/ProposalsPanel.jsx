@@ -1,64 +1,25 @@
-import { useState, useEffect, useCallback, Fragment } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  listProposals, approveProposal, rejectProposal, promoteProposal,
+  listProposals, proposalCount, approveProposal, rejectProposal, promoteProposal,
+  listConnectedApps,
 } from "@/lib/api";
+import InboxRow from "./InboxRow";
+import ObservationCard from "./ObservationCard";
+import PromoteDialog, { promotionTargets } from "./PromoteDialog";
+
+// Must match auth/src/oauth.js and ConnectedApps.jsx exactly -- this is the
+// wire value, not a label.
+const PROPOSE = "persona:propose";
 
 const KINDS = [
   { key: "entity", label: "Inbox" },
   { key: "note", label: "Observations" },
 ];
-
-/**
- * Which entities in a pack a single line of text can actually become.
- *
- * A note is one sentence, so the only entities it can fill are the ones whose
- * sole required field is their own identifier. Anything needing a second value
- * -- `hobby_specific` needs an owning hobby, `project_reference` needs a
- * project -- would produce a proposal that cannot execute, so it is not
- * offered rather than offered and then failing on confirm.
- */
-export function promotionTargets(pack) {
-  return Object.entries(pack?.entities || {})
-    .filter(([, spec]) => {
-      const required = spec.required || [];
-      return (spec.actions || []).includes("add")
-        && spec.identifier
-        && !spec.parent
-        && required.length === 1
-        && required[0] === spec.identifier;
-    })
-    .map(([entity, spec]) => ({ entity, field: spec.identifier }));
-}
-
-const ACTION_VERB = { add: "Add", update: "Update", remove: "Remove" };
-
-// Entity names and field keys are snake_case in the schema. This is a review
-// surface a person reads, so they get read as words.
-function humanise(key) {
-  return String(key || "").replace(/_/g, " ");
-}
-
-function renderValue(value) {
-  if (Array.isArray(value)) return value.map(humanise).join(", ");
-  if (value && typeof value === "object") {
-    return Object.entries(value)
-      .map(([k, v]) => `${humanise(k)}: ${v}`)
-      .join(" · ");
-  }
-  if (typeof value === "boolean") return value ? "yes" : "no";
-  return humanise(value);
-}
 
 /**
  * Two review surfaces over one queue.
@@ -75,14 +36,37 @@ function renderValue(value) {
 const QUEUE_POLL_MS = 15000;
 
 export default function ProposalsPanel({
-  onViewSection, onSectionChanged, onResolved, sectionTitles = {}, packs = [],
+  onViewSection, onSectionChanged, onCounts, onOpenSettings,
+  sectionTitles = {}, packs = [],
 }) {
   const [kind, setKind] = useState("entity");
   const [rows, setRows] = useState([]);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const [promoting, setPromoting] = useState(null);
+  const [counts, setCounts] = useState({ entity: 0, note: 0, total: 0 });
+  const [grants, setGrants] = useState(null);
+  const [loaded, setLoaded] = useState(false);
   const { toast } = useToast();
+
+  // Held in a ref so refreshCounts never changes identity. It is a dependency
+  // of the polling effect, so a caller passing an inline arrow would otherwise
+  // tear down and rebuild the interval on every render -- and a 15s interval
+  // rebuilt every render never fires at all.
+  const onCountsRef = useRef(onCounts);
+  onCountsRef.current = onCounts;
+
+  // The tab you are not looking at has to say how much is waiting in it, and
+  // the count endpoint is the only read that does not mark rows seen.
+  const refreshCounts = useCallback(async () => {
+    try {
+      const next = await proposalCount();
+      setCounts(next);
+      onCountsRef.current?.(next.total);
+    } catch {
+      // A stale badge beats a broken panel.
+    }
+  }, []);
 
   const refresh = useCallback(async (which) => {
     try {
@@ -91,15 +75,19 @@ export default function ProposalsPanel({
     } catch {
       setRows([]);
       setError("Could not load the queue.");
+    } finally {
+      setLoaded(true);
     }
   }, []);
 
-  useEffect(() => { refresh(kind); }, [kind, refresh]);
+  useEffect(() => { refresh(kind); refreshCounts(); }, [kind, refresh, refreshCounts]);
 
   useEffect(() => {
     const tick = () => {
       // A backgrounded tab polling every 15s is just battery and rate limit.
-      if (document.visibilityState === "visible") refresh(kind);
+      if (document.visibilityState !== "visible") return;
+      refresh(kind);
+      refreshCounts();
     };
     const timer = setInterval(tick, QUEUE_POLL_MS);
     document.addEventListener("visibilitychange", tick);
@@ -107,7 +95,24 @@ export default function ProposalsPanel({
       clearInterval(timer);
       document.removeEventListener("visibilitychange", tick);
     };
-  }, [kind, refresh]);
+  }, [kind, refresh, refreshCounts]);
+
+  // An empty queue has two very different causes, and they have different
+  // fixes. Asked once, and only when there is nothing to review: a reader with
+  // proposals waiting never sees this line, and this is the one surface in the
+  // app that already polls. A failure is treated as "no grants", which renders
+  // no extra line -- which is what happens today.
+  useEffect(() => {
+    // `loaded` matters: rows is [] on the first render too, before the queue
+    // has been fetched at all. Without it this fires on every mount, which is
+    // the opposite of asking only when there is nothing to review.
+    if (!loaded || rows.length > 0 || grants !== null) return;
+    let cancelled = false;
+    listConnectedApps()
+      .then((list) => { if (!cancelled) setGrants(list); })
+      .catch(() => { if (!cancelled) setGrants([]); });
+    return () => { cancelled = true; };
+  }, [loaded, rows.length, grants]);
 
   /**
    * Run one resolution, then say what happened.
@@ -126,8 +131,10 @@ export default function ProposalsPanel({
       setError(null);
       const section = res?.section;
       // The sidebar dot is owned by the app, and it stops polling while this
-      // panel is open -- so resolving something has to tell it directly.
-      onResolved?.();
+      // panel is open -- so resolving something has to tell it. Refreshing the
+      // counts does both: it moves the tab badges and hands the new total up,
+      // in one request rather than the panel's and App's.
+      refreshCounts();
       // Refetch the section that changed straight away, rather than waiting
       // for the user to click through and find stale data. We know exactly
       // what moved, so there is nothing here worth polling for.
@@ -193,211 +200,96 @@ export default function ProposalsPanel({
       promoteProposal(row.id, entity, { [field]: text.trim() }));
   }
 
-  const promotingSection = promotable.find((s) => s.key === promoting?.section);
-  const promotingField = promotingSection?.targets
-    .find((t) => t.entity === promoting?.entity)?.field;
-
-  const selectClass =
-    "h-9 w-full rounded-md border border-input bg-background px-3 text-sm " +
-    "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2";
-
   return (
     <div className="space-y-4">
-      <Dialog open={Boolean(promoting)} onOpenChange={(o) => !o && setPromoting(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Promote to your persona</DialogTitle>
-            <DialogDescription>
-              An observation has no home of its own. Choose where this belongs
-              and it becomes real, editable data.
-            </DialogDescription>
-          </DialogHeader>
+      <PromoteDialog
+        promoting={promoting}
+        promotable={promotable}
+        onChange={setPromoting}
+        onCancel={() => setPromoting(null)}
+        onConfirm={confirmPromote}
+      />
 
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="promote-section">Section</Label>
-              <select
-                id="promote-section"
-                className={selectClass}
-                value={promoting?.section || ""}
-                onChange={(e) => {
-                  const next = promotable.find((s) => s.key === e.target.value);
-                  setPromoting((p) => ({
-                    ...p,
-                    section: e.target.value,
-                    entity: next?.targets[0]?.entity ?? "",
-                  }));
-                }}
-              >
-                {promotable.map((s) => (
-                  <option key={s.key} value={s.key}>{s.title}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="promote-entity">Type</Label>
-              <select
-                id="promote-entity"
-                className={selectClass}
-                value={promoting?.entity || ""}
-                onChange={(e) =>
-                  setPromoting((p) => ({ ...p, entity: e.target.value }))
-                }
-              >
-                {(promotingSection?.targets || []).map((t) => (
-                  <option key={t.entity} value={t.entity}>
-                    {humanise(t.entity)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {promotingField && (
-              <div className="space-y-1.5">
-                {/* The agent's wording is a starting point, not the record.
-                    Editing here is the last chance before it becomes data. */}
-                <Label htmlFor="promote-text">{humanise(promotingField)}</Label>
-                <Input
-                  id="promote-text"
-                  value={promoting?.text || ""}
-                  onChange={(e) =>
-                    setPromoting((p) => ({ ...p, text: e.target.value }))
-                  }
-                />
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPromoting(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmPromote}
-              disabled={!promotingField || !promoting?.text?.trim()}
-            >
-              Promote
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <div className="flex gap-2">
-        {KINDS.map((k) => (
-          <Button
-            key={k.key}
-            variant={kind === k.key ? "default" : "outline"}
-            size="sm"
-            onClick={() => setKind(k.key)}
-          >
-            {k.label}
-          </Button>
-        ))}
-      </div>
+      <Tabs value={kind} onValueChange={setKind}>
+        <TabsList>
+          {KINDS.map((k) => (
+            <TabsTrigger key={k.key} value={k.key}>
+              {k.label}
+              {/* Both the space and the margin are needed, at different
+                  layers. The whitespace text node is what makes the accessible
+                  name "Inbox 3" rather than "Inbox3" -- but TabsTrigger is
+                  inline-flex, and a whitespace-only text node never becomes a
+                  flex item, so on screen it contributes nothing. The margin is
+                  what you actually see. */}
+              {counts[k.key] > 0 && (
+                <>
+                  {" "}
+                  <span className="ml-1.5 text-xs text-muted-foreground">
+                    {counts[k.key]}
+                  </span>
+                </>
+              )}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {rows.length === 0 ? (
-        <EmptyState>
-          Nothing waiting. Agents propose changes here as they notice them.
+        <EmptyState className="space-y-2">
+          <p>Nothing waiting. Agents propose changes here as they notice them.</p>
+          {grants?.length === 0 && (
+            <p>
+              Nothing is connected yet.{" "}
+              <Button variant="link" className="h-auto p-0" onClick={onOpenSettings}>
+                Connect an app
+              </Button>
+            </p>
+          )}
+          {grants?.length > 0
+            && !grants.some((g) => (g.scopes || []).includes(PROPOSE)) && (
+            <p>
+              {grants.length === 1
+                ? `${grants[0].clientName} can read your persona but not suggest changes to it.`
+                : "None of your connected apps can suggest changes to your persona."}{" "}
+              <Button variant="link" className="h-auto p-0" onClick={onOpenSettings}>
+                Review access
+              </Button>
+            </p>
+          )}
         </EmptyState>
       ) : (
-        rows.map((row) => (
-          <Card key={row.id} className="space-y-3 p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{row.proposed_by}</Badge>
-              {row.seen_count > 1 && (
-                <span className="text-xs text-muted-foreground">
-                  seen {row.seen_count}×
-                </span>
-              )}
-              {row.section_hint && (
-                // "suggested", not an arrow: this is where the agent thinks it
-                // belongs, and you choose the real destination on promote. An
-                // arrow read as a promise the promote dialog then broke.
-                <span className="text-xs text-muted-foreground">
-                  suggested: {humanise(row.section_hint)}
-                </span>
-              )}
-            </div>
-
-            {row.kind === "entity" ? (
-              <div className="space-y-1">
-                <p className="text-sm font-medium">
-                  <span>{ACTION_VERB[row.action] || row.action}</span>{" "}
-                  <span className="text-muted-foreground">{humanise(row.entity)}</span>
-                </p>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
-                  {Object.entries(row.data || {}).map(([field, value]) => (
-                    <Fragment key={field}>
-                      <dt className="text-muted-foreground">{humanise(field)}</dt>
-                      <dd className="min-w-0 break-words">{renderValue(value)}</dd>
-                    </Fragment>
-                  ))}
-                </dl>
-              </div>
-            ) : (
-              <p className="text-sm font-medium">{row.note}</p>
-            )}
-
-            <p className="text-sm text-muted-foreground">{row.rationale}</p>
-            {row.evidence && (
-              <blockquote className="border-l-2 pl-3 text-sm italic text-muted-foreground">
-                “{row.evidence}”
-              </blockquote>
-            )}
-
-            <div className="flex gap-2">
-              {row.kind === "entity" ? (
-                <>
-                  <Button
-                    size="sm"
-                    disabled={busy === row.id}
-                    onClick={() =>
-                      act(row.id, "Added to your persona", () =>
-                        approveProposal(row.id, undefined))
-                    }
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy === row.id}
-                    onClick={() =>
-                      act(row.id, "Rejected — it will not be proposed again", () =>
-                        rejectProposal(row.id))
-                    }
-                  >
-                    Reject
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    size="sm"
-                    disabled={busy === row.id || !promotable.length}
-                    onClick={() => openPromote(row)}
-                  >
-                    Promote
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy === row.id}
-                    onClick={() =>
-                      act(row.id, "Deleted — it will not be proposed again", () =>
-                        rejectProposal(row.id))
-                    }
-                  >
-                    Delete
-                  </Button>
-                </>
-              )}
-            </div>
-          </Card>
-        ))
+        rows.map((row) =>
+          row.kind === "entity" ? (
+            <InboxRow
+              key={row.id}
+              row={row}
+              packs={packs}
+              busy={busy === row.id}
+              onApprove={() =>
+                act(row.id, "Added to your persona", () =>
+                  approveProposal(row.id, undefined))
+              }
+              onReject={() =>
+                act(row.id, "Rejected — it will not be proposed again", () =>
+                  rejectProposal(row.id))
+              }
+            />
+          ) : (
+            <ObservationCard
+              key={row.id}
+              row={row}
+              busy={busy === row.id}
+              canPromote={promotable.length > 0}
+              onPromote={() => openPromote(row)}
+              onDelete={() =>
+                act(row.id, "Deleted — it will not be proposed again", () =>
+                  rejectProposal(row.id))
+              }
+            />
+          ),
+        )
       )}
     </div>
   );

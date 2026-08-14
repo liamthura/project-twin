@@ -66,10 +66,21 @@ which `backend/tests/test_proposals_api.py:87` already guards.
 The panel fetches the count on the same 15s tick as the list and passes
 `total` up through a new `onCounts` prop.
 
-**This lets `App.jsx` drop its `activeSection !== "review"` exception.** Today
-App polls the count every 30s but skips the tick while the review panel is
-open, because the panel refreshes itself. Two pollers arranging not to collide
-becomes one poller and a callback.
+`proposalCount()` in `lib/api.js` already exists and has no callers — App
+calls `api("/proposals/count")` directly and keeps only `total`. It changes to
+return the whole `{entity, note, total}` object, which is safe precisely
+because nothing reads it yet.
+
+**`onCounts` replaces `onResolved`.** Today, resolving an item calls
+`onResolved`, which makes App fetch the count again — a second request for a
+number the panel is about to fetch anyway. Instead the panel refreshes its own
+counts after a resolution and hands the total up. One request instead of two.
+
+*(Corrected 2026-08-14, while planning: an earlier draft of this section said
+App should also drop its `activeSection !== "review"` exception. That was
+wrong. The exception is what stops App polling the count while the panel is
+already polling it; removing it would mean two pollers instead of one. App
+keeps the exception unchanged.)*
 
 ## The inbox row
 
@@ -84,6 +95,10 @@ Remove  goal              ship the beta           ✓  ✕  ⌄
 Approve and reject work from the collapsed row. The chevron expands in place to
 what the card shows today: the full field list, the rationale, and the evidence
 quote.
+
+The collapsed row has no room for the `proposed_by` badge or `seen N×`, so both
+move into the expanded detail. Observations keep them on the card face, where
+they inform a decision the reader is about to make.
 
 ### The summary rule
 
@@ -184,7 +199,22 @@ rather than inventing a rule.
 
 ### The server narrows an update before storing it
 
-Prose guidance only works on models that follow it. So when `action` is
+**Deferred to its own spec and plan (decided 2026-08-14).** Planning showed
+this is a sub-slice, not a bolt-on. `execute_modify` is a per-entity if/elif
+chain where each branch hand-resolves its own file and nested path, so there
+is no generic "given entity and identifier, fetch the stored record" to build
+on. Making one needs a manifest path-walker written beside `derive_entities`
+— which must stay pure and whose output `test_converter.py` freezes key for
+key — plus alias translation through `normalize_data`, because proposals carry
+MCP spellings while storage uses stored names. Getting it wrong silently
+discards a field the reader wanted changed, which is not a thing to rush.
+
+The design below is what that plan should implement. Everything above it, and
+the docstring change, ship in this slice.
+
+---
+
+When `action` is
 `update`, the server locates the existing item with `find_in_array`
 (`server.py:244`, the same exact identifier lookup the write path uses) and
 drops from `data` every field whose value already matches what is stored.
@@ -229,10 +259,13 @@ the repo rendered two Radix layer components together.
 That test fails by hanging rather than by going red. The plan must give it an
 explicit timeout so a regression reports as a failure and not as silence.
 
-Backend tests cover narrowing: an update that changes one field of eight stores
-one field plus the identifier; an update that changes nothing returns
-`no_change`; an update against a missing record stores unchanged; an `add` with
-values matching an existing record is untouched.
+Backend tests for narrowing move to that slice's plan: an update that changes
+one field of eight stores one field plus the identifier; an update that changes
+nothing returns `no_change`; an update against a missing record stores
+unchanged; an `add` with values matching an existing record is untouched.
+
+This slice's only backend change is the `propose_update` docstring, so its test
+is that `test_propose_update.py` still passes.
 
 ## Out of scope
 

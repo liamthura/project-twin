@@ -3540,11 +3540,26 @@ def propose_update(proposals: list, client: str) -> str:
             {kind: "note", section_hint: "preferences", text: "...",
              rationale: "...", evidence: "...", confidence: 0.6}
 
+    HOW MUCH TO SEND IN `data`:
+        add    -- every required field, plus any optional field you actually
+                  know. Do not invent values to fill out the shape.
+        update -- the identifier (and the parent, where the entity has one) to
+                  locate the row, plus ONLY the fields that change. Resending
+                  fields you are not changing is the most common mistake here,
+                  and the user sees the result: a review row padded with values
+                  that are already on record.
+        remove -- the identifier and parent only. Nothing else is read.
+
+        This is the same shape get_schema's examples show for persona_modify.
+
     REQUIRED ON EVERY PROPOSAL:
-        rationale -- why this is durable, in your words. The user reads this
-            when deciding, so make it the reason, not a restatement.
-        evidence -- the user's own words that prompted it. If you cannot quote
-            them, you have inferred too far and should not propose.
+        rationale -- why this is durable, in your words. ONE SENTENCE. The user
+            reads it while deciding, next to a dozen others, so it has to be
+            the reason -- not a restatement of the change, and not a summary of
+            the conversation.
+        evidence -- the user's own words that prompted it. Quote them, briefly.
+            If you cannot quote them, you have inferred too far and should not
+            propose.
 
     PROPOSE when the user reveals something still true next month: a skill
     level that has actually moved, a project's real status, a person who

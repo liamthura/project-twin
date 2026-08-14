@@ -460,11 +460,13 @@ async function listProposals(kind) {
   return data.proposals || [];
 }
 
-// How many proposals are waiting. Unlike listProposals this does not mark
-// rows seen, which matters because the sidebar dot polls it from every tab.
+// How many proposals are waiting, per queue. Unlike listProposals this does not
+// mark rows seen, and that is what makes it safe for a badge: listing marks a
+// row seen, and a row marked seen loses its eviction protection. A count that
+// did the same would quietly strip that off observations nobody has looked at.
 async function proposalCount() {
   const data = await api("/proposals/count");
-  return data?.total ?? 0;
+  return { entity: data?.entity ?? 0, note: data?.note ?? 0, total: data?.total ?? 0 };
 }
 
 // `data` overrides the proposal's own payload, for edit-then-approve.
