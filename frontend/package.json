@@ -10,9 +10,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "fixtures": "node scripts/generate-pack-fixtures.mjs",
-    "test": "vitest run",
+    "test": "node scripts/run-tests.mjs",
     "test:watch": "vitest",
-    "test:storybook": "vitest run --project=storybook",
+    "test:storybook": "node scripts/run-tests.mjs --project=storybook",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

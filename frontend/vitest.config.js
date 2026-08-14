@@ -11,6 +11,23 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
+      // Stated rather than left to the defaults, so a hang fails with a named
+      // test instead of sitting there. These cover the ASYNC case only -- vitest
+      // runs the timer on the same thread as the test, so a synchronous loop
+      // blocks the event loop and none of them ever fire. A run that hung this
+      // way once spun a core for two and a half days with
+      // `--testTimeout=20000` set on it. The wall clock in
+      // scripts/run-tests.mjs is what actually stops that, from outside the
+      // process; these three just make the ordinary case legible.
+      //
+      // 10s against a suite whose slowest file is ~8s: room for CI's two cores
+      // without waiting on a hang.
+      testTimeout: 10_000,
+      hookTimeout: 10_000,
+      // How long vitest waits for a pool to shut down before giving up on it.
+      // Left short deliberately: a worker that will not close is the thing that
+      // becomes an orphan.
+      teardownTimeout: 10_000,
       projects: [
         {
           extends: true,
