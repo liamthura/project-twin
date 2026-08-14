@@ -262,7 +262,7 @@ python -m pytest tests/test_pack_loader.py -q   # the loader and the schema
 python -m pytest -q                             # the mechanical guards
 ```
 
-The full suite is where the [guards](#guards-you-will-meet) live. Run it before
+The full suite is where the [guards](#guards) live. Run it before
 opening a PR, because they check things the loader does not.
 
 </Step>
@@ -611,7 +611,7 @@ Use it. The shipped packs use it heavily, and it is the only place a non-obvious
 decision can live next to the thing it explains. An `element` has no `$comment`
 of its own, so there is one place per node to look.
 
-## Guards you will meet
+## Guards
 
 The test suite checks packs mechanically, and it will reject things that look
 fine to a human. Each of these exists because it caught a real defect.

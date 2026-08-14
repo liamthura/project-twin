@@ -14,7 +14,7 @@ are:
 | | |
 |---|---|
 | **OAuth** | The client connects itself. You sign in, approve a consent screen, and there is nothing to copy anywhere. Use it whenever the client offers it. |
-| **A bearer token** | You create it yourself and hand it to the client. For anything that can't open a browser to sign in — see [Using a token instead](#using-a-token-instead). |
+| **A bearer token** | You create it yourself and hand it to the client. For anything that can't open a browser to sign in — see [Connecting with a token](#connecting-with-a-token). |
 
 The short version: **OAuth is how an application connects. A token is how you
 script.**
@@ -128,7 +128,7 @@ now rather than as routine cleanup.
 There's no way to widen or narrow a grant in place. Reconnecting from the
 client goes through consent again, where you can choose differently.
 
-## Using a token instead
+## Connecting with a token
 
 A bearer token remains the right tool for anything that has no browser to open
 — a cron job, a CI pipeline, a `curl` command, a client that hasn't implemented

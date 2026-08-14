@@ -154,7 +154,7 @@ curl -s https://your-instance/.well-known/oauth-protected-resource
 A 404 means `AUTH_MCP_RESOURCE` is unset, which gates the entire OAuth surface
 — no discovery documents on the API, no OAuth endpoints on the auth service.
 That is the intended state for an instance that has not opted in; clients use
-[bearer tokens](/use/clients#using-a-token-instead) instead.
+[bearer tokens](/use/clients#connecting-with-a-token) instead.
 
 Set on the API only, clients discover an authorization server that serves
 nothing. Set it on both containers or on neither.
@@ -207,7 +207,7 @@ owns Better Auth's sign-up, and the API owns the deprecated
 You are in FTS-only mode. Either pgvector is absent, or no embedding provider is
 configured. Check the startup log.
 
-See [Database](/run/database#pgvector-and-life-without-it).
+See [Database](/run/database#pgvector).
 
 </Accordion>
 
@@ -270,7 +270,7 @@ and a rejection is the correct outcome.
 
 Historically the most common cause was different: a field that was *documented*
 but never stored. The stored-key audit now makes that impossible to introduce —
-see [Section packs](/run/section-packs#guards-you-will-meet).
+see [Section packs](/run/section-packs#guards).
 
 </Accordion>
 
