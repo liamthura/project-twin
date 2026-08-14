@@ -52,8 +52,13 @@ export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
         >
           <Check className="h-4 w-4" />
         </Button>
+        {/* Red foreground rather than a solid destructive fill: four filled
+            red buttons down a dense queue would out-shout the rows they sit
+            on. Same treatment as a destructive dropdown item. Colour alone is
+            not an accessible signal, which is what the aria-label is for. */}
         <Button
           size="sm" variant="ghost" disabled={busy} onClick={onReject}
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
           aria-label={`Reject ${lead}`}
         >
           <X className="h-4 w-4" />

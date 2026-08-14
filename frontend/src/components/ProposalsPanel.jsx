@@ -215,12 +215,16 @@ export default function ProposalsPanel({
           {KINDS.map((k) => (
             <TabsTrigger key={k.key} value={k.key}>
               {k.label}
-              {/* A real space, not just the margin. Without a whitespace text
-                  node the accessible name computes as "Inbox3". */}
+              {/* Both the space and the margin are needed, at different
+                  layers. The whitespace text node is what makes the accessible
+                  name "Inbox 3" rather than "Inbox3" -- but TabsTrigger is
+                  inline-flex, and a whitespace-only text node never becomes a
+                  flex item, so on screen it contributes nothing. The margin is
+                  what you actually see. */}
               {counts[k.key] > 0 && (
                 <>
                   {" "}
-                  <span className="text-xs text-muted-foreground">
+                  <span className="ml-1.5 text-xs text-muted-foreground">
                     {counts[k.key]}
                   </span>
                 </>

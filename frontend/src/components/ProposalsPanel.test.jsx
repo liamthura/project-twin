@@ -172,6 +172,19 @@ describe("ProposalsPanel", () => {
     expect(await screen.findByText(/\+2 more/)).toBeInTheDocument();
   });
 
+  it("marks reject as destructive, and lets that beat the ghost variant", async () => {
+    render(<ProposalsPanel />);
+    const reject = await screen.findByRole("button", { name: /^reject /i });
+    expect(reject.className).toContain("text-destructive");
+    // The real risk is not the class being absent, it is the class losing.
+    // `ghost` ships hover:text-accent-foreground, and two utilities of equal
+    // specificity are settled by CSS source order, not by the order they are
+    // passed -- which is how headline-3 shipped at the wrong weight in slice
+    // 2b. cn() runs twMerge, so the loser should be gone from the list
+    // entirely rather than sitting there hoping to win the cascade.
+    expect(reject.className).not.toContain("hover:text-accent-foreground");
+  });
+
   it("approves and drops the row", async () => {
     const user = userEvent.setup();
     render(<ProposalsPanel />);

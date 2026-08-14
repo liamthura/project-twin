@@ -41,7 +41,12 @@ export default function ObservationCard({ row, busy, canPromote, onPromote, onDe
         <Button size="sm" disabled={busy || !canPromote} onClick={onPromote}>
           Promote
         </Button>
-        <Button size="sm" variant="outline" disabled={busy} onClick={onDelete}>
+        {/* Matches the inbox row's reject: same call, same tombstone, so it
+            should not read as a milder act than the one next door. */}
+        <Button
+          size="sm" variant="outline" disabled={busy} onClick={onDelete}
+          className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+        >
           Delete
         </Button>
       </div>
