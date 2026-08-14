@@ -8,6 +8,13 @@
 
 **Tech Stack:** React 18, Vite, Vitest + Testing Library, Tailwind 3, shadcn/ui over Radix.
 
+**Status: implemented 2026-08-14** on `design/review-slice`. Final counts:
+933 / 47 unit, 935 / 48 both projects, backend 1001 passed and 1 skipped,
+`npm run build` green. `ProposalsPanel.jsx` came out at 285 lines rather than
+the 200 estimated -- under the 300 the plan set as its report threshold, but
+the estimate was optimistic. Narrowing (`no_change`, the manifest path-walker)
+is deferred to its own plan and has no task here.
+
 Spec: `docs/superpowers/specs/2026-08-14-review-slice-design.md`
 
 ## Global Constraints

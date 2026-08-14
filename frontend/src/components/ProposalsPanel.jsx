@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
@@ -49,17 +49,24 @@ export default function ProposalsPanel({
   const [loaded, setLoaded] = useState(false);
   const { toast } = useToast();
 
+  // Held in a ref so refreshCounts never changes identity. It is a dependency
+  // of the polling effect, so a caller passing an inline arrow would otherwise
+  // tear down and rebuild the interval on every render -- and a 15s interval
+  // rebuilt every render never fires at all.
+  const onCountsRef = useRef(onCounts);
+  onCountsRef.current = onCounts;
+
   // The tab you are not looking at has to say how much is waiting in it, and
   // the count endpoint is the only read that does not mark rows seen.
   const refreshCounts = useCallback(async () => {
     try {
       const next = await proposalCount();
       setCounts(next);
-      onCounts?.(next.total);
+      onCountsRef.current?.(next.total);
     } catch {
       // A stale badge beats a broken panel.
     }
-  }, [onCounts]);
+  }, []);
 
   const refresh = useCallback(async (which) => {
     try {
