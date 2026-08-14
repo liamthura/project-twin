@@ -58,19 +58,29 @@ beforeEach(() => {
 });
 
 describe("ProposalsPanel", () => {
+  // The chevron's name carries the row's value, so a queue of a dozen rows
+  // does not offer a dozen buttons called "Details".
+  const expandRow = async (user) =>
+    user.click(await screen.findByRole("button", { name: /^details for /i }));
+
   it("shows the rationale and the evidence, not just the change", async () => {
+    const user = userEvent.setup();
     render(<ProposalsPanel />);
-    expect(await screen.findByText(/Runs the on-call dashboards unaided/)).toBeInTheDocument();
+    await expandRow(user);
+    expect(screen.getByText(/Runs the on-call dashboards unaided/)).toBeInTheDocument();
     expect(screen.getByText(/I rebuilt the whole alerting setup myself/)).toBeInTheDocument();
   });
 
   it("renders the change as fields, never as raw JSON", async () => {
+    const user = userEvent.setup();
     render(<ProposalsPanel />);
     // The whole point of this surface is that a person reads it and decides.
     expect(await screen.findByText("Update")).toBeInTheDocument();
     expect(screen.getByText("domain")).toBeInTheDocument();
+    await expandRow(user);
     expect(screen.getByText("name")).toBeInTheDocument();
-    expect(screen.getByText("Datadog")).toBeInTheDocument();
+    // Twice over once expanded: the row's own line and the field list.
+    expect(screen.getAllByText("Datadog").length).toBeGreaterThan(0);
     expect(screen.getByText("level")).toBeInTheDocument();
     expect(screen.getByText("advanced")).toBeInTheDocument();
     expect(screen.queryByText(/[{}"]/)).not.toBeInTheDocument();
@@ -82,25 +92,59 @@ describe("ProposalsPanel", () => {
         ? [{ ...ENTITY, entity: "work_experience", data: { company: "Acme", start_date: "2026-01" } }]
         : []),
     );
+    const user = userEvent.setup();
     render(<ProposalsPanel />);
     expect(await screen.findByText("work experience")).toBeInTheDocument();
+    await expandRow(user);
     expect(screen.getByText("start date")).toBeInTheDocument();
   });
 
   it("names the tool that proposed it", async () => {
+    const user = userEvent.setup();
     render(<ProposalsPanel />);
-    expect(await screen.findByText("Cursor")).toBeInTheDocument();
+    await expandRow(user);
+    expect(screen.getByText("Cursor")).toBeInTheDocument();
   });
 
   it("shows how many tools raised the same thing", async () => {
+    const user = userEvent.setup();
     render(<ProposalsPanel />);
-    expect(await screen.findByText(/seen 2×/)).toBeInTheDocument();
+    await expandRow(user);
+    expect(screen.getByText(/seen 2×/)).toBeInTheDocument();
+  });
+
+  it("says what the change is without being expanded", async () => {
+    // hobby's identifier is `name`, and `notes` is the one other field with a
+    // value, so the line reads the identifier and what it becomes. Approving
+    // must not require opening anything.
+    api.listProposals.mockImplementation((kind) =>
+      Promise.resolve(kind === "entity"
+        ? [{ ...ENTITY, entity: "hobby", data: { name: "bouldering", notes: "twice a week" } }]
+        : []),
+    );
+    render(<ProposalsPanel packs={PACKS} />);
+    expect(await screen.findByText(/bouldering/)).toBeInTheDocument();
+    expect(screen.getByText(/twice a week/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^approve bouldering$/i })).toBeInTheDocument();
+    // The rationale is behind the chevron.
+    expect(screen.queryByText(/Runs the on-call dashboards/)).not.toBeInTheDocument();
+  });
+
+  it("counts the fields it cannot fit rather than truncating them away", async () => {
+    api.listProposals.mockImplementation((kind) =>
+      Promise.resolve(kind === "entity"
+        ? [{ ...ENTITY, entity: "hobby",
+             data: { name: "bouldering", notes: "twice a week", level: "keen" } }]
+        : []),
+    );
+    render(<ProposalsPanel packs={PACKS} />);
+    expect(await screen.findByText(/\+2 more/)).toBeInTheDocument();
   });
 
   it("approves and drops the row", async () => {
     const user = userEvent.setup();
     render(<ProposalsPanel />);
-    await user.click(await screen.findByRole("button", { name: /^approve$/i }));
+    await user.click(await screen.findByRole("button", { name: /^approve /i }));
     await waitFor(() => expect(api.approveProposal).toHaveBeenCalledWith("p1", undefined));
     await waitFor(() =>
       expect(screen.queryByText(/Runs the on-call dashboards/)).not.toBeInTheDocument(),
@@ -110,7 +154,7 @@ describe("ProposalsPanel", () => {
   it("rejects without writing anything", async () => {
     const user = userEvent.setup();
     render(<ProposalsPanel />);
-    await user.click(await screen.findByRole("button", { name: /^reject$/i }));
+    await user.click(await screen.findByRole("button", { name: /^reject /i }));
     await waitFor(() => expect(api.rejectProposal).toHaveBeenCalledWith("p1"));
     expect(api.approveProposal).not.toHaveBeenCalled();
   });
@@ -121,13 +165,13 @@ describe("ProposalsPanel", () => {
     await user.click(screen.getByRole("button", { name: /observations/i }));
     expect(await screen.findByRole("button", { name: /^promote$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^approve$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^approve /i })).not.toBeInTheDocument();
   });
 
   it("confirms every action with a toast", async () => {
     const user = userEvent.setup();
     render(<ProposalsPanel />);
-    await user.click(await screen.findByRole("button", { name: /^approve$/i }));
+    await user.click(await screen.findByRole("button", { name: /^approve /i }));
     await waitFor(() => expect(toast).toHaveBeenCalled());
     expect(toast.mock.calls[0][0]).toMatchObject({ variant: "success" });
   });
@@ -136,7 +180,7 @@ describe("ProposalsPanel", () => {
     const user = userEvent.setup();
     const onViewSection = vi.fn();
     render(<ProposalsPanel onViewSection={onViewSection} sectionTitles={{ knowledge: "Knowledge" }} />);
-    await user.click(await screen.findByRole("button", { name: /^approve$/i }));
+    await user.click(await screen.findByRole("button", { name: /^approve /i }));
     await waitFor(() => expect(toast).toHaveBeenCalled());
     const { action } = toast.mock.calls[0][0];
     expect(action).toBeTruthy();
@@ -223,7 +267,7 @@ describe("ProposalsPanel", () => {
     const user = userEvent.setup();
     const onSectionChanged = vi.fn();
     render(<ProposalsPanel onSectionChanged={onSectionChanged} />);
-    await user.click(await screen.findByRole("button", { name: /^approve$/i }));
+    await user.click(await screen.findByRole("button", { name: /^approve /i }));
     await waitFor(() => expect(onSectionChanged).toHaveBeenCalledWith("knowledge"));
   });
 
@@ -231,7 +275,7 @@ describe("ProposalsPanel", () => {
     const user = userEvent.setup();
     const onSectionChanged = vi.fn();
     render(<ProposalsPanel onSectionChanged={onSectionChanged} />);
-    await user.click(await screen.findByRole("button", { name: /^reject$/i }));
+    await user.click(await screen.findByRole("button", { name: /^reject /i }));
     await waitFor(() => expect(toast).toHaveBeenCalled());
     expect(onSectionChanged).not.toHaveBeenCalled();
   });
@@ -252,7 +296,7 @@ describe("ProposalsPanel", () => {
   it("gives rejecting a toast but no link, because nothing changed", async () => {
     const user = userEvent.setup();
     render(<ProposalsPanel onViewSection={vi.fn()} sectionTitles={{}} />);
-    await user.click(await screen.findByRole("button", { name: /^reject$/i }));
+    await user.click(await screen.findByRole("button", { name: /^reject /i }));
     await waitFor(() => expect(toast).toHaveBeenCalled());
     expect(toast.mock.calls[0][0].action).toBeUndefined();
   });
@@ -261,10 +305,12 @@ describe("ProposalsPanel", () => {
     const user = userEvent.setup();
     api.approveProposal.mockRejectedValueOnce(new Error("boom"));
     render(<ProposalsPanel />);
-    await user.click(await screen.findByRole("button", { name: /^approve$/i }));
+    await user.click(await screen.findByRole("button", { name: /^approve /i }));
     await waitFor(() => expect(toast).toHaveBeenCalled());
     expect(toast.mock.calls[0][0]).toMatchObject({ variant: "destructive" });
-    expect(screen.getByText(/Runs the on-call dashboards/)).toBeInTheDocument();
+    // The row is still there to try again. Asserted on the collapsed line,
+    // since the rationale it used to check now sits behind the chevron.
+    expect(screen.getByRole("button", { name: /^approve /i })).toBeInTheDocument();
   });
 
   it("says the queue is empty rather than showing nothing", async () => {

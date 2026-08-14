@@ -1,23 +1,19 @@
-import { useState, useEffect, useCallback, Fragment } from "react";
-import { Card } from "@/components/ui/card";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
 import {
   listProposals, approveProposal, rejectProposal, promoteProposal,
 } from "@/lib/api";
+import InboxRow from "./InboxRow";
 import ObservationCard from "./ObservationCard";
 import PromoteDialog, { promotionTargets } from "./PromoteDialog";
-import { humanise, renderValue } from "./proposalSummary";
 
 const KINDS = [
   { key: "entity", label: "Inbox" },
   { key: "note", label: "Observations" },
 ];
-
-const ACTION_VERB = { add: "Add", update: "Update", remove: "Remove" };
 
 /**
  * Two review surfaces over one queue.
@@ -184,62 +180,20 @@ export default function ProposalsPanel({
       ) : (
         rows.map((row) =>
           row.kind === "entity" ? (
-            <Card key={row.id} className="space-y-3 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">{row.proposed_by}</Badge>
-                {row.seen_count > 1 && (
-                  <span className="text-xs text-muted-foreground">
-                    seen {row.seen_count}×
-                  </span>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-sm font-medium">
-                  <span>{ACTION_VERB[row.action] || row.action}</span>{" "}
-                  <span className="text-muted-foreground">{humanise(row.entity)}</span>
-                </p>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
-                  {Object.entries(row.data || {}).map(([field, value]) => (
-                    <Fragment key={field}>
-                      <dt className="text-muted-foreground">{humanise(field)}</dt>
-                      <dd className="min-w-0 break-words">{renderValue(value)}</dd>
-                    </Fragment>
-                  ))}
-                </dl>
-              </div>
-
-              <p className="text-sm text-muted-foreground">{row.rationale}</p>
-              {row.evidence && (
-                <blockquote className="border-l-2 pl-3 text-sm italic text-muted-foreground">
-                  “{row.evidence}”
-                </blockquote>
-              )}
-
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  disabled={busy === row.id}
-                  onClick={() =>
-                    act(row.id, "Added to your persona", () =>
-                      approveProposal(row.id, undefined))
-                  }
-                >
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy === row.id}
-                  onClick={() =>
-                    act(row.id, "Rejected — it will not be proposed again", () =>
-                      rejectProposal(row.id))
-                  }
-                >
-                  Reject
-                </Button>
-              </div>
-            </Card>
+            <InboxRow
+              key={row.id}
+              row={row}
+              packs={packs}
+              busy={busy === row.id}
+              onApprove={() =>
+                act(row.id, "Added to your persona", () =>
+                  approveProposal(row.id, undefined))
+              }
+              onReject={() =>
+                act(row.id, "Rejected — it will not be proposed again", () =>
+                  rejectProposal(row.id))
+              }
+            />
           ) : (
             <ObservationCard
               key={row.id}
