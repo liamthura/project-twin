@@ -248,6 +248,26 @@ an action in the menu that cannot do what it says.
 `on_list_prompts` and `on_get_prompt` alongside the two tool hooks it already has.
 Same fail-closed behaviour: no grant on the request means an empty list.
 
+### Verified over HTTP, with three grants
+
+The in-process tests attach `ScopeMiddleware` by hand; `main.py` is what wires it
+in the shipped app, so only an HTTP run proves the wiring. Three tokens minted in
+the preview container:
+
+| Grant | Prompts offered | Tools |
+|---|---|---|
+| `persona:read` | `whats_on_file` | 5 |
+| `read + propose` | `whats_on_file`, `catch_up` | 6 |
+| `read + propose + write` | all three | 8 |
+
+And naming a hidden prompt anyway is refused with something actionable rather
+than a bare denial:
+
+> This connection is not authorised to use the log_learning prompt. It needs the
+> persona:write scope; reconnect from MyGist's settings to grant it.
+
+All three probe tokens deleted afterwards; confirmed 401.
+
 ### Not mentioned in the `instructions`
 
 Deliberate. The instructions are at 44 of their 45 lines, and prompts are a
