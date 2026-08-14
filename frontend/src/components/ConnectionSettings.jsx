@@ -1,11 +1,7 @@
 import { useState, useEffect } from "react";
 import {
-  Wifi,
   Loader2,
-  Check,
-  X,
   Server,
-  Key,
   Laptop,
   Globe,
   User,
@@ -23,25 +19,16 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { segmentClass } from "@/components/ui/segmented-control";
-import {
-  CLOUD_API_URL,
-  getConfig,
-  saveConfig,
-  clearConfig,
-  testConnection,
-  whoami,
-  getApiBase,
-  setPassword,
-} from "@/lib/api.js";
+import { getConfig, getApiBase, whoami, setPassword } from "@/lib/api.js";
 import { signOut } from "@/lib/session.js";
 import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
 import { EmailSettings } from "@/components/EmailSettings";
 import { AppsPanel } from "@/components/settings/AppsPanel";
 import { DataPanel } from "@/components/settings/DataPanel";
+import { ServerPanel } from "@/components/settings/ServerPanel";
 import { TokenPanel } from "@/components/settings/TokenPanel";
 
 const TABS = [
@@ -90,15 +77,6 @@ export function ConnectionSettings({
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [signedInUsername, setSignedInUsername] = useState(null);
 
-  // Connection tab
-  const [connectionType, setConnectionType] = useState("cloud"); // "cloud" | "self-hosted"
-  const [serverUrl, setServerUrl] = useState(CLOUD_API_URL);
-  const [selfHostedUrl, setSelfHostedUrl] = useState("");
-  const [token, setToken] = useState("");
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState(null);
-  const [showToken, setShowToken] = useState(false);
-
   // Change password disclosure
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -110,22 +88,7 @@ export function ConnectionSettings({
   useEffect(() => {
     if (!isOpen) return;
 
-    const config = getConfig();
-    const savedUrl = config?.serverUrl || "";
-    if (!config || savedUrl === CLOUD_API_URL) {
-      setConnectionType("cloud");
-      setServerUrl(CLOUD_API_URL);
-      setSelfHostedUrl("");
-    } else {
-      setConnectionType("self-hosted");
-      setServerUrl(savedUrl);
-      setSelfHostedUrl(savedUrl);
-    }
-    setToken(config?.token || "");
-    setTestResult(null);
-    setShowToken(false);
     setActiveTab("connection");
-
     setShowPasswordForm(false);
     setCurrentPassword("");
     setNewPasswordValue("");
@@ -155,72 +118,6 @@ export function ConnectionSettings({
         setSignedInUsername(null);
       });
   }, [isOpen]);
-
-  const selectCloud = () => {
-    setConnectionType("cloud");
-    setServerUrl(CLOUD_API_URL);
-  };
-
-  const selectSelfHosted = () => {
-    setConnectionType("self-hosted");
-    setServerUrl(selfHostedUrl);
-  };
-
-  const handleSelfHostedUrlChange = (value) => {
-    setServerUrl(value);
-    setSelfHostedUrl(value);
-  };
-
-  const handleTest = async () => {
-    if (!serverUrl) {
-      setTestResult({ success: false, message: "Server URL is required" });
-      return;
-    }
-
-    setTesting(true);
-    setTestResult(null);
-
-    try {
-      await testConnection(serverUrl, token);
-      try {
-        const me = await whoami(serverUrl, token);
-        setTestResult({ success: true, message: `Connected as ${me.username}` });
-      } catch {
-        setTestResult({
-          success: true,
-          message: "Server reachable, but token is missing or invalid.",
-        });
-      }
-    } catch (error) {
-      setTestResult({
-        success: false,
-        message: error.message,
-      });
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const handleSave = () => {
-    if (serverUrl) {
-      saveConfig({ serverUrl, token });
-    } else {
-      clearConfig();
-    }
-    onConnectionChange?.();
-    onClose();
-  };
-
-  const handleReset = async () => {
-    await signOut();
-    clearConfig();
-    setConnectionType("cloud");
-    setServerUrl(CLOUD_API_URL);
-    setSelfHostedUrl("");
-    setToken("");
-    setTestResult(null);
-    onConnectionChange?.();
-  };
 
   const handleSignOut = async () => {
     // Clearing localStorage alone would leave the Better Auth session cookie
@@ -382,102 +279,6 @@ export function ConnectionSettings({
               </div>
             )}
 
-            {/* Connection type */}
-            <div className="space-y-2">
-              <Label>Connection Type</Label>
-              <div className="flex rounded-lg bg-muted p-0.5">
-                <button
-                  type="button"
-                  onClick={selectCloud}
-                  className={segmentClass(connectionType === "cloud", false)}
-                >
-                  <Globe className="h-4 w-4" />
-                  Cloud
-                </button>
-                <button
-                  type="button"
-                  onClick={selectSelfHosted}
-                  className={segmentClass(connectionType === "self-hosted", false)}
-                >
-                  <Server className="h-4 w-4" />
-                  Self-hosted
-                </button>
-              </div>
-            </div>
-
-            {/* Server URL (self-hosted only) */}
-            {connectionType === "self-hosted" && (
-              <div className="space-y-2">
-                <Label htmlFor="serverUrl">Server URL</Label>
-                <Input
-                  id="serverUrl"
-                  placeholder="https://your-mygist-server.com/api"
-                  value={serverUrl}
-                  onChange={(e) => handleSelfHostedUrlChange(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Full URL to your MyGist API endpoint. Leave empty to use the
-                  local development server.
-                </p>
-              </div>
-            )}
-
-            {/* Manual token entry -- recovery path when not signed in */}
-            {!isSignedIn && (
-              <div className="space-y-2">
-                <Label htmlFor="token" className="flex items-center gap-2">
-                  <Key className="h-3 w-3" />
-                  API Token
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="token"
-                    type={showToken ? "text" : "password"}
-                    placeholder="Your access token"
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowToken(!showToken)}
-                  >
-                    {showToken ? "Hide" : "Show"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Test Result */}
-            {testResult && (
-              <div
-                className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
-                  testResult.success
-                    ? "bg-accent text-accent-foreground"
-                    : "border border-destructive/40 text-destructive"
-                }`}
-              >
-                {testResult.success ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  <X className="h-4 w-4" />
-                )}
-                {testResult.message}
-              </div>
-            )}
-
-            {/* Current Config Info */}
-            <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-              <p>
-                <strong>Current API:</strong> {getApiBase()}
-              </p>
-              <p>
-                <strong>Mode:</strong>{" "}
-                {import.meta.env.DEV ? "Development (proxied)" : "Production"}
-              </p>
-            </div>
-
             {/* Change password */}
             {isSignedIn && (
               <div className="border-t pt-4">
@@ -545,6 +346,12 @@ export function ConnectionSettings({
                 )}
               </div>
             )}
+
+            <ServerPanel
+              isSignedIn={isSignedIn}
+              onConnectionChange={onConnectionChange}
+              onClose={onClose}
+            />
           </div>
         )}
 
@@ -553,34 +360,6 @@ export function ConnectionSettings({
         {activeTab === "apps" && <AppsPanel isOpen />}
 
         {activeTab === "data" && <DataPanel />}
-
-        {activeTab === "connection" && (
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={handleReset}
-              className="sm:mr-auto"
-            >
-              Reset to Default
-            </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleTest} disabled={testing}>
-                {testing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Testing...
-                  </>
-                ) : (
-                  <>
-                    <Wifi className="h-4 w-4 mr-2" />
-                    Test Connection
-                  </>
-                )}
-              </Button>
-              <Button onClick={handleSave}>Save</Button>
-            </div>
-          </DialogFooter>
-        )}
       </DialogContent>
     </Dialog>
   );
