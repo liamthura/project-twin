@@ -2,16 +2,15 @@
 
 > _Formerly "Project Twin" / "Persona MCP"_
 
-Your portable personal context for AI — stop repeating yourself.
+Your portable personal context for AI. Stop repeating yourself.
 
-**📖 [Documentation](https://mygist.thuradev.qzz.io/docs)** —
+**📖 [Documentation](https://mygist.thuradev.qzz.io/docs)** ·
 [Using MyGist](https://mygist.thuradev.qzz.io/docs/use) to connect a client and
 edit your persona, [Running MyGist](https://mygist.thuradev.qzz.io/docs/run) to
 host your own.
 
-The docs site is the single source of truth. This file is deliberately an
-overview and duplicates nothing from it, so it cannot fall out of date the way a
-copied table or file tree does.
+The docs site is the single source of truth, and this file duplicates nothing
+from it, so it cannot fall out of date the way a copied table or file tree does.
 
 ## Why this exists
 
@@ -21,9 +20,9 @@ once and serves it to any client that speaks
 [MCP](https://modelcontextprotocol.io), so the context travels with you instead
 of living in one vendor's memory.
 
-Your persona is structured JSON in your own Postgres — readable, exportable, and
-editable by hand or through the web UI. Nothing is inferred behind your back:
-MCP tools are passive and run only when a client calls them.
+Your persona is structured JSON in your own Postgres: readable, exportable, and
+editable by hand or through the web UI. MCP tools are passive and run only when a
+client calls them, so nothing is inferred behind your back.
 
 ## What it does
 
@@ -34,19 +33,20 @@ MCP tools are passive and run only when a client calls them.
   optional pgvector, degrading to FTS-only rather than breaking.
 - **Structured writes.** A published entity vocabulary (`get_schema`) across ten
   persona sections, with duplicate advisories on add.
-- **Proposals, not guesses.** Agents propose durable changes with their
-  reasoning and a quote from you; nothing reaches your persona until you approve
-  it, and anything you reject is never raised again.
+- **Proposals.** Agents propose durable changes with their reasoning and a quote
+  from you. Nothing reaches your persona until you approve it, and anything you
+  reject is never raised again.
 - **OAuth or a token.** A client that speaks OAuth connects with nothing but the
   URL, through a consent screen where you choose what it may do. Anything
-  without a browser uses a scoped bearer token instead.
-- **Extensible sections.** A new persona section is one declarative manifest —
-  no backend or frontend code. See
-  [docs/CONTRIBUTING-PACKS.md](docs/CONTRIBUTING-PACKS.md).
+  without a browser uses a scoped bearer token.
+- **Extensible sections.** A new persona section is one declarative manifest,
+  with no backend or frontend code. See
+  [Section packs](https://mygist.thuradev.qzz.io/docs/run/section-packs).
 - **Skills that make agents consistent.** Four Markdown skills in
-  [`skills/`](skills/) covering how to read a persona, which write tool is
-  correct, and what is worth proposing — so behaviour does not depend on which
-  client you happen to be in.
+  [`backend/skills/`](backend/skills/) covering how to read a persona, which
+  write tool is correct, and what is worth proposing, so behaviour holds up
+  whichever client you happen to be in. A running server serves them over MCP at
+  `skill://mygist/<name>/SKILL.md`.
 
 ## Quick start
 
@@ -81,4 +81,4 @@ cd backend && docker compose up -d && python -m pytest -q
 
 ## License
 
-TBD — currently private
+TBD, currently private
