@@ -162,10 +162,25 @@ def test_register_still_works_when_the_mode_is_off(client, monkeypatch):
 
 def test_instance_reports_the_mode(client, monkeypatch):
     monkeypatch.setenv("INVITE_ONLY", "true")
-    assert client.get("/api/instance").json() == {"invite_only": True}
+    assert client.get("/api/instance").json()["invite_only"] is True
 
     monkeypatch.delenv("INVITE_ONLY", raising=False)
-    assert client.get("/api/instance").json() == {"invite_only": False}
+    assert client.get("/api/instance").json()["invite_only"] is False
+
+
+def test_instance_reports_whether_a_client_can_sign_in(client, monkeypatch):
+    """Onboarding recommends a connection method from this. An instance with no
+    AUTH_MCP_RESOURCE mounts no discovery routes, so a client told to sign in
+    there follows the path to a 404 -- which is why this is reported rather than
+    assumed."""
+    import jwt_auth
+
+    monkeypatch.setattr(jwt_auth, "MCP_RESOURCE", "")
+    assert client.get("/api/instance").json()["mcp_oauth"] is False
+
+    monkeypatch.setattr(jwt_auth, "MCP_RESOURCE", "https://example.test/mcp")
+    monkeypatch.setattr(jwt_auth, "JWKS_URL", "https://example.test/auth/jwks")
+    assert client.get("/api/instance").json()["mcp_oauth"] is True
 
 
 def test_instance_is_readable_without_a_credential(client):

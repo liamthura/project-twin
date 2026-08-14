@@ -261,7 +261,10 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
         // sign-in would otherwise take precedence over it in resolveCredential.
         saveConfig({ serverUrl });
       }
-      onSuccess();
+      // The signup moment is the one thing only this component knows, and it
+      // knows it without asking the server anything. App uses it to send a
+      // brand-new account to onboarding rather than to an empty Profile.
+      onSuccess({ isNew: mode === "signup" });
     } catch (err) {
       setFormError(err.message);
     } finally {

@@ -7,13 +7,15 @@
  * in the Dockerfile's static mount, and in anything anyone puts in front of it.
  * Hash routing keeps that promise of "one upstream, one port" intact.
  *
- * Two families:
+ * Three families:
  *
  *   #/profile, #/review, ...   sections of the app, one per tab
  *   #/signin, #/signup, ...    the auth screens
+ *   #/onboarding/<step>        the first-run flow
  *
- * They never appear at once, because one is what you see with a credential and
- * the other is what you see without.
+ * They never appear at once. One is what you see with a credential and one is
+ * what you see without; the third replaces the shell while it is up, rather
+ * than sitting inside it.
  */
 
 /** Auth screens. The names match WelcomeAuth's modes exactly, which is what
@@ -31,6 +33,21 @@ export function readRoute() {
 export function isAuthRoute(route) {
   return AUTH_ROUTES.includes(route);
 }
+
+// Onboarding's routes live here too, so a call site that already imports
+// `isAuthRoute` does not need a second import to ask the matching question.
+// The logic itself is in ./onboardingSteps -- see that file's header.
+export {
+  ONBOARDING_STEPS,
+  STORABLE_STEPS,
+  DEFAULT_ONBOARDING_STEP,
+  isStorableStep,
+  isOnboardingRoute,
+  normaliseStep,
+  stepIndex,
+  nextStep,
+  prevStep,
+} from "./onboardingSteps";
 
 /**
  * Split a raw route -- what `readRoute()` returns -- into its two segments.

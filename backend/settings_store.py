@@ -58,6 +58,49 @@ def set_enabled_optins(keys: list[str]) -> None:
     set_settings(blob)
 
 
+# The steps that COLLECT something, and are therefore the only ones whose
+# status is a fact about the persona. `welcome` and `complete` are pages, and a
+# status on either would record a page view.
+ONBOARDING_STEP_KEYS = frozenset({"about-you", "how-you-like"})
+
+# `skipped` is stored rather than derived, because it is the one thing a
+# progress count over field values cannot recover: a reader who deliberately
+# passed a step has not failed it, and both look identical from the data.
+ONBOARDING_STATUSES = frozenset({"done", "skipped"})
+
+
+def get_onboarding() -> dict:
+    """Onboarding progress, always in the documented shape.
+
+    Repaired rather than trusted on read: the blob is free-form, so a bad value
+    must degrade to "nothing recorded yet" instead of breaking GET /api/settings
+    for everything else that shares the response.
+    """
+    raw = get_settings().get("onboarding")
+    if not isinstance(raw, dict):
+        return {"dismissed": False, "steps": {}}
+    steps = raw.get("steps")
+    if not isinstance(steps, dict):
+        steps = {}
+    return {
+        "dismissed": bool(raw.get("dismissed", False)),
+        "steps": {
+            k: v
+            for k, v in steps.items()
+            if k in ONBOARDING_STEP_KEYS and v in ONBOARDING_STATUSES
+        },
+    }
+
+
+def set_onboarding(state: dict) -> None:
+    blob = get_settings()
+    blob["onboarding"] = {
+        "dismissed": bool(state.get("dismissed", False)),
+        "steps": dict(state.get("steps") or {}),
+    }
+    set_settings(blob)
+
+
 def enabled_sections() -> set:
     """Registry sections visible to the current user. Core sections are always
     on; default-on packs are on unless disabled; default-off packs are on only

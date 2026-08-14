@@ -1,0 +1,106 @@
+/**
+ * The last screen: what landed, two optional extras, and the way in.
+ *
+ * The extras exist because the reversed design had four field bands and this
+ * one has two. Rather than lose `top_of_mind` and a goal entirely, they are
+ * offered here as a one-line add -- so the flow stays short without the fields
+ * disappearing.
+ *
+ * The one place in this slice that does not reuse a renderer. A ListRenderer
+ * would bring search, badges, an add dialog and a remove confirmation to
+ * collect one sentence. What it writes is identical: both entities id-assign
+ * server-side, and `useListItems.addItem` appends bare objects too.
+ */
+import { useState } from "react";
+import { CheckCircle2 } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+// A value someone actually gave us. An empty string is a field they passed
+// over, and counting it would congratulate them for skipping.
+function filledCount(value) {
+  if (Array.isArray(value)) return value.length > 0 ? 1 : 0;
+  if (value && typeof value === "object") {
+    return Object.values(value).reduce((n, v) => n + filledCount(v), 0);
+  }
+  return String(value ?? "").trim() === "" ? 0 : 1;
+}
+
+function OneLineAdd({ id, label, placeholder, buttonLabel, onAdd }) {
+  const [text, setText] = useState("");
+  const submit = () => {
+    const value = text.trim();
+    if (!value) return;
+    onAdd(value);
+    setText("");
+  };
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex gap-2">
+        <Input
+          id={id}
+          value={text}
+          placeholder={placeholder}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        <Button variant="outline" onClick={submit} className="shrink-0">
+          {buttonLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export function StepComplete({ data, onAdd, onDone }) {
+  const saved =
+    filledCount(data?.profile) + filledCount(data?.preferences?.communication);
+
+  return (
+    <div className="space-y-8">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-5 w-5 text-success" />
+          <h1 className="text-2xl font-semibold tracking-tight">
+            That's the basics
+          </h1>
+        </div>
+        <p className="text-muted-foreground">
+          {saved > 0
+            ? `${saved} things saved. Everything is editable later, and an assistant can fill in the rest.`
+            : "Nothing saved yet — which is fine. You can fill this in whenever, or let an assistant do it."}
+        </p>
+      </div>
+
+      <div className="space-y-5 rounded-lg border p-4">
+        <p className="text-sm font-medium">Two more, if you want them</p>
+        <OneLineAdd
+          id="onboarding-top-of-mind"
+          label="What is on your mind right now?"
+          placeholder="e.g. finishing the migration"
+          buttonLabel="Add this"
+          onAdd={(value) => onAdd("projects", ["top_of_mind"], { idea: value })}
+        />
+        <OneLineAdd
+          id="onboarding-goal"
+          label="One goal you are working towards"
+          placeholder="e.g. learn Rust properly"
+          buttonLabel="Add goal"
+          onAdd={(value) => onAdd("goals", ["goals"], { title: value })}
+        />
+      </div>
+
+      <Button onClick={onDone} className="w-full sm:w-auto">
+        Go to my persona
+      </Button>
+    </div>
+  );
+}

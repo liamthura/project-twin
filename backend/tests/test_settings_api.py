@@ -65,3 +65,60 @@ def test_get_settings_includes_pack_metadata(clean_database):
     body = client.get("/api/settings", headers=auth).json()
     circle = next(p for p in body["packs"] if p["key"] == "circle")
     assert circle["enabled"] is False and circle["core"] is False
+
+
+def test_get_settings_reports_onboarding_defaults(clean_database):
+    client, auth = _client_and_auth()
+    body = client.get("/api/settings", headers=auth).json()
+    assert body["onboarding"] == {"dismissed": False, "steps": {}}
+
+
+def test_put_settings_persists_onboarding(clean_database):
+    client, auth = _client_and_auth()
+    r = client.put(
+        "/api/settings",
+        json={
+            "disabled_sections": [],
+            "onboarding": {"dismissed": False, "steps": {"about-you": "done"}},
+        },
+        headers=auth,
+    )
+    assert r.status_code == 200
+    body = client.get("/api/settings", headers=auth).json()
+    assert body["onboarding"] == {"dismissed": False, "steps": {"about-you": "done"}}
+
+
+def test_put_settings_leaves_onboarding_alone_when_omitted(clean_database):
+    # Every existing caller sends only disabled_sections -- App.jsx's togglePack
+    # is one -- and none of them may quietly clear progress.
+    client, auth = _client_and_auth()
+    client.put(
+        "/api/settings",
+        json={"disabled_sections": [], "onboarding": {"dismissed": True, "steps": {}}},
+        headers=auth,
+    )
+    client.put("/api/settings", json={"disabled_sections": ["circle"]}, headers=auth)
+    body = client.get("/api/settings", headers=auth).json()
+    assert body["onboarding"]["dismissed"] is True
+
+
+def test_put_rejects_an_unknown_onboarding_step(clean_database):
+    client, auth = _client_and_auth()
+    r = client.put(
+        "/api/settings",
+        json={"disabled_sections": [], "onboarding": {"steps": {"welcome": "done"}}},
+        headers=auth,
+    )
+    assert r.status_code == 400
+    assert "welcome" in r.json()["detail"]
+
+
+def test_put_rejects_an_unknown_onboarding_status(clean_database):
+    client, auth = _client_and_auth()
+    r = client.put(
+        "/api/settings",
+        json={"disabled_sections": [], "onboarding": {"steps": {"about-you": "later"}}},
+        headers=auth,
+    )
+    assert r.status_code == 400
+    assert "later" in r.json()["detail"]

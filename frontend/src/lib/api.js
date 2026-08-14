@@ -49,6 +49,43 @@ function getApiBase() {
   return import.meta.env.VITE_API_URL || "/api";
 }
 
+/**
+ * Where the server itself lives, as an absolute URL with no trailing slash.
+ *
+ * Everything MyGist serves sits beside `/api` on one origin -- the MCP endpoint
+ * at `/mcp`, the documentation site at `/docs` -- which is the "one upstream,
+ * one port" promise the whole deployment is built on. So these are derived from
+ * the API base rather than configured separately, which would be more things to
+ * get wrong.
+ *
+ * `getApiBase()` returns either an absolute base ending in `/api` or the
+ * relative `/api`. A relative one is resolved against this origin, because both
+ * callers below produce a URL that leaves the page: one gets pasted into a
+ * config file on another machine, the other opens in a new tab.
+ */
+function serverBase() {
+  const withoutApi = getApiBase().replace(/\/api\/?$/, "");
+  if (/^https?:\/\//i.test(withoutApi)) return withoutApi;
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  return `${origin}${withoutApi}`;
+}
+
+// The MCP endpoint an AI client should be pointed at.
+function mcpUrl() {
+  return `${serverBase()}/mcp`;
+}
+
+/**
+ * A page on this server's documentation site.
+ *
+ * `path` carries its own trailing slash on purpose: the docs are a static
+ * export, and `/docs/use/clients` answers 307 to `/docs/use/clients/`. Linking
+ * the canonical form saves every reader a redirect.
+ */
+function docsUrl(path = "/") {
+  return `${serverBase()}/docs${path}`;
+}
+
 // Get auth token
 function getAuthToken() {
   const config = getConfig();
@@ -232,12 +269,17 @@ function isConfigured() {
  * self-hosted instance the moment this call failed.
  */
 async function getInstance() {
+  // Both fallbacks name every key a caller reads. `mcp_oauth: false` is the
+  // safe answer when we cannot ask: recommending that a client sign in, on an
+  // instance that turns out to mount no discovery routes, sends someone through
+  // a flow that ends in a 404.
+  const unknown = { invite_only: false, mcp_oauth: false };
   try {
     const response = await fetch(`${getApiBase()}/instance`);
-    if (!response.ok) return { invite_only: false };
+    if (!response.ok) return unknown;
     return await response.json();
   } catch {
-    return { invite_only: false };
+    return unknown;
   }
 }
 
@@ -500,6 +542,8 @@ export {
   saveConfig,
   clearConfig,
   getApiBase,
+  mcpUrl,
+  docsUrl,
   getAuthToken,
   testConnection,
   registerAccount,
