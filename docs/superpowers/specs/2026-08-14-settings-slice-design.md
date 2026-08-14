@@ -58,12 +58,13 @@ Three render sites in `App.jsx` (631, 673, 857) and one import (25).
 nowhere. It polls `/health` every 30 seconds. Slice 1 replaced it with the
 header's Disconnected badge and left this behind. This slice deletes it.
 
-### Three copies of the scope constants
+### Four copies of the scope constants
 
 `persona:read`, `persona:propose` and `persona:write` are declared in
-`ConnectionSettings.jsx:60`, `ConnectedApps.jsx:45` and `Consent.jsx:48`. Each
-carries a comment saying it must match the others exactly. Their plain-language
-labels are duplicated too.
+`ConnectionSettings.jsx:60`, `ConnectedApps.jsx:45` and `Consent.jsx:48`, and
+`persona:propose` alone again in `ProposalsPanel.jsx:17`. Each carries a comment
+saying it must match the others exactly, and one of those comments names only two
+of the other three. The plain-language labels are duplicated too.
 
 ## Decomposition
 
@@ -89,8 +90,11 @@ already single-purpose and tested; moving them would churn imports for nothing.
 
 Today's row is `<button>` elements styled by `segmentClass`. They carry no
 `role="tab"`, so the app's main settings surface has no tablist semantics and no
-arrow-key navigation. `ProposalsPanel.jsx:6` already uses shadcn `Tabs`; this
-matches it.
+arrow-key navigation. `ProposalsPanel.jsx:213` already uses shadcn `Tabs`; this
+matches it, including the part where it uses `Tabs`, `TabsList` and `TabsTrigger`
+and renders the panels itself rather than through `TabsContent`. Keeping that
+shape means only the open panel mounts, so each panel's fetch still happens when
+its tab is first opened rather than five at once.
 
 `segmentClass` stays for the two genuine segmented controls: import mode here,
 and the server toggle in `WelcomeAuth`. Its header comment needs updating, since
@@ -130,10 +134,11 @@ and change directly" would claim a permission the token does not carry.
 | `read`, `propose`, `write` | Read, propose and change directly |
 | `read`, `write` | Read and change directly |
 
-`Consent.jsx` is 5b's file, and this slice changes its import. That is a
-foothold, ruled in here rather than discovered later, per the umbrella's rule.
-It is an import swap with no change to what renders. Leaving a third copy of a
-must-match-exactly constant while editing its two siblings is the worse option.
+`Consent.jsx` belongs to 5b and `ProposalsPanel.jsx` to slice 3, and this slice
+changes both imports. Those are footholds, ruled in here rather than discovered
+later, per the umbrella's rule. Both are import swaps with no change to what
+renders. Leaving two copies of a must-match-exactly constant while editing the
+other two is the worse option.
 
 ## The tabs
 
@@ -276,7 +281,8 @@ tab against both credential states, `defaultTab` for each, and
 
 `SettingsDialog.test.jsx` covers what the shell owns: which tabs render, which
 are disabled without a credential, the default tab in each state, and that the
-tab row exposes `role="tab"`.
+tab row exposes `role="tab"`. It also asserts that a panel's fetch does not run
+until its tab is opened, which is the regression `TabsContent` would introduce.
 
 One test file per panel. The 13 existing tests are redistributed, not deleted:
 the 3 getting-started tests move to `AccountPanel.test.jsx`, and the 10 in
@@ -329,6 +335,7 @@ Modified:
 frontend/src/App.jsx                              three render sites, one import
 frontend/src/components/ConnectedApps.jsx         imports lib/scopes.js
 frontend/src/components/Consent.jsx               imports lib/scopes.js
+frontend/src/components/ProposalsPanel.jsx        imports lib/scopes.js
 frontend/src/components/ui/segmented-control.jsx  header comment
 frontend/src/App.test.jsx                         one comment
 ```
