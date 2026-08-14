@@ -164,6 +164,11 @@ field they are about:
 | server URL | self-hosted and empty | `Server URL is required.` |
 | invite code | short | `An invite code is 8 characters.` |
 
+The invite code is the one row that stays where it is, in `InviteGate.jsx:73`.
+It is a pre-flight before a network call rather than a blur rule, and the field
+auto-submits when its last cell fills, so there is no blur to hang it on. It
+gets the `Field` kit for its error slot and keeps its own check.
+
 Four rules govern when they appear, and each exists because the alternative is
 worse:
 
