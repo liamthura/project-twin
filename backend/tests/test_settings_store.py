@@ -50,3 +50,40 @@ def test_enabled_sections_force_includes_always_on(as_user):
     enabled = ss.enabled_sections()
     assert sections.ALWAYS_ON_SECTIONS <= enabled
     assert "circle" not in enabled
+
+
+def test_onboarding_defaults_for_an_account_that_predates_it(as_user):
+    assert ss.get_onboarding() == {"dismissed": False, "steps": {}}
+
+
+def test_onboarding_round_trips(as_user):
+    ss.set_onboarding({"dismissed": True, "steps": {"about-you": "done"}})
+    assert ss.get_onboarding() == {
+        "dismissed": True,
+        "steps": {"about-you": "done"},
+    }
+
+
+def test_onboarding_does_not_disturb_the_rest_of_the_blob(as_user):
+    ss.set_disabled_sections(["circle"])
+    ss.set_onboarding({"dismissed": True, "steps": {}})
+    assert ss.get_disabled_sections() == {"circle"}
+
+
+def test_onboarding_repairs_a_blob_written_by_hand(as_user):
+    # The settings blob is free-form on the Python side and nothing stops a
+    # future writer -- or a hand-edited row -- leaving a string here. Reading it
+    # must produce a usable shape rather than raising in a GET everything else
+    # depends on.
+    blob = ss.get_settings()
+    blob["onboarding"] = "yes"
+    ss.set_settings(blob)
+    assert ss.get_onboarding() == {"dismissed": False, "steps": {}}
+
+
+def test_onboarding_drops_steps_and_statuses_it_does_not_recognise(as_user):
+    # `welcome` collects nothing, so a status on it would record a page view.
+    ss.set_onboarding(
+        {"dismissed": False, "steps": {"welcome": "done", "about-you": "later"}}
+    )
+    assert ss.get_onboarding() == {"dismissed": False, "steps": {}}

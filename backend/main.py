@@ -695,6 +695,10 @@ async def update_file(file_type: str, update: FileUpdate):
 class SettingsUpdate(BaseModel):
     disabled_sections: list[str]
     enabled_sections: Optional[list[str]] = None
+    # Omitted means "not my business", not "clear it". Every existing caller
+    # sends only disabled_sections, and none of them may wipe onboarding
+    # progress as a side effect of toggling a section.
+    onboarding: Optional[dict] = None
 
 
 @app.get("/api/settings")
@@ -705,6 +709,7 @@ async def get_settings():
         "enabled_sections": sorted(settings_store.get_enabled_optins()),
         "toggleable": sorted(sections.toggleable_sections()),
         "always_on": sorted(sections.ALWAYS_ON_SECTIONS),
+        "onboarding": settings_store.get_onboarding(),
         "packs": [
             {
                 "key": key,
@@ -742,8 +747,28 @@ async def update_settings(update: SettingsUpdate):
                        f"Opt-in packs: {sorted(default_off)}",
             )
         settings_store.set_enabled_optins(sorted(set(update.enabled_sections)))
+    if update.onboarding is not None:
+        steps = update.onboarding.get("steps") or {}
+        if not isinstance(steps, dict):
+            raise HTTPException(status_code=400, detail="onboarding.steps must be an object")
+        bad_steps = set(steps) - settings_store.ONBOARDING_STEP_KEYS
+        if bad_steps:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown onboarding steps: {sorted(bad_steps)}. "
+                       f"Storable: {sorted(settings_store.ONBOARDING_STEP_KEYS)}",
+            )
+        bad_statuses = set(steps.values()) - settings_store.ONBOARDING_STATUSES
+        if bad_statuses:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown onboarding statuses: {sorted(bad_statuses)}. "
+                       f"Valid: {sorted(settings_store.ONBOARDING_STATUSES)}",
+            )
+        settings_store.set_onboarding(update.onboarding)
     return {"status": "saved", "disabled_sections": sorted(requested),
-            "enabled_sections": sorted(settings_store.get_enabled_optins())}
+            "enabled_sections": sorted(settings_store.get_enabled_optins()),
+            "onboarding": settings_store.get_onboarding()}
 
 
 @app.get("/api/all")
