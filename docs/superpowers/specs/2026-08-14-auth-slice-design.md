@@ -328,3 +328,54 @@ anyway (see the risk below).
   routing effects at `:137-182` coordinate all of them. A split along mode lines
   would duplicate that coordination three times. The Field kit is what takes
   lines out; the file should come down, not up.
+
+## What shipped
+
+Ten tasks, ten commits. Unit suite went from 1167 to 1219 tests across 67 to 69
+files; the Storybook project is unchanged at 4, as planned. `npm run build` is
+clean.
+
+Four things came out differently from the plan, and one sentence of this spec
+was wrong.
+
+**The blur rule, corrected.** This spec first said "tabbing through an untouched
+form does not paint it". It does, and it should: leaving a field empty is leaving
+it. The sentence was written before the behaviour existed and described
+something softer than what "on blur" means. Found by a test of my own that
+asserted no alert after returning to Username — the password it had tabbed
+through was legitimately empty. Rule 1 above now says what the form does.
+
+**The invite code's rule stayed in `InviteGate`.** Foreseen in the plan, and the
+reason holds: it guards a network call rather than a blur, and the field
+auto-submits when its last cell fills, so there is no blur to hang it on. It got
+the `Field` kit for its error slot and kept its own check.
+
+**`Field`'s children are a function.** Not settled when this spec was written.
+`<Field id label description error>{(control) => <Input {...control} … />}</Field>`
+— the render prop is what lets `Field` compute `aria-describedby` from knowledge
+of which of the two lines it actually rendered. Cloning the child breaks on
+controls that handle props themselves, and a context the control opts into
+cannot be used with a plain `<Input>`.
+
+**Prettier is not set up in this repo**, which is worth knowing before anyone
+reaches for it as I did. There is no config, so `npx prettier --write` applies
+its defaults and rewrote 63 lines of untouched code in `WelcomeAuth.jsx` on top
+of the change being made. Reverted and redone by hand; `git diff -w` on that
+commit is 61 insertions and 1 deletion, the rest being the reindent that
+wrapping two returns in `AuthShell` causes.
+
+**The mark's colour needed no fallback.** `--primary-foreground` is `0 0% 100%`
+in both `:root` and `.dark`, so `currentColor` through `text-primary-foreground`
+resolves to exactly what the inlined copy hardcoded. Checked in
+`globals.css:23,90` and in the built stylesheet rather than by eye, because the
+two are the same value by definition.
+
+Also verified rather than assumed: `aria-[invalid=true]:` compiles (two rules in
+the built CSS — `aria-invalid:` would have emitted nothing, silently), and
+`@radix-ui/react-checkbox@1.3.11` deduped against the pinned
+`react-primitive@2.1.10` and `react-presence@1.1.10` with no second copy.
+
+**The test guard came along.** `fix/runaway-test-guard` was rebased under this
+branch rather than left unmerged, because `src/renderers/rowRemovalConfirmation.test.jsx`
+— the file that span for two and a half days — is still in the suite and this
+slice ran it ten times. `main` had no wall clock until now.
