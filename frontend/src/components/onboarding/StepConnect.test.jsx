@@ -201,7 +201,7 @@ describe("StepConnect, the documentation link", () => {
     getInstanceMock.mockResolvedValue({ invite_only: false, mcp_oauth: true });
     renderStep();
 
-    const link = await screen.findByRole("link", { name: /setting this up in claude/i });
+    const link = await screen.findByRole("link", { name: /need help connecting/i });
     expect(link).toHaveAttribute(
       "href",
       `${window.location.origin}/docs/use/clients/#connecting-over-oauth`,
@@ -210,7 +210,7 @@ describe("StepConnect, the documentation link", () => {
 
   it("points at the token section on the key path", async () => {
     renderStep();
-    const link = await screen.findByRole("link", { name: /where the key goes/i });
+    const link = await screen.findByRole("link", { name: /need help connecting/i });
     expect(link).toHaveAttribute(
       "href",
       `${window.location.origin}/docs/use/clients/#using-a-token-instead`,
@@ -225,13 +225,27 @@ describe("StepConnect, the documentation link", () => {
     await user.click(await screen.findByRole("button", { name: /create a key/i }));
 
     expect(screen.getByText("mg_secret_value")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /where the key goes/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /need help connecting/i })).toBeInTheDocument();
   });
 
   it("opens in a new tab, because a shown-once key is lost by navigating away", async () => {
     renderStep();
-    const link = await screen.findByRole("link", { name: /where the key goes/i });
+    const link = await screen.findByRole("link", { name: /need help connecting/i });
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noreferrer");
+  });
+
+  it("sits on its own line rather than touching the button above it", async () => {
+    // The bug this pins: the anchor was inline-flex, so it shared a line with
+    // the inline-level Create-a-key button and the two rendered touching --
+    // `space-y` on the parent cannot separate inline siblings. Asserting the
+    // OLD class is GONE, not merely that the new one is present: a stale
+    // inline-flex left alongside would still lose the layout.
+    renderStep();
+    const link = await screen.findByRole("link", { name: /need help connecting/i });
+
+    expect(link.className).not.toMatch(/\binline-flex\b/);
+    expect(link.className).toMatch(/\bflex\b/);
+    expect(link.className).toMatch(/\bw-fit\b/);
   });
 });

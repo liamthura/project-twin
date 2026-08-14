@@ -95,6 +95,12 @@ function CopyRow({ id, label, value, hint }) {
  * Opens in a new tab, and not merely as a courtesy. A freshly minted key is
  * shown ONCE -- navigating away from this screen loses it for good, and the
  * reader would have no way of knowing that before clicking.
+ *
+ * `flex w-fit`, not `inline-flex`. An inline-level box sits on the same line as
+ * the inline-level button before it, and JSX strips the newline between them --
+ * so the two rendered touching, and the parent's `space-y` could not separate
+ * them because vertical margins only push apart block-level siblings. `w-fit`
+ * keeps the underline the width of the words rather than the whole row.
  */
 function DocsLink({ path, children }) {
   return (
@@ -102,7 +108,7 @@ function DocsLink({ path, children }) {
       href={docsUrl(path)}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-1 text-xs underline underline-offset-4 hover:text-foreground"
+      className="flex w-fit items-center gap-1 text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
     >
       {children}
       <ExternalLink className="h-3 w-3" aria-hidden="true" />
@@ -231,7 +237,7 @@ export function StepConnect({ onDelegate, onFillManually }) {
           />
 
           <DocsLink path="/use/clients/#connecting-over-oauth">
-            Setting this up in Claude, and in other clients
+            Need help connecting?
           </DocsLink>
         </div>
       )}
@@ -279,7 +285,7 @@ export function StepConnect({ onDelegate, onFillManually }) {
               {error && <p className="text-sm text-destructive">{error}</p>}
 
               <DocsLink path="/use/clients/#using-a-token-instead">
-                Where the key goes, per client
+                Need help connecting?
               </DocsLink>
             </div>
           )}
@@ -305,7 +311,7 @@ export function StepConnect({ onDelegate, onFillManually }) {
               block is gone by the time this one appears, and this is the moment
               someone actually needs to know where the key goes. */}
           <DocsLink path="/use/clients/#using-a-token-instead">
-            Where the key goes, per client
+            Need help connecting?
           </DocsLink>
         </div>
       )}
