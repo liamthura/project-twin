@@ -220,3 +220,21 @@ describe("someone who already has an account", () => {
     expect(onBack).toHaveBeenCalled();
   });
 });
+
+describe("the helper line", () => {
+  it("does not claim the dash is optional to type", () => {
+    // It was one text input when that sentence was written. The dash is now
+    // drawn between the two groups and cannot be typed into at all, so the
+    // promise was about a field that no longer exists.
+    open();
+
+    expect(screen.getByText(/case does not matter/i)).toBeInTheDocument();
+    expect(screen.queryByText(/the dash/i)).not.toBeInTheDocument();
+  });
+
+  it("still describes the field it belongs to", () => {
+    open();
+
+    expect(codeField()).toHaveAccessibleDescription(/closed testing/i);
+  });
+});
