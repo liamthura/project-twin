@@ -435,3 +435,61 @@ describe("what the sign-in screen no longer offers", () => {
     expect(screen.getByRole("button", { name: /^Server:/ })).toBeInTheDocument();
   });
 });
+
+describe("the card's heading is part of its state", () => {
+  // The heading used to be App's, set at the point WelcomeAuth was mounted, so
+  // it could not change when the form did: "Welcome to MyGist -- Sign in or
+  // create an account to get started" sat above the forgot-password form, and
+  // above the invite gate.
+  const heading = () => screen.getByRole("heading", { level: 1 }).textContent;
+  const waitForForm = () =>
+    waitFor(() => expect(screen.getByLabelText(/username/i)).toBeInTheDocument());
+
+  // Stated rather than inherited. clearAllMocks() empties the call log but
+  // leaves implementations in place, so an earlier block's
+  // mockResolvedValue({ invite_only: true }) is still in force here.
+  beforeEach(() => getInstance.mockResolvedValue({ invite_only: false }));
+
+  it("welcomes on sign-in", async () => {
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    await waitForForm();
+    expect(heading()).toMatch(/Welcome to MyGist/i);
+  });
+
+  it("changes when an account is being created", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    await waitForForm();
+    await user.click(screen.getByRole("button", { name: /create an account/i }));
+    expect(heading()).toMatch(/Create your account/i);
+  });
+
+  it("changes again for a password reset", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    await waitForForm();
+    await user.click(screen.getByRole("button", { name: /forgot your password/i }));
+    expect(heading()).toMatch(/Reset your password/i);
+  });
+
+  it("says what the sign-in is for when a client is waiting", async () => {
+    render(<WelcomeAuth intent="connect" onSuccess={() => {}} />);
+
+    await waitForForm();
+    expect(heading()).toMatch(/Sign in to connect/i);
+  });
+
+  it("names the gate rather than the welcome on an invite-only instance", async () => {
+    getInstance.mockResolvedValue({ invite_only: true });
+    const user = userEvent.setup();
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    await waitForForm();
+    await user.click(screen.getByRole("button", { name: /create an account/i }));
+    await screen.findByLabelText(/invite code/i);
+    expect(heading()).toMatch(/You need an invite/i);
+  });
+});

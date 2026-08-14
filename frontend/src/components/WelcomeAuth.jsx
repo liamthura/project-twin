@@ -20,6 +20,7 @@ import {
   normaliseInvite,
 } from "@/lib/session.js";
 import { InviteGate, AcceptedInvite } from "@/components/InviteGate";
+import { AuthShell } from "@/components/AuthShell";
 import {
   DEFAULT_AUTH_ROUTE,
   goToRoute,
@@ -57,11 +58,62 @@ const ORIGIN_API_URL =
     ? `${window.location.origin}/api`
     : CLOUD_API_URL;
 
+/**
+ * The card's heading, by what it is currently asking for.
+ *
+ * This used to live in App, at the point it mounted this component -- so the
+ * heading could not change when the form did, and "Welcome to MyGist. Sign in
+ * or create an account to get started" sat above the forgot-password form and
+ * above the invite gate.
+ *
+ * `intent` is the one thing App knows that this component does not: whether
+ * this is the app's own sign-in or the middle of an OAuth flow, where the
+ * person did not come here to sign in and is owed a sentence saying why they
+ * are being asked.
+ */
+const COPY = {
+  app: {
+    signin: {
+      title: "Welcome to MyGist",
+      description: "Your portable personal context for AI.",
+    },
+    signup: {
+      title: "Create your account",
+      description: "One account, and every AI client you use reads the same persona.",
+    },
+    forgot: {
+      title: "Reset your password",
+      description: "We will email you a link.",
+    },
+  },
+  connect: {
+    signin: {
+      title: "Sign in to connect",
+      description: "Sign in to let this application connect to your persona.",
+    },
+    signup: {
+      title: "Create your account",
+      description: "You will be asked to approve the connection next.",
+    },
+    forgot: {
+      title: "Reset your password",
+      description: "We will email you a link.",
+    },
+  },
+};
+
+// The gate reads the same under both intents: it is a statement about the
+// instance, and nothing about it changes because a client is waiting.
+const INVITE_COPY = {
+  title: "You need an invite",
+  description: "MyGist is in closed testing.",
+};
+
 // Welcome / sign-in form: username + password, with a "Create account"
 // toggle. Lives on the first-run welcome screen (see the `error &&
 // !getAuthToken()` branch below). On success it saves the config and hands
 // control back to the caller (which reloads app data).
-export function WelcomeAuth({ onSuccess }) {
+export function WelcomeAuth({ intent = "app", onSuccess }) {
   // The mode IS the route -- #/signin, #/signup, #/forgot. Seeded from the URL
   // so a deep link lands on the right screen, and written back to it on every
   // change so the address bar never describes a page nobody is looking at.
@@ -272,226 +324,234 @@ export function WelcomeAuth({ onSuccess }) {
     }
   };
 
+  const copy = needsInvite ? INVITE_COPY : COPY[intent][mode];
+
   if (needsInvite) {
     return (
-      <InviteGate
-        initialCode={linkInvite}
-        onAccepted={setAcceptedInvite}
-        onBack={() => switchMode("signin")}
-      />
+      <AuthShell title={copy.title} description={copy.description}>
+        <InviteGate
+          initialCode={linkInvite}
+          onAccepted={setAcceptedInvite}
+          onBack={() => switchMode("signin")}
+        />
+      </AuthShell>
     );
   }
 
   if (mode === "forgot") {
     return (
-      <div className="w-full space-y-4 text-left">
-        {resetSent ? (
-          // Deliberately says nothing about whether that address has an
-          // account. The service answers identically either way so a stranger
-          // cannot use this to find out who has signed up, and it would be a
-          // waste of that care to give it away in the copy.
-          <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
-            <p className="text-sm">
-              If <strong>{resetEmail.trim()}</strong> is on a MyGist account, a reset
-              link is on its way.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              The link works once and expires within the hour. Nothing has changed
-              until you open it.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleResetSubmit} className="space-y-4" noValidate>
-            <div className="space-y-1.5">
-              <Label htmlFor="reset-email" className="text-xs font-medium">
-                Email
-              </Label>
-              <Input
-                id="reset-email"
-                type="email"
-                autoComplete="email"
-                value={resetEmail}
-                onChange={(e) => setResetEmail(e.target.value)}
-                placeholder="you@example.com"
-              />
+      <AuthShell title={copy.title} description={copy.description}>
+        <div className="w-full space-y-4 text-left">
+          {resetSent ? (
+            // Deliberately says nothing about whether that address has an
+            // account. The service answers identically either way so a stranger
+            // cannot use this to find out who has signed up, and it would be a
+            // waste of that care to give it away in the copy.
+            <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+              <p className="text-sm">
+                If <strong>{resetEmail.trim()}</strong> is on a MyGist account, a reset
+                link is on its way.
+              </p>
               <p className="text-xs text-muted-foreground">
-                The address on your account. If you never added one, a reset cannot
-                reach you — sign in and add one first.
+                The link works once and expires within the hour. Nothing has changed
+                until you open it.
               </p>
             </div>
-
-            {formError && <p className="text-xs text-destructive">{formError}</p>}
-
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "Send reset link"
-              )}
-            </Button>
-          </form>
-        )}
-
-        <p className="text-center text-xs text-muted-foreground">
-          <button
-            type="button"
-            onClick={() => switchMode("signin")}
-            className="underline hover:text-foreground"
-          >
-            Back to sign in
-          </button>
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-full space-y-4 text-left">
-      {/* Which code is about to be spent, and a way back to change it. */}
-      {mode === "signup" && acceptedInvite && (
-        <AcceptedInvite code={acceptedInvite} onChange={() => setAcceptedInvite("")} />
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        <div className="space-y-1.5">
-          <Label htmlFor="welcome-username" className="text-xs font-medium">
-            {acceptsEmail ? "Username or email" : "Username"}
-          </Label>
-          <Input
-            id="welcome-username"
-            autoComplete="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder={acceptsEmail ? "yourname or you@example.com" : "yourname"}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="welcome-password" className="text-xs font-medium">
-            Password
-          </Label>
-          <Input
-            id="welcome-password"
-            type="password"
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
-          />
-        </div>
-        {mode === "signup" && (
-          <div className="space-y-1.5">
-            <Label htmlFor="welcome-confirm-password" className="text-xs font-medium">
-              Confirm password
-            </Label>
-            <Input
-              id="welcome-confirm-password"
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter password"
-            />
-          </div>
-        )}
-
-        {showServer && (
-          <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-left">
-            <Label className="text-xs font-medium">Server</Label>
-            <div className="flex rounded-lg bg-muted p-0.5">
-              <button
-                type="button"
-                onClick={() => setConnectionType("cloud")}
-                className={segmentClass(connectionType === "cloud")}
-              >
-                <Globe className="h-4 w-4" />
-                Cloud
-              </button>
-              <button
-                type="button"
-                onClick={() => setConnectionType("self-hosted")}
-                className={segmentClass(connectionType === "self-hosted")}
-              >
-                <Server className="h-4 w-4" />
-                Self-hosted
-              </button>
-            </div>
-            {connectionType === "self-hosted" && (
-              <Input
-                placeholder="https://your-mygist-server.com/api"
-                value={selfHostedUrl}
-                onChange={(e) => setSelfHostedUrl(e.target.value)}
-              />
-            )}
-          </div>
-        )}
-
-        {formError && <p className="text-xs text-destructive">{formError}</p>}
-
-        <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : mode === "signup" ? (
-            "Create account"
           ) : (
-            "Sign in"
-          )}
-        </Button>
-      </form>
+            <form onSubmit={handleResetSubmit} className="space-y-4" noValidate>
+              <div className="space-y-1.5">
+                <Label htmlFor="reset-email" className="text-xs font-medium">
+                  Email
+                </Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  autoComplete="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder="you@example.com"
+                />
+                <p className="text-xs text-muted-foreground">
+                  The address on your account. If you never added one, a reset cannot
+                  reach you — sign in and add one first.
+                </p>
+              </div>
 
-      <p className="text-center text-xs text-muted-foreground">
-        {mode === "signup" ? (
-          <>
-            Already have an account?{" "}
+              {formError && <p className="text-xs text-destructive">{formError}</p>}
+
+              <Button type="submit" className="w-full" disabled={pending}>
+                {pending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Send reset link"
+                )}
+              </Button>
+            </form>
+          )}
+
+          <p className="text-center text-xs text-muted-foreground">
             <button
               type="button"
               onClick={() => switchMode("signin")}
               className="underline hover:text-foreground"
             >
-              Sign in
+              Back to sign in
             </button>
-          </>
-        ) : (
-          <>
-            New to MyGist?{" "}
-            <button
-              type="button"
-              onClick={() => switchMode("signup")}
-              className="underline hover:text-foreground"
-            >
-              Create an account
-            </button>
-            {/* Reset runs through Better Auth, which is same-origin only.
-                Detached mode talks to the old endpoints, which have no reset
-                at all -- offering it there would be a dead end. */}
-            {!isDetached(serverUrl) && (
-              <>
-                <br />
+          </p>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  return (
+    <AuthShell title={copy.title} description={copy.description}>
+      <div className="w-full space-y-4 text-left">
+        {/* Which code is about to be spent, and a way back to change it. */}
+        {mode === "signup" && acceptedInvite && (
+          <AcceptedInvite code={acceptedInvite} onChange={() => setAcceptedInvite("")} />
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <div className="space-y-1.5">
+            <Label htmlFor="welcome-username" className="text-xs font-medium">
+              {acceptsEmail ? "Username or email" : "Username"}
+            </Label>
+            <Input
+              id="welcome-username"
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder={acceptsEmail ? "yourname or you@example.com" : "yourname"}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="welcome-password" className="text-xs font-medium">
+              Password
+            </Label>
+            <Input
+              id="welcome-password"
+              type="password"
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
+            />
+          </div>
+          {mode === "signup" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="welcome-confirm-password" className="text-xs font-medium">
+                Confirm password
+              </Label>
+              <Input
+                id="welcome-confirm-password"
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter password"
+              />
+            </div>
+          )}
+
+          {showServer && (
+            <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-left">
+              <Label className="text-xs font-medium">Server</Label>
+              <div className="flex rounded-lg bg-muted p-0.5">
                 <button
                   type="button"
-                  onClick={() => switchMode("forgot")}
-                  className="underline hover:text-foreground"
+                  onClick={() => setConnectionType("cloud")}
+                  className={segmentClass(connectionType === "cloud")}
                 >
-                  Forgot your password?
+                  <Globe className="h-4 w-4" />
+                  Cloud
                 </button>
-              </>
-            )}
-          </>
-        )}
-      </p>
+                <button
+                  type="button"
+                  onClick={() => setConnectionType("self-hosted")}
+                  className={segmentClass(connectionType === "self-hosted")}
+                >
+                  <Server className="h-4 w-4" />
+                  Self-hosted
+                </button>
+              </div>
+              {connectionType === "self-hosted" && (
+                <Input
+                  placeholder="https://your-mygist-server.com/api"
+                  value={selfHostedUrl}
+                  onChange={(e) => setSelfHostedUrl(e.target.value)}
+                />
+              )}
+            </div>
+          )}
 
-      {/* "Use an access token instead" used to share this row. Deleted per the
-          prototype's change 5 -- Better Auth supersedes it -- and the cost is
-          recorded in the auth slice spec: a first run with no account now has
-          no way to paste a bare token. */}
-      <div className="flex items-center justify-center border-t pt-3 text-xs text-muted-foreground">
-        <button
-          type="button"
-          onClick={() => setShowServer((v) => !v)}
-          className="underline hover:text-foreground"
-        >
-          Server: {connectionType === "cloud" ? "Cloud" : "Self-hosted"}
-        </button>
+          {formError && <p className="text-xs text-destructive">{formError}</p>}
+
+          <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : mode === "signup" ? (
+              "Create account"
+            ) : (
+              "Sign in"
+            )}
+          </Button>
+        </form>
+
+        <p className="text-center text-xs text-muted-foreground">
+          {mode === "signup" ? (
+            <>
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={() => switchMode("signin")}
+                className="underline hover:text-foreground"
+              >
+                Sign in
+              </button>
+            </>
+          ) : (
+            <>
+              New to MyGist?{" "}
+              <button
+                type="button"
+                onClick={() => switchMode("signup")}
+                className="underline hover:text-foreground"
+              >
+                Create an account
+              </button>
+              {/* Reset runs through Better Auth, which is same-origin only.
+                  Detached mode talks to the old endpoints, which have no reset
+                  at all -- offering it there would be a dead end. */}
+              {!isDetached(serverUrl) && (
+                <>
+                  <br />
+                  <button
+                    type="button"
+                    onClick={() => switchMode("forgot")}
+                    className="underline hover:text-foreground"
+                  >
+                    Forgot your password?
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </p>
+
+        {/* "Use an access token instead" used to share this row. Deleted per the
+            prototype's change 5 -- Better Auth supersedes it -- and the cost is
+            recorded in the auth slice spec: a first run with no account now has
+            no way to paste a bare token. */}
+        <div className="flex items-center justify-center border-t pt-3 text-xs text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => setShowServer((v) => !v)}
+            className="underline hover:text-foreground"
+          >
+            Server: {connectionType === "cloud" ? "Cloud" : "Self-hosted"}
+          </button>
+        </div>
       </div>
-    </div>
+    </AuthShell>
   );
 }
