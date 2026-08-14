@@ -493,3 +493,131 @@ describe("the card's heading is part of its state", () => {
     expect(heading()).toMatch(/You need an invite/i);
   });
 });
+
+describe("validation arrives per field, on blur", () => {
+  beforeEach(() => getInstance.mockResolvedValue({ invite_only: false }));
+
+  const openSignIn = async () => {
+    render(<WelcomeAuth onSuccess={() => {}} />);
+    await waitFor(() => expect(screen.getByLabelText(/username/i)).toBeInTheDocument());
+  };
+
+  it("is silent on a form nobody has touched", async () => {
+    await openSignIn();
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("names the empty field when it is left", async () => {
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.click(screen.getByLabelText(/username/i));
+    await user.tab();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a username or email.");
+  });
+
+  it("marks that field invalid, not the form", async () => {
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.click(screen.getByLabelText(/username/i));
+    await user.tab();
+
+    expect(screen.getByLabelText(/username/i)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/^password/i)).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("clears as the fix is typed, not on the next blur", async () => {
+    // A red message under the box being corrected is the thing this rule
+    // exists to prevent.
+    //
+    // Asserted on this field's own message rather than on any alert: tabbing
+    // out of Username puts focus in Password, and coming back here leaves
+    // Password blurred and empty, which correctly earns a message of its own.
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.click(screen.getByLabelText(/username/i));
+    await user.tab();
+    expect(screen.getByText("Enter a username or email.")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/username/i), "l");
+
+    expect(screen.queryByText("Enter a username or email.")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("still checks everything on a submit where nothing was blurred", async () => {
+    // Enter submits a form in which no field was ever left.
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    const messages = screen.getAllByRole("alert").map((el) => el.textContent);
+    expect(messages).toContain("Enter a username or email.");
+    expect(messages).toContain("Enter a password.");
+  });
+
+  it("holds a new password to eight characters, and only when signing up", async () => {
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.type(screen.getByLabelText(/^password/i), "short");
+    await user.tab();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /create an account/i }));
+    await user.type(screen.getByLabelText(/^password/i), "short");
+    await user.tab();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Password must be at least 8 characters.",
+    );
+  });
+
+  it("reports a mismatch under Confirm, where the correction goes", async () => {
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.click(screen.getByRole("button", { name: /create an account/i }));
+    await user.type(screen.getByLabelText(/^password/i), "a-good-password");
+    await user.type(screen.getByLabelText(/confirm password/i), "a-good-passwerd");
+    await user.tab();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Passwords do not match.");
+  });
+
+  it("stops saying they differ once the first field is the one that changed", async () => {
+    // Fixing Password leaves a stale mismatch under Confirm unless the pair is
+    // re-checked when either side moves.
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.click(screen.getByRole("button", { name: /create an account/i }));
+    await user.type(screen.getByLabelText(/^password/i), "a-good-passwerd");
+    await user.type(screen.getByLabelText(/confirm password/i), "a-good-password");
+    await user.tab();
+    expect(screen.getByRole("alert")).toHaveTextContent("Passwords do not match.");
+
+    await user.clear(screen.getByLabelText(/^password/i));
+    await user.type(screen.getByLabelText(/^password/i), "a-good-password");
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps the form-level line for what the server says", async () => {
+    const user = userEvent.setup();
+    signIn.mockImplementation(() => Promise.reject(new Error("Invalid username or password")));
+    await openSignIn();
+
+    await user.type(screen.getByLabelText(/username/i), "liamthura");
+    await user.type(screen.getByLabelText(/^password/i), "a-good-password");
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Invalid username or password")).toBeInTheDocument(),
+    );
+  });
+});

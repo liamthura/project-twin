@@ -21,6 +21,14 @@ import {
 } from "@/lib/session.js";
 import { InviteGate, AcceptedInvite } from "@/components/InviteGate";
 import { AuthShell } from "@/components/AuthShell";
+import { Field } from "@/components/ui/field";
+import {
+  validateUsername,
+  validatePassword,
+  validateConfirmPassword,
+  validateResetEmail,
+  validateServerUrl,
+} from "@/lib/authValidation.js";
 import {
   DEFAULT_AUTH_ROUTE,
   goToRoute,
@@ -134,6 +142,12 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState(null);
   const [showServer, setShowServer] = useState(false);
+  // Which fields have been left, and what is currently wrong with each. Two
+  // pieces of state rather than one, because a field can be untouched AND
+  // invalid -- nothing typed yet -- and the difference is exactly what decides
+  // whether to say so.
+  const [touched, setTouched] = useState({});
+  const [errors, setErrors] = useState({});
   // MyGist ships as one container serving both this page and /api, so the
   // server that handed you this form is almost always the one you want to
   // authenticate against -- and `getApiBase()` already defaults to the
@@ -243,16 +257,65 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
     setPassword("");
     setConfirmPassword("");
     setResetSent(false);
+    // Otherwise "Enter a password" follows you from sign-in onto the sign-up
+    // form, about a field that has just been cleared.
+    setTouched({});
+    setErrors({});
   };
+
+  /**
+   * Every field's rule at once. One function so the blur path and the submit
+   * path cannot come to disagree about what counts as valid -- which is how the
+   * old code ended up checking the server URL only on submit.
+   *
+   * Fields that are not on screen are left out rather than passed: a key that is
+   * absent cannot be reported, and `mode` decides which exist.
+   */
+  const checkAll = () => ({
+    username: validateUsername(username, { acceptsEmail }),
+    password: validatePassword(password, { isNew: mode === "signup" }),
+    ...(mode === "signup"
+      ? { confirmPassword: validateConfirmPassword(confirmPassword, password) }
+      : {}),
+    ...(connectionType === "self-hosted" && showServer
+      ? { selfHostedUrl: validateServerUrl(selfHostedUrl) }
+      : {}),
+  });
+
+  const blur = (field) => () => {
+    setTouched((t) => ({ ...t, [field]: true }));
+    setErrors(checkAll());
+  };
+
+  /**
+   * Cleared as the fix is typed, not on the next blur. The alternative leaves a
+   * red message under the box being corrected.
+   *
+   * More than one field name for the password pair: typing in Password clears
+   * both its own message and Confirm's now-stale mismatch.
+   */
+  const change =
+    (setter, ...fields) =>
+    (e) => {
+      setter(e.target.value);
+      setErrors((prev) => {
+        const next = { ...prev };
+        for (const field of fields) delete next[field];
+        return next;
+      });
+    };
+
+  /** Shown once the field has been left, or once submit has touched everything. */
+  const shown = (field) => (touched[field] ? errors[field] : undefined);
 
   const handleResetSubmit = async (e) => {
     e.preventDefault();
     setFormError(null);
 
-    if (!resetEmail.trim()) {
-      setFormError("Enter the email on your account.");
-      return;
-    }
+    const emailError = validateResetEmail(resetEmail);
+    setTouched((t) => ({ ...t, resetEmail: true }));
+    setErrors((prev) => ({ ...prev, resetEmail: emailError }));
+    if (emailError) return;
 
     setPending(true);
     try {
@@ -269,24 +332,17 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
     e.preventDefault();
     setFormError(null);
 
-    if (!username.trim() || !password) {
-      setFormError("Enter a username and password.");
-      return;
-    }
-    if (connectionType === "self-hosted" && !selfHostedUrl.trim()) {
-      setFormError("Server URL is required.");
-      return;
-    }
-    if (mode === "signup") {
-      if (password.length < 8) {
-        setFormError("Password must be at least 8 characters.");
-        return;
-      }
-      if (password !== confirmPassword) {
-        setFormError("Passwords do not match.");
-        return;
-      }
-    }
+    // Everything is marked touched so a form submitted by Enter reports all of
+    // its problems, rather than the first one an if-chain happened to reach.
+    const found = checkAll();
+    setErrors(found);
+    setTouched({
+      username: true,
+      password: true,
+      confirmPassword: true,
+      selfHostedUrl: true,
+    });
+    if (Object.values(found).some(Boolean)) return;
 
     setPending(true);
     try {
@@ -359,23 +415,34 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
             </div>
           ) : (
             <form onSubmit={handleResetSubmit} className="space-y-4" noValidate>
-              <div className="space-y-1.5">
-                <Label htmlFor="reset-email" className="text-xs font-medium">
-                  Email
-                </Label>
-                <Input
-                  id="reset-email"
-                  type="email"
-                  autoComplete="email"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  placeholder="you@example.com"
-                />
-                <p className="text-xs text-muted-foreground">
-                  The address on your account. If you never added one, a reset cannot
-                  reach you — sign in and add one first.
-                </p>
-              </div>
+              <Field
+                id="reset-email"
+                label="Email"
+                description="The address on your account. If you never added one, a reset cannot reach you — sign in and add one first."
+                error={shown("resetEmail")}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    type="email"
+                    autoComplete="email"
+                    value={resetEmail}
+                    onChange={change(setResetEmail, "resetEmail")}
+                    // Its own handler rather than blur("resetEmail"): checkAll
+                    // covers the sign-in form's fields, and running it here
+                    // would mark a username and password invalid on a screen
+                    // that is not showing either.
+                    onBlur={() => {
+                      setTouched((t) => ({ ...t, resetEmail: true }));
+                      setErrors((prev) => ({
+                        ...prev,
+                        resetEmail: validateResetEmail(resetEmail),
+                      }));
+                    }}
+                    placeholder="you@example.com"
+                  />
+                )}
+              </Field>
 
               {formError && <p className="text-xs text-destructive">{formError}</p>}
 
@@ -412,45 +479,55 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <div className="space-y-1.5">
-            <Label htmlFor="welcome-username" className="text-xs font-medium">
-              {acceptsEmail ? "Username or email" : "Username"}
-            </Label>
-            <Input
-              id="welcome-username"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder={acceptsEmail ? "yourname or you@example.com" : "yourname"}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="welcome-password" className="text-xs font-medium">
-              Password
-            </Label>
-            <Input
-              id="welcome-password"
-              type="password"
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
-            />
-          </div>
-          {mode === "signup" && (
-            <div className="space-y-1.5">
-              <Label htmlFor="welcome-confirm-password" className="text-xs font-medium">
-                Confirm password
-              </Label>
+          <Field
+            id="welcome-username"
+            label={acceptsEmail ? "Username or email" : "Username"}
+            error={shown("username")}
+          >
+            {(control) => (
               <Input
-                id="welcome-confirm-password"
-                type="password"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Re-enter password"
+                {...control}
+                autoComplete="username"
+                value={username}
+                onChange={change(setUsername, "username")}
+                onBlur={blur("username")}
+                placeholder={acceptsEmail ? "yourname or you@example.com" : "yourname"}
               />
-            </div>
+            )}
+          </Field>
+          <Field id="welcome-password" label="Password" error={shown("password")}>
+            {(control) => (
+              <Input
+                {...control}
+                type="password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                value={password}
+                // Clears Confirm's message too: fixing this field is what makes
+                // a mismatch under the next one stale.
+                onChange={change(setPassword, "password", "confirmPassword")}
+                onBlur={blur("password")}
+                placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
+              />
+            )}
+          </Field>
+          {mode === "signup" && (
+            <Field
+              id="welcome-confirm-password"
+              label="Confirm password"
+              error={shown("confirmPassword")}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={change(setConfirmPassword, "confirmPassword")}
+                  onBlur={blur("confirmPassword")}
+                  placeholder="Re-enter password"
+                />
+              )}
+            </Field>
           )}
 
           {showServer && (
@@ -475,11 +552,21 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
                 </button>
               </div>
               {connectionType === "self-hosted" && (
-                <Input
-                  placeholder="https://your-mygist-server.com/api"
-                  value={selfHostedUrl}
-                  onChange={(e) => setSelfHostedUrl(e.target.value)}
-                />
+                <Field
+                  id="welcome-server-url"
+                  label="Server URL"
+                  error={shown("selfHostedUrl")}
+                >
+                  {(control) => (
+                    <Input
+                      {...control}
+                      placeholder="https://your-mygist-server.com/api"
+                      value={selfHostedUrl}
+                      onChange={change(setSelfHostedUrl, "selfHostedUrl")}
+                      onBlur={blur("selfHostedUrl")}
+                    />
+                  )}
+                </Field>
               )}
             </div>
           )}

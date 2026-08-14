@@ -172,8 +172,11 @@ gets the `Field` kit for its error slot and keeps its own check.
 Four rules govern when they appear, and each exists because the alternative is
 worse:
 
-1. **A field is checked on blur only once it has been touched.** Nothing is red
-   on first render, and tabbing through an untouched form does not paint it.
+1. **A field is checked when it is left, and not before.** Nothing is red on
+   first render or while a field is still being typed into. Leaving a field
+   empty does count as leaving it, so tabbing through the form does report the
+   fields tabbed past — that is the intended reading of "on blur", and it is
+   what the sign-in form now does.
 2. **An error clears on change, not on the next blur.** The alternative is a red
    field with a red message sitting under the correction being typed into it.
    `WaitlistForm.jsx:117-121` already works this way.
