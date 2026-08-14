@@ -8,10 +8,8 @@ import {
   Key,
   Laptop,
   Globe,
-  Copy,
   User,
   LogOut,
-  Trash2,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -38,16 +36,13 @@ import {
   whoami,
   getApiBase,
   setPassword,
-  listTokens,
-  createToken,
-  revokeToken,
 } from "@/lib/api.js";
 import { signOut } from "@/lib/session.js";
-import { READ, PROPOSE, WRITE } from "@/lib/scopes.js";
 import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
 import { EmailSettings } from "@/components/EmailSettings";
 import { AppsPanel } from "@/components/settings/AppsPanel";
 import { DataPanel } from "@/components/settings/DataPanel";
+import { TokenPanel } from "@/components/settings/TokenPanel";
 
 const TABS = [
   { id: "connection", label: "Connection" },
@@ -55,13 +50,6 @@ const TABS = [
   { id: "apps", label: "Connected apps" },
   { id: "data", label: "Data" },
 ];
-
-function formatDate(iso) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
-}
 
 export function ConnectionSettings({
   isOpen,
@@ -119,23 +107,6 @@ export function ConnectionSettings({
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState(null);
 
-  // API tokens tab
-  const [tokensList, setTokensList] = useState([]);
-  const [tokensLoading, setTokensLoading] = useState(false);
-  const [tokensError, setTokensError] = useState(null);
-  const [newTokenLabel, setNewTokenLabel] = useState("mcp");
-  const [generating, setGenerating] = useState(false);
-  const [revealedToken, setRevealedToken] = useState(null); // { id, label, token }
-  const [copied, setCopied] = useState(false);
-  const [confirmRevokeId, setConfirmRevokeId] = useState(null);
-  const [revokingId, setRevokingId] = useState(null);
-  // The scope choice for the next minted token. write implies propose
-  // (write ⊃ propose ⊃ read), same rule and same handlers as Consent.jsx's
-  // scope-implication logic -- read has no toggle because it is the floor
-  // for every token, not a choice.
-  const [tokenPropose, setTokenPropose] = useState(true);
-  const [tokenWrite, setTokenWrite] = useState(true);
-
   useEffect(() => {
     if (!isOpen) return;
 
@@ -161,15 +132,6 @@ export function ConnectionSettings({
     setConfirmNewPassword("");
     setPasswordError(null);
 
-    setTokensList([]);
-    setTokensError(null);
-    setNewTokenLabel("mcp");
-    setRevealedToken(null);
-    setCopied(false);
-    setConfirmRevokeId(null);
-    setTokenPropose(true);
-    setTokenWrite(true);
-
     // Ask the server rather than inferring from localStorage. There used to be
     // a token there for every signed-in account, so `!!config?.token` was a
     // fair proxy; with Better Auth the credential is an HttpOnly cookie that
@@ -193,40 +155,6 @@ export function ConnectionSettings({
         setSignedInUsername(null);
       });
   }, [isOpen]);
-
-  const loadTokens = async () => {
-    setTokensLoading(true);
-    setTokensError(null);
-    try {
-      const list = await listTokens();
-      setTokensList(list);
-    } catch (err) {
-      setTokensError(err.message);
-    } finally {
-      setTokensLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen && activeTab === "tokens" && isSignedIn) {
-      loadTokens();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, activeTab, isSignedIn]);
-
-  // write implies propose (write ⊃ propose ⊃ read): both start selected, and
-  // these keep that implication true no matter what gets toggled, rather
-  // than letting a click build a scope choice that means nothing -- same
-  // rule as Consent.jsx's onWriteChange/onProposeChange.
-  const onTokenWriteChange = (next) => {
-    setTokenWrite(next);
-    if (next) setTokenPropose(true);
-  };
-
-  const onTokenProposeChange = (next) => {
-    setTokenPropose(next);
-    if (!next) setTokenWrite(false);
-  };
 
   const selectCloud = () => {
     setConnectionType("cloud");
@@ -329,61 +257,6 @@ export function ConnectionSettings({
       setPasswordError(err.message);
     } finally {
       setPasswordSaving(false);
-    }
-  };
-
-  const handleGenerateToken = async () => {
-    setGenerating(true);
-    try {
-      const tokenScopes = [READ, ...(tokenPropose ? [PROPOSE] : []), ...(tokenWrite ? [WRITE] : [])];
-      const result = await createToken(newTokenLabel.trim() || "mcp", tokenScopes);
-      setRevealedToken(result);
-      setCopied(false);
-    } catch (err) {
-      toast({
-        title: "Failed to generate token",
-        description: err.message,
-        variant: "destructive",
-      });
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleCopyRevealedToken = async () => {
-    if (!revealedToken) return;
-    try {
-      await navigator.clipboard.writeText(revealedToken.token);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard unavailable; token stays visible for manual copy
-    }
-  };
-
-  const handleDoneReveal = () => {
-    setRevealedToken(null);
-    setNewTokenLabel("mcp");
-    setTokenPropose(true);
-    setTokenWrite(true);
-    loadTokens();
-  };
-
-  const handleRevoke = async (id) => {
-    setRevokingId(id);
-    try {
-      await revokeToken(id);
-      setConfirmRevokeId(null);
-      toast({ title: "Token revoked", variant: "success" });
-      loadTokens();
-    } catch (err) {
-      toast({
-        title: "Failed to revoke token",
-        description: err.message,
-        variant: "destructive",
-      });
-    } finally {
-      setRevokingId(null);
     }
   };
 
@@ -675,168 +548,7 @@ export function ConnectionSettings({
           </div>
         )}
 
-        {activeTab === "tokens" && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Tokens let AI clients (Claude, MCP) access your MyGist.
-            </p>
-
-            {revealedToken ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3 text-sm">
-                  <Check className="h-4 w-4 flex-shrink-0 text-primary" />
-                  <span>
-                    Token <strong>{revealedToken.label}</strong> created.
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  <Label>Token</Label>
-                  <div className="select-all break-all rounded-lg border bg-muted/50 p-3 font-mono text-sm">
-                    {revealedToken.token}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={handleCopyRevealedToken}
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="h-4 w-4 mr-2" />
-                        Copied
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy token
-                      </>
-                    )}
-                  </Button>
-                </div>
-                <div className="flex gap-2 rounded-lg border p-3 text-xs text-muted-foreground">
-                  <Key className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                  <span>
-                    This token won&apos;t be shown again. Save it in a password
-                    manager or somewhere safe.
-                  </span>
-                </div>
-                <Button className="w-full" onClick={handleDoneReveal}>
-                  Done
-                </Button>
-              </div>
-            ) : (
-              <>
-                {tokensLoading ? (
-                  <div className="flex items-center justify-center py-6 text-muted-foreground">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  </div>
-                ) : tokensError ? (
-                  <p className="text-sm text-destructive">{tokensError}</p>
-                ) : tokensList.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No tokens yet. Generate one below to connect an AI client.
-                  </p>
-                ) : (
-                  <div className="rounded-lg border divide-y">
-                    {tokensList.map((t) => (
-                      <div
-                        key={t.id}
-                        className="flex items-center justify-between gap-3 p-3"
-                      >
-                        <div className="min-w-0 space-y-1">
-                          <p className="truncate text-sm font-medium">{t.label}</p>
-                          <p className="font-mono text-xs text-muted-foreground">
-                            created {formatDate(t.created_at) || "unknown"} &middot;{" "}
-                            last used {formatDate(t.last_used_at) || "never"}
-                          </p>
-                        </div>
-                        {confirmRevokeId === t.id ? (
-                          <div className="flex shrink-0 gap-2">
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleRevoke(t.id)}
-                              disabled={revokingId === t.id}
-                            >
-                              {revokingId === t.id ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                "Revoke"
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setConfirmRevokeId(null)}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="shrink-0 text-muted-foreground hover:text-destructive"
-                            onClick={() => setConfirmRevokeId(t.id)}
-                            title="Revoke token"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="space-y-3 border-t pt-4">
-                  <Label htmlFor="new-token-label">Generate token</Label>
-                  <Input
-                    id="new-token-label"
-                    placeholder="mcp"
-                    value={newTokenLabel}
-                    onChange={(e) => setNewTokenLabel(e.target.value)}
-                  />
-
-                  <div className="space-y-3 rounded-lg border p-3">
-                    <TokenScopeRow
-                      id="token-scope-read"
-                      label="Read your persona"
-                      help="Always granted -- a token needs this to do anything."
-                      checked
-                      disabled
-                    />
-                    <TokenScopeRow
-                      id="token-scope-propose"
-                      label="Suggest changes for your approval"
-                      help={
-                        tokenWrite
-                          ? "Included -- direct changes below need this too."
-                          : "Changes wait for you to approve them before they apply."
-                      }
-                      checked={tokenPropose}
-                      onCheckedChange={onTokenProposeChange}
-                    />
-                    <TokenScopeRow
-                      id="token-scope-write"
-                      label="Change your persona directly"
-                      help="Applied immediately, without asking first."
-                      checked={tokenWrite}
-                      onCheckedChange={onTokenWriteChange}
-                    />
-                  </div>
-
-                  <Button onClick={handleGenerateToken} disabled={generating} className="w-full">
-                    {generating ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      "Generate token"
-                    )}
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+        {activeTab === "tokens" && <TokenPanel isOpen />}
 
         {activeTab === "apps" && <AppsPanel isOpen />}
 
@@ -871,29 +583,6 @@ export function ConnectionSettings({
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-// Same shape as Consent.jsx's ScopeRow -- the scope choice here is the same
-// three-way decision, just for a manually minted token instead of an OAuth
-// grant, so it reuses that presentation rather than inventing a second one.
-function TokenScopeRow({ id, label, help, checked, disabled, onCheckedChange }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="space-y-0.5 pr-2">
-        <Label htmlFor={id} className="text-sm font-medium">
-          {label}
-        </Label>
-        <p className="text-xs text-muted-foreground">{help}</p>
-      </div>
-      <Switch
-        id={id}
-        checked={checked}
-        disabled={disabled}
-        onCheckedChange={onCheckedChange ?? (() => {})}
-        className="mt-0.5 shrink-0"
-      />
-    </div>
   );
 }
 
