@@ -3,8 +3,8 @@ title: Quick start
 description: From nothing to a connected assistant in about ten minutes.
 ---
 
-By the end of this page you will have an account, an access token, a connected
-AI client, and a few real facts stored.
+By the end of this page you will have an account, a connected AI client, and a
+few real facts stored.
 
 <Callout>
 This page assumes a MyGist server is already running, either a hosted instance
@@ -48,24 +48,70 @@ The response carries your first token:
 </Accordion>
 </Accordions>
 
-There are two kinds of credential, and it helps to know which is which:
+There are three kinds of credential, and it helps to know which is which:
 
 | | Used by | Expires |
 |---|---|---|
 | **Username and password** | You, in a browser | Sign-in sessions last 30 days |
-| **Bearer token** | AI clients, scripts | Never, until you revoke it |
+| **An OAuth connection** | A client that can open a browser | Short-lived, and the client renews it itself |
+| **A bearer token** | Clients and scripts that cannot | Never, until you revoke it |
 
-Both point at the same persona. Every read and write is scoped to the account
-behind the credential, so two accounts on one server cannot see each other.
+All three point at the same persona. Every read and write is scoped to the
+account behind the credential, so two accounts on one server cannot see each
+other.
 
 </Step>
 
 <Step>
 
-## Create a token for your client
+## Connect your AI client
 
-Open **Account → API tokens** and create one. Give it a name that says what it
-is for, like `claude-desktop` or `laptop-cli`.
+MyGist's MCP server runs over HTTP, so clients connect by **URL** rather than by
+launching a local process:
+
+```text
+https://mygist.thuradev.qzz.io/mcp    # a hosted instance
+http://127.0.0.1:1120/mcp             # one on your own machine
+```
+
+Give the client that address. Where it supports OAuth, that is the whole
+configuration: no token to create, paste or renew.
+
+A browser opens, you sign in, and a consent screen names the client and the
+account before anything is granted:
+
+> **Claude Desktop** wants to connect to **your-username**'s persona
+
+Check that name, then choose what to allow. Reading is always on; suggesting
+changes and writing directly are both checked to begin with, and you can uncheck
+either. [Other clients](/use/clients#choose-what-to-grant) explains what each
+line means, and how to change your mind later.
+
+Approve it and you are done. The client holds a short-lived token that it
+refreshes on its own.
+
+<Callout>
+OAuth has to be switched on for the instance you are connecting to. The hosted
+instance has it; a server you started yourself does not unless you set
+`AUTH_MCP_RESOURCE`. To check:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' \
+  https://your-instance/.well-known/oauth-protected-resource
+```
+
+`200` means OAuth is available. `404` means use a token instead, below.
+</Callout>
+
+<Accordions>
+<Accordion title="No OAuth? Connect with a token instead">
+
+Needed for a client that has no browser to open, one that has not implemented
+remote MCP authorization yet, or an instance with OAuth switched off. It is the
+same access, configured by hand.
+
+Start by creating the token. Open **Account → API tokens** and make one, named
+for what it is for, like `claude-desktop` or `laptop-cli`.
 
 <Screenshot
   caption="Account → API tokens, with a new token being created"
@@ -77,21 +123,10 @@ The token is shown **once**, at the moment it is created. Copy it now. There is
 no way to read it back later, only to revoke it and issue a new one.
 </Callout>
 
-Use a separate token for each client. Then revoking one does not disconnect
+Use a separate token for each client, so revoking one does not disconnect
 everything else you have set up.
 
-</Step>
-
-<Step>
-
-## Connect your AI client
-
-MyGist's MCP server runs over HTTP, so clients connect by **URL** rather than by
-launching a local process. The token goes in an `Authorization` header.
-
-### Claude Desktop
-
-Edit the config file:
+For Claude Desktop, edit the config file:
 
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
@@ -113,25 +148,24 @@ For a local server, use `http://127.0.0.1:1120/mcp`.
 
 Then restart Claude Desktop completely: quit it, do not close the window.
 
-### Claude Code
-
-One command, no file editing:
+For Claude Code, one command does it with no file editing:
 
 ```bash
 claude mcp add --transport http mygist https://mygist.thuradev.qzz.io/mcp \
   --header "Authorization: Bearer YOUR_TOKEN"
 ```
 
-### Something else
-
-See [Other clients](/use/clients).
-
 <Callout>
 Config shapes for remote MCP servers have changed between client versions, and
-different clients disagree about where headers go. If the shape above does not
-match what your client expects, check that client's own documentation. The URL
-and the bearer token are the parts that never change.
+clients disagree about where headers go. If the shape above does not match what
+your client expects, check that client's own documentation. The URL and the
+bearer token are the parts that never change.
 </Callout>
+
+</Accordion>
+</Accordions>
+
+For anything not named here, see [Other clients](/use/clients).
 
 </Step>
 
