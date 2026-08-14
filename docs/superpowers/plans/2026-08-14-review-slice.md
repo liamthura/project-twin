@@ -660,7 +660,7 @@ cd frontend && npx vitest run --project unit src/components/PromoteDialog.test.j
 cd frontend && npx vitest run --project unit
 ```
 
-Expected: **922 / 47** (921 + 1 new test in 1 new file).
+Expected: **923 / 47** (921 + 2 new tests in 1 new file).
 
 - [ ] **Step 5: Verify no raw selects remain**
 
@@ -839,7 +839,7 @@ it("says what the change is without being expanded", async () => {
 cd frontend && npx vitest run --project unit
 ```
 
-Expected: **923 / 47**. If more than the listed tests fail, **stop and report** — the list is the plan's claim about what this change touches, and a longer list means the claim is wrong.
+Expected: **924 / 47**. If more than the listed tests fail, **stop and report** — the list is the plan's claim about what this change touches, and a longer list means the claim is wrong.
 
 - [ ] **Step 5: Commit**
 
@@ -961,7 +961,7 @@ it("tells the app the new total, so the sidebar dot does not need its own fetch"
 cd frontend && npx vitest run --project unit
 ```
 
-Expected: **925 / 47**.
+Expected: **926 / 47**.
 
 - [ ] **Step 5: Commit**
 
@@ -1100,7 +1100,7 @@ describe("the empty state says why it is empty", () => {
 cd frontend && npx vitest run --project unit
 ```
 
-Expected: **929 / 47**.
+Expected: **930 / 47**.
 
 - [ ] **Step 6: Commit**
 
@@ -1154,7 +1154,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>')"
 cd frontend && npx vitest run --project unit
 ```
 
-Expected: **929 / 47**.
+Expected: **930 / 47**.
 
 - [ ] **Step 4: Commit**
 
@@ -1250,7 +1250,7 @@ cd frontend && npm test 2>&1 | tail -5
 cd backend && pytest -q 2>&1 | tail -5
 ```
 
-Expected: frontend **931 / 48** (929 unit + 2 Storybook, 47 + 1). Backend **1001 passed, 1 skipped**.
+Expected: frontend **932 / 48** (930 unit + 2 Storybook, 47 + 1). Backend **1001 passed, 1 skipped**.
 
 - [ ] **Step 2: Build**
 
@@ -1287,6 +1287,6 @@ wc -l frontend/src/components/ProposalsPanel.jsx frontend/src/components/InboxRo
 
 **Type consistency.** `proposalSummary` returns `{lead, trail, extra}` in Tasks 1 and 5. `promotionTargets(pack) => [{entity, field}]` in Tasks 3 and 4, and `promotable` entries are `{key, title, targets}` in 3, 4 and 7. `proposalCount()` returns `{entity, note, total}` in 6 and is consumed as `counts[k.key]` where `KINDS` keys are `entity`/`note`. `onCounts(total)` in 6 and 8.
 
-**Test arithmetic.** 869 → +52 (T1) → 921 → +1 (T4) → 922 → +1 (T5) → 923 → +2 (T6) → 925 → +4 (T7) → 929. Files 45 → 46 (T1) → 47 (T4). Both projects add 2 tests and 1 file: 931 / 48.
+**Test arithmetic.** 869 → +52 (T1) → 921 → +2 (T4) → 923 → +1 (T5) → 924 → +2 (T6) → 926 → +4 (T7) → 930. Files 45 → 46 (T1) → 47 (T4). Both projects add 2 tests and 1 file: 932 / 48.
 
 *(Corrected during Task 1: the first draft said Task 1 adds 11 tests. It adds 52 — `it.each(specs)` generates one test per entity and the fixture holds 42. Measured, not counted by hand.)*

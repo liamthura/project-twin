@@ -4,6 +4,9 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { humanise } from "./proposalSummary";
 
 /**
@@ -28,10 +31,6 @@ export function promotionTargets(pack) {
     .map(([entity, spec]) => ({ entity, field: spec.identifier }));
 }
 
-const selectClass =
-  "h-9 w-full rounded-md border border-input bg-background px-3 text-sm " +
-  "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2";
-
 export default function PromoteDialog({
   promoting, promotable, onChange, onCancel, onConfirm,
 }) {
@@ -52,39 +51,48 @@ export default function PromoteDialog({
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="promote-section">Section</Label>
-            <select
-              id="promote-section"
-              className={selectClass}
+            {/* Label htmlFor + SelectTrigger id, the same pairing the sort
+                control uses. A Radix trigger is a button, so this is what
+                gives it an accessible name. */}
+            <Select
               value={promoting?.section || ""}
-              onChange={(e) => {
-                const next = promotable.find((s) => s.key === e.target.value);
+              onValueChange={(value) => {
+                const next = promotable.find((s) => s.key === value);
                 onChange((p) => ({
                   ...p,
-                  section: e.target.value,
+                  section: value,
                   entity: next?.targets[0]?.entity ?? "",
                 }));
               }}
             >
-              {promotable.map((s) => (
-                <option key={s.key} value={s.key}>{s.title}</option>
-              ))}
-            </select>
+              <SelectTrigger id="promote-section">
+                <SelectValue placeholder="Choose a section" />
+              </SelectTrigger>
+              <SelectContent>
+                {promotable.map((s) => (
+                  <SelectItem key={s.key} value={s.key}>{s.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="promote-entity">Type</Label>
-            <select
-              id="promote-entity"
-              className={selectClass}
+            <Select
               value={promoting?.entity || ""}
-              onChange={(e) => onChange((p) => ({ ...p, entity: e.target.value }))}
+              onValueChange={(value) => onChange((p) => ({ ...p, entity: value }))}
             >
-              {(section?.targets || []).map((t) => (
-                <option key={t.entity} value={t.entity}>
-                  {humanise(t.entity)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="promote-entity">
+                <SelectValue placeholder="Choose a type" />
+              </SelectTrigger>
+              <SelectContent>
+                {(section?.targets || []).map((t) => (
+                  <SelectItem key={t.entity} value={t.entity}>
+                    {humanise(t.entity)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {field && (

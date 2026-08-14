@@ -177,11 +177,19 @@ describe("ProposalsPanel", () => {
       expect(within(dialog).getByLabelText(/section/i)).toBeInTheDocument();
     });
 
+    // A Radix Select is a button, not a <select>, so selectOptions no longer
+    // applies. The listbox is portalled outside the dialog, which is why the
+    // option is found through `screen` rather than `within(dialog)`.
+    async function pick(user, dialog, labelText, optionName) {
+      await user.click(within(dialog).getByLabelText(labelText));
+      await user.click(await screen.findByRole("option", { name: optionName }));
+    }
+
     it("promotes into the entity you picked, under its own field", async () => {
       const user = userEvent.setup();
       const dialog = await openPromoteDialog(user);
-      await user.selectOptions(within(dialog).getByLabelText(/section/i), "lifestyle");
-      await user.selectOptions(within(dialog).getByLabelText(/^type$/i), "value");
+      await pick(user, dialog, /section/i, "Lifestyle");
+      await pick(user, dialog, /^type$/i, "value");
       await user.click(within(dialog).getByRole("button", { name: /^promote$/i }));
       await waitFor(() =>
         expect(api.promoteProposal).toHaveBeenCalledWith(
@@ -192,7 +200,7 @@ describe("ProposalsPanel", () => {
     it("lets you edit the wording before it becomes real data", async () => {
       const user = userEvent.setup();
       const dialog = await openPromoteDialog(user);
-      await user.selectOptions(within(dialog).getByLabelText(/section/i), "knowledge");
+      await pick(user, dialog, /section/i, "Knowledge");
       const field = within(dialog).getByLabelText(/^title$/i);
       await user.clear(field);
       await user.type(field, "Recommendation first");
