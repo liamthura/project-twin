@@ -172,6 +172,16 @@ describe("ProposalsPanel", () => {
     expect(await screen.findByText(/\+2 more/)).toBeInTheDocument();
   });
 
+  it("tints approve and reject at the same weight", async () => {
+    // A red reject beside a neutral approve pulls the eye down the reject
+    // column, which is the wrong emphasis for the action taken most.
+    render(<ProposalsPanel />);
+    expect(await screen.findByRole("button", { name: /^approve /i }))
+      .toHaveClass("text-success");
+    expect(screen.getByRole("button", { name: /^reject /i }))
+      .toHaveClass("text-destructive");
+  });
+
   it("marks reject as destructive, and lets that beat the ghost variant", async () => {
     render(<ProposalsPanel />);
     const reject = await screen.findByRole("button", { name: /^reject /i });

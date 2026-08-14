@@ -45,17 +45,22 @@ export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
 
         {/* Icon buttons, so they get their names from aria-label. The name
             carries the row's value because a queue of a dozen rows otherwise
-            offers a dozen buttons called "Approve". */}
+            offers a dozen buttons called "Approve".
+
+            Approve and reject are both tinted, and deliberately at the same
+            weight. A red reject beside a neutral approve pulls the eye down
+            the reject column, which is the wrong emphasis for the action
+            people take most. Foreground tint rather than a filled button on
+            either: a queue of filled buttons out-shouts its own rows. */}
         <Button
           size="sm" variant="ghost" disabled={busy} onClick={onApprove}
+          className="text-success hover:bg-success/10 hover:text-success"
           aria-label={`Approve ${lead}`}
         >
           <Check className="h-4 w-4" />
         </Button>
-        {/* Red foreground rather than a solid destructive fill: four filled
-            red buttons down a dense queue would out-shout the rows they sit
-            on. Same treatment as a destructive dropdown item. Colour alone is
-            not an accessible signal, which is what the aria-label is for. */}
+        {/* Colour alone is not an accessible signal, which is what the
+            aria-label is for. */}
         <Button
           size="sm" variant="ghost" disabled={busy} onClick={onReject}
           className="text-destructive hover:bg-destructive/10 hover:text-destructive"
