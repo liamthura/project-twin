@@ -10,23 +10,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { ArrayInput } from "@/components/ArrayInput";
 import { EnumControl } from "@/components/controls";
+import { DatePicker } from "@/components/DatePicker";
+import { parseIsoDate } from "./isoDate";
 
 // Default long-text field set, exported so callers that don't supply their
 // own `meta.long_text` can pass this one through.
 export const LONG_TEXT_FIELDS = new Set(["notes", "why", "description"]);
 
-// What <input type="date"> will accept and round-trip. Anything else it
-// discards on render, showing an empty picker.
-//
-// Exported because ListRenderer's `display_formats` needs the same test: a
-// value matching this is a CALENDAR DATE, not an instant, and the two
-// renderers have to agree on which values that means or the same string
-// could round-trip through a picker one way and be reinterpreted through a
-// timezone the other.
-export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+// The stored calendar-date shape, defined in ./isoDate beside the parsing that
+// has to agree with it, and re-exported here because ListRenderer's
+// `display_formats` imports it from this module. One declaration: a value
+// matching this is a CALENDAR DATE, not an instant, and the two renderers have
+// to agree on which values that means or the same string could round-trip
+// through a picker one way and be reinterpreted through a timezone the other.
+export { ISO_DATE } from "./isoDate";
 
 // What <input type="time"> will accept and round-trip. Same contract as
-// ISO_DATE and same hazard: a value the picker cannot parse is shown as empty
+// the date shape above and same hazard: a value the picker cannot parse is
+// shown as empty
 // and written back as empty on the next edit. Seconds are optional because the
 // browser emits "HH:MM:SS" when a step is set, and a stored value in that form
 // must not be demoted to a text input.
@@ -140,22 +141,23 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
   if ((meta.date_fields || []).includes(field)) {
     // A date field is only safe to render as a picker when what is stored is
     // actually a date. Nothing validates these on write -- an MCP client can
-    // put "next spring" or "Q2 2027" into goals.target_date -- and
-    // <input type="date"> silently drops any value it cannot parse, so a
-    // picker would show empty and write that emptiness back on the next edit.
-    // A non-ISO value therefore stays a text input: visible, editable, and
-    // preserved. Clearing it hands the user the picker.
-    if (!value || ISO_DATE.test(value)) {
+    // put "next spring" or "Q2 2027" into goals.target_date -- and a calendar
+    // has no way to show that, exactly as <input type="date"> had none: it
+    // dropped any value it could not parse, showing empty and then writing the
+    // emptiness back on the next edit. A value the picker cannot represent
+    // therefore stays a text input: visible, editable, and preserved. Clearing
+    // it hands the user the picker.
+    //
+    // `parseIsoDate` rather than ISO_DATE alone, which is a tightening: the
+    // regex accepts 2026-02-31, and the native input quietly rolled that over
+    // to March 3rd. A date that does not exist now keeps its text input too.
+    if (!value || parseIsoDate(value)) {
       return (
-        <Input
+        <DatePicker
           id={id}
-          type="date"
-          placeholder={hint}
           value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
-          // Ask the browser to draw its native picker in the app's theme,
-          // otherwise the calendar renders light-on-light in dark mode.
-          className="[color-scheme:light] dark:[color-scheme:dark]"
+          onChange={onChange}
+          placeholder={hint ?? "Pick a date"}
         />
       );
     }

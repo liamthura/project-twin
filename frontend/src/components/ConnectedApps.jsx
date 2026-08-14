@@ -19,10 +19,10 @@
  *
  * Presentational only: `grants` and `onRevoke` are handed in as props so
  * this can be rendered and asserted on without a network (see
- * ConnectedApps.test.jsx). ConnectionSettings.jsx is what actually calls
+ * ConnectedApps.test.jsx). settings/AppsPanel.jsx is what actually calls
  * listConnectedApps()/revokeConnectedApp() and wires this up to the API.
  *
- * `grants` is the already-normalised shape ConnectionSettings produces from
+ * `grants` is the already-normalised shape AppsPanel produces from
  * GET /oauth2/get-consents:
  *   { id, clientName, scopes: string[] }
  *
@@ -38,20 +38,9 @@ import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-
-// Must match auth/src/oauth.js and Consent.jsx's wording exactly -- these
-// are the wire values, and the labels below are what the consent screen
-// used for the same three scopes.
-const READ = "persona:read";
-const PROPOSE = "persona:propose";
-const WRITE = "persona:write";
-
 // Read is the floor for every grant (Consent.jsx never lets it be declined),
-// so it is listed unconditionally rather than checked against `scopes`.
-const SCOPE_LABELS = [
-  [PROPOSE, "Suggest changes for your approval"],
-  [WRITE, "Change your persona directly"],
-];
+// so the row below lists it unconditionally rather than checking `scopes`.
+import { SCOPE_LABELS } from "@/lib/scopes.js";
 
 export default function ConnectedApps({ grants, onRevoke }) {
   const [confirmId, setConfirmId] = useState(null);
@@ -63,7 +52,7 @@ export default function ConnectedApps({ grants, onRevoke }) {
       await onRevoke(id);
       setConfirmId(null);
     } catch {
-      // The caller (ConnectionSettings.jsx) already surfaced this -- a
+      // The caller (settings/AppsPanel.jsx) already surfaced this -- a
       // toast, typically. Swallowed here only so a failed revoke doesn't
       // become an unhandled rejection; skipping setConfirmId(null) above is
       // what actually matters, since it's what keeps this row in confirm

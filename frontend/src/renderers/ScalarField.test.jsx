@@ -199,21 +199,34 @@ describe("ScalarField", () => {
   describe("a field in date_fields", () => {
     const meta = { date_fields: ["target_date"] };
 
-    it("renders a native date picker when the value is a yyyy-mm-dd date", () => {
+    // The control is a popover trigger showing the date in words, not an
+    // <input type="date">. The native picker's calendar could not be styled
+    // past `color-scheme`, which is why it went; ScalarField's job here is
+    // still only to pick the control, and DatePicker.test.jsx covers what the
+    // control then does.
+    it("renders the date picker when the value is a real calendar date", () => {
       render(
         <ScalarField field="target_date" value="2026-12-31" meta={meta} onChange={() => {}} />
       );
-      const input = screen.getByDisplayValue("2026-12-31");
-      expect(input).toHaveAttribute("type", "date");
+      expect(
+        screen.getByRole("button", { name: /31 December 2026/ })
+      ).toBeInTheDocument();
     });
 
     it("renders an empty date picker when there is no value", () => {
-      const { container } = render(
+      render(
         <ScalarField field="target_date" value={undefined} meta={meta} onChange={() => {}} />
       );
-      const input = container.querySelector("input");
-      expect(input).toHaveAttribute("type", "date");
-      expect(input.value).toBe("");
+      expect(screen.getByRole("button", { name: /pick a date/i })).toBeInTheDocument();
+    });
+
+    it("keeps a well-formed date that does not exist in a text input", () => {
+      // A tightening over the native input, which rolled 2026-02-31 over to
+      // March 3rd without saying so. ISO_DATE alone still matches this.
+      render(
+        <ScalarField field="target_date" value="2026-02-31" meta={meta} onChange={() => {}} />
+      );
+      expect(screen.getByDisplayValue("2026-02-31")).toBeInTheDocument();
     });
 
     // The data-safety case. Nothing validates this field on write -- an MCP
@@ -228,15 +241,15 @@ describe("ScalarField", () => {
       expect(input).not.toHaveAttribute("type", "date");
     });
 
-    it("reports the picked date as a plain yyyy-mm-dd string", () => {
+    it("clears to an empty string rather than to undefined", () => {
+      // The stored shape is a string either way. Handing `undefined` back would
+      // make the field disappear from the written object instead of emptying.
       const onChange = vi.fn();
       render(
         <ScalarField field="target_date" value="2026-12-31" meta={meta} onChange={onChange} />
       );
-      fireEvent.change(screen.getByDisplayValue("2026-12-31"), {
-        target: { value: "2027-01-15" },
-      });
-      expect(onChange).toHaveBeenCalledWith("2027-01-15");
+      fireEvent.click(screen.getByRole("button", { name: /clear date/i }));
+      expect(onChange).toHaveBeenCalledWith("");
     });
 
     it("leaves a field alone when it is not listed in date_fields", () => {

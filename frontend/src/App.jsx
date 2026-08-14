@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ConnectionSettings } from "@/components/ConnectionSettings";
+import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { api, getAuthToken } from "@/lib/api.js";
 import { hasSession } from "@/lib/session.js";
 import { WelcomeAuth } from "@/components/WelcomeAuth";
@@ -628,7 +628,7 @@ export default function App() {
           />
           {/* Renders through a portal, so its place in this tree is only
               about which state it reads. */}
-          <ConnectionSettings
+          <SettingsDialog
             isOpen={showConnectionSettings}
             disabledSections={disabledSections}
             onClose={() => setShowConnectionSettings(false)}
@@ -670,7 +670,7 @@ export default function App() {
             </p>
           </CardContent>
         </Card>
-        <ConnectionSettings
+        <SettingsDialog
           isOpen={showConnectionSettings}
           disabledSections={disabledSections}
           onClose={() => setShowConnectionSettings(false)}
@@ -854,7 +854,7 @@ export default function App() {
       </Dialog>
 
       {/* Connection Settings Dialog */}
-      <ConnectionSettings
+      <SettingsDialog
         isOpen={showConnectionSettings}
         disabledSections={disabledSections}
         onClose={() => setShowConnectionSettings(false)}

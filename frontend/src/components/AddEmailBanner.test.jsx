@@ -85,6 +85,36 @@ describe("dismissing it", () => {
   });
 });
 
+describe("laying out the row", () => {
+  beforeEach(() => getSession.mockResolvedValue(sessionWith("liam@mygist.invalid")));
+
+  it("centres the sentence against the button rather than top-aligning it", async () => {
+    // The row holds a 20px line of text beside a 36px `size="sm"` button
+    // (h-9), so items-start put the sentence 8px above the button's own label.
+    // jsdom has no layout and cannot measure that, so this pins the class that
+    // decides it -- and asserts the losing one is gone, which is the half that
+    // catches a revert.
+    render(<AddEmailBanner onAddEmail={() => {}} />);
+
+    const row = (await screen.findByText(/add an email/i)).closest("div.flex");
+
+    expect(row.className).toMatch(/items-center/);
+    expect(row.className).not.toMatch(/items-start/);
+  });
+
+  it("leaves the icon unnudged, since centring already lines it up", async () => {
+    // mt-0.5 existed to drop the icon onto the first line of text while the row
+    // was top-aligned. Centred, it pushes the icon 2px low instead.
+    render(<AddEmailBanner onAddEmail={() => {}} />);
+    const row = (await screen.findByText(/add an email/i)).closest("div.flex");
+
+    const icon = row.firstElementChild;
+
+    expect(icon.tagName.toLowerCase()).toBe("svg");
+    expect(icon.getAttribute("class")).not.toMatch(/mt-0\.5/);
+  });
+});
+
 describe("when there is nothing to prompt about", () => {
   it("stays away from an account with a real email", async () => {
     getSession.mockResolvedValue(sessionWith("liam@example.com"));

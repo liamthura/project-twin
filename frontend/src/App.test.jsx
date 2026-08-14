@@ -6,18 +6,25 @@ import circleData from "@/__fixtures__/data/circle.json";
 import learningLogData from "@/__fixtures__/data/learning_log.json";
 
 // App.jsx only ever reaches the network through `api`/`getAuthToken`, but it
-// also unconditionally renders <ConnectionSettings> (just hidden), which
+// also unconditionally renders <SettingsDialog> (just hidden), which
 // imports several other named exports (CLOUD_API_URL, getApiBase, ...) from
 // this same module. A mock that only replaces api/getAuthToken and drops the
 // rest makes React throw the moment that component mounts -- well after
 // these tests' own assertions would otherwise have passed -- so this keeps
-// every real export and overrides only the two App.jsx's data flow uses.
+// every real export and overrides only the ones these tests depend on.
+//
+// whoami is one of them. The dialog asks the server who you are and shows the
+// Account tab only if it answers, so leaving the real one here would have it
+// reach for fetch, fail, and decide nobody is signed in -- inside an App that
+// has already rendered the signed-in shell, which it only does with a working
+// credential. The fixture has to agree with itself.
 vi.mock("@/lib/api.js", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
     api: vi.fn(),
     getAuthToken: vi.fn(() => "test-token"),
+    whoami: vi.fn(async () => ({ user_id: "u-1", username: "Liam" })),
   };
 });
 

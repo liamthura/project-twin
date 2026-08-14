@@ -258,6 +258,25 @@ function describeGuards({ pack, listKey, data, exclusions }) {
           `field "${field}" item "${v}" is not reachable in the UI`
         ).toBeInTheDocument();
       }
+    } else if (meta.date_fields?.includes(field)) {
+      // A date renders as a popover trigger now, not an input, so there is no
+      // display value to read. Its label is the date as a person reads it, so
+      // the proof is that the trigger names this item's own day, month and
+      // year -- derived here from the stored string rather than from the
+      // component's formatter, which would only make this agree with itself.
+      const [y, m, d] = String(value).split("-").map(Number);
+      const monthName = new Intl.DateTimeFormat("en-GB", { month: "long" }).format(
+        new Date(y, m - 1, d)
+      );
+      const trigger = screen
+        .getAllByRole("button")
+        .find(
+          (el) =>
+            el.textContent.includes(String(y)) &&
+            el.textContent.includes(monthName) &&
+            el.textContent.includes(String(d))
+        );
+      expect(trigger, `field "${field}" is not bound to "${value}" in the UI`).toBeTruthy();
     } else {
       expect(
         screen.getByDisplayValue(value),

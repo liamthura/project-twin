@@ -8,9 +8,8 @@
  * file is a placeholder -- which must never be shown to anyone as if it were
  * theirs, and never offered as somewhere mail could go.
  *
- * Its own component rather than more of ConnectionSettings: that file is
- * already the connection form, the token manager and the data tab, and this
- * needs its own fetch, its own three states and its own error surface.
+ * Its own component rather than more of AccountPanel: this needs its own fetch,
+ * its own three states and its own error surface.
  */
 import { useEffect, useState, useCallback } from "react";
 import { Loader2, Mail, MailCheck, MailWarning } from "lucide-react";
