@@ -195,3 +195,43 @@ describe("StepConnect", () => {
     expect(await screen.findByText(/token limit reached/i)).toBeInTheDocument();
   });
 });
+
+describe("StepConnect, the documentation link", () => {
+  it("points at the OAuth section when that is what it recommended", async () => {
+    getInstanceMock.mockResolvedValue({ invite_only: false, mcp_oauth: true });
+    renderStep();
+
+    const link = await screen.findByRole("link", { name: /setting this up in claude/i });
+    expect(link).toHaveAttribute(
+      "href",
+      `${window.location.origin}/docs/use/clients/#connecting-over-oauth`,
+    );
+  });
+
+  it("points at the token section on the key path", async () => {
+    renderStep();
+    const link = await screen.findByRole("link", { name: /where the key goes/i });
+    expect(link).toHaveAttribute(
+      "href",
+      `${window.location.origin}/docs/use/clients/#using-a-token-instead`,
+    );
+  });
+
+  it("keeps the link beside the key once the key is showing", async () => {
+    // The block that held the first one is gone by then, and this is the moment
+    // someone needs to know where the key goes.
+    const user = userEvent.setup();
+    renderStep();
+    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+
+    expect(screen.getByText("mg_secret_value")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /where the key goes/i })).toBeInTheDocument();
+  });
+
+  it("opens in a new tab, because a shown-once key is lost by navigating away", async () => {
+    renderStep();
+    const link = await screen.findByRole("link", { name: /where the key goes/i });
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noreferrer");
+  });
+});

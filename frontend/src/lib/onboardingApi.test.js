@@ -11,7 +11,7 @@ const { getOnboarding, saveOnboarding } = await import("./onboarding.js");
 // The real one: the mock above spreads every actual export and replaces only
 // `api`, and mcpUrl derives from getApiBase and localStorage rather than from
 // any request.
-const { mcpUrl } = await import("./api.js");
+const { mcpUrl, docsUrl } = await import("./api.js");
 
 beforeEach(() => {
   apiMock.mockReset();
@@ -80,5 +80,23 @@ describe("mcpUrl", () => {
       JSON.stringify({ serverUrl: "https://example.test/api/" }),
     );
     expect(mcpUrl()).toBe("https://example.test/mcp");
+  });
+});
+
+describe("docsUrl", () => {
+  beforeEach(() => {
+    localStorage.removeItem("mygist_config");
+  });
+
+  it("defaults to the docs root on this origin", () => {
+    expect(docsUrl()).toBe(`${window.location.origin}/docs/`);
+  });
+
+  it("follows a configured server, so the docs match the thing being connected to", () => {
+    localStorage.setItem(
+      "mygist_config",
+      JSON.stringify({ serverUrl: "https://example.test/api" }),
+    );
+    expect(docsUrl("/use/clients/")).toBe("https://example.test/docs/use/clients/");
   });
 });

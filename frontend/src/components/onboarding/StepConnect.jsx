@@ -23,12 +23,13 @@
  * asks rather than assuming.
  */
 import { useEffect, useState } from "react";
-import { Check, Copy, Loader2, Sparkles } from "lucide-react";
+import { Check, Copy, ExternalLink, Loader2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   createToken,
+  docsUrl,
   getInstance,
   listConnectedApps,
   listTokens,
@@ -83,6 +84,29 @@ function CopyRow({ id, label, value, hint }) {
       </div>
       {hint && <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>}
     </div>
+  );
+}
+
+/**
+ * A link into the documentation site for the per-client detail this screen
+ * cannot hold: where the setting lives in each application, and what to do when
+ * a connection does not take.
+ *
+ * Opens in a new tab, and not merely as a courtesy. A freshly minted key is
+ * shown ONCE -- navigating away from this screen loses it for good, and the
+ * reader would have no way of knowing that before clicking.
+ */
+function DocsLink({ path, children }) {
+  return (
+    <a
+      href={docsUrl(path)}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 text-xs underline underline-offset-4 hover:text-foreground"
+    >
+      {children}
+      <ExternalLink className="h-3 w-3" aria-hidden="true" />
+    </a>
   );
 }
 
@@ -205,6 +229,10 @@ export function StepConnect({ onDelegate, onFillManually }) {
             label="Server address"
             value={address}
           />
+
+          <DocsLink path="/use/clients/#connecting-over-oauth">
+            Setting this up in Claude, and in other clients
+          </DocsLink>
         </div>
       )}
 
@@ -249,6 +277,10 @@ export function StepConnect({ onDelegate, onFillManually }) {
                 )}
               </Button>
               {error && <p className="text-sm text-destructive">{error}</p>}
+
+              <DocsLink path="/use/clients/#using-a-token-instead">
+                Where the key goes, per client
+              </DocsLink>
             </div>
           )}
         </div>
@@ -268,6 +300,13 @@ export function StepConnect({ onDelegate, onFillManually }) {
             value={token}
             hint="Shown once. Copy it into your client now, or make another later from Connection Settings."
           />
+
+          {/* Repeated here rather than left behind in the block above: that
+              block is gone by the time this one appears, and this is the moment
+              someone actually needs to know where the key goes. */}
+          <DocsLink path="/use/clients/#using-a-token-instead">
+            Where the key goes, per client
+          </DocsLink>
         </div>
       )}
 
