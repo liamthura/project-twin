@@ -204,6 +204,58 @@ answers 401.
 - `_meta.ideToolTitles`, which belongs in a `.mcp.json` — layer 3.
 - Deduplicating `~/.claude/skills/` against the repo copy.
 
+## Follow-up: MCP prompts, 2026-08-14
+
+Added after a critique of this spec's own reasoning. The five-layer plan was
+copied from Figma, whose MCP server **is** a coding-agent product — design to
+code, Code Connect, `.figma.ts` files. MyGist's schema is `aesthetics`, `media`,
+`circle`, `sleep`, `personality_trait`. The audience is a person talking to a
+chat assistant, so a plugin aimed at Claude Code was the distribution strategy of
+a product whose users are the inverse of MyGist's. Layers 3–5 stay declined, and
+prompts take their place — server-side, client-agnostic, no install.
+
+### Why prompts repair the weak part of layer 2
+
+Layer 2 was verified at the protocol level and **not** at the uptake level. A
+`skill://` resource only helps if a client autonomously fetches it, and in a chat
+client resources are generally surfaced for the *user* to attach rather than read
+by the model unprompted. So the skills may sit there unread.
+
+A prompt fixes that from the other end. It is user-invoked — it appears in the
+client's own UI — and its text can instruct the agent to read the skill first. The
+user picking "Catch up my persona" is what makes the skill load, in any client,
+with no plugin. That turns layer 2 from *hope the agent looks* into *the user can
+make it look*, which is a materially different claim.
+
+### The three
+
+Three, not eight. A menu of actions nobody uses is noise, and each one has to earn
+its row.
+
+| Prompt | Needs | What it is for |
+|---|---|---|
+| `catch_up` | `persona:propose` | "Review this conversation and propose anything durable." The under-proposing problem, solved from the user's side rather than by hoping the agent noticed. Tells the agent to read `mygist-capture` first. |
+| `whats_on_file` | `persona:read` | Optional `topic`. "Show me what you have on me, and where it came from." Transparency for someone who has no idea what is stored, and it enforces the attribution rule rather than restating records as memories. |
+| `log_learning` | `persona:write` | "Record what I worked out here in my learning log." An explicit instruction, so `persona_modify` is correct — which makes this the one prompt that demonstrates the asked/inferred boundary rather than describing it. |
+
+### Scope-filtered, like the tools
+
+`catch_up` tells the agent to call `propose_update`. On a `persona:read` grant that
+tool is not even visible, so offering the prompt would be a broken promise —
+an action in the menu that cannot do what it says.
+
+`PROMPT_SCOPES` in `scopes.py` mirrors `TOOL_SCOPES`, and `ScopeMiddleware` gains
+`on_list_prompts` and `on_get_prompt` alongside the two tool hooks it already has.
+Same fail-closed behaviour: no grant on the request means an empty list.
+
+### Not mentioned in the `instructions`
+
+Deliberate. The instructions are at 44 of their 45 lines, and prompts are a
+**client UI surface aimed at the user**, not a tool the model chooses. The client
+lists them; the model does not need telling they exist. If that turns out wrong —
+if an agent should be suggesting them — the honest fix is to raise the cap on
+purpose, not to squeeze them in.
+
 ## Risks
 
 - **The skills are now published.** They are written for an agent, not a reader,
