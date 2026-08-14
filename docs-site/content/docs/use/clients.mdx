@@ -7,22 +7,22 @@ MyGist exposes a standard MCP endpoint at `/mcp`, over plain HTTP. Any client
 that can reach a URL can use it. There is nothing Claude-specific in the
 server.
 
-Every client needs the same URL — `https://your-instance/mcp`, or
-`http://127.0.0.1:1120/mcp` locally — and then one of two ways to prove who you
+Every client needs the same URL, `https://your-instance/mcp` or
+`http://127.0.0.1:1120/mcp` locally, and then one of two ways to prove who you
 are:
 
 | | |
 |---|---|
 | **OAuth** | The client connects itself. You sign in, approve a consent screen, and there is nothing to copy anywhere. Use it whenever the client offers it. |
-| **A bearer token** | You create it yourself and hand it to the client. For anything that can't open a browser to sign in — see [Connecting with a token](#connecting-with-a-token). |
+| **A bearer token** | You create it yourself and hand it to the client. For anything that can't open a browser to sign in, see [Connecting with a token](#connecting-with-a-token). |
 
-The short version: **OAuth is how an application connects. A token is how you
-script.**
+The short version: OAuth is how an application connects, and a token is how you
+script.
 
 ## Connecting over OAuth
 
-If a client supports OAuth for remote MCP servers — increasingly the default
-for newer ones — connecting takes nothing but the URL. The client works out the
+If a client supports OAuth for remote MCP servers, which is increasingly the
+default for newer ones, connecting takes nothing but the URL. The client works out the
 rest for itself.
 
 <Steps>
@@ -42,7 +42,7 @@ in.
 
 The first request gets a 401 naming where to find MyGist's metadata. The client
 follows that to `/.well-known/oauth-protected-resource`, then to MyGist's
-authorization server, and registers itself there automatically — no client id
+authorization server, and registers itself there automatically, with no client id
 to obtain in advance. This step is invisible; it's mentioned here only so the
 redirect that follows doesn't look unexplained.
 
@@ -52,7 +52,7 @@ redirect that follows doesn't look unexplained.
 
 ### Sign in, then consent
 
-A browser opens — to sign in if you aren't already, then to a screen naming the
+A browser opens: to sign in if you aren't already, then to a screen naming the
 client and the account it's about to connect:
 
 > **Claude Desktop** wants to connect to **your-username**'s persona
@@ -72,7 +72,7 @@ Three lines, each a real permission:
 
 | Shown as | Wire name | Can you say no? |
 |---|---|---|
-| Read your persona | `persona:read` | No — a connection that can't read has nothing to authorise |
+| Read your persona | `persona:read` | No: a connection that can't read has nothing to authorise |
 | Suggest changes for your approval | `persona:propose` | Yes, starts checked |
 | Change your persona directly | `persona:write` | Yes, starts checked |
 
@@ -81,7 +81,7 @@ useful day to day. Uncheck **Change your persona directly** to keep an
 assistant proposing edits for you to approve rather than applying them; uncheck
 both for a connection that can only read.
 
-There's no prompt later asking for more — MCP has no mechanism for a tool call
+There's no prompt later asking for more. MCP has no mechanism for a tool call
 to request broader access mid-conversation, so this screen is the only place
 the grant gets decided. Narrowing or widening afterwards means reconnecting
 from scratch; see [Managing a connection](#managing-a-connection).
@@ -95,23 +95,23 @@ Nothing to copy, nothing to renew.
 
 ## What the scopes mean
 
-The same three scopes apply everywhere — OAuth connections, and bearer tokens
+The same three scopes apply everywhere: OAuth connections, and bearer tokens
 created after this feature shipped. They're hierarchical: **write** includes
 everything **propose** does, which includes everything **read** does. Granting
 the broadest one you need is enough; there's no reason to grant more than one.
 
-- **Read your persona** — the assistant can call `get_context`, `search_context`
+- **Read your persona**: the assistant can call `get_context`, `search_context`
   and the other read tools. Always granted; it's the floor every connection
   needs to be useful at all.
-- **Suggest changes for your approval** — adds `propose_update`. The assistant
+- **Suggest changes for your approval**: adds `propose_update`. The assistant
   can draft a change with its reasoning, but nothing reaches your persona until
   you approve it in the web editor.
-- **Change your persona directly** — adds `persona_modify` and `persona_batch`.
+- **Change your persona directly**: adds `persona_modify` and `persona_batch`.
   The assistant writes immediately, without asking first.
 
-A connection without a scope doesn't just get refused when it tries the
-matching tool — the tool never shows up in its tool list. An assistant limited
-to reading has no `persona_modify` to reach for in the first place.
+A connection without a scope never sees the matching tool. It is absent from the
+tool list, so an assistant limited to reading has no `persona_modify` to reach
+for in the first place.
 
 ## Managing a connection
 
@@ -121,7 +121,7 @@ to API tokens. Each entry shows the client's name and what it's allowed to do.
 Revoking removes it from that list and kills its refresh token immediately, so
 it can't ask for a new access token again. But an access token it's already
 holding is a signed credential MyGist stops tracking the moment it's issued, so
-it keeps working until it expires on its own — up to ten minutes later. That's
+it keeps working until it expires on its own, up to ten minutes later. That's
 worth knowing if you're revoking because something is misusing access right
 now rather than as routine cleanup.
 
@@ -130,10 +130,10 @@ client goes through consent again, where you can choose differently.
 
 ## Connecting with a token
 
-A bearer token remains the right tool for anything that has no browser to open
-— a cron job, a CI pipeline, a `curl` command, a client that hasn't implemented
+A bearer token remains the right tool for anything that has no browser to open:
+a cron job, a CI pipeline, a `curl` command, a client that hasn't implemented
 remote MCP authorization yet. None of that is a lesser path; it's the same
-credential the server itself has always used, just scoped now instead of
+credential the server itself has always used, scoped now instead of
 all-or-nothing.
 
 Create one in **Account → API tokens**, choosing scopes from the same three
@@ -145,16 +145,16 @@ lines shown above, then use it directly:
 | **Auth** | `Authorization: Bearer YOUR_TOKEN` |
 
 Create a separate token per client, so revoking one does not disconnect the
-rest. A token, unlike an OAuth connection, does not expire on its own — revoke
-it from the same screen once you're done with it.
+rest. A token, unlike an OAuth connection, does not expire on its own. Revoke it
+from the same screen once you're done with it.
 
 <Callout>
 An older token with no scopes attached still works exactly as it always has,
 with all three scopes. Nothing about this feature narrows a credential you
-already have — it only adds the option to mint a narrower one.
+already have; it only adds the option to mint a narrower one.
 </Callout>
 
-The client-specific configs below are the token path, spelled out — for
+The client-specific configs below are the token path, spelled out for
 Claude Desktop and Claude Code specifically, and anything else that needs an
 `Authorization` header set by hand. If your client offers OAuth, you don't
 need any of this; the URL is enough.
@@ -180,7 +180,7 @@ claude mcp list
 ## Anything else
 
 Most clients want the same three things under some spelling: a name, the URL,
-and a set of headers. In MCP terms this is a **streamable HTTP** server — not a
+and a set of headers. In MCP terms this is a **streamable HTTP** server, not a
 stdio one, so there is no command to run and no process to launch.
 
 If a client only offers stdio, it can usually still reach an HTTP server through
@@ -210,7 +210,7 @@ out one layer.
 curl -s https://mygist.thuradev.qzz.io/api/health
 ```
 
-This endpoint is public — no token needed. A connection error or a DNS failure
+This endpoint is public, with no token needed. A connection error or a DNS failure
 means the server or the network, not your config.
 
 </Step>
@@ -225,18 +225,18 @@ curl -s https://mygist.thuradev.qzz.io/api/auth/whoami \
 ```
 
 You should get your user id and username back. A **401** means the token is
-wrong, revoked, or not being sent — check for a trailing space when you pasted
+wrong, revoked, or not being sent. Check for a trailing space when you pasted
 it.
 
 Connected over OAuth instead of a static token? There's nothing to paste into
-`curl` here — check discovery resolves instead:
+`curl` here, so check that discovery resolves instead:
 
 ```bash
 curl -s https://mygist.thuradev.qzz.io/.well-known/oauth-protected-resource
 ```
 
-A 404 there means the server has no `AUTH_MCP_RESOURCE` configured — worth
-raising with whoever runs the instance, not something fixable from your end.
+A 404 there means the server has no `AUTH_MCP_RESOURCE` configured, which is
+worth raising with whoever runs the instance and is not fixable from your end.
 
 </Step>
 
@@ -262,5 +262,5 @@ detail.
 
 Nothing special is required. Point them all at the same URL with their own
 tokens, and they share one persona. A fact written from Claude Code is
-immediately visible in Claude Desktop — there is no sync step, because there is
+immediately visible in Claude Desktop. There is no sync step, because there is
 only one copy.
