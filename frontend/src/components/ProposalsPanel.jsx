@@ -5,61 +5,19 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import {
   listProposals, approveProposal, rejectProposal, promoteProposal,
 } from "@/lib/api";
 import ObservationCard from "./ObservationCard";
+import PromoteDialog, { promotionTargets } from "./PromoteDialog";
+import { humanise, renderValue } from "./proposalSummary";
 
 const KINDS = [
   { key: "entity", label: "Inbox" },
   { key: "note", label: "Observations" },
 ];
 
-/**
- * Which entities in a pack a single line of text can actually become.
- *
- * A note is one sentence, so the only entities it can fill are the ones whose
- * sole required field is their own identifier. Anything needing a second value
- * -- `hobby_specific` needs an owning hobby, `project_reference` needs a
- * project -- would produce a proposal that cannot execute, so it is not
- * offered rather than offered and then failing on confirm.
- */
-export function promotionTargets(pack) {
-  return Object.entries(pack?.entities || {})
-    .filter(([, spec]) => {
-      const required = spec.required || [];
-      return (spec.actions || []).includes("add")
-        && spec.identifier
-        && !spec.parent
-        && required.length === 1
-        && required[0] === spec.identifier;
-    })
-    .map(([entity, spec]) => ({ entity, field: spec.identifier }));
-}
-
 const ACTION_VERB = { add: "Add", update: "Update", remove: "Remove" };
-
-// Entity names and field keys are snake_case in the schema. This is a review
-// surface a person reads, so they get read as words.
-function humanise(key) {
-  return String(key || "").replace(/_/g, " ");
-}
-
-function renderValue(value) {
-  if (Array.isArray(value)) return value.map(humanise).join(", ");
-  if (value && typeof value === "object") {
-    return Object.entries(value)
-      .map(([k, v]) => `${humanise(k)}: ${v}`)
-      .join(" · ");
-  }
-  if (typeof value === "boolean") return value ? "yes" : "no";
-  return humanise(value);
-}
 
 /**
  * Two review surfaces over one queue.
@@ -194,95 +152,15 @@ export default function ProposalsPanel({
       promoteProposal(row.id, entity, { [field]: text.trim() }));
   }
 
-  const promotingSection = promotable.find((s) => s.key === promoting?.section);
-  const promotingField = promotingSection?.targets
-    .find((t) => t.entity === promoting?.entity)?.field;
-
-  const selectClass =
-    "h-9 w-full rounded-md border border-input bg-background px-3 text-sm " +
-    "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2";
-
   return (
     <div className="space-y-4">
-      <Dialog open={Boolean(promoting)} onOpenChange={(o) => !o && setPromoting(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Promote to your persona</DialogTitle>
-            <DialogDescription>
-              An observation has no home of its own. Choose where this belongs
-              and it becomes real, editable data.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="promote-section">Section</Label>
-              <select
-                id="promote-section"
-                className={selectClass}
-                value={promoting?.section || ""}
-                onChange={(e) => {
-                  const next = promotable.find((s) => s.key === e.target.value);
-                  setPromoting((p) => ({
-                    ...p,
-                    section: e.target.value,
-                    entity: next?.targets[0]?.entity ?? "",
-                  }));
-                }}
-              >
-                {promotable.map((s) => (
-                  <option key={s.key} value={s.key}>{s.title}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="promote-entity">Type</Label>
-              <select
-                id="promote-entity"
-                className={selectClass}
-                value={promoting?.entity || ""}
-                onChange={(e) =>
-                  setPromoting((p) => ({ ...p, entity: e.target.value }))
-                }
-              >
-                {(promotingSection?.targets || []).map((t) => (
-                  <option key={t.entity} value={t.entity}>
-                    {humanise(t.entity)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {promotingField && (
-              <div className="space-y-1.5">
-                {/* The agent's wording is a starting point, not the record.
-                    Editing here is the last chance before it becomes data. */}
-                <Label htmlFor="promote-text">{humanise(promotingField)}</Label>
-                <Input
-                  id="promote-text"
-                  value={promoting?.text || ""}
-                  onChange={(e) =>
-                    setPromoting((p) => ({ ...p, text: e.target.value }))
-                  }
-                />
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPromoting(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmPromote}
-              disabled={!promotingField || !promoting?.text?.trim()}
-            >
-              Promote
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PromoteDialog
+        promoting={promoting}
+        promotable={promotable}
+        onChange={setPromoting}
+        onCancel={() => setPromoting(null)}
+        onConfirm={confirmPromote}
+      />
 
       <div className="flex gap-2">
         {KINDS.map((k) => (
