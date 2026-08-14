@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  listProposals, approveProposal, rejectProposal, promoteProposal,
+  listProposals, proposalCount, approveProposal, rejectProposal, promoteProposal,
 } from "@/lib/api";
 import InboxRow from "./InboxRow";
 import ObservationCard from "./ObservationCard";
@@ -30,14 +30,27 @@ const KINDS = [
 const QUEUE_POLL_MS = 15000;
 
 export default function ProposalsPanel({
-  onViewSection, onSectionChanged, onResolved, sectionTitles = {}, packs = [],
+  onViewSection, onSectionChanged, onCounts, sectionTitles = {}, packs = [],
 }) {
   const [kind, setKind] = useState("entity");
   const [rows, setRows] = useState([]);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const [promoting, setPromoting] = useState(null);
+  const [counts, setCounts] = useState({ entity: 0, note: 0, total: 0 });
   const { toast } = useToast();
+
+  // The tab you are not looking at has to say how much is waiting in it, and
+  // the count endpoint is the only read that does not mark rows seen.
+  const refreshCounts = useCallback(async () => {
+    try {
+      const next = await proposalCount();
+      setCounts(next);
+      onCounts?.(next.total);
+    } catch {
+      // A stale badge beats a broken panel.
+    }
+  }, [onCounts]);
 
   const refresh = useCallback(async (which) => {
     try {
@@ -49,12 +62,14 @@ export default function ProposalsPanel({
     }
   }, []);
 
-  useEffect(() => { refresh(kind); }, [kind, refresh]);
+  useEffect(() => { refresh(kind); refreshCounts(); }, [kind, refresh, refreshCounts]);
 
   useEffect(() => {
     const tick = () => {
       // A backgrounded tab polling every 15s is just battery and rate limit.
-      if (document.visibilityState === "visible") refresh(kind);
+      if (document.visibilityState !== "visible") return;
+      refresh(kind);
+      refreshCounts();
     };
     const timer = setInterval(tick, QUEUE_POLL_MS);
     document.addEventListener("visibilitychange", tick);
@@ -62,7 +77,7 @@ export default function ProposalsPanel({
       clearInterval(timer);
       document.removeEventListener("visibilitychange", tick);
     };
-  }, [kind, refresh]);
+  }, [kind, refresh, refreshCounts]);
 
   /**
    * Run one resolution, then say what happened.
@@ -81,8 +96,10 @@ export default function ProposalsPanel({
       setError(null);
       const section = res?.section;
       // The sidebar dot is owned by the app, and it stops polling while this
-      // panel is open -- so resolving something has to tell it directly.
-      onResolved?.();
+      // panel is open -- so resolving something has to tell it. Refreshing the
+      // counts does both: it moves the tab badges and hands the new total up,
+      // in one request rather than the panel's and App's.
+      refreshCounts();
       // Refetch the section that changed straight away, rather than waiting
       // for the user to click through and find stale data. We know exactly
       // what moved, so there is nothing here worth polling for.
@@ -158,18 +175,25 @@ export default function ProposalsPanel({
         onConfirm={confirmPromote}
       />
 
-      <div className="flex gap-2">
-        {KINDS.map((k) => (
-          <Button
-            key={k.key}
-            variant={kind === k.key ? "default" : "outline"}
-            size="sm"
-            onClick={() => setKind(k.key)}
-          >
-            {k.label}
-          </Button>
-        ))}
-      </div>
+      <Tabs value={kind} onValueChange={setKind}>
+        <TabsList>
+          {KINDS.map((k) => (
+            <TabsTrigger key={k.key} value={k.key}>
+              {k.label}
+              {/* A real space, not just the margin. Without a whitespace text
+                  node the accessible name computes as "Inbox3". */}
+              {counts[k.key] > 0 && (
+                <>
+                  {" "}
+                  <span className="text-xs text-muted-foreground">
+                    {counts[k.key]}
+                  </span>
+                </>
+              )}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 

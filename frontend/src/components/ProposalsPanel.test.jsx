@@ -24,6 +24,7 @@ const PACKS = [
 
 vi.mock("@/lib/api", () => ({
   listProposals: vi.fn(),
+  proposalCount: vi.fn(() => Promise.resolve({ entity: 1, note: 1, total: 2 })),
   approveProposal: vi.fn(() => Promise.resolve({ status: "approved", section: "knowledge" })),
   rejectProposal: vi.fn(() => Promise.resolve({ status: "rejected", section: null })),
   promoteProposal: vi.fn(() => Promise.resolve({ status: "promoted", section: "lifestyle" })),
@@ -113,6 +114,35 @@ describe("ProposalsPanel", () => {
     expect(screen.getByText(/seen 2×/)).toBeInTheDocument();
   });
 
+  it("says how much is waiting in the queue you are not looking at", async () => {
+    api.proposalCount.mockResolvedValue({ entity: 3, note: 2, total: 5 });
+    render(<ProposalsPanel />);
+    expect(await screen.findByRole("tab", { name: /inbox 3/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /observations 2/i })).toBeInTheDocument();
+  });
+
+  it("counts without marking anything seen", async () => {
+    // listProposals marks rows seen server-side, which is what protects them
+    // from eviction. The badge must never be the thing that strips that.
+    render(<ProposalsPanel />);
+    await waitFor(() => expect(api.proposalCount).toHaveBeenCalled());
+    expect(api.listProposals).toHaveBeenCalledTimes(1);
+    expect(api.listProposals).toHaveBeenCalledWith("entity");
+  });
+
+  it("tells the app the new total, so the sidebar dot needs no fetch of its own", async () => {
+    const user = userEvent.setup();
+    const onCounts = vi.fn();
+    // Set explicitly: clearAllMocks does not undo a mockResolvedValue, so the
+    // test above would otherwise hand this one its 5.
+    api.proposalCount.mockResolvedValue({ entity: 1, note: 1, total: 2 });
+    render(<ProposalsPanel onCounts={onCounts} />);
+    await waitFor(() => expect(onCounts).toHaveBeenCalledWith(2));
+    api.proposalCount.mockResolvedValue({ entity: 0, note: 1, total: 1 });
+    await user.click(await screen.findByRole("button", { name: /^approve /i }));
+    await waitFor(() => expect(onCounts).toHaveBeenCalledWith(1));
+  });
+
   it("says what the change is without being expanded", async () => {
     // hobby's identifier is `name`, and `notes` is the one other field with a
     // value, so the line reads the identifier and what it becomes. Approving
@@ -162,7 +192,7 @@ describe("ProposalsPanel", () => {
   it("offers promote and delete on observations, never approve", async () => {
     const user = userEvent.setup();
     render(<ProposalsPanel />);
-    await user.click(screen.getByRole("button", { name: /observations/i }));
+    await user.click(screen.getByRole("tab", { name: /observations/i }));
     expect(await screen.findByRole("button", { name: /^promote$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^approve /i })).not.toBeInTheDocument();
@@ -194,7 +224,7 @@ describe("ProposalsPanel", () => {
   describe("promotion asks where it should go", () => {
     async function openPromoteDialog(user, props = {}) {
       render(<ProposalsPanel packs={PACKS} sectionTitles={{ lifestyle: "Lifestyle" }} {...props} />);
-      await user.click(screen.getByRole("button", { name: /observations/i }));
+      await user.click(screen.getByRole("tab", { name: /observations/i }));
       await user.click(await screen.findByRole("button", { name: /^promote$/i }));
       return screen.findByRole("dialog");
     }
