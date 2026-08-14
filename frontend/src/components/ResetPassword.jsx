@@ -17,13 +17,16 @@ import { Loader2, CheckCircle2 } from "lucide-react";
 import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { resetPassword } from "@/lib/session.js";
-
-// Matches MIN_PASSWORD_LENGTH in backend/main.py and Better Auth's own
-// minimum. Checked here so the failure arrives before a round trip, not
-// instead of the server's check.
-const MIN_PASSWORD_LENGTH = 8;
+// The minimum used to be declared here as well as in WelcomeAuth, which is two
+// copies of a number the backend owns. Checked before a round trip, not instead
+// of the server's own check.
+import {
+  MIN_PASSWORD_LENGTH,
+  validatePassword,
+  validateConfirmPassword,
+} from "@/lib/authValidation.js";
 
 export function ResetPassword({ token, onDone }) {
   const [password, setPassword] = useState("");
@@ -31,19 +34,41 @@ export function ResetPassword({ token, onDone }) {
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState(null);
   const [done, setDone] = useState(false);
+  const [touched, setTouched] = useState({});
+  const [errors, setErrors] = useState({});
+
+  // Both fields together, because the second one's rule is about the first.
+  const checkAll = () => ({
+    password: validatePassword(password, { isNew: true }),
+    confirmPassword: validateConfirmPassword(confirmPassword, password),
+  });
+
+  const blur = (field) => () => {
+    setTouched((t) => ({ ...t, [field]: true }));
+    setErrors(checkAll());
+  };
+
+  const change =
+    (setter, ...fields) =>
+    (e) => {
+      setter(e.target.value);
+      setErrors((prev) => {
+        const next = { ...prev };
+        for (const field of fields) delete next[field];
+        return next;
+      });
+    };
+
+  const shown = (field) => (touched[field] ? errors[field] : undefined);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError(null);
 
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setFormError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
-      return;
-    }
-    if (password !== confirmPassword) {
-      setFormError("Passwords do not match.");
-      return;
-    }
+    const found = checkAll();
+    setErrors(found);
+    setTouched({ password: true, confirmPassword: true });
+    if (Object.values(found).some(Boolean)) return;
 
     setPending(true);
     try {
@@ -81,32 +106,38 @@ export function ResetPassword({ token, onDone }) {
       description="This link works once. Pick something you have not used here before."
     >
       <form onSubmit={handleSubmit} className="space-y-4 text-left" noValidate>
-        <div className="space-y-1.5">
-          <Label htmlFor="reset-password" className="text-xs font-medium">
-            New password
-          </Label>
-          <Input
-            id="reset-password"
-            type="password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="reset-confirm-password" className="text-xs font-medium">
-            Confirm password
-          </Label>
-          <Input
-            id="reset-confirm-password"
-            type="password"
-            autoComplete="new-password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Re-enter password"
-          />
-        </div>
+        <Field id="reset-password" label="New password" error={shown("password")}>
+          {(control) => (
+            <Input
+              {...control}
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              // Clears Confirm's message too: changing this field is what makes
+              // a mismatch under the next one stale.
+              onChange={change(setPassword, "password", "confirmPassword")}
+              onBlur={blur("password")}
+              placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+            />
+          )}
+        </Field>
+        <Field
+          id="reset-confirm-password"
+          label="Confirm password"
+          error={shown("confirmPassword")}
+        >
+          {(control) => (
+            <Input
+              {...control}
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={change(setConfirmPassword, "confirmPassword")}
+              onBlur={blur("confirmPassword")}
+              placeholder="Re-enter password"
+            />
+          )}
+        </Field>
 
         {formError && <p className="text-xs text-destructive">{formError}</p>}
 

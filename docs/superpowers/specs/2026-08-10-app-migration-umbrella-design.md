@@ -56,6 +56,16 @@ Five child specs, in dependency order.
 | 4 | **Onboarding** | The spine; step 2 as a rail destination; step 3 |
 | 5 | **Auth & settings** | `AuthShell` three states, `InviteGate` segmented field, `ResetPassword` match hint, `ConnectionSettings` modal with tabs, `ConnectedApps` plain-language grants, `Consent` with a neutral Deny |
 
+**Slice 5 shipped as two specs**, split at the owner's direction because the row
+above covers seven components across two surfaces that share almost no code:
+`2026-08-14-settings-slice-design.md` (the dialog) and
+`2026-08-14-auth-slice-design.md` (the screens shown without a credential). It
+was the last slice of the umbrella.
+
+Two of that row's items turned out to be already built when 5b was scoped —
+`InviteGate`'s segmented field and `Consent`'s plain language and neutral Deny.
+The row was written from the prototype rather than against the code.
+
 **Motion is not a slice.** Its tokens are defined once in slice 1; each slice
 implements its own named motions against them.
 

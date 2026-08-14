@@ -20,6 +20,15 @@ import {
   normaliseInvite,
 } from "@/lib/session.js";
 import { InviteGate, AcceptedInvite } from "@/components/InviteGate";
+import { AuthShell } from "@/components/AuthShell";
+import { Field } from "@/components/ui/field";
+import {
+  validateUsername,
+  validatePassword,
+  validateConfirmPassword,
+  validateResetEmail,
+  validateServerUrl,
+} from "@/lib/authValidation.js";
 import {
   DEFAULT_AUTH_ROUTE,
   goToRoute,
@@ -57,11 +66,62 @@ const ORIGIN_API_URL =
     ? `${window.location.origin}/api`
     : CLOUD_API_URL;
 
+/**
+ * The card's heading, by what it is currently asking for.
+ *
+ * This used to live in App, at the point it mounted this component -- so the
+ * heading could not change when the form did, and "Welcome to MyGist. Sign in
+ * or create an account to get started" sat above the forgot-password form and
+ * above the invite gate.
+ *
+ * `intent` is the one thing App knows that this component does not: whether
+ * this is the app's own sign-in or the middle of an OAuth flow, where the
+ * person did not come here to sign in and is owed a sentence saying why they
+ * are being asked.
+ */
+const COPY = {
+  app: {
+    signin: {
+      title: "Welcome to MyGist",
+      description: "Your portable personal context for AI.",
+    },
+    signup: {
+      title: "Create your account",
+      description: "One account, and every AI client you use reads the same persona.",
+    },
+    forgot: {
+      title: "Reset your password",
+      description: "We will email you a link.",
+    },
+  },
+  connect: {
+    signin: {
+      title: "Sign in to connect",
+      description: "Sign in to let this application connect to your persona.",
+    },
+    signup: {
+      title: "Create your account",
+      description: "You will be asked to approve the connection next.",
+    },
+    forgot: {
+      title: "Reset your password",
+      description: "We will email you a link.",
+    },
+  },
+};
+
+// The gate reads the same under both intents: it is a statement about the
+// instance, and nothing about it changes because a client is waiting.
+const INVITE_COPY = {
+  title: "You need an invite",
+  description: "MyGist is in closed testing.",
+};
+
 // Welcome / sign-in form: username + password, with a "Create account"
 // toggle. Lives on the first-run welcome screen (see the `error &&
 // !getAuthToken()` branch below). On success it saves the config and hands
 // control back to the caller (which reloads app data).
-export function WelcomeAuth({ onUseToken, onSuccess }) {
+export function WelcomeAuth({ intent = "app", onSuccess }) {
   // The mode IS the route -- #/signin, #/signup, #/forgot. Seeded from the URL
   // so a deep link lands on the right screen, and written back to it on every
   // change so the address bar never describes a page nobody is looking at.
@@ -82,6 +142,12 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState(null);
   const [showServer, setShowServer] = useState(false);
+  // Which fields have been left, and what is currently wrong with each. Two
+  // pieces of state rather than one, because a field can be untouched AND
+  // invalid -- nothing typed yet -- and the difference is exactly what decides
+  // whether to say so.
+  const [touched, setTouched] = useState({});
+  const [errors, setErrors] = useState({});
   // MyGist ships as one container serving both this page and /api, so the
   // server that handed you this form is almost always the one you want to
   // authenticate against -- and `getApiBase()` already defaults to the
@@ -191,16 +257,65 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
     setPassword("");
     setConfirmPassword("");
     setResetSent(false);
+    // Otherwise "Enter a password" follows you from sign-in onto the sign-up
+    // form, about a field that has just been cleared.
+    setTouched({});
+    setErrors({});
   };
+
+  /**
+   * Every field's rule at once. One function so the blur path and the submit
+   * path cannot come to disagree about what counts as valid -- which is how the
+   * old code ended up checking the server URL only on submit.
+   *
+   * Fields that are not on screen are left out rather than passed: a key that is
+   * absent cannot be reported, and `mode` decides which exist.
+   */
+  const checkAll = () => ({
+    username: validateUsername(username, { acceptsEmail }),
+    password: validatePassword(password, { isNew: mode === "signup" }),
+    ...(mode === "signup"
+      ? { confirmPassword: validateConfirmPassword(confirmPassword, password) }
+      : {}),
+    ...(connectionType === "self-hosted" && showServer
+      ? { selfHostedUrl: validateServerUrl(selfHostedUrl) }
+      : {}),
+  });
+
+  const blur = (field) => () => {
+    setTouched((t) => ({ ...t, [field]: true }));
+    setErrors(checkAll());
+  };
+
+  /**
+   * Cleared as the fix is typed, not on the next blur. The alternative leaves a
+   * red message under the box being corrected.
+   *
+   * More than one field name for the password pair: typing in Password clears
+   * both its own message and Confirm's now-stale mismatch.
+   */
+  const change =
+    (setter, ...fields) =>
+    (e) => {
+      setter(e.target.value);
+      setErrors((prev) => {
+        const next = { ...prev };
+        for (const field of fields) delete next[field];
+        return next;
+      });
+    };
+
+  /** Shown once the field has been left, or once submit has touched everything. */
+  const shown = (field) => (touched[field] ? errors[field] : undefined);
 
   const handleResetSubmit = async (e) => {
     e.preventDefault();
     setFormError(null);
 
-    if (!resetEmail.trim()) {
-      setFormError("Enter the email on your account.");
-      return;
-    }
+    const emailError = validateResetEmail(resetEmail);
+    setTouched((t) => ({ ...t, resetEmail: true }));
+    setErrors((prev) => ({ ...prev, resetEmail: emailError }));
+    if (emailError) return;
 
     setPending(true);
     try {
@@ -217,24 +332,17 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
     e.preventDefault();
     setFormError(null);
 
-    if (!username.trim() || !password) {
-      setFormError("Enter a username and password.");
-      return;
-    }
-    if (connectionType === "self-hosted" && !selfHostedUrl.trim()) {
-      setFormError("Server URL is required.");
-      return;
-    }
-    if (mode === "signup") {
-      if (password.length < 8) {
-        setFormError("Password must be at least 8 characters.");
-        return;
-      }
-      if (password !== confirmPassword) {
-        setFormError("Passwords do not match.");
-        return;
-      }
-    }
+    // Everything is marked touched so a form submitted by Enter reports all of
+    // its problems, rather than the first one an if-chain happened to reach.
+    const found = checkAll();
+    setErrors(found);
+    setTouched({
+      username: true,
+      password: true,
+      confirmPassword: true,
+      selfHostedUrl: true,
+    });
+    if (Object.values(found).some(Boolean)) return;
 
     setPending(true);
     try {
@@ -272,230 +380,265 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
     }
   };
 
+  const copy = needsInvite ? INVITE_COPY : COPY[intent][mode];
+
   if (needsInvite) {
     return (
-      <InviteGate
-        initialCode={linkInvite}
-        onAccepted={setAcceptedInvite}
-        onBack={() => switchMode("signin")}
-      />
+      <AuthShell title={copy.title} description={copy.description}>
+        <InviteGate
+          initialCode={linkInvite}
+          onAccepted={setAcceptedInvite}
+          onBack={() => switchMode("signin")}
+        />
+      </AuthShell>
     );
   }
 
   if (mode === "forgot") {
     return (
-      <div className="w-full space-y-4 text-left">
-        {resetSent ? (
-          // Deliberately says nothing about whether that address has an
-          // account. The service answers identically either way so a stranger
-          // cannot use this to find out who has signed up, and it would be a
-          // waste of that care to give it away in the copy.
-          <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
-            <p className="text-sm">
-              If <strong>{resetEmail.trim()}</strong> is on a MyGist account, a reset
-              link is on its way.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              The link works once and expires within the hour. Nothing has changed
-              until you open it.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleResetSubmit} className="space-y-4" noValidate>
-            <div className="space-y-1.5">
-              <Label htmlFor="reset-email" className="text-xs font-medium">
-                Email
-              </Label>
-              <Input
-                id="reset-email"
-                type="email"
-                autoComplete="email"
-                value={resetEmail}
-                onChange={(e) => setResetEmail(e.target.value)}
-                placeholder="you@example.com"
-              />
+      <AuthShell title={copy.title} description={copy.description}>
+        <div className="w-full space-y-4 text-left">
+          {resetSent ? (
+            // Deliberately says nothing about whether that address has an
+            // account. The service answers identically either way so a stranger
+            // cannot use this to find out who has signed up, and it would be a
+            // waste of that care to give it away in the copy.
+            <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+              <p className="text-sm">
+                If <strong>{resetEmail.trim()}</strong> is on a MyGist account, a reset
+                link is on its way.
+              </p>
               <p className="text-xs text-muted-foreground">
-                The address on your account. If you never added one, a reset cannot
-                reach you — sign in and add one first.
+                The link works once and expires within the hour. Nothing has changed
+                until you open it.
               </p>
             </div>
-
-            {formError && <p className="text-xs text-destructive">{formError}</p>}
-
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "Send reset link"
-              )}
-            </Button>
-          </form>
-        )}
-
-        <p className="text-center text-xs text-muted-foreground">
-          <button
-            type="button"
-            onClick={() => switchMode("signin")}
-            className="underline hover:text-foreground"
-          >
-            Back to sign in
-          </button>
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-full space-y-4 text-left">
-      {/* Which code is about to be spent, and a way back to change it. */}
-      {mode === "signup" && acceptedInvite && (
-        <AcceptedInvite code={acceptedInvite} onChange={() => setAcceptedInvite("")} />
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        <div className="space-y-1.5">
-          <Label htmlFor="welcome-username" className="text-xs font-medium">
-            {acceptsEmail ? "Username or email" : "Username"}
-          </Label>
-          <Input
-            id="welcome-username"
-            autoComplete="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder={acceptsEmail ? "yourname or you@example.com" : "yourname"}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="welcome-password" className="text-xs font-medium">
-            Password
-          </Label>
-          <Input
-            id="welcome-password"
-            type="password"
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
-          />
-        </div>
-        {mode === "signup" && (
-          <div className="space-y-1.5">
-            <Label htmlFor="welcome-confirm-password" className="text-xs font-medium">
-              Confirm password
-            </Label>
-            <Input
-              id="welcome-confirm-password"
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter password"
-            />
-          </div>
-        )}
-
-        {showServer && (
-          <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-left">
-            <Label className="text-xs font-medium">Server</Label>
-            <div className="flex rounded-lg bg-muted p-0.5">
-              <button
-                type="button"
-                onClick={() => setConnectionType("cloud")}
-                className={segmentClass(connectionType === "cloud")}
-              >
-                <Globe className="h-4 w-4" />
-                Cloud
-              </button>
-              <button
-                type="button"
-                onClick={() => setConnectionType("self-hosted")}
-                className={segmentClass(connectionType === "self-hosted")}
-              >
-                <Server className="h-4 w-4" />
-                Self-hosted
-              </button>
-            </div>
-            {connectionType === "self-hosted" && (
-              <Input
-                placeholder="https://your-mygist-server.com/api"
-                value={selfHostedUrl}
-                onChange={(e) => setSelfHostedUrl(e.target.value)}
-              />
-            )}
-          </div>
-        )}
-
-        {formError && <p className="text-xs text-destructive">{formError}</p>}
-
-        <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : mode === "signup" ? (
-            "Create account"
           ) : (
-            "Sign in"
-          )}
-        </Button>
-      </form>
+            <form onSubmit={handleResetSubmit} className="space-y-4" noValidate>
+              <Field
+                id="reset-email"
+                label="Email"
+                description="The address on your account. If you never added one, a reset cannot reach you — sign in and add one first."
+                error={shown("resetEmail")}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    type="email"
+                    autoComplete="email"
+                    value={resetEmail}
+                    onChange={change(setResetEmail, "resetEmail")}
+                    // Its own handler rather than blur("resetEmail"): checkAll
+                    // covers the sign-in form's fields, and running it here
+                    // would mark a username and password invalid on a screen
+                    // that is not showing either.
+                    onBlur={() => {
+                      setTouched((t) => ({ ...t, resetEmail: true }));
+                      setErrors((prev) => ({
+                        ...prev,
+                        resetEmail: validateResetEmail(resetEmail),
+                      }));
+                    }}
+                    placeholder="you@example.com"
+                  />
+                )}
+              </Field>
 
-      <p className="text-center text-xs text-muted-foreground">
-        {mode === "signup" ? (
-          <>
-            Already have an account?{" "}
+              {formError && <p className="text-xs text-destructive">{formError}</p>}
+
+              <Button type="submit" className="w-full" disabled={pending}>
+                {pending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Send reset link"
+                )}
+              </Button>
+            </form>
+          )}
+
+          <p className="text-center text-xs text-muted-foreground">
             <button
               type="button"
               onClick={() => switchMode("signin")}
               className="underline hover:text-foreground"
             >
-              Sign in
+              Back to sign in
             </button>
-          </>
-        ) : (
-          <>
-            New to MyGist?{" "}
-            <button
-              type="button"
-              onClick={() => switchMode("signup")}
-              className="underline hover:text-foreground"
+          </p>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  return (
+    <AuthShell title={copy.title} description={copy.description}>
+      <div className="w-full space-y-4 text-left">
+        {/* Which code is about to be spent, and a way back to change it. */}
+        {mode === "signup" && acceptedInvite && (
+          <AcceptedInvite code={acceptedInvite} onChange={() => setAcceptedInvite("")} />
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <Field
+            id="welcome-username"
+            label={acceptsEmail ? "Username or email" : "Username"}
+            error={shown("username")}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                autoComplete="username"
+                value={username}
+                onChange={change(setUsername, "username")}
+                onBlur={blur("username")}
+                placeholder={acceptsEmail ? "yourname or you@example.com" : "yourname"}
+              />
+            )}
+          </Field>
+          <Field id="welcome-password" label="Password" error={shown("password")}>
+            {(control) => (
+              <Input
+                {...control}
+                type="password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                value={password}
+                // Clears Confirm's message too: fixing this field is what makes
+                // a mismatch under the next one stale.
+                onChange={change(setPassword, "password", "confirmPassword")}
+                onBlur={blur("password")}
+                placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
+              />
+            )}
+          </Field>
+          {mode === "signup" && (
+            <Field
+              id="welcome-confirm-password"
+              label="Confirm password"
+              error={shown("confirmPassword")}
             >
-              Create an account
-            </button>
-            {/* Reset runs through Better Auth, which is same-origin only.
-                Detached mode talks to the old endpoints, which have no reset
-                at all -- offering it there would be a dead end. */}
-            {!isDetached(serverUrl) && (
-              <>
-                <br />
+              {(control) => (
+                <Input
+                  {...control}
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={change(setConfirmPassword, "confirmPassword")}
+                  onBlur={blur("confirmPassword")}
+                  placeholder="Re-enter password"
+                />
+              )}
+            </Field>
+          )}
+
+          {showServer && (
+            <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-left">
+              <Label className="text-xs font-medium">Server</Label>
+              <div className="flex rounded-lg bg-muted p-0.5">
                 <button
                   type="button"
-                  onClick={() => switchMode("forgot")}
-                  className="underline hover:text-foreground"
+                  onClick={() => setConnectionType("cloud")}
+                  className={segmentClass(connectionType === "cloud")}
                 >
-                  Forgot your password?
+                  <Globe className="h-4 w-4" />
+                  Cloud
                 </button>
-              </>
-            )}
-          </>
-        )}
-      </p>
+                <button
+                  type="button"
+                  onClick={() => setConnectionType("self-hosted")}
+                  className={segmentClass(connectionType === "self-hosted")}
+                >
+                  <Server className="h-4 w-4" />
+                  Self-hosted
+                </button>
+              </div>
+              {connectionType === "self-hosted" && (
+                <Field
+                  id="welcome-server-url"
+                  label="Server URL"
+                  error={shown("selfHostedUrl")}
+                >
+                  {(control) => (
+                    <Input
+                      {...control}
+                      placeholder="https://your-mygist-server.com/api"
+                      value={selfHostedUrl}
+                      onChange={change(setSelfHostedUrl, "selfHostedUrl")}
+                      onBlur={blur("selfHostedUrl")}
+                    />
+                  )}
+                </Field>
+              )}
+            </div>
+          )}
 
-      <div className="flex items-center justify-center gap-3 border-t pt-3 text-xs text-muted-foreground">
-        <button
-          type="button"
-          onClick={onUseToken}
-          className="underline hover:text-foreground"
-        >
-          Use an access token instead
-        </button>
-        <span aria-hidden="true">&middot;</span>
-        <button
-          type="button"
-          onClick={() => setShowServer((v) => !v)}
-          className="underline hover:text-foreground"
-        >
-          Server: {connectionType === "cloud" ? "Cloud" : "Self-hosted"}
-        </button>
+          {formError && <p className="text-xs text-destructive">{formError}</p>}
+
+          <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : mode === "signup" ? (
+              "Create account"
+            ) : (
+              "Sign in"
+            )}
+          </Button>
+        </form>
+
+        <p className="text-center text-xs text-muted-foreground">
+          {mode === "signup" ? (
+            <>
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={() => switchMode("signin")}
+                className="underline hover:text-foreground"
+              >
+                Sign in
+              </button>
+            </>
+          ) : (
+            <>
+              New to MyGist?{" "}
+              <button
+                type="button"
+                onClick={() => switchMode("signup")}
+                className="underline hover:text-foreground"
+              >
+                Create an account
+              </button>
+              {/* Reset runs through Better Auth, which is same-origin only.
+                  Detached mode talks to the old endpoints, which have no reset
+                  at all -- offering it there would be a dead end. */}
+              {!isDetached(serverUrl) && (
+                <>
+                  <br />
+                  <button
+                    type="button"
+                    onClick={() => switchMode("forgot")}
+                    className="underline hover:text-foreground"
+                  >
+                    Forgot your password?
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </p>
+
+        {/* "Use an access token instead" used to share this row. Deleted per the
+            prototype's change 5 -- Better Auth supersedes it -- and the cost is
+            recorded in the auth slice spec: a first run with no account now has
+            no way to paste a bare token. */}
+        <div className="flex items-center justify-center border-t pt-3 text-xs text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => setShowServer((v) => !v)}
+            className="underline hover:text-foreground"
+          >
+            Server: {connectionType === "cloud" ? "Cloud" : "Self-hosted"}
+          </button>
+        </div>
       </div>
-    </div>
+    </AuthShell>
   );
 }

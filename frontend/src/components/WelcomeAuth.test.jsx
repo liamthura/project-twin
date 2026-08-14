@@ -52,7 +52,7 @@ beforeEach(() => {
 describe("WelcomeAuth server default", () => {
   it("signs in against the origin that served the page, not the cloud preset", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.type(screen.getByLabelText("Username or email"), "someone");
     await user.type(screen.getByLabelText("Password"), "CorrectHorse9!");
@@ -73,7 +73,7 @@ describe("WelcomeAuth server default", () => {
 
   it("stores no token for a same-origin sign-in, so the cookie stays authoritative", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.type(screen.getByLabelText("Username or email"), "someone");
     await user.type(screen.getByLabelText("Password"), "CorrectHorse9!");
@@ -86,7 +86,7 @@ describe("WelcomeAuth server default", () => {
 
   it("registers against that same origin", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: "Create an account" }));
     await user.type(screen.getByLabelText("Username"), "someone");
@@ -102,7 +102,7 @@ describe("WelcomeAuth server default", () => {
 
   it("still lets the cloud preset be chosen in one click", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: /^Server:/ }));
     await user.click(screen.getByRole("button", { name: "Cloud" }));
@@ -120,7 +120,7 @@ describe("WelcomeAuth server default", () => {
 
   it("prefills the serving origin so the URL is visible, not guessed at", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: /^Server:/ }));
 
@@ -130,7 +130,7 @@ describe("WelcomeAuth server default", () => {
 
 describe("forgotten password", () => {
   const openForgot = async (user) => {
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
     await user.click(screen.getByRole("button", { name: /forgot your password/i }));
   };
 
@@ -190,7 +190,7 @@ describe("forgotten password", () => {
 
   it("is not offered while signing up, where it makes no sense", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: /create an account/i }));
 
@@ -202,13 +202,13 @@ describe("forgotten password", () => {
 
 describe("signing in with an email", () => {
   it("says the field takes either identifier", () => {
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
     expect(screen.getByLabelText("Username or email")).toBeInTheDocument();
   });
 
   it("passes an email through to the session module, which routes it", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.type(screen.getByLabelText("Username or email"), "liam@example.com");
     await user.type(screen.getByLabelText("Password"), "CorrectHorse9!");
@@ -221,7 +221,7 @@ describe("signing in with an email", () => {
     // Sign-up is unchanged. Offering a choice here would promise something the
     // next step does not deliver.
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: "Create an account" }));
 
@@ -233,7 +233,7 @@ describe("signing in with an email", () => {
     // Detached mode talks to /api/auth/login, which knows only usernames. A
     // label promising email would be a lie on that path.
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: /^Server:/ }));
     await user.click(screen.getByRole("button", { name: "Cloud" }));
@@ -251,7 +251,7 @@ describe("an invite-only instance", () => {
 
   it("asks for a code before the account form", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: "Create an account" }));
 
@@ -262,7 +262,7 @@ describe("an invite-only instance", () => {
   it("does not gate signing in", async () => {
     // Only account creation passes through the gate. Someone who already has an
     // account has already been invited.
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     expect(await screen.findByLabelText("Username or email")).toBeInTheDocument();
     expect(screen.queryByLabelText(/invite code/i)).toBeNull();
@@ -270,7 +270,7 @@ describe("an invite-only instance", () => {
 
   it("shows the account form once a code is accepted, and which code it was", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: "Create an account" }));
     await user.type(await screen.findByLabelText(/invite code/i), "7F2KQX91");
@@ -281,7 +281,7 @@ describe("an invite-only instance", () => {
 
   it("sends the code with the registration", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: "Create an account" }));
     await user.type(await screen.findByLabelText(/invite code/i), "7F2KQX91");
@@ -296,7 +296,7 @@ describe("an invite-only instance", () => {
 
   it("lets a wrong code be changed without losing the form", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: "Create an account" }));
     await user.type(await screen.findByLabelText(/invite code/i), "7F2KQX91");
@@ -312,7 +312,7 @@ describe("an open instance", () => {
   it("never mentions invite codes", async () => {
     getInstance.mockResolvedValue({ invite_only: false });
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: "Create an account" }));
 
@@ -328,14 +328,14 @@ describe("the auth screens have their own routes", () => {
     // The bug: the tab sync wrote #/profile while the sign-in form was on
     // screen, so the address bar named a page you could not reach without
     // signing in first.
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await waitFor(() => expect(routeNow()).toBe("#/signin"));
   });
 
   it("moves to #/signup when an account is being created", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: "Create an account" }));
 
@@ -344,7 +344,7 @@ describe("the auth screens have their own routes", () => {
 
   it("moves to #/forgot for a password reset", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await user.click(screen.getByRole("button", { name: /forgot your password/i }));
 
@@ -354,7 +354,7 @@ describe("the auth screens have their own routes", () => {
   it("opens straight onto the form a deep link names", async () => {
     window.history.replaceState(null, "", "#/signup");
 
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     expect(await screen.findByLabelText("Confirm password")).toBeInTheDocument();
   });
@@ -364,7 +364,7 @@ describe("the auth screens have their own routes", () => {
     // on a blank page would be the alternative.
     window.history.replaceState(null, "", "#/profile");
 
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     expect(await screen.findByLabelText("Username or email")).toBeInTheDocument();
     await waitFor(() => expect(routeNow()).toBe("#/signin"));
@@ -372,7 +372,7 @@ describe("the auth screens have their own routes", () => {
 
   it("follows the back button between screens", async () => {
     const user = userEvent.setup();
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
     await user.click(screen.getByRole("button", { name: "Create an account" }));
     await waitFor(() => expect(routeNow()).toBe("#/signup"));
 
@@ -388,7 +388,7 @@ describe("the auth screens have their own routes", () => {
     // it, or the code is lost the moment the screen names itself.
     window.history.replaceState(null, "", "/?invite=7F2K-QX91");
 
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await waitFor(() => expect(window.location.search).toBe("?invite=7F2K-QX91"));
   });
@@ -396,7 +396,7 @@ describe("the auth screens have their own routes", () => {
   it("starts an invite link on sign-up, not sign-in", async () => {
     window.history.replaceState(null, "", "/?invite=7F2K-QX91");
 
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await waitFor(() => expect(routeNow()).toBe("#/signup"));
   });
@@ -407,11 +407,217 @@ describe("the auth screens have their own routes", () => {
     checkInvite.mockResolvedValue(true);
     window.history.replaceState(null, "", "/?invite=7F2K-QX91");
 
-    render(<WelcomeAuth onUseToken={() => {}} onSuccess={() => {}} />);
+    render(<WelcomeAuth onSuccess={() => {}} />);
 
     await screen.findByLabelText("Confirm password");
     await waitFor(() => expect(window.location.search).toBe(""));
     // The route it navigated to is untouched by the cleanup.
     expect(window.location.hash).toBe("#/signup");
+  });
+});
+
+describe("what the sign-in screen no longer offers", () => {
+  // Per the prototype's change 5: Better Auth supersedes the pasted token.
+  // Asserted rather than assumed because deleting it also cost the first-run
+  // route to the token field -- see the auth slice spec's correction section.
+  // If that decision is ever revisited, this test is where it surfaces.
+  it("does not offer a pasted access token", async () => {
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    await waitFor(() => expect(screen.getByLabelText(/username/i)).toBeInTheDocument());
+    expect(screen.queryByText(/access token/i)).not.toBeInTheDocument();
+  });
+
+  it("still lets the server be changed, which shared that row", async () => {
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    await waitFor(() => expect(screen.getByLabelText(/username/i)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /^Server:/ })).toBeInTheDocument();
+  });
+});
+
+describe("the card's heading is part of its state", () => {
+  // The heading used to be App's, set at the point WelcomeAuth was mounted, so
+  // it could not change when the form did: "Welcome to MyGist -- Sign in or
+  // create an account to get started" sat above the forgot-password form, and
+  // above the invite gate.
+  const heading = () => screen.getByRole("heading", { level: 1 }).textContent;
+  const waitForForm = () =>
+    waitFor(() => expect(screen.getByLabelText(/username/i)).toBeInTheDocument());
+
+  // Stated rather than inherited. clearAllMocks() empties the call log but
+  // leaves implementations in place, so an earlier block's
+  // mockResolvedValue({ invite_only: true }) is still in force here.
+  beforeEach(() => getInstance.mockResolvedValue({ invite_only: false }));
+
+  it("welcomes on sign-in", async () => {
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    await waitForForm();
+    expect(heading()).toMatch(/Welcome to MyGist/i);
+  });
+
+  it("changes when an account is being created", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    await waitForForm();
+    await user.click(screen.getByRole("button", { name: /create an account/i }));
+    expect(heading()).toMatch(/Create your account/i);
+  });
+
+  it("changes again for a password reset", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    await waitForForm();
+    await user.click(screen.getByRole("button", { name: /forgot your password/i }));
+    expect(heading()).toMatch(/Reset your password/i);
+  });
+
+  it("says what the sign-in is for when a client is waiting", async () => {
+    render(<WelcomeAuth intent="connect" onSuccess={() => {}} />);
+
+    await waitForForm();
+    expect(heading()).toMatch(/Sign in to connect/i);
+  });
+
+  it("names the gate rather than the welcome on an invite-only instance", async () => {
+    getInstance.mockResolvedValue({ invite_only: true });
+    const user = userEvent.setup();
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    await waitForForm();
+    await user.click(screen.getByRole("button", { name: /create an account/i }));
+    await screen.findByLabelText(/invite code/i);
+    expect(heading()).toMatch(/You need an invite/i);
+  });
+});
+
+describe("validation arrives per field, on blur", () => {
+  beforeEach(() => getInstance.mockResolvedValue({ invite_only: false }));
+
+  const openSignIn = async () => {
+    render(<WelcomeAuth onSuccess={() => {}} />);
+    await waitFor(() => expect(screen.getByLabelText(/username/i)).toBeInTheDocument());
+  };
+
+  it("is silent on a form nobody has touched", async () => {
+    await openSignIn();
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("names the empty field when it is left", async () => {
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.click(screen.getByLabelText(/username/i));
+    await user.tab();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a username or email.");
+  });
+
+  it("marks that field invalid, not the form", async () => {
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.click(screen.getByLabelText(/username/i));
+    await user.tab();
+
+    expect(screen.getByLabelText(/username/i)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/^password/i)).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("clears as the fix is typed, not on the next blur", async () => {
+    // A red message under the box being corrected is the thing this rule
+    // exists to prevent.
+    //
+    // Asserted on this field's own message rather than on any alert: tabbing
+    // out of Username puts focus in Password, and coming back here leaves
+    // Password blurred and empty, which correctly earns a message of its own.
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.click(screen.getByLabelText(/username/i));
+    await user.tab();
+    expect(screen.getByText("Enter a username or email.")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/username/i), "l");
+
+    expect(screen.queryByText("Enter a username or email.")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("still checks everything on a submit where nothing was blurred", async () => {
+    // Enter submits a form in which no field was ever left.
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    const messages = screen.getAllByRole("alert").map((el) => el.textContent);
+    expect(messages).toContain("Enter a username or email.");
+    expect(messages).toContain("Enter a password.");
+  });
+
+  it("holds a new password to eight characters, and only when signing up", async () => {
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.type(screen.getByLabelText(/^password/i), "short");
+    await user.tab();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /create an account/i }));
+    await user.type(screen.getByLabelText(/^password/i), "short");
+    await user.tab();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Password must be at least 8 characters.",
+    );
+  });
+
+  it("reports a mismatch under Confirm, where the correction goes", async () => {
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.click(screen.getByRole("button", { name: /create an account/i }));
+    await user.type(screen.getByLabelText(/^password/i), "a-good-password");
+    await user.type(screen.getByLabelText(/confirm password/i), "a-good-passwerd");
+    await user.tab();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Passwords do not match.");
+  });
+
+  it("stops saying they differ once the first field is the one that changed", async () => {
+    // Fixing Password leaves a stale mismatch under Confirm unless the pair is
+    // re-checked when either side moves.
+    const user = userEvent.setup();
+    await openSignIn();
+
+    await user.click(screen.getByRole("button", { name: /create an account/i }));
+    await user.type(screen.getByLabelText(/^password/i), "a-good-passwerd");
+    await user.type(screen.getByLabelText(/confirm password/i), "a-good-password");
+    await user.tab();
+    expect(screen.getByRole("alert")).toHaveTextContent("Passwords do not match.");
+
+    await user.clear(screen.getByLabelText(/^password/i));
+    await user.type(screen.getByLabelText(/^password/i), "a-good-password");
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps the form-level line for what the server says", async () => {
+    const user = userEvent.setup();
+    signIn.mockImplementation(() => Promise.reject(new Error("Invalid username or password")));
+    await openSignIn();
+
+    await user.type(screen.getByLabelText(/username/i), "liamthura");
+    await user.type(screen.getByLabelText(/^password/i), "a-good-password");
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Invalid username or password")).toBeInTheDocument(),
+    );
   });
 });

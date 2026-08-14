@@ -134,3 +134,66 @@ describe("leaving the screen", () => {
     expect(onDone).toHaveBeenCalled();
   });
 });
+
+describe("the fields say what is wrong before the button is pressed", () => {
+  it("is silent until a field is left", () => {
+    open();
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("holds the new password to the minimum on blur", async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.type(screen.getByLabelText(/new password/i), "short");
+    await user.tab();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Password must be at least 8 characters.",
+    );
+  });
+
+  it("shows the mismatch under Confirm, not above the button", async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.type(screen.getByLabelText(/new password/i), "a-good-password");
+    await user.type(screen.getByLabelText(/confirm password/i), "a-good-passwerd");
+    await user.tab();
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Passwords do not match.");
+    // Under Confirm specifically -- the field the correction goes into.
+    expect(screen.getByLabelText(/confirm password/i)).toHaveAttribute(
+      "aria-describedby",
+      alert.id,
+    );
+  });
+
+  it("stops saying they differ once they do not", async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.type(screen.getByLabelText(/new password/i), "a-good-password");
+    await user.type(screen.getByLabelText(/confirm password/i), "a-good-passwerd");
+    await user.tab();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText(/confirm password/i));
+    await user.type(screen.getByLabelText(/confirm password/i), "a-good-password");
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("does not submit a form it has already found fault with", async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.type(screen.getByLabelText(/new password/i), "short");
+    await user.type(screen.getByLabelText(/confirm password/i), "short");
+    await user.click(screen.getByRole("button", { name: /set new password/i }));
+
+    expect(resetPassword).not.toHaveBeenCalled();
+  });
+});

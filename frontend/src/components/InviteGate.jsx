@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Ticket } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import {
   InputOTP,
   InputOTPGroup,
@@ -99,56 +99,56 @@ export function InviteGate({ initialCode, onAccepted, onBack }) {
   return (
     <div className="w-full space-y-4 text-left">
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        <div className="space-y-2">
-          <Label htmlFor="invite-code" className="text-xs font-medium">
-            Invite code
-          </Label>
+        {/* The helper used to add "and the dash do not matter", which was true
+            when this was one text input. The dash is drawn between the two
+            groups now and cannot be typed into, so the sentence described a
+            field that no longer exists. */}
+        <Field
+          id="invite-code"
+          label="Invite code"
+          description="MyGist is in closed testing. Paste the code from your invite — case does not matter."
+          error={error}
+        >
+          {(control) => (
+            <InputOTP
+              {...control}
+              maxLength={INVITE_LENGTH}
+              pattern={PATTERN}
+              // input-otp defaults this to "numeric", which is right for the
+              // one-time codes it was written for and wrong here: two thirds of
+              // the invite alphabet is letters, so a phone raises the number pad
+              // and the code cannot be typed at all. Invisible on a desktop,
+              // where every keyboard has everything.
+              inputMode="text"
+              // The alphabet is uppercase, and normaliseInvite would fix the case
+              // anyway -- but a keyboard that shows the case it will produce is
+              // less unnerving than one whose letters arrive changed.
+              autoCapitalize="characters"
+              value={code}
+              onChange={(value) => {
+                setCode(normaliseInvite(value));
+                setError(null);
+              }}
+              // Enter is natural once the last slot is filled, and waiting for a
+              // deliberate button press after that is friction with no purpose.
+              onComplete={(value) => submit(value)}
+              disabled={pending}
+            >
+              <InputOTPGroup>
+                {[0, 1, 2, 3].map((i) => (
+                  <InputOTPSlot key={i} index={i} />
+                ))}
+              </InputOTPGroup>
+              <InputOTPSeparator />
+              <InputOTPGroup>
+                {[4, 5, 6, 7].map((i) => (
+                  <InputOTPSlot key={i} index={i} />
+                ))}
+              </InputOTPGroup>
+            </InputOTP>
+          )}
+        </Field>
 
-          <InputOTP
-            id="invite-code"
-            maxLength={INVITE_LENGTH}
-            pattern={PATTERN}
-            // input-otp defaults this to "numeric", which is right for the
-            // one-time codes it was written for and wrong here: two thirds of
-            // the invite alphabet is letters, so a phone raises the number pad
-            // and the code cannot be typed at all. Invisible on a desktop,
-            // where every keyboard has everything.
-            inputMode="text"
-            // The alphabet is uppercase, and normaliseInvite would fix the case
-            // anyway -- but a keyboard that shows the case it will produce is
-            // less unnerving than one whose letters arrive changed.
-            autoCapitalize="characters"
-            value={code}
-            onChange={(value) => {
-              setCode(normaliseInvite(value));
-              setError(null);
-            }}
-            // Enter is natural once the last slot is filled, and waiting for a
-            // deliberate button press after that is friction with no purpose.
-            onComplete={(value) => submit(value)}
-            disabled={pending}
-            aria-describedby="invite-code-help"
-          >
-            <InputOTPGroup>
-              {[0, 1, 2, 3].map((i) => (
-                <InputOTPSlot key={i} index={i} />
-              ))}
-            </InputOTPGroup>
-            <InputOTPSeparator />
-            <InputOTPGroup>
-              {[4, 5, 6, 7].map((i) => (
-                <InputOTPSlot key={i} index={i} />
-              ))}
-            </InputOTPGroup>
-          </InputOTP>
-
-          <p id="invite-code-help" className="text-xs text-muted-foreground">
-            MyGist is in closed testing. Paste the code from your invite — case
-            and the dash do not matter.
-          </p>
-        </div>
-
-        {error && <p className="text-xs text-destructive">{error}</p>}
 
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continue"}

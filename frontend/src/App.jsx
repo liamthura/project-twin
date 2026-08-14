@@ -26,7 +26,6 @@ import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { api, getAuthToken } from "@/lib/api.js";
 import { hasSession } from "@/lib/session.js";
 import { WelcomeAuth } from "@/components/WelcomeAuth";
-import { AuthShell } from "@/components/AuthShell";
 import { ResetPassword } from "@/components/ResetPassword";
 import { AddEmailBanner } from "@/components/AddEmailBanner";
 import Consent from "@/components/Consent";
@@ -93,33 +92,21 @@ export default function App() {
     // itself is where someone signing in wanted to end up.
     const isOAuthRequest = new URLSearchParams(oauthQuery).has("client_id");
     return (
-      <AuthShell
-        title={isOAuthRequest ? "Sign in to connect" : "Sign in"}
-        description={
-          isOAuthRequest
-            ? "Sign in to let this application connect to your persona."
-            : "Sign in to your MyGist account."
-        }
-      >
-        <WelcomeAuth
-          // Detached mode -- a UI pointed at someone else's server -- has no
-          // meaning mid-OAuth-flow: this page IS the server the client is
-          // connecting to. The link still renders (WelcomeAuth is not
-          // forked for this), it just has nothing to do here.
-          onUseToken={() => {}}
-          onSuccess={() => {
-            if (!isOAuthRequest) {
-              window.location.assign("/");
-              return;
-            }
-            // Better Auth's /oauth2/authorize re-evaluates now that a
-            // session cookie exists, and continues the flow it interrupted
-            // -- on to /consent, or straight through for a client that has
-            // one already.
-            window.location.assign(`/auth/oauth2/authorize${oauthQuery}`);
-          }}
-        />
-      </AuthShell>
+      <WelcomeAuth
+        // The heading is WelcomeAuth's own now, because it changes with the
+        // form -- this only says which of the two framings applies.
+        intent={isOAuthRequest ? "connect" : "app"}
+        onSuccess={() => {
+          if (!isOAuthRequest) {
+            window.location.assign("/");
+            return;
+          }
+          // Better Auth's /oauth2/authorize re-evaluates now that a session
+          // cookie exists, and continues the flow it interrupted -- on to
+          // /consent, or straight through for a client that has one already.
+          window.location.assign(`/auth/oauth2/authorize${oauthQuery}`);
+        }}
+      />
     );
   }
 
@@ -609,36 +596,21 @@ export default function App() {
   }
 
   if (showingAuth) {
+    // No SettingsDialog here any more. The only thing that opened it on this
+    // screen was "Use an access token instead", and with that gone it had no
+    // trigger -- a dialog nobody could reach. The Server toggle inside
+    // WelcomeAuth covers choosing an instance.
     return (
-      <AuthShell
-        title="Welcome to MyGist"
-        description="Your portable personal context for AI. Sign in or create an account to get started."
-      >
-        <>
-          <WelcomeAuth
-            onUseToken={() => setShowConnectionSettings(true)}
-            onSuccess={({ isNew } = {}) => {
-              // A brand-new account lands on Welcome, not on an empty Profile:
-              // that is the moment intent is highest, and Welcome is where the
-              // offer to hand the work to a client is made.
-              if (isNew) navigate("onboarding", DEFAULT_ONBOARDING_STEP);
-              loadAllData();
-              loadSettings();
-            }}
-          />
-          {/* Renders through a portal, so its place in this tree is only
-              about which state it reads. */}
-          <SettingsDialog
-            isOpen={showConnectionSettings}
-            disabledSections={disabledSections}
-            onClose={() => setShowConnectionSettings(false)}
-            onConnectionChange={() => {
-              loadAllData();
-              loadSettings();
-            }}
-          />
-        </>
-      </AuthShell>
+      <WelcomeAuth
+        onSuccess={({ isNew } = {}) => {
+          // A brand-new account lands on Welcome, not on an empty Profile:
+          // that is the moment intent is highest, and Welcome is where the
+          // offer to hand the work to a client is made.
+          if (isNew) navigate("onboarding", DEFAULT_ONBOARDING_STEP);
+          loadAllData();
+          loadSettings();
+        }}
+      />
     );
   }
 

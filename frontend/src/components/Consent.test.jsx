@@ -291,3 +291,23 @@ describe("Consent — returning to the client", () => {
     expect(assign).not.toHaveBeenCalled();
   });
 });
+
+describe("the grant rows are checkboxes, not switches", () => {
+  it("offers each scope as a checkbox", () => {
+    // A switch says "this is on now", which is how the rest of the app uses it
+    // -- in Preferences, and on the autosave setting. These rows say "this is
+    // what I am about to agree to", and nothing happens until Allow.
+    render(<Consent client={CLIENT} username="liamthura" />);
+
+    expect(screen.getAllByRole("checkbox")).toHaveLength(3);
+    expect(screen.queryAllByRole("switch")).toHaveLength(0);
+  });
+
+  it("will not let read be withdrawn", () => {
+    render(<Consent client={CLIENT} username="liamthura" />);
+
+    const read = screen.getByLabelText(/Read your persona/i);
+    expect(read).toBeChecked();
+    expect(read).toBeDisabled();
+  });
+});

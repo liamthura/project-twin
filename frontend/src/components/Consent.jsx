@@ -40,17 +40,23 @@ import { Loader2 } from "lucide-react";
 import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { authFetch, getSession } from "@/lib/session.js";
 // PERSONA_SCOPES is the three this screen has a row for. Anything else in the
 // request -- `offline_access`, `openid` -- is the client's business, not the
 // user's, and is passed through rather than decided on.
-import { READ, PROPOSE, WRITE, PERSONA_SCOPES } from "@/lib/scopes.js";
+import { READ, PROPOSE, WRITE, PERSONA_SCOPES, SCOPE_LABELS } from "@/lib/scopes.js";
 
 async function readError(res, fallback) {
   const body = await res.json().catch(() => ({}));
   return body?.error_description || body?.message || fallback;
 }
+
+// The two mutable rows' labels, from the constant the settings slice extracted,
+// so this screen and the token list cannot describe the same grant two ways.
+// READ has no entry there: it is not a grant a token can vary, so its label
+// stays a literal below.
+const LABELS = Object.fromEntries(SCOPE_LABELS);
 
 export default function Consent({ client: clientProp, username: usernameProp } = {}) {
   const [client, setClient] = useState(clientProp ?? null);
@@ -259,7 +265,7 @@ export default function Consent({ client: clientProp, username: usernameProp } =
           {askedPropose && (
             <ScopeRow
               id="scope-propose"
-              label="Suggest changes for your approval"
+              label={LABELS[PROPOSE]}
               help={
                 write
                   ? "Included -- you're allowing direct changes below, which needs this too."
@@ -272,7 +278,7 @@ export default function Consent({ client: clientProp, username: usernameProp } =
           {askedWrite && (
             <ScopeRow
               id="scope-write"
-              label="Change your persona directly"
+              label={LABELS[WRITE]}
               help="Applied immediately, without asking first."
               checked={write}
               onCheckedChange={onWriteChange}
@@ -315,7 +321,7 @@ function ScopeRow({ id, label, help, checked, disabled, onCheckedChange }) {
         </Label>
         <p className="text-xs text-muted-foreground">{help}</p>
       </div>
-      <Switch
+      <Checkbox
         id={id}
         checked={checked}
         disabled={disabled}
