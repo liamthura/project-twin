@@ -25,18 +25,33 @@ export function Calendar({ className, classNames, showOutsideDays = true, ...pro
       showOutsideDays={showOutsideDays}
       className={cn("p-3", className)}
       classNames={{
-        months: "flex flex-col gap-2 sm:flex-row",
+        // `relative` here, not on month_caption. The nav is a child of THIS
+        // element -- react-day-picker v9 renders it as a sibling of `month`, not
+        // inside the caption -- so with the caption positioned instead, the
+        // absolutely-placed nav below resolved against whatever happened to be
+        // positioned further up the tree (the popover). It landed in roughly the
+        // right place by luck, and would have moved the moment this was used
+        // anywhere else.
+        months: "relative flex flex-col gap-2 sm:flex-row",
         month: "flex flex-col gap-4",
-        month_caption: "relative flex h-7 items-center justify-center",
+        // Same height as the nav, so the caption row and the arrows occupy one
+        // band rather than the arrows almost fitting above the weekdays.
+        month_caption: "flex h-9 items-center justify-center",
         caption_label: "text-sm font-medium",
-        nav: "absolute right-1 top-1 flex items-center gap-1",
+        nav: "absolute right-0 top-0 flex h-9 items-center gap-1",
+        // 36px, the same as a day button, rather than shadcn's 28. The app has a
+        // `tap-target` utility for undersized controls (globals.css) and it is
+        // deliberately NOT used here: it extends the hit area 6px in every
+        // direction, and two arrows a gap-1 apart would end up with overlapping
+        // targets. Sending "previous" to "next" is worse than a small button, so
+        // these get real size instead of a bigger invisible one.
         button_previous: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+          "h-9 w-9 bg-transparent p-0 opacity-60 hover:opacity-100",
         ),
         button_next: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+          "h-9 w-9 bg-transparent p-0 opacity-60 hover:opacity-100",
         ),
         month_grid: "w-full border-collapse",
         weekdays: "flex",
