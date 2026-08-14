@@ -13,6 +13,7 @@ import {
 import {
   listProposals, approveProposal, rejectProposal, promoteProposal,
 } from "@/lib/api";
+import ObservationCard from "./ObservationCard";
 
 const KINDS = [
   { key: "entity", label: "Inbox" },
@@ -303,26 +304,18 @@ export default function ProposalsPanel({
           Nothing waiting. Agents propose changes here as they notice them.
         </EmptyState>
       ) : (
-        rows.map((row) => (
-          <Card key={row.id} className="space-y-3 p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{row.proposed_by}</Badge>
-              {row.seen_count > 1 && (
-                <span className="text-xs text-muted-foreground">
-                  seen {row.seen_count}×
-                </span>
-              )}
-              {row.section_hint && (
-                // "suggested", not an arrow: this is where the agent thinks it
-                // belongs, and you choose the real destination on promote. An
-                // arrow read as a promise the promote dialog then broke.
-                <span className="text-xs text-muted-foreground">
-                  suggested: {humanise(row.section_hint)}
-                </span>
-              )}
-            </div>
+        rows.map((row) =>
+          row.kind === "entity" ? (
+            <Card key={row.id} className="space-y-3 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{row.proposed_by}</Badge>
+                {row.seen_count > 1 && (
+                  <span className="text-xs text-muted-foreground">
+                    seen {row.seen_count}×
+                  </span>
+                )}
+              </div>
 
-            {row.kind === "entity" ? (
               <div className="space-y-1">
                 <p className="text-sm font-medium">
                   <span>{ACTION_VERB[row.action] || row.action}</span>{" "}
@@ -337,67 +330,52 @@ export default function ProposalsPanel({
                   ))}
                 </dl>
               </div>
-            ) : (
-              <p className="text-sm font-medium">{row.note}</p>
-            )}
 
-            <p className="text-sm text-muted-foreground">{row.rationale}</p>
-            {row.evidence && (
-              <blockquote className="border-l-2 pl-3 text-sm italic text-muted-foreground">
-                “{row.evidence}”
-              </blockquote>
-            )}
-
-            <div className="flex gap-2">
-              {row.kind === "entity" ? (
-                <>
-                  <Button
-                    size="sm"
-                    disabled={busy === row.id}
-                    onClick={() =>
-                      act(row.id, "Added to your persona", () =>
-                        approveProposal(row.id, undefined))
-                    }
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy === row.id}
-                    onClick={() =>
-                      act(row.id, "Rejected — it will not be proposed again", () =>
-                        rejectProposal(row.id))
-                    }
-                  >
-                    Reject
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    size="sm"
-                    disabled={busy === row.id || !promotable.length}
-                    onClick={() => openPromote(row)}
-                  >
-                    Promote
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy === row.id}
-                    onClick={() =>
-                      act(row.id, "Deleted — it will not be proposed again", () =>
-                        rejectProposal(row.id))
-                    }
-                  >
-                    Delete
-                  </Button>
-                </>
+              <p className="text-sm text-muted-foreground">{row.rationale}</p>
+              {row.evidence && (
+                <blockquote className="border-l-2 pl-3 text-sm italic text-muted-foreground">
+                  “{row.evidence}”
+                </blockquote>
               )}
-            </div>
-          </Card>
-        ))
+
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  disabled={busy === row.id}
+                  onClick={() =>
+                    act(row.id, "Added to your persona", () =>
+                      approveProposal(row.id, undefined))
+                  }
+                >
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy === row.id}
+                  onClick={() =>
+                    act(row.id, "Rejected — it will not be proposed again", () =>
+                      rejectProposal(row.id))
+                  }
+                >
+                  Reject
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <ObservationCard
+              key={row.id}
+              row={row}
+              busy={busy === row.id}
+              canPromote={promotable.length > 0}
+              onPromote={() => openPromote(row)}
+              onDelete={() =>
+                act(row.id, "Deleted — it will not be proposed again", () =>
+                  rejectProposal(row.id))
+              }
+            />
+          ),
+        )
       )}
     </div>
   );
