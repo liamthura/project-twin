@@ -104,3 +104,45 @@ class ScopeMiddleware(Middleware):
                 f"grant it."
             )
         return await call_next(context)
+
+    async def on_list_prompts(self, context: MiddlewareContext, call_next):
+        """Hide prompts the grant cannot carry out.
+
+        Unlike a tool, an unclassified prompt is hidden rather than shown. The
+        asymmetry is deliberate and scopes.PROMPT_SCOPES says why: a tool that
+        appears and then refuses names the problem to whoever called it, while a
+        prompt that appears and then cannot work reads as a broken product to
+        somebody who never asked for a tool and cannot see a scope.
+        """
+        prompts = await call_next(context)
+        try:
+            granted = scopes.current_scopes.get()
+        except LookupError:
+            return []
+        return [
+            prompt
+            for prompt in prompts
+            if scopes.has(granted, scopes.PROMPT_SCOPES.get(prompt.name, scopes.WRITE))
+        ]
+
+    async def on_get_prompt(self, context: MiddlewareContext, call_next):
+        """Refuse a prompt the grant does not cover, in case one was named anyway.
+
+        A hidden prompt is still callable by a client that remembers it from a
+        wider grant, or that guessed. Same fail-closed default as the list above:
+        an unclassified prompt needs WRITE, which nothing but a full grant has.
+        """
+        name = context.message.name
+        try:
+            granted = scopes.current_scopes.get()
+        except LookupError:
+            granted = frozenset()
+
+        required = scopes.PROMPT_SCOPES.get(name, scopes.WRITE)
+        if not scopes.has(granted, required):
+            raise ToolError(
+                f"This connection is not authorised to use the {name} prompt. It "
+                f"needs the {required} scope; reconnect from MyGist's settings to "
+                f"grant it."
+            )
+        return await call_next(context)

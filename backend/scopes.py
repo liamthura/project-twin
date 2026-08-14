@@ -42,6 +42,22 @@ TOOL_SCOPES: dict[str, str] = {
     "persona_batch": WRITE,
 }
 
+# The same question for prompts, which are actions a user picks from their
+# client's menu. A prompt needs whatever the tool it instructs the agent to call
+# needs: catch_up ends in propose_update, log_learning in persona_modify.
+#
+# Filtered rather than left visible, which is the opposite of the choice made for
+# an unclassified TOOL above -- and for a reason. A tool that appears and then
+# refuses names the problem to whoever tries it. A prompt that appears and then
+# cannot work looks like the product is broken, because the person who picked it
+# never asked for a tool and has no way to connect the failure to a missing
+# scope.
+PROMPT_SCOPES: dict[str, str] = {
+    "whats_on_file": READ,
+    "catch_up": PROPOSE,
+    "log_learning": WRITE,
+}
+
 # Set once per request by main.py's auth middleware, alongside
 # db.current_user_id. No default, for the same reason that one has none: a code
 # path that reaches persona data without authenticating must raise rather than
