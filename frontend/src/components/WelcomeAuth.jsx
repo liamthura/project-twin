@@ -61,7 +61,7 @@ const ORIGIN_API_URL =
 // toggle. Lives on the first-run welcome screen (see the `error &&
 // !getAuthToken()` branch below). On success it saves the config and hands
 // control back to the caller (which reloads app data).
-export function WelcomeAuth({ onUseToken, onSuccess }) {
+export function WelcomeAuth({ onSuccess }) {
   // The mode IS the route -- #/signin, #/signup, #/forgot. Seeded from the URL
   // so a deep link lands on the right screen, and written back to it on every
   // change so the address bar never describes a page nobody is looking at.
@@ -479,15 +479,11 @@ export function WelcomeAuth({ onUseToken, onSuccess }) {
         )}
       </p>
 
-      <div className="flex items-center justify-center gap-3 border-t pt-3 text-xs text-muted-foreground">
-        <button
-          type="button"
-          onClick={onUseToken}
-          className="underline hover:text-foreground"
-        >
-          Use an access token instead
-        </button>
-        <span aria-hidden="true">&middot;</span>
+      {/* "Use an access token instead" used to share this row. Deleted per the
+          prototype's change 5 -- Better Auth supersedes it -- and the cost is
+          recorded in the auth slice spec: a first run with no account now has
+          no way to paste a bare token. */}
+      <div className="flex items-center justify-center border-t pt-3 text-xs text-muted-foreground">
         <button
           type="button"
           onClick={() => setShowServer((v) => !v)}

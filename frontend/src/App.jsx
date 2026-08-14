@@ -102,11 +102,6 @@ export default function App() {
         }
       >
         <WelcomeAuth
-          // Detached mode -- a UI pointed at someone else's server -- has no
-          // meaning mid-OAuth-flow: this page IS the server the client is
-          // connecting to. The link still renders (WelcomeAuth is not
-          // forked for this), it just has nothing to do here.
-          onUseToken={() => {}}
           onSuccess={() => {
             if (!isOAuthRequest) {
               window.location.assign("/");
@@ -614,30 +609,20 @@ export default function App() {
         title="Welcome to MyGist"
         description="Your portable personal context for AI. Sign in or create an account to get started."
       >
-        <>
-          <WelcomeAuth
-            onUseToken={() => setShowConnectionSettings(true)}
-            onSuccess={({ isNew } = {}) => {
-              // A brand-new account lands on Welcome, not on an empty Profile:
-              // that is the moment intent is highest, and Welcome is where the
-              // offer to hand the work to a client is made.
-              if (isNew) navigate("onboarding", DEFAULT_ONBOARDING_STEP);
-              loadAllData();
-              loadSettings();
-            }}
-          />
-          {/* Renders through a portal, so its place in this tree is only
-              about which state it reads. */}
-          <SettingsDialog
-            isOpen={showConnectionSettings}
-            disabledSections={disabledSections}
-            onClose={() => setShowConnectionSettings(false)}
-            onConnectionChange={() => {
-              loadAllData();
-              loadSettings();
-            }}
-          />
-        </>
+        {/* No SettingsDialog here any more. The only thing that opened it on
+            this screen was "Use an access token instead", and with that gone
+            it had no trigger -- a dialog nobody can reach. The Server toggle
+            inside WelcomeAuth covers choosing an instance. */}
+        <WelcomeAuth
+          onSuccess={({ isNew } = {}) => {
+            // A brand-new account lands on Welcome, not on an empty Profile:
+            // that is the moment intent is highest, and Welcome is where the
+            // offer to hand the work to a client is made.
+            if (isNew) navigate("onboarding", DEFAULT_ONBOARDING_STEP);
+            loadAllData();
+            loadSettings();
+          }}
+        />
       </AuthShell>
     );
   }
