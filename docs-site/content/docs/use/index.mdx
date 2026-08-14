@@ -4,8 +4,8 @@ description: What happens once a client is connected, and where to go next.
 ---
 
 This half of the documentation is for people who *use* MyGist. It assumes a
-server is already running — either one you host, or one someone hosts for you.
-If you need to start one first, go to [Self-hosting](/run/self-hosting).
+server is already running, either one you host or one someone hosts for you. If
+you need to start one first, go to [Self-hosting](/run/self-hosting).
 
 ## The short version
 
@@ -30,31 +30,31 @@ which tool to use.
   <Card title="Other clients" href="/use/clients" description="Claude Code, and anything else that speaks MCP over HTTP." />
   <Card title="Concepts" href="/use/concepts" description="The four ideas the rest of the docs assume: persona, sections, entities, ids." />
   <Card title="What goes in each section" href="/use/sections" description="A tour of all ten sections and what belongs in them." />
-  <Card title="Reading" href="/use/reading" description="Scopes, search, and why a client should not just load everything." />
-  <Card title="Writing" href="/use/writing" description="Adding, changing and removing entries — in conversation or in bulk." />
+  <Card title="Reading" href="/use/reading" description="Scopes, search, and why a client reads a slice at a time." />
+  <Card title="Writing" href="/use/writing" description="Adding, changing and removing entries, in conversation or in bulk." />
   <Card title="Capture" href="/use/capture" description="Why nothing is saved unless you ask, and how to turn suggestions on." />
   <Card title="Relations" href="/use/relations" description="Linking entries to each other." />
   <Card title="The web editor" href="/use/editor" description="Editing by hand, managing tokens, exporting your data." />
   <Card title="FAQ" href="/use/faq" description="Short answers to the questions that come up most." />
 </Cards>
 
-## How a conversation actually uses it
+## How a conversation uses it
 
 At the start of a conversation, a well-behaved client calls `get_context` and
-gets back a compact summary — your name, your role, how you like answers
-written, what you are working on. Not everything. A slice.
+gets back a compact summary: your name, your role, how you like answers written,
+what you are working on. A slice of the persona, sized for the conversation.
 
-When something specific comes up later, it searches rather than loading more:
+When something specific comes up later, it searches:
 
 ```text
 search_context("postgres")   →  about ten ranked snippets, each with an id
 get_entity(["proj_a1b2"])    →  the full entry, for the one that matters
 ```
 
-Two small calls instead of one large one. This is the pattern the whole tool set
-is built around, and [Reading](/use/reading) covers it properly.
+Two small calls do the work of one large one, and that pattern is what the whole
+tool set is built around. [Reading](/use/reading) covers it properly.
 
-## What it will not do
+## When the tools run
 
 MyGist's tools are **passive**. They run when a client calls them, and never
 otherwise. Nothing watches your conversation in the background, and nothing is
@@ -62,8 +62,8 @@ written without an explicit call.
 
 So if you mention halfway through a chat that you have started learning Rust,
 that fact is *not* saved. You have to ask, or you have to turn on suggestions at
-the start of the conversation. [Capture](/use/capture) explains both, and why
-this is deliberate rather than unfinished.
+the start of the conversation. [Capture](/use/capture) explains both, and why it
+works this way on purpose.
 
 ## Next
 
