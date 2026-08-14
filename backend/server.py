@@ -42,6 +42,7 @@ import db
 import persona_store
 import proposals_store
 import search_index
+import mcp_prompts
 import sections
 import settings_store
 import skill_resources
@@ -2852,6 +2853,11 @@ it in one short clause or not at all."""
 # documentation about how to call an API and holds no persona data. See
 # skill_resources.py.
 skill_resources.register(mcp)
+
+# The actions a user can pick from their client's own menu. These ARE
+# scope-gated -- see scopes.PROMPT_SCOPES for why they are hidden rather than
+# shown-and-refused, which is the opposite of the choice made for tools.
+mcp_prompts.register(mcp)
 
 
 # =============================================================================
