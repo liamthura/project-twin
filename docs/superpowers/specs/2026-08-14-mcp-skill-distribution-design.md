@@ -67,8 +67,14 @@ What replaces it, in order:
    one is installed, otherwise read the `skill://` resource.
 6. One line: do not narrate the plumbing.
 
-Kept under ~40 lines. It is a pointer to the skills, not a replacement for them —
-the moment it tries to be both it stops being cheap enough to send every time.
+**Capped at 45 lines, enforced by a test.** The first draft of this spec said
+"about forty"; the written string came out at 44 and everything left in it is
+load-bearing, so the number moved rather than the content — trimming further would
+have cut trigger rows, which are the whole reason for the rewrite. The cap exists
+to stop drift, and 45 does that job as well as 40 would have.
+
+It is a pointer to the skills, not a replacement for them. The moment it tries to
+be both, it stops being cheap enough to send every time.
 
 ## Layer 2: skills as MCP resources
 

@@ -44,6 +44,7 @@ import proposals_store
 import search_index
 import sections
 import settings_store
+import skill_resources
 from persona_store import FILE_MAP, generate_entity_id, get_all as get_all_persona_data
 from sections import SECTION_REGISTRY
 
@@ -2789,20 +2790,68 @@ def get_entity_schema(entity: str = None, file: str = None) -> dict:
 # FASTMCP SERVER INITIALIZATION
 # =============================================================================
 
+# This string is injected into the system prompt of EVERY conversation in every
+# client that connects, which makes it the most expensive prose in the codebase
+# and the only channel that reaches a client with no plugin system. It used to
+# spend six of its ten lines re-listing the tools the client already has in its
+# tool schema.
+#
+# So it now carries only what the tool descriptions cannot: when to reach for
+# them, and where the skills are. Keep it under about forty lines. Growing it is
+# easy to do and hard to notice.
 mcp = FastMCP(
     "mygist",
-    instructions="""MyGist is your portable personal context for AI.
-    
-Available tools:
-- get_context: Retrieve scoped persona context (minimal/professional/personal/learning/full)
-- get_raw: Get raw JSON file data for detailed inspection
-- get_schema: Discover valid entity types and their fields
-- persona_modify: Add, update, or remove persona data
-- persona_batch: Perform multiple modifications at once
-- propose_update: Propose durable persona changes for the user to review
+    instructions="""MyGist is the user's portable personal context. It is theirs, it
+outlives this conversation, and every other assistant they use reads it.
 
-Always call get_context at the start of conversations to personalize responses."""
+START HERE
+Call get_context before your first substantive answer, at the smallest scope that
+answers the question -- "minimal" covers most things and already carries their
+name, bio, top-of-mind and preferences. To find one entry use search_context then
+get_entity rather than widening the scope. "full" is a debug and export surface.
+Then act on what you read: reading a persona and answering exactly as you would
+have anyway is the most common failure with one connected.
+
+THE RULE
+Asked writes, inferred proposes.
+- They asked you to record something -> persona_modify (or persona_batch).
+- You worked it out from what they said -> propose_update, which cannot write and
+  puts it in their review queue.
+No third case. "They would obviously want this" is the inferred case in disguise,
+and that queue is what makes MyGist safe to leave connected.
+
+PROPOSE WHEN YOU HEAR
+"we've switched to X" / "I've started using X"     -> domain, work_skill
+"I've been doing X for a month"                   -> domain level, hobby, interest
+"we shipped it" / "that's done" / "I've parked it" -> project status
+"always give me X first" / "stop doing Y"         -> response_format
+"I can't stand X" / "I love X"                    -> dislike, like
+"my sister just started a PhD"                    -> connection
+"I want to be running 10k by March"               -> goal
+"I'm useless after 3pm"                           -> energy_peak, sleep
+"I got the job" / "I've left"                     -> work_experience
+Anything about them still true in a month is a candidate. Every proposal needs
+evidence in their own words -- if you cannot quote them, do not send it. An empty
+review queue usually means nobody was looking, not that there was nothing to say.
+Send one propose_update with a list, not one call per item.
+
+SKILLS
+Four skills cover the above in full, at skill://mygist/<name>/SKILL.md, or
+skill://index.json for the list. Prefer a plugin's copy where one is installed.
+- mygist            the rules, and the full trigger list
+- mygist-reading    choosing a scope, filtering, what to do with preferences
+- mygist-writing    entity vocabulary, identifiers, how much to send on an update
+- mygist-capture    what is worth proposing, with worked examples
+
+Do not narrate any of this. Use their context, propose what surfaces, and mention
+it in one short clause or not at all."""
 )
+
+# The skills the instructions above point at, served at skill://mygist/<name>/
+# SKILL.md. Not scope-gated, unlike the tools: a skill file is public
+# documentation about how to call an API and holds no persona data. See
+# skill_resources.py.
+skill_resources.register(mcp)
 
 
 # =============================================================================
