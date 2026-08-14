@@ -41,14 +41,12 @@ import {
   listTokens,
   createToken,
   revokeToken,
-  listConnectedApps,
-  revokeConnectedApp,
 } from "@/lib/api.js";
 import { signOut } from "@/lib/session.js";
 import { READ, PROPOSE, WRITE } from "@/lib/scopes.js";
 import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
 import { EmailSettings } from "@/components/EmailSettings";
-import ConnectedApps from "@/components/ConnectedApps";
+import { AppsPanel } from "@/components/settings/AppsPanel";
 import { DataPanel } from "@/components/settings/DataPanel";
 
 const TABS = [
@@ -138,11 +136,6 @@ export function ConnectionSettings({
   const [tokenPropose, setTokenPropose] = useState(true);
   const [tokenWrite, setTokenWrite] = useState(true);
 
-  // Connected apps tab
-  const [appsList, setAppsList] = useState([]);
-  const [appsLoading, setAppsLoading] = useState(false);
-  const [appsError, setAppsError] = useState(null);
-
   useEffect(() => {
     if (!isOpen) return;
 
@@ -176,9 +169,6 @@ export function ConnectionSettings({
     setConfirmRevokeId(null);
     setTokenPropose(true);
     setTokenWrite(true);
-
-    setAppsList([]);
-    setAppsError(null);
 
     // Ask the server rather than inferring from localStorage. There used to be
     // a token there for every signed-in account, so `!!config?.token` was a
@@ -223,49 +213,6 @@ export function ConnectionSettings({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, activeTab, isSignedIn]);
-
-  const loadApps = async () => {
-    setAppsLoading(true);
-    setAppsError(null);
-    try {
-      const list = await listConnectedApps();
-      setAppsList(list);
-    } catch (err) {
-      setAppsError(err.message);
-    } finally {
-      setAppsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen && activeTab === "apps" && isSignedIn) {
-      loadApps();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, activeTab, isSignedIn]);
-
-  const handleRevokeApp = async (id) => {
-    try {
-      await revokeConnectedApp(id);
-      toast({
-        title: "Connection revoked",
-        description:
-          "It can no longer get new access. A request already in flight may continue for up to 10 minutes.",
-        variant: "success",
-      });
-      loadApps();
-    } catch (err) {
-      toast({
-        title: "Failed to revoke connection",
-        description: err.message,
-        variant: "destructive",
-      });
-      // Rethrown so ConnectedApps.jsx knows the revoke didn't go through --
-      // it keeps the confirm row open on a rejection rather than collapsing
-      // it as if this had succeeded. See its handleRevoke for the catch.
-      throw err;
-    }
-  };
 
   // write implies propose (write ⊃ propose ⊃ read): both start selected, and
   // these keep that implication true no matter what gets toggled, rather
@@ -891,24 +838,7 @@ export function ConnectionSettings({
           </div>
         )}
 
-        {activeTab === "apps" && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Applications you&apos;ve connected through &quot;Allow&quot; on a
-              consent screen -- Claude Desktop, an MCP client, or anything
-              else that signed in with your account.
-            </p>
-            {appsLoading ? (
-              <div className="flex items-center justify-center py-6 text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
-            ) : appsError ? (
-              <p className="text-sm text-destructive">{appsError}</p>
-            ) : (
-              <ConnectedApps grants={appsList} onRevoke={handleRevokeApp} />
-            )}
-          </div>
-        )}
+        {activeTab === "apps" && <AppsPanel isOpen />}
 
         {activeTab === "data" && <DataPanel />}
 
