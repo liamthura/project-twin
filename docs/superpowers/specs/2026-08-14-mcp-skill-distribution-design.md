@@ -1,7 +1,7 @@
 # Shipping the skills with the MCP server — design
 
 Date: 2026-08-14
-Status: approved, implementing
+Status: shipped (layers 1 and 2). Layers 3–5 deferred by decision, not pending.
 
 ## Why
 
@@ -31,7 +31,15 @@ two that reach every client without anyone installing anything, and MyGist's
 whole proposition is that every assistant reads the same persona — so a
 Claude-Code-only channel is the wrong place to start.
 
-Layers 3–5 are recorded here so the next spec does not re-derive them.
+Layers 3–5 are recorded here so the next spec does not re-derive them. **They were
+then declined outright, not shelved for the end of this piece of work** — layers 1
+and 2 reach every client, and a plugin adds a second place to keep the same four
+files in sync for the benefit of one client that can already read them.
+
+One consequence to know about: the instructions say *"Prefer a plugin's copy where
+one is installed"*, and no plugin exists. That reads oddly today and is deliberate
+— it is a conditional that is simply false for now and becomes true the day layer
+3 ships, with no change needed here.
 
 ## Layer 1: the `instructions` string
 
