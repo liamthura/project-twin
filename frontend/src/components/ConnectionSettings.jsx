@@ -49,17 +49,10 @@ import {
   revokeConnectedApp,
 } from "@/lib/api.js";
 import { signOut } from "@/lib/session.js";
+import { READ, PROPOSE, WRITE } from "@/lib/scopes.js";
 import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
 import { EmailSettings } from "@/components/EmailSettings";
 import ConnectedApps from "@/components/ConnectedApps";
-
-// Must match auth/src/oauth.js and Consent.jsx's wording exactly -- the
-// mint-a-token scope choice below is the same three-way decision the
-// consent screen makes for an OAuth grant, offered here for a manually
-// minted token instead.
-const READ = "persona:read";
-const PROPOSE = "persona:propose";
-const WRITE = "persona:write";
 
 const TABS = [
   { id: "connection", label: "Connection" },

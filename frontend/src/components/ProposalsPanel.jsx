@@ -8,13 +8,10 @@ import {
   listProposals, proposalCount, approveProposal, rejectProposal, promoteProposal,
   listConnectedApps,
 } from "@/lib/api";
+import { PROPOSE } from "@/lib/scopes.js";
 import InboxRow from "./InboxRow";
 import ObservationCard from "./ObservationCard";
 import PromoteDialog, { promotionTargets } from "./PromoteDialog";
-
-// Must match auth/src/oauth.js and ConnectedApps.jsx exactly -- this is the
-// wire value, not a label.
-const PROPOSE = "persona:propose";
 
 const KINDS = [
   { key: "entity", label: "Inbox" },

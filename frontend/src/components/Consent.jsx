@@ -42,17 +42,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { authFetch, getSession } from "@/lib/session.js";
-
-// Must match auth/src/oauth.js exactly -- these are the wire values Better
-// Auth stores and checks, not display strings.
-const READ = "persona:read";
-const PROPOSE = "persona:propose";
-const WRITE = "persona:write";
-
-// The three this screen has a row for. Anything else in the request --
-// `offline_access`, `openid` -- is the client's business, not the user's, and
-// is passed through rather than decided on.
-const PERSONA_SCOPES = [READ, PROPOSE, WRITE];
+// PERSONA_SCOPES is the three this screen has a row for. Anything else in the
+// request -- `offline_access`, `openid` -- is the client's business, not the
+// user's, and is passed through rather than decided on.
+import { READ, PROPOSE, WRITE, PERSONA_SCOPES } from "@/lib/scopes.js";
 
 async function readError(res, fallback) {
   const body = await res.json().catch(() => ({}));

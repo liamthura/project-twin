@@ -38,20 +38,9 @@ import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-
-// Must match auth/src/oauth.js and Consent.jsx's wording exactly -- these
-// are the wire values, and the labels below are what the consent screen
-// used for the same three scopes.
-const READ = "persona:read";
-const PROPOSE = "persona:propose";
-const WRITE = "persona:write";
-
 // Read is the floor for every grant (Consent.jsx never lets it be declined),
-// so it is listed unconditionally rather than checked against `scopes`.
-const SCOPE_LABELS = [
-  [PROPOSE, "Suggest changes for your approval"],
-  [WRITE, "Change your persona directly"],
-];
+// so the row below lists it unconditionally rather than checking `scopes`.
+import { SCOPE_LABELS } from "@/lib/scopes.js";
 
 export default function ConnectedApps({ grants, onRevoke }) {
   const [confirmId, setConfirmId] = useState(null);
