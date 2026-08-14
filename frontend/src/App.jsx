@@ -733,7 +733,12 @@ export default function App() {
               <ProposalsPanel
                 onViewSection={(section) => navigate(section, null)}
                 onSectionChanged={refreshSection}
-                onResolved={refreshPendingCount}
+                // The panel already fetches the count for its own tab badges,
+                // so it hands the total over rather than making us fetch the
+                // same number again. The polling exception below still stands:
+                // it is what stops the two of us polling at once.
+                onCounts={setPendingCount}
+                onOpenSettings={() => setShowConnectionSettings(true)}
                 sectionTitles={sectionTitles}
                 packs={packs}
               />

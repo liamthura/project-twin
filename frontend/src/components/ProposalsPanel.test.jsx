@@ -24,6 +24,7 @@ const PACKS = [
 
 vi.mock("@/lib/api", () => ({
   listProposals: vi.fn(),
+  listConnectedApps: vi.fn(() => Promise.resolve([])),
   proposalCount: vi.fn(() => Promise.resolve({ entity: 1, note: 1, total: 2 })),
   approveProposal: vi.fn(() => Promise.resolve({ status: "approved", section: "knowledge" })),
   rejectProposal: vi.fn(() => Promise.resolve({ status: "rejected", section: null })),
@@ -347,5 +348,55 @@ describe("ProposalsPanel", () => {
     api.listProposals.mockResolvedValue([]);
     render(<ProposalsPanel />);
     expect(await screen.findByText(/nothing waiting/i)).toBeInTheDocument();
+  });
+
+  describe("an empty queue says which fix applies", () => {
+    beforeEach(() => { api.listProposals.mockResolvedValue([]); });
+
+    it("points at the connect flow when nothing is connected", async () => {
+      api.listConnectedApps.mockResolvedValue([]);
+      render(<ProposalsPanel />);
+      expect(await screen.findByText(/nothing is connected yet/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /connect an app/i })).toBeInTheDocument();
+    });
+
+    it("names the app that can read but not propose", async () => {
+      api.listConnectedApps.mockResolvedValue([
+        { id: "g1", clientId: "c1", clientName: "Claude Desktop", scopes: ["persona:read"] },
+      ]);
+      render(<ProposalsPanel />);
+      expect(await screen.findByText(
+        /Claude Desktop can read your persona but not suggest changes/i)).toBeInTheDocument();
+    });
+
+    it("does not name one app when several are connected and none can propose", async () => {
+      api.listConnectedApps.mockResolvedValue([
+        { id: "g1", clientId: "c1", clientName: "Claude Desktop", scopes: ["persona:read"] },
+        { id: "g2", clientId: "c2", clientName: "Cursor", scopes: ["persona:read"] },
+      ]);
+      render(<ProposalsPanel />);
+      expect(await screen.findByText(
+        /None of your connected apps can suggest changes/i)).toBeInTheDocument();
+    });
+
+    it("says nothing extra when something can propose", async () => {
+      api.listConnectedApps.mockResolvedValue([
+        { id: "g1", clientId: "c1", clientName: "Cursor",
+          scopes: ["persona:read", "persona:propose"] },
+      ]);
+      render(<ProposalsPanel />);
+      expect(await screen.findByText(/nothing waiting/i)).toBeInTheDocument();
+      await waitFor(() => expect(api.listConnectedApps).toHaveBeenCalled());
+      expect(screen.queryByText(/not suggest changes/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/nothing is connected/i)).not.toBeInTheDocument();
+    });
+
+    it("does not ask about connections while there is something to review", async () => {
+      api.listProposals.mockImplementation((kind) =>
+        Promise.resolve(kind === "entity" ? [ENTITY] : []));
+      render(<ProposalsPanel />);
+      await screen.findByRole("button", { name: /^approve /i });
+      expect(api.listConnectedApps).not.toHaveBeenCalled();
+    });
   });
 });

@@ -2,13 +2,19 @@ import { useState, useEffect, useCallback } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   listProposals, proposalCount, approveProposal, rejectProposal, promoteProposal,
+  listConnectedApps,
 } from "@/lib/api";
 import InboxRow from "./InboxRow";
 import ObservationCard from "./ObservationCard";
 import PromoteDialog, { promotionTargets } from "./PromoteDialog";
+
+// Must match auth/src/oauth.js and ConnectedApps.jsx exactly -- this is the
+// wire value, not a label.
+const PROPOSE = "persona:propose";
 
 const KINDS = [
   { key: "entity", label: "Inbox" },
@@ -30,7 +36,8 @@ const KINDS = [
 const QUEUE_POLL_MS = 15000;
 
 export default function ProposalsPanel({
-  onViewSection, onSectionChanged, onCounts, sectionTitles = {}, packs = [],
+  onViewSection, onSectionChanged, onCounts, onOpenSettings,
+  sectionTitles = {}, packs = [],
 }) {
   const [kind, setKind] = useState("entity");
   const [rows, setRows] = useState([]);
@@ -38,6 +45,8 @@ export default function ProposalsPanel({
   const [error, setError] = useState(null);
   const [promoting, setPromoting] = useState(null);
   const [counts, setCounts] = useState({ entity: 0, note: 0, total: 0 });
+  const [grants, setGrants] = useState(null);
+  const [loaded, setLoaded] = useState(false);
   const { toast } = useToast();
 
   // The tab you are not looking at has to say how much is waiting in it, and
@@ -59,6 +68,8 @@ export default function ProposalsPanel({
     } catch {
       setRows([]);
       setError("Could not load the queue.");
+    } finally {
+      setLoaded(true);
     }
   }, []);
 
@@ -78,6 +89,23 @@ export default function ProposalsPanel({
       document.removeEventListener("visibilitychange", tick);
     };
   }, [kind, refresh, refreshCounts]);
+
+  // An empty queue has two very different causes, and they have different
+  // fixes. Asked once, and only when there is nothing to review: a reader with
+  // proposals waiting never sees this line, and this is the one surface in the
+  // app that already polls. A failure is treated as "no grants", which renders
+  // no extra line -- which is what happens today.
+  useEffect(() => {
+    // `loaded` matters: rows is [] on the first render too, before the queue
+    // has been fetched at all. Without it this fires on every mount, which is
+    // the opposite of asking only when there is nothing to review.
+    if (!loaded || rows.length > 0 || grants !== null) return;
+    let cancelled = false;
+    listConnectedApps()
+      .then((list) => { if (!cancelled) setGrants(list); })
+      .catch(() => { if (!cancelled) setGrants([]); });
+    return () => { cancelled = true; };
+  }, [loaded, rows.length, grants]);
 
   /**
    * Run one resolution, then say what happened.
@@ -198,8 +226,27 @@ export default function ProposalsPanel({
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {rows.length === 0 ? (
-        <EmptyState>
-          Nothing waiting. Agents propose changes here as they notice them.
+        <EmptyState className="space-y-2">
+          <p>Nothing waiting. Agents propose changes here as they notice them.</p>
+          {grants?.length === 0 && (
+            <p>
+              Nothing is connected yet.{" "}
+              <Button variant="link" className="h-auto p-0" onClick={onOpenSettings}>
+                Connect an app
+              </Button>
+            </p>
+          )}
+          {grants?.length > 0
+            && !grants.some((g) => (g.scopes || []).includes(PROPOSE)) && (
+            <p>
+              {grants.length === 1
+                ? `${grants[0].clientName} can read your persona but not suggest changes to it.`
+                : "None of your connected apps can suggest changes to your persona."}{" "}
+              <Button variant="link" className="h-auto p-0" onClick={onOpenSettings}>
+                Review access
+              </Button>
+            </p>
+          )}
         </EmptyState>
       ) : (
         rows.map((row) =>
