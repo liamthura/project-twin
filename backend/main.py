@@ -514,13 +514,24 @@ def invite_only() -> bool:
 
 @app.get("/api/instance")
 async def instance():
-    """What the sign-in screen needs before anyone has a credential.
+    """What this instance is like, before anyone has a credential.
 
     Deliberately says nothing about who is signed in or what exists here -- it
     is read by strangers by definition, since it decides which screen a stranger
     is shown.
+
+    `mcp_oauth` says whether an AI client can connect by SIGNING IN rather than
+    by being handed a token. It is not a preference: `oauth_metadata.register()`
+    mounts no discovery routes when AUTH_MCP_RESOURCE is unset, so on an
+    instance without it a client following that path reaches a 404. Onboarding
+    reads this to decide which connection method to recommend, because
+    recommending the one that cannot work here would be worse than recommending
+    neither.
     """
-    return {"invite_only": invite_only()}
+    return {
+        "invite_only": invite_only(),
+        "mcp_oauth": jwt_auth.mcp_resource_configured(),
+    }
 
 
 class WaitlistRequest(BaseModel):

@@ -16,7 +16,6 @@
  * queue nobody will read.
  */
 export const AUTOFILL_PROMPT =
-  "Read my MyGist persona with the tools you have, then propose updates for " +
-  "anything you already know about me that is missing or out of date. Send one " +
-  "compact proposal per fact — only the fields that change — and give a " +
-  "one-sentence reason for each.";
+  "Read my MyGist persona. Then propose updates for anything you know about me " +
+  "that is missing or wrong. Send one proposal per fact, include only the " +
+  "fields that change, and give a one-sentence reason for each.";

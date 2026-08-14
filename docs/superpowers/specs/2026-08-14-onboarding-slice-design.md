@@ -74,11 +74,28 @@ The app has also **never shown the MCP endpoint anywhere** -- it hands out a
 token and stops -- so "connect an assistant" was not a thing a reader could
 actually do from inside the product.
 
-The Connect step closes both. It mints a `persona:propose` token, shows that key
-and `<origin>/mcp` side by side, and then forks: hand it to the assistant with
-the prompt, or type it yourself. `connect` is deliberately **not** a storable
-step -- it is derived from whether a token or grant exists, and a stored claim
-could disagree with the connections themselves.
+The Connect step closes both. It shows `<origin>/mcp` with numbered setup
+steps, and then forks: hand the work to the assistant with the prompt, or type
+it yourself. `connect` is deliberately **not** a storable step -- it is derived
+from whether a token or grant exists, and a stored claim could disagree with the
+connections themselves.
+
+**Signing in is recommended; a key is the fallback.** A client that signs in
+produces a grant the reader can see and revoke by name, and there is no secret
+to paste, lose, or leave sitting in a config file. A token is for clients that
+cannot do that.
+
+Which method is even possible is an **instance fact, not a preference**. Both
+`oauth_metadata.register()` and the auth service's OAuth plugin are gated on
+`AUTH_MCP_RESOURCE`, so an instance without it mounts no discovery routes and a
+client told to sign in follows the path to a 404. `/api/instance` therefore
+gained `mcp_oauth`, and the step recommends from it -- recommending the method
+that cannot work on this server would be worse than recommending neither. Where
+`mcp_oauth` is false the key becomes the lead, and the copy says why.
+
+The token it mints asks for `persona:propose` and not write: at that point the
+reader has not seen the review queue, so they cannot have formed a view on
+letting a client change things unasked.
 
 Welcome gained a CSS-animated diagram (sources → MyGist → clients). CSS rather
 than JavaScript on purpose: `globals.css` already zeroes every animation under

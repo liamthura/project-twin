@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 const listTokensMock = vi.hoisted(() => vi.fn());
 const listConnectedAppsMock = vi.hoisted(() => vi.fn());
 const createTokenMock = vi.hoisted(() => vi.fn());
+const getInstanceMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api.js", async (importOriginal) => {
   const actual = await importOriginal();
@@ -13,6 +14,7 @@ vi.mock("@/lib/api.js", async (importOriginal) => {
     listTokens: listTokensMock,
     listConnectedApps: listConnectedAppsMock,
     createToken: createTokenMock,
+    getInstance: getInstanceMock,
     mcpUrl: () => "https://example.test/mcp",
   };
 });
@@ -23,6 +25,9 @@ const { AUTOFILL_PROMPT } = await import("./autofillPrompt");
 beforeEach(() => {
   listTokensMock.mockReset().mockResolvedValue([]);
   listConnectedAppsMock.mockReset().mockResolvedValue([]);
+  // Default to the instance the preview actually is: no OAuth. Each test that
+  // cares about the other case says so.
+  getInstanceMock.mockReset().mockResolvedValue({ invite_only: false, mcp_oauth: false });
   createTokenMock.mockReset().mockResolvedValue({
     id: "t1",
     label: "my assistant",
@@ -34,6 +39,70 @@ const renderStep = (props = {}) =>
   render(
     <StepConnect onDelegate={vi.fn()} onFillManually={vi.fn()} {...props} />,
   );
+
+describe("StepConnect, where clients can sign in", () => {
+  beforeEach(() => {
+    getInstanceMock.mockResolvedValue({ invite_only: false, mcp_oauth: true });
+  });
+
+  it("recommends signing in, and shows the address without a key", async () => {
+    renderStep();
+
+    expect(await screen.findByText(/recommended/i)).toBeInTheDocument();
+    expect(screen.getByText("https://example.test/mcp")).toBeInTheDocument();
+    // The key path is still reachable, but it is not what the screen leads with.
+    expect(screen.queryByRole("button", { name: /create a key/i })).not.toBeInTheDocument();
+  });
+
+  it("spells the setup out as numbered steps", async () => {
+    renderStep();
+    await screen.findByText(/recommended/i);
+
+    expect(screen.getByText(/add a custom mcp connector/i)).toBeInTheDocument();
+    expect(screen.getByText(/asks you to sign in/i)).toBeInTheDocument();
+  });
+
+  it("keeps the key path for a client that cannot sign in", async () => {
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /can't sign in/i }));
+    expect(screen.getByRole("button", { name: /create a key/i })).toBeInTheDocument();
+  });
+
+  it("stops recommending a connection once one exists", async () => {
+    // Instructions for a job already done are noise.
+    listConnectedAppsMock.mockResolvedValue([
+      { id: "g1", clientId: "c1", clientName: "Claude", scopes: ["persona:propose"] },
+    ]);
+    renderStep();
+
+    expect(await screen.findByText(/connected · Claude/i)).toBeInTheDocument();
+    expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("StepConnect, where clients cannot sign in", () => {
+  it("leads with the key and says why", async () => {
+    renderStep();
+
+    expect(
+      await screen.findByText(/does not offer sign-in for clients/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create a key/i })).toBeInTheDocument();
+    expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
+  });
+
+  it("recommends nothing when the instance cannot be reached", async () => {
+    // getInstance falls back to mcp_oauth: false. Recommending sign-in on an
+    // instance that mounts no discovery routes sends someone into a 404.
+    getInstanceMock.mockResolvedValue({ invite_only: false, mcp_oauth: false });
+    renderStep();
+
+    await screen.findByRole("button", { name: /create a key/i });
+    expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
+  });
+});
 
 describe("StepConnect", () => {
   it("offers to create a key when nothing is connected", async () => {

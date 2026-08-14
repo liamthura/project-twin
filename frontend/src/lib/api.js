@@ -252,12 +252,17 @@ function isConfigured() {
  * self-hosted instance the moment this call failed.
  */
 async function getInstance() {
+  // Both fallbacks name every key a caller reads. `mcp_oauth: false` is the
+  // safe answer when we cannot ask: recommending that a client sign in, on an
+  // instance that turns out to mount no discovery routes, sends someone through
+  // a flow that ends in a 404.
+  const unknown = { invite_only: false, mcp_oauth: false };
   try {
     const response = await fetch(`${getApiBase()}/instance`);
-    if (!response.ok) return { invite_only: false };
+    if (!response.ok) return unknown;
     return await response.json();
   } catch {
-    return { invite_only: false };
+    return unknown;
   }
 }
 

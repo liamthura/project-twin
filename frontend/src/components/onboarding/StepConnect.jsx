@@ -7,16 +7,33 @@
  * never shown the MCP endpoint anywhere at all: it hands out a token and stops,
  * leaving the reader to guess the URL it belongs in.
  *
+ * Signing in comes first, and a key second. A client that signs in gets a grant
+ * the reader can see and revoke by name in Connection Settings, and there is no
+ * secret to paste, lose, or leave in a config file. A token is the fallback for
+ * clients that cannot do that.
+ *
+ * Which one is even possible is an INSTANCE fact, not a preference:
+ * `oauth_metadata.register()` mounts no discovery routes when AUTH_MCP_RESOURCE
+ * is unset, so on an instance without it a client told to sign in follows the
+ * path to a 404. `/api/instance` reports it, and this screen recommends
+ * accordingly rather than recommending something that cannot work here.
+ *
  * The fork at the end is the point of the whole screen. Once something is
  * connected there are two honest answers to "who fills this in", and the flow
- * asks rather than assuming: hand it to the assistant, or carry on typing.
+ * asks rather than assuming.
  */
 import { useEffect, useState } from "react";
 import { Check, Copy, Loader2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { createToken, listConnectedApps, listTokens, mcpUrl } from "@/lib/api.js";
+import {
+  createToken,
+  getInstance,
+  listConnectedApps,
+  listTokens,
+  mcpUrl,
+} from "@/lib/api.js";
 
 import { AUTOFILL_PROMPT } from "./autofillPrompt";
 import { connectionStatus } from "./connectionStatus";
@@ -28,8 +45,30 @@ import { connectionStatus } from "./connectionStatus";
 // regardless; see db.create_token.
 const FIRST_TOKEN_SCOPES = ["persona:propose"];
 
-function CopyRow({ id, label, value, hint }) {
+function CopyButton({ value, label, children }) {
   const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="shrink-0"
+      aria-label={label}
+      onClick={() => {
+        navigator.clipboard?.writeText(value);
+        setCopied(true);
+      }}
+    >
+      {copied ? (
+        <Check className="h-3.5 w-3.5" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" />
+      )}
+      {children && <span className="ml-1.5">{copied ? "Copied" : children}</span>}
+    </Button>
+  );
+}
+
+function CopyRow({ id, label, value, hint }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>{label}</Label>
@@ -40,27 +79,35 @@ function CopyRow({ id, label, value, hint }) {
         >
           {value}
         </output>
-        <Button
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-          onClick={() => {
-            navigator.clipboard?.writeText(value);
-            setCopied(true);
-          }}
-          aria-label={`Copy ${label.toLowerCase()}`}
-        >
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-        </Button>
+        <CopyButton value={value} label={`Copy ${label.toLowerCase()}`} />
       </div>
       {hint && <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>}
     </div>
   );
 }
 
+// Numbered rather than prose, because this is a procedure someone carries out
+// in another application with this screen still open beside it.
+function Steps({ items }) {
+  return (
+    <ol className="space-y-2 text-sm">
+      {items.map((item, i) => (
+        <li key={i} className="flex gap-3">
+          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+            {i + 1}
+          </span>
+          <span className="leading-relaxed text-muted-foreground">{item}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function StepConnect({ onDelegate, onFillManually }) {
   const [connection, setConnection] = useState(null);
+  const [oauthAvailable, setOauthAvailable] = useState(false);
   const [token, setToken] = useState(null);
+  const [showKeyPath, setShowKeyPath] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [promptCopied, setPromptCopied] = useState(false);
@@ -72,8 +119,11 @@ export function StepConnect({ onDelegate, onFillManually }) {
       // An empty list is the honest reading of "nothing I am allowed to see".
       listTokens().catch(() => []),
       listConnectedApps().catch(() => []),
-    ]).then(([tokens, grants]) => {
-      if (!cancelled) setConnection(connectionStatus(tokens, grants));
+      getInstance(),
+    ]).then(([tokens, grants, instance]) => {
+      if (cancelled) return;
+      setConnection(connectionStatus(tokens, grants));
+      setOauthAvailable(!!instance?.mcp_oauth);
     });
     return () => {
       cancelled = true;
@@ -107,6 +157,11 @@ export function StepConnect({ onDelegate, onFillManually }) {
   }
 
   const connected = connection.state !== "none";
+  const address = mcpUrl();
+  // Nothing connected yet, and this instance can do the better method. Once
+  // something IS connected the recommendation has been acted on, and repeating
+  // it would be instructions for a job already done.
+  const recommendOauth = oauthAvailable && !connected;
 
   return (
     <div className="space-y-8">
@@ -115,37 +170,96 @@ export function StepConnect({ onDelegate, onFillManually }) {
           Connect an assistant
         </h1>
         <p className="text-muted-foreground">
-          Give an AI client an address and a key, and it can read your persona —
-          and suggest additions for you to approve.
+          Point an AI client at MyGist and it can read your persona, and suggest
+          additions for you to approve.
         </p>
       </div>
 
-      {!connected && !token && (
-        <div className="space-y-4 rounded-lg border p-4">
+      {recommendOauth && (
+        <div className="space-y-4 rounded-lg border border-primary/40 bg-primary/5 p-4">
           <div className="space-y-1">
-            <p className="text-sm font-medium">Create a key for your assistant</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium">Add it to your client</p>
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                recommended
+              </span>
+            </div>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              It will be able to read your persona and suggest changes. It cannot
-              change anything without your approval.
+              Your client sends you here to sign in, so there is no key to copy
+              or keep safe. You can see it by name and disconnect it whenever
+              you like.
             </p>
           </div>
-          <Button onClick={generate} disabled={generating}>
-            {generating ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              "Create a key"
-            )}
-          </Button>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          <Steps
+            items={[
+              "Copy the address below.",
+              "In your client, add a custom MCP connector and paste it in. In Claude that is Settings, then Connectors, then Add custom connector.",
+              "Your client opens MyGist and asks you to sign in.",
+              "Approve the connection. Choose the option that lets it suggest changes.",
+            ]}
+          />
+
+          <CopyRow
+            id="onboarding-mcp-url"
+            label="Server address"
+            value={address}
+          />
+        </div>
+      )}
+
+      {/* The key path. Second where signing in works, and the only path where
+          it does not -- a client that cannot sign in still needs to connect. */}
+      {!connected && !token && (
+        <div className="space-y-4">
+          {recommendOauth && !showKeyPath && (
+            <button
+              type="button"
+              className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              onClick={() => setShowKeyPath(true)}
+            >
+              My client can't sign in. Use a key instead
+            </button>
+          )}
+
+          {(!recommendOauth || showKeyPath) && (
+            <div className="space-y-4 rounded-lg border p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Connect with a key</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {oauthAvailable
+                    ? "For clients that only accept a server address and a token."
+                    : "This server does not offer sign-in for clients, so a key is how you connect."}
+                </p>
+              </div>
+
+              <Steps
+                items={[
+                  "Create a key below. It can read your persona and suggest changes, and cannot change anything without your approval.",
+                  "In your client, add an MCP server with the address shown.",
+                  "Paste the key in as the bearer token, or as the Authorization header.",
+                ]}
+              />
+
+              <Button onClick={generate} disabled={generating}>
+                {generating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Create a key"
+                )}
+              </Button>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+            </div>
+          )}
         </div>
       )}
 
       {token && (
         <div className="space-y-4 rounded-lg border p-4">
           <CopyRow
-            id="onboarding-mcp-url"
+            id="onboarding-mcp-url-key"
             label="Server address"
-            value={mcpUrl()}
+            value={address}
             hint="Your client asks for this as an MCP server URL."
           />
           <CopyRow
@@ -207,7 +321,7 @@ export function StepConnect({ onDelegate, onFillManually }) {
                 {promptCopied ? "Copied" : "Copy prompt"}
               </Button>
               <Button variant="ghost" onClick={onDelegate}>
-                Done — my assistant will fill it in
+                Done, my assistant will fill it in
               </Button>
             </div>
           </div>
@@ -219,7 +333,10 @@ export function StepConnect({ onDelegate, onFillManually }) {
           </p>
         )}
 
-        <Button variant={connection.canPropose ? "ghost" : "default"} onClick={onFillManually}>
+        <Button
+          variant={connection.canPropose ? "ghost" : "default"}
+          onClick={onFillManually}
+        >
           I'll fill it in myself
         </Button>
       </div>
