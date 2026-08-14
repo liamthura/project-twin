@@ -164,6 +164,27 @@ already past 3,600 lines.
   test worth having. The failure it prevents is instructions that point an agent
   at a skill nobody shipped.
 
+## Verified against the running preview
+
+The in-process tests use FastMCP's in-memory client, which bypasses HTTP, the
+auth middleware and the scope filter — so they say nothing about whether a real
+client can reach any of this. Driven over `/mcp` against
+`scripts/local-preview.sh` on this branch, with a read-only token minted in the
+container:
+
+- `initialize` returns the new instructions: 44 lines, trigger table present,
+  `skill://mygist` pointer present, `Available tools:` gone.
+- `capabilities` advertises `resources`, which it did not before.
+- `resources/list` returns all five with the right `mimeType` and `name`.
+- `resources/read` on `skill://mygist/mygist-capture/SKILL.md` returns 6,205
+  bytes of the real file, worked examples included.
+- `skill://index.json` parses and lists the four.
+- A **`persona:read`-only** grant reaches all of it, which is the intended
+  behaviour: skills are documentation, not persona data.
+
+Probe token revoked afterwards, and confirmed dead — the same request now
+answers 401.
+
 ## Out of scope
 
 - Layers 3–5.
