@@ -31,7 +31,17 @@ import { ResetPassword } from "@/components/ResetPassword";
 import { AddEmailBanner } from "@/components/AddEmailBanner";
 import Consent from "@/components/Consent";
 import Landing from "@/landing/Landing";
-import { goToRoute, isAuthRoute, parseRoute, readRoute } from "@/lib/routes.js";
+import {
+  DEFAULT_ONBOARDING_STEP,
+  goToRoute,
+  isAuthRoute,
+  isOnboardingRoute,
+  normaliseStep,
+  parseRoute,
+  readRoute,
+} from "@/lib/routes.js";
+import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
+import { GettingStartedCard } from "@/components/GettingStartedCard";
 import SectionRenderer from "@/renderers/SectionRenderer";
 import { outline } from "@/renderers/paths";
 import { Header } from "@/shell/Header";
@@ -273,6 +283,10 @@ export default function App() {
   const bandKeys = activeBands.map((b) => b.id).join(",");
   useEffect(() => {
     if (!enabledKeys) return;
+    // Onboarding is a route family of its own, not a section, so it is not in
+    // `valid` and would be rewritten to profile the moment settings resolved.
+    // Its own step correction lives in the branch that renders it.
+    if (isOnboardingRoute(activeSection)) return;
     const valid = new Set([...enabledKeys.split(","), "review", "sections"]);
     if (!valid.has(activeSection)) {
       setPlace({ section: "profile", band: null });
@@ -603,7 +617,11 @@ export default function App() {
         <>
           <WelcomeAuth
             onUseToken={() => setShowConnectionSettings(true)}
-            onSuccess={() => {
+            onSuccess={({ isNew } = {}) => {
+              // A brand-new account lands on Welcome, not on an empty Profile:
+              // that is the moment intent is highest, and Welcome is where the
+              // offer to hand the work to a client is made.
+              if (isNew) navigate("onboarding", DEFAULT_ONBOARDING_STEP);
               loadAllData();
               loadSettings();
             }}
@@ -665,6 +683,25 @@ export default function App() {
     );
   }
 
+  // The third render branch. A credential exists and the route names the
+  // onboarding family, so the flow replaces the shell entirely -- no header,
+  // no rail. `routes.js` promises the families never appear at once, and this
+  // is where that promise is kept rather than quietly broken.
+  if (isOnboardingRoute(activeSection)) {
+    const step = normaliseStep(activeBand);
+    // A step nobody navigated to must not become a history entry, which is why
+    // this replaces. Same correction the shell already makes for an unknown
+    // band, one level up.
+    if (step !== activeBand) goToRoute(`onboarding/${step}`, { replace: true });
+    return (
+      <OnboardingFlow
+        step={step}
+        onNavigate={(next) => navigate("onboarding", next)}
+        onLeave={() => navigate("profile", null)}
+      />
+    );
+  }
+
   // Review's toasts link to whatever section just changed, so navigation has
   // to be steerable from outside the rail.
   const sectionTitles = Object.fromEntries(packs.map((p) => [p.key, p.title]));
@@ -716,6 +753,17 @@ export default function App() {
               section's content and hid all but one, so ten SectionRenderers
               were live at once; only the section being read is now built. */}
           <div className="min-w-0 flex-1">
+            {/* Profile only. It is the screen someone lands on, and a card that
+                followed them to every section would be an interruption rather
+                than a starting point. */}
+            {activeSection === "profile" && (
+              <GettingStartedCard
+                disabledSections={disabledSections}
+                onStart={() => navigate("onboarding", DEFAULT_ONBOARDING_STEP)}
+                onOpenSettings={() => setShowConnectionSettings(true)}
+              />
+            )}
+
             {activePack && (
               <SectionRenderer
                 key={activePack.key}
