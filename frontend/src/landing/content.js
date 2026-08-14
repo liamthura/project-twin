@@ -46,7 +46,7 @@ export const STEPS = {
   items: [
     {
       title: "Write your gist.",
-      body: "Your role, your stack, how you want answers written. Structured JSON, editable by hand or in the web UI.",
+      body: "Your role, your stack, how you want answers written. Edit it by hand or in the web UI.",
     },
     {
       title: "Connect a client.",
@@ -75,49 +75,49 @@ export const BENTO = {
       id: "scoped-reads",
       span: 2,
       title: "Scoped reads",
-      body: "An assistant asks for a named scope and gets that slice, nothing else. Ask for minimal and it's a name and a role. Ask for professional and it's your tone rules and what you're in the middle of.",
+      body: "An assistant asks for a named scope and gets that slice. Minimal is your name and role; professional adds your tone rules and what you're working on.",
       source: "backend/server.py:2813",
     },
     {
       id: "search",
       span: 1,
       title: "Search",
-      body: "Ask for one thing, get one thing. MyGist returns ranked snippets first and fetches the whole entry only when something needs it, so a long persona never floods the conversation.",
+      body: "MyGist returns ranked snippets first and fetches a whole entry only when one is needed, so a long persona never floods the conversation.",
       source: "backend/search_index.py",
     },
     {
       id: "sections",
       span: 1,
       title: "Your sections",
-      body: "The ten sections are where you start. Adding an eleventh is one declarative file, so your gist can hold whatever you actually keep track of.",
+      body: "Ten sections to start with, and adding an eleventh is one declarative file, so your gist can hold whatever you keep track of.",
       source: "backend/section_packs/*/manifest.json",
     },
     {
       id: "proposals",
       span: 2,
       title: "Proposals",
-      body: "Nothing lands until you say so. When an assistant notices something durable about you, it proposes the change with its reasoning and a quote from you. Approve it, edit it, or reject it for good.",
+      body: "Nothing lands until you say so. An assistant that notices something durable proposes it, with its reasoning and a quote from you, and you approve, edit, or reject it for good.",
       source: "backend/scopes.py",
     },
     {
       id: "consent",
       span: 1,
       title: "Consent",
-      body: "Connecting a client takes one URL. On the consent screen you decide whether it can only read, suggest changes for you to approve, or write to your gist directly.",
+      body: "Connecting takes one URL, and on the consent screen you choose whether a client can read, suggest changes for you to approve, or write directly.",
       source: "frontend/src/components/Consent.jsx",
     },
     {
       id: "skills",
       span: 1,
       title: "Skills",
-      body: "Four short guides ship with MyGist, covering how to read a gist and what's worth proposing. Same behaviour whichever client you happen to be in.",
+      body: "Four short guides ship with MyGist, covering how to read a gist and what's worth proposing, so behaviour holds up whichever client you're in.",
       source: "skills/*/SKILL.md",
     },
     {
       id: "self-host",
       span: 1,
       title: "Run it yourself",
-      body: "One Docker image serves the editor, the API and the MCP endpoint. Point it at your own Postgres if you would rather nobody else hosted it.",
+      body: "One Docker image serves the editor, the API and the MCP endpoint. Point it at your own Postgres and nobody else is hosting your data.",
       source: "README.md, Dockerfile",
     },
   ],
@@ -134,7 +134,7 @@ export const BENTO = {
  */
 export const FAQ = {
   eyebrow: "FAQ",
-  headline: "Questions people actually ask.",
+  headline: "Common questions.",
   sub: "The nine that come up most. The rest are in the docs.",
   groups: [
     {
@@ -142,15 +142,15 @@ export const FAQ = {
       items: [
         {
           q: "Which AI clients does this work with?",
-          a: "Anything that speaks MCP: Claude, Codex, Raycast, Notion AI, Hermes. A client that speaks OAuth connects with nothing but the URL, through a consent screen. Anything without a browser uses a scoped token instead.",
+          a: "Anything that speaks MCP: Claude, Codex, Raycast, Notion AI, Hermes. Clients that speak OAuth connect with nothing but the URL, through a consent screen; anything without a browser uses a scoped token.",
         },
         {
           q: "How is this different from my client's built-in memory?",
-          a: "Built-in memory lives inside one product. Move tools, and it does not come with you. MyGist is a database you control, reachable by anything that speaks MCP. It is also structured rather than a pile of notes, which is what lets a client ask for a slice instead of everything.",
+          a: "Built-in memory lives inside one product and stays there when you move tools. MyGist is a Postgres database you control, reachable by anything that speaks MCP, and structured enough that a client can ask for one slice of it.",
         },
         {
           q: "Can I use it from more than one client?",
-          a: "Yes. Issue a token each and point them at the same URL. They share one persona with no sync step, because there is only one copy.",
+          a: "Yes. Issue a token each, point them at the same URL, and they share one persona with no sync step, because there is only one copy.",
         },
       ],
     },
@@ -159,11 +159,11 @@ export const FAQ = {
       items: [
         {
           q: "Does MyGist read my conversations?",
-          a: "No. MCP tools only run when a client calls them. MyGist never sees a message a client did not explicitly send it, and there is no background process watching anything.",
+          a: "No. MCP tools only run when a client calls them, so MyGist never sees a message a client did not send it and there is no background process watching anything.",
         },
         {
           q: "Can an assistant change my gist without asking?",
-          a: "Only if you let it. A connection gets one of three levels: read only, suggest changes for you to approve, or write directly. Suggestions sit in your review queue until you say yes.",
+          a: "Only if you let it: a connection gets read-only, suggest-for-approval, or write-directly. Anything suggested sits in your review queue until you say yes.",
         },
         {
           q: "Can other users on the same server see my persona?",
@@ -176,7 +176,7 @@ export const FAQ = {
       items: [
         {
           q: "Where does my data actually live?",
-          a: "In a Postgres database, as JSON — one row per section, per account. Self-host and that database is yours. On the hosted instance it sits on my server, and you can export all of it whenever you want.",
+          a: "In a Postgres database, as JSON: one row per section, per account. Self-host and that database is yours; on the hosted instance it sits on my server, and you can export all of it whenever you want.",
         },
         {
           q: "Can I get everything back out?",
@@ -184,7 +184,7 @@ export const FAQ = {
         },
         {
           q: "Can I run it myself?",
-          a: "Yes. One Docker image serves the web UI, the REST API, the MCP endpoint and the documentation. Point it at your own Postgres and nobody else is hosting your data.",
+          a: "Yes. One Docker image serves the web UI, the REST API, the MCP endpoint and the documentation, and you point it at your own Postgres so nobody else is hosting your data.",
         },
       ],
     },
@@ -207,8 +207,7 @@ export const CLOSING = {
 };
 
 export const FOOTER = {
-  blurb:
-    "Portable context for AI. Write yourself down once and stop doing it again.",
+  blurb: "Portable context for AI. Write yourself down once.",
   status: "Invite-only while it's small.",
   groups: [
     {
