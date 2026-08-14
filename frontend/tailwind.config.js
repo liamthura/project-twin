@@ -111,11 +111,29 @@ export default {
           "0%,70%,100%": { opacity: "1" },
           "20%,50%": { opacity: "0" },
         },
+        // The onboarding diagram's connectors. Animating the dash OFFSET (not
+        // the pattern) walks the gaps along a stroke that never changes shape,
+        // which is what reads as current flowing rather than a line redrawing
+        // itself. The distance matches the dash period declared on the path.
+        "dash-flow": {
+          from: { strokeDashoffset: "24" },
+          to: { strokeDashoffset: "0" },
+        },
+        // The hub in the middle of that diagram. Opacity only -- a scale would
+        // move the connectors' endpoints with it, and the lines are drawn to
+        // fixed coordinates.
+        "hub-pulse": {
+          "0%,100%": { opacity: "0.25" },
+          "50%": { opacity: "0.6" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "caret-blink": "caret-blink 1.25s ease-out infinite",
+        // Linear, because a flow that eases is a flow that visibly restarts.
+        "dash-flow": "dash-flow 1.4s linear infinite",
+        "hub-pulse": "hub-pulse 2.8s ease-in-out infinite",
       },
       // Motion, as `duration-medium` / `ease-standard` classes. Pointed at the
       // custom properties rather than literal values so the reduced-motion

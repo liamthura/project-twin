@@ -9,9 +9,15 @@ import { Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
+import { WelcomeVisual } from "./WelcomeVisual";
+
 export function StepWelcome({ onStart, onSkip }) {
   return (
     <div className="space-y-8">
+      <div className="flex justify-center">
+        <WelcomeVisual />
+      </div>
+
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold tracking-tight">Welcome to MyGist</h1>
         <p className="leading-relaxed text-muted-foreground">
@@ -28,8 +34,8 @@ export function StepWelcome({ onStart, onSkip }) {
             <p className="text-sm font-medium">You don't have to type any of it</p>
             <p className="text-sm leading-relaxed text-muted-foreground">
               Connect an assistant and it can fill this in for you, a suggestion
-              at a time, for you to approve. The next two steps cover the basics
-              if you would rather start now.
+              at a time, for you to approve. That is the next screen — and you
+              can still type it yourself from there.
             </p>
           </div>
         </div>

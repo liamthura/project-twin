@@ -1,0 +1,128 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+
+const listTokensMock = vi.hoisted(() => vi.fn());
+const listConnectedAppsMock = vi.hoisted(() => vi.fn());
+const createTokenMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/api.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    listTokens: listTokensMock,
+    listConnectedApps: listConnectedAppsMock,
+    createToken: createTokenMock,
+    mcpUrl: () => "https://example.test/mcp",
+  };
+});
+
+const { StepConnect } = await import("./StepConnect");
+const { AUTOFILL_PROMPT } = await import("./autofillPrompt");
+
+beforeEach(() => {
+  listTokensMock.mockReset().mockResolvedValue([]);
+  listConnectedAppsMock.mockReset().mockResolvedValue([]);
+  createTokenMock.mockReset().mockResolvedValue({
+    id: "t1",
+    label: "my assistant",
+    token: "mg_secret_value",
+  });
+});
+
+const renderStep = (props = {}) =>
+  render(
+    <StepConnect onDelegate={vi.fn()} onFillManually={vi.fn()} {...props} />,
+  );
+
+describe("StepConnect", () => {
+  it("offers to create a key when nothing is connected", async () => {
+    renderStep();
+    expect(await screen.findByRole("button", { name: /create a key/i })).toBeInTheDocument();
+  });
+
+  it("shows the server address and the key once one is created", async () => {
+    const user = userEvent.setup();
+    renderStep();
+    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+
+    // The address is the gap this step exists to close: the app has never told
+    // anyone where to point their client.
+    expect(screen.getByText("https://example.test/mcp")).toBeInTheDocument();
+    expect(screen.getByText("mg_secret_value")).toBeInTheDocument();
+  });
+
+  it("asks for propose and not write on a first connection", async () => {
+    const user = userEvent.setup();
+    renderStep();
+    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+
+    expect(createTokenMock).toHaveBeenCalledWith("my assistant", ["persona:propose"]);
+  });
+
+  it("offers the prompt as soon as the new key exists", async () => {
+    // Read back through user-event's own clipboard: setup() replaces
+    // navigator.clipboard with its stub, so a spy installed beforehand is
+    // discarded and would report zero calls for a copy that did happen.
+    const user = userEvent.setup();
+    renderStep();
+    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+
+    await user.click(screen.getByRole("button", { name: /copy prompt/i }));
+    await expect(navigator.clipboard.readText()).resolves.toBe(AUTOFILL_PROMPT);
+  });
+
+  it("says why rather than offering a prompt a read-only connection cannot use", async () => {
+    // mcp_scopes.py HIDES out-of-scope tools rather than failing them, so the
+    // pasted prompt would do nothing at all, with no error anywhere.
+    listTokensMock.mockResolvedValue([
+      { id: "t1", label: "Read only", last_used_at: null, scopes: ["persona:read"] },
+    ]);
+    renderStep();
+
+    expect(await screen.findByText(/can only read your persona/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /copy prompt/i })).not.toBeInTheDocument();
+  });
+
+  it("names an existing connection rather than asking for another key", async () => {
+    listConnectedAppsMock.mockResolvedValue([
+      { id: "g1", clientId: "c1", clientName: "Claude", scopes: ["persona:propose"] },
+    ]);
+    renderStep();
+
+    expect(await screen.findByText(/connected · Claude/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /create a key/i })).not.toBeInTheDocument();
+  });
+
+  it("takes the delegate branch", async () => {
+    const onDelegate = vi.fn();
+    const user = userEvent.setup();
+    listTokensMock.mockResolvedValue([
+      { id: "t1", label: "Claude", last_used_at: null, scopes: ["persona:propose"] },
+    ]);
+    renderStep({ onDelegate });
+
+    await user.click(
+      await screen.findByRole("button", { name: /my assistant will fill it in/i }),
+    );
+    expect(onDelegate).toHaveBeenCalled();
+  });
+
+  it("lets someone type it themselves even with nothing connected", async () => {
+    const onFillManually = vi.fn();
+    const user = userEvent.setup();
+    renderStep({ onFillManually });
+
+    await user.click(await screen.findByRole("button", { name: /fill it in myself/i }));
+    expect(onFillManually).toHaveBeenCalled();
+  });
+
+  it("reports a failed key rather than looking like nothing happened", async () => {
+    createTokenMock.mockRejectedValue(new Error("Token limit reached"));
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+    expect(await screen.findByText(/token limit reached/i)).toBeInTheDocument();
+  });
+});

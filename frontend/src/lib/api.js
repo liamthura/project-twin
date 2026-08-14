@@ -49,6 +49,26 @@ function getApiBase() {
   return import.meta.env.VITE_API_URL || "/api";
 }
 
+/**
+ * The MCP endpoint an AI client should be pointed at.
+ *
+ * Derived from the API base rather than stored, because the two are siblings on
+ * one origin: FastAPI serves `/api/*` and mounts the MCP app at `/mcp`
+ * (main.py:89). Everything MyGist ships keeps that promise of one upstream and
+ * one port, so a second configurable URL would be a second thing to get wrong.
+ *
+ * `getApiBase()` returns either an absolute base ending in `/api` or the
+ * relative `/api`. A relative one is resolved against this origin here: a
+ * client is going to paste this into a config file on its own machine, where a
+ * path with no host means nothing.
+ */
+function mcpUrl() {
+  const withoutApi = getApiBase().replace(/\/api\/?$/, "");
+  if (/^https?:\/\//i.test(withoutApi)) return `${withoutApi}/mcp`;
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  return `${origin}${withoutApi}/mcp`;
+}
+
 // Get auth token
 function getAuthToken() {
   const config = getConfig();
@@ -500,6 +520,7 @@ export {
   saveConfig,
   clearConfig,
   getApiBase,
+  mcpUrl,
   getAuthToken,
   testConnection,
   registerAccount,

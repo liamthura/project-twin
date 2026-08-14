@@ -39,7 +39,9 @@ export function isAuthRoute(route) {
 // The logic itself is in ./onboardingSteps -- see that file's header.
 export {
   ONBOARDING_STEPS,
+  STORABLE_STEPS,
   DEFAULT_ONBOARDING_STEP,
+  isStorableStep,
   isOnboardingRoute,
   normaliseStep,
   stepIndex,

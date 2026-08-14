@@ -17,15 +17,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { listConnectedApps, listTokens } from "@/lib/api.js";
 import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
 
+import { AUTOFILL_PROMPT } from "./onboarding/autofillPrompt";
 import { connectionStatus } from "./onboarding/connectionStatus";
-
-// What someone pastes into an assistant that already has propose. It asks for
-// suggestions rather than writes, which is the whole point: the reader's first
-// real task becomes approving rows in Review, and the review mechanic is
-// learned on day one instead of being discovered later.
-const PROMPT =
-  "Read my MyGist persona, then propose updates for anything you know about me " +
-  "that is missing — one compact proposal per fact, with a one-sentence reason.";
 
 function StepMark({ done, n }) {
   return done ? (
@@ -184,7 +177,7 @@ export function GettingStartedCard({ disabledSections = [], onStart, onOpenSetti
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    navigator.clipboard?.writeText(PROMPT);
+                    navigator.clipboard?.writeText(AUTOFILL_PROMPT);
                     setCopied(true);
                   }}
                 >

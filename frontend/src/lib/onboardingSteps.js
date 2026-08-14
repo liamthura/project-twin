@@ -10,7 +10,28 @@
  * routing still has one import while this stays testable on its own.
  */
 
-export const ONBOARDING_STEPS = ["welcome", "about-you", "how-you-like", "complete"];
+export const ONBOARDING_STEPS = [
+  "welcome",
+  "connect",
+  "about-you",
+  "how-you-like",
+  "complete",
+];
+
+/**
+ * The steps whose status the SERVER will store.
+ *
+ * It mirrors `settings_store.ONBOARDING_STEP_KEYS`, which rejects anything else
+ * with a 400. Only the two steps that collect fields qualify: `welcome` and
+ * `complete` are pages, and `connect` is derived from whether a token or grant
+ * actually exists -- storing a claim about that would let it disagree with the
+ * connections themselves.
+ */
+export const STORABLE_STEPS = ["about-you", "how-you-like"];
+
+export function isStorableStep(step) {
+  return STORABLE_STEPS.includes(step);
+}
 
 export const DEFAULT_ONBOARDING_STEP = "welcome";
 

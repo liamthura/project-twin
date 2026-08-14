@@ -8,6 +8,10 @@ vi.mock("./api.js", async (importOriginal) => {
 });
 
 const { getOnboarding, saveOnboarding } = await import("./onboarding.js");
+// The real one: the mock above spreads every actual export and replaces only
+// `api`, and mcpUrl derives from getApiBase and localStorage rather than from
+// any request.
+const { mcpUrl } = await import("./api.js");
 
 beforeEach(() => {
   apiMock.mockReset();
@@ -47,5 +51,34 @@ describe("saveOnboarding", () => {
         onboarding: { dismissed: true, steps: {} },
       }),
     });
+  });
+});
+
+describe("mcpUrl", () => {
+  beforeEach(() => {
+    localStorage.removeItem("mygist_config");
+  });
+
+  it("resolves a relative base against this origin", async () => {
+    // A client pastes this into a config file on its own machine, where a path
+    // with no host means nothing.
+    expect(mcpUrl()).toBe(`${window.location.origin}/mcp`);
+  });
+
+  it("puts /mcp beside /api on a configured server, not under it", async () => {
+    // FastAPI mounts the MCP app at /mcp -- a SIBLING of /api, not a child.
+    localStorage.setItem(
+      "mygist_config",
+      JSON.stringify({ serverUrl: "https://example.test/api" }),
+    );
+    expect(mcpUrl()).toBe("https://example.test/mcp");
+  });
+
+  it("tolerates a trailing slash on the configured base", async () => {
+    localStorage.setItem(
+      "mygist_config",
+      JSON.stringify({ serverUrl: "https://example.test/api/" }),
+    );
+    expect(mcpUrl()).toBe("https://example.test/mcp");
   });
 });

@@ -16,19 +16,25 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api.js";
 import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
-import { normaliseStep, nextStep, prevStep } from "@/lib/onboardingSteps.js";
+import {
+  isStorableStep,
+  normaliseStep,
+  nextStep,
+  prevStep,
+} from "@/lib/onboardingSteps.js";
 import { getAt, setAt } from "@/renderers/paths";
 
 import { StepWelcome } from "./StepWelcome";
+import { StepConnect } from "./StepConnect";
 import { StepAboutYou } from "./StepAboutYou";
 import { StepHowYouLike } from "./StepHowYouLike";
 import { StepComplete } from "./StepComplete";
 
-// Welcome explains and Complete congratulates; neither is a question, so
-// counting Welcome would tell someone they have four things to do when they
-// have two. Complete stays in the count as the destination -- a progress bar
-// that never fills reads as unfinished work.
-const COUNTED_STEPS = ["about-you", "how-you-like", "complete"];
+// Welcome explains and is not a question, so counting it would tell someone
+// they have five things to do when they have three and a destination. Complete
+// stays in the count as that destination -- a progress bar that never fills
+// reads as unfinished work.
+const COUNTED_STEPS = ["connect", "about-you", "how-you-like", "complete"];
 
 // The editor's debounce, from App.jsx. The same number on purpose: a reader who
 // learns the app's saving rhythm here should find it unchanged afterwards.
@@ -120,6 +126,11 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
 
   const markStep = useCallback(
     (key, status) => {
+      // The server stores a status for the two steps that collect fields and
+      // rejects anything else with a 400. `connect` is derived from whether a
+      // token or grant exists, so sending one here would be a write that could
+      // only ever fail -- silently, since the failure is swallowed below.
+      if (!isStorableStep(key)) return;
       setProgress((prev) => {
         const next = { ...prev, steps: { ...prev.steps, [key]: status } };
         saveOnboarding(next, disabledSections).catch(() => {
@@ -174,7 +185,25 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
 
         <div className="flex-1">
           {current === "welcome" && (
-            <StepWelcome onStart={() => go("about-you")} onSkip={() => go(null)} />
+            // `nextStep` rather than a literal: a hardcoded destination here
+            // is exactly what let Welcome jump straight over Connect when the
+            // step was inserted.
+            <StepWelcome onStart={() => go(nextStep(current))} onSkip={() => go(null)} />
+          )}
+
+          {current === "connect" && (
+            <StepConnect
+              // Handing the work over is a real answer, not an abandonment:
+              // both field steps are recorded as deliberately skipped, and the
+              // reader goes straight to the end. Complete then reads correctly
+              // -- nothing was filled in, and that was the plan.
+              onDelegate={() => {
+                markStep("about-you", "skipped");
+                markStep("how-you-like", "skipped");
+                go("complete");
+              }}
+              onFillManually={() => go("about-you")}
+            />
           )}
 
           {current === "about-you" && (
@@ -198,8 +227,19 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
           )}
         </div>
 
-        {/* Complete has its own single way in, so it draws no footer. */}
-        {current !== "welcome" && current !== "complete" && (
+        {/* Connect ends in its own two-way choice and Complete has its own
+            single way in, so neither takes the standard footer -- a Continue
+            beside "I'll fill it in myself" would be two buttons for one
+            decision. Connect still owes a way back. */}
+        {current === "connect" && (
+          <div className="mt-10">
+            <Button variant="ghost" onClick={() => go(prevStep(current))}>
+              Back
+            </Button>
+          </div>
+        )}
+
+        {current !== "welcome" && current !== "connect" && current !== "complete" && (
           <div className="mt-10 flex items-center justify-between gap-3">
             <Button variant="ghost" onClick={() => go(prevStep(current))}>
               Back

@@ -61,10 +61,29 @@ correction nobody navigated to must not become a history entry.
 
 | Screen | Holds |
 | --- | --- |
-| **Welcome** | What this is, the delegate offer, `Get started` and `Skip for now` |
+| **Welcome** | An animated diagram, what this is, the delegate offer, `Get started` and `Skip for now` |
+| **Connect** | A key, the MCP address, and the choice of who fills the persona in |
 | **About you** | `name`, `preferred_name`, `current_role`, `organisation`, `location`, `bio` |
 | **How you like answers** | `tone`, `locale`, `detail_level`, `response_format` |
 | **Complete** | What was filled, optional extras, and the way into the app |
+
+**Added 2026-08-14, after the first preview.** The flow originally went straight
+from Welcome to the fields, which left the delegate offer unhonoured: Welcome
+said "you don't have to type any of it" and then offered nothing but typing.
+The app has also **never shown the MCP endpoint anywhere** -- it hands out a
+token and stops -- so "connect an assistant" was not a thing a reader could
+actually do from inside the product.
+
+The Connect step closes both. It mints a `persona:propose` token, shows that key
+and `<origin>/mcp` side by side, and then forks: hand it to the assistant with
+the prompt, or type it yourself. `connect` is deliberately **not** a storable
+step -- it is derived from whether a token or grant exists, and a stored claim
+could disagree with the connections themselves.
+
+Welcome gained a CSS-animated diagram (sources → MyGist → clients). CSS rather
+than JavaScript on purpose: `globals.css` already zeroes every animation under
+`prefers-reduced-motion: reduce`, so the existing promise covers it without the
+component re-checking the rule itself.
 
 Every About-you field and `tone`/`locale`/`detail_level` were confirmed present
 in the v2 manifests. Two notes for planning:
