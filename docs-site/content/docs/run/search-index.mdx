@@ -1,10 +1,10 @@
 ---
 title: Search index
-description: How the index is maintained, and the restart step that is easy to miss.
+description: How the index is maintained, backfilled and rebuilt.
 ---
 
-`persona_search` holds one row per entity: a full-text vector, and — where
-embeddings are configured — an `embedding` column.
+`persona_search` holds one row per entity: a full-text vector, plus an
+`embedding` column where embeddings are configured.
 
 It is **derived** from `persona_data`, so it can always be rebuilt. Nothing is
 lost by dropping it.
@@ -37,13 +37,12 @@ does, including from `.env`.
 Use `--recreate` whenever `EMBEDDING_DIM` changes. The existing column is at the
 old width and cannot simply be written into.
 
-## The two gotchas
+## Backfill caveats
 
-Both of these have cost real debugging time. They are here so they cost you
-none.
+Both of these have cost real debugging time.
 
 <Callout type="warn">
-### `--recreate` is not enough on its own. Restart the server too.
+### Restart the server after `--recreate`
 
 If the server booted and logged:
 
@@ -52,7 +51,7 @@ persona_search.embedding is vector(N) but EMBEDDING_DIM=M
 ```
 
 then it cached the decision at startup and is running FTS-only. Fixing the
-column does **not** change that — the running process only re-checks when it
+column does **not** change that: the running process only re-checks when it
 restarts.
 
 Backfill, then restart. Otherwise you will spend an afternoon debugging a
@@ -60,7 +59,7 @@ perfectly correct index that nothing is using.
 </Callout>
 
 <Callout>
-### `--recreate` resets every entry's last-change time.
+### `--recreate` resets last-change times
 
 Three things read that timestamp, and all three go quiet afterwards until
 entries start changing again:
@@ -70,7 +69,7 @@ entries start changing again:
   everything.
 - The top-of-mind staleness advisory is suppressed for 30 days.
 
-Nothing is lost — these timestamps describe indexing, not your data. But a
+Nothing is lost: these timestamps describe indexing, not your data. But a
 persona that looks suspiciously "all edited today" right after a recreate is
 expected, not a bug.
 </Callout>
@@ -86,8 +85,8 @@ search_context("something you know is in there")
 Then test the difference between the two modes. Search for a **paraphrase** of
 something stored, using none of its actual words:
 
-- **Paraphrase hits** — you are in hybrid mode. Embeddings are working.
-- **Paraphrase misses, exact word hits** — you are in FTS-only mode. Check the
+- **Paraphrase hits**: you are in hybrid mode. Embeddings are working.
+- **Paraphrase misses, exact word hits**: you are in FTS-only mode. Check the
   provider variables and the startup log.
 
 ## Cost and privacy

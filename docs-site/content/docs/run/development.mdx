@@ -9,7 +9,7 @@ For working on MyGist itself rather than just running it.
 
 ```text
 ├── backend/            FastAPI: REST API, MCP server, persona logic
-│   ├── main.py           entry point — /api, /mcp, static routes
+│   ├── main.py           entry point: /api, /mcp, static routes
 │   ├── server.py         MCP tools and the persona write path
 │   ├── persona_store.py  storage, defaults, read-time normalisation
 │   ├── search_index.py   persona_search maintenance
@@ -17,15 +17,15 @@ For working on MyGist itself rather than just running it.
 │   ├── pack_loader.py    manifest validation
 │   ├── section_packs/    one manifest per persona section
 │   ├── scripts/          backfills and one-off tools
-│   ├── migrations/       Alembic — the schema of record, auth tables included
+│   ├── migrations/       Alembic: the schema of record, auth tables included
 │   └── tests/            pytest, against a real Postgres
-├── auth/               Better Auth (Node) — sign-in, and the OAuth server
+├── auth/               Better Auth (Node): sign-in and the OAuth server
 │   └── src/
 │       ├── auth.js       plugins, issuer, session JWTs
 │       ├── oauth.js      scopes, registration, consent, revocation
 │       ├── invite.js     the INVITE_ONLY rule
 │       └── __fixtures__/ the schema this service expects
-├── frontend/           React SPA — the persona editor
+├── frontend/           React SPA: the persona editor
 │   ├── src/renderers/    the shared renderer kit packs drive
 │   └── src/__fixtures__/ pack fixtures, generated from the manifests
 ├── docs-site/          this documentation (Fumadocs, static export)
@@ -40,7 +40,7 @@ python -m venv venv && source venv/bin/activate
 pip install -r requirements-dev.txt
 ```
 
-Start a throwaway Postgres — the suite needs pgvector, and the compose file
+Start a throwaway Postgres. The suite needs pgvector, and the compose file
 provides an image that has it:
 
 ```bash
@@ -81,7 +81,7 @@ Two fixtures cover the cases row-level cleanup cannot:
 | Fixture | Use it when |
 |---|---|
 | `rerun_migrations` | Replaying migrations over existing data |
-| `fresh_schema` | The test issues its own DDL — dropping a table or a column |
+| `fresh_schema` | The test issues its own DDL: dropping a table or a column |
 
 Either one marks the schema dirty, so the next test gets a genuine rebuild.
 A test that changes the schema without asking for one of these will leak into
@@ -99,14 +99,14 @@ npm run dev
 
 | Command | Does |
 |---|---|
-| `npm test` | The whole suite — jsdom unit tests and browser-based Storybook tests |
+| `npm test` | The whole suite: jsdom unit tests and browser-based Storybook tests |
 | `npm run test:watch` | Watch mode |
 | `npm run fixtures` | Regenerate `src/__fixtures__/packs.json` from the manifests |
 | `npm run build` | Production build |
 | `npm run storybook` | Storybook on port 6006 |
 
 <Callout type="warn">
-**Change a section pack manifest, regenerate the fixtures.** `packs.json` is
+Change a section pack manifest, and regenerate the fixtures. `packs.json` is
 generated from `backend/section_packs/*/manifest.json`, and the frontend tests
 assert against it. If it goes stale, the tests are checking a shape that no
 longer exists.
@@ -126,7 +126,7 @@ assertions do not depend on the machine.
 
 ## Auth service
 
-Plain ESM on Node 22, with no build step — `src/` is what runs.
+Plain ESM on Node 22, with no build step; `src/` is what runs.
 
 ```bash
 cd auth
@@ -141,10 +141,10 @@ npm test                         # node:test, no test framework to install
 The suite needs a real Postgres for the same reason the backend's does: the
 invite rule *is* a `WHERE` clause, and a stubbed pool would only prove the
 string is the string. It reads `TEST_DATABASE_URL`, and plain `postgres:16` is
-enough — nothing here touches pgvector.
+enough, because nothing here touches pgvector.
 
 <Callout type="warn">
-**Alembic owns the schema, including Better Auth's tables.** The Better Auth
+Alembic owns the schema, including Better Auth's tables. The Better Auth
 CLI can emit and even apply its own DDL, and doing so puts the database into a
 state no migration describes.
 
@@ -153,7 +153,7 @@ npm run schema:generate          # writes DDL, for reading
 ```
 
 That command exists to be read once while writing the matching Alembic
-migration, and its output is gitignored — it reappears on every run and is a
+migration, and its output is gitignored; it reappears on every run and is a
 record of nothing. `npm run schema:migrate` applies DDL directly; do not run it
 against anything you care about.
 
@@ -172,7 +172,7 @@ npm run dev
 ```
 
 The site is a Next static export served by the backend at `/docs`. Internal
-links are written **without** the `/docs` prefix — `basePath` adds it at build
+links are written **without** the `/docs` prefix; `basePath` adds it at build
 time, and writing it by hand produces `/docs/docs/...`.
 
 Screenshots go in `docs-site/public/screenshots/` and are referenced through the
@@ -215,31 +215,35 @@ local development tends to run 3.13. Testing both stops them drifting apart
 unnoticed.
 
 The frontend and docs builds run in CI because the single-container merge means
-either one breaking blocks the whole image — and therefore any backend fix.
+either one breaking blocks the whole image, and therefore any backend fix.
 Catching that in CI is much cheaper than catching it at deploy time, which is
 after review and after merge.
 
 <Callout>
 The link check exists because `basePath` prefixes `/docs` automatically, so an
 author writing `/docs/use/...` by hand emits `/docs/docs/use/...`. Every
-internal link on the site was wrong that way once and nothing failed — the
+internal link on the site was wrong that way once and nothing failed: the
 pages built, the links 404'd. Anchors rot the same way when a heading is
 reworded, so both are checked.
 </Callout>
 
-## Conventions worth knowing
+## Conventions
 
-**Section packs are declarative only.** A pack cannot ship Python or React. If
-something cannot be expressed in the manifest, that is a renderer-kit change,
-not a pack change.
+### Packs are declarative
 
-**The entity vocabulary is generated, never hand-copied.** `get_schema` is built
-from the enforced manifests. Documentation that reproduces it has been wrong
-more than once, which is why these docs do not.
+A pack cannot ship Python or React. If something cannot be expressed in the
+manifest, that is a renderer-kit change, not a pack change.
 
-**Guards carry their reasons.** Where a test allows an exception, it demands a
-written reason string. Those strings are the documentation for why the exception
-exists.
+### The entity vocabulary is generated
+
+`get_schema` is built from the enforced manifests, never hand-copied.
+Documentation that reproduces it has been wrong more than once, which is why
+these docs do not.
+
+### Guards carry their reasons
+
+Where a test allows an exception, it demands a written reason string. Those
+strings are the documentation for why the exception exists.
 
 ## Next
 

@@ -14,7 +14,7 @@ Organised by what you are seeing, not by what is wrong.
 A manifest in `backend/section_packs/` is invalid, and the message names it.
 
 Packs shipped in the repository raise rather than being skipped, so this is the
-loader doing its job. Fix the manifest — the error names the offending key.
+loader doing its job. Fix the manifest; the error names the offending key.
 
 See [Section packs](/run/section-packs#an-invalid-pack-stops-the-server).
 
@@ -64,10 +64,10 @@ curl -s https://your-instance/api/auth/whoami \
 
 | Symptom | Means |
 |---|---|
-| Connection refused, or a DNS failure | The server or the network — not your config |
-| `no available server` from Cloudflare | A proxied hostname with nothing behind it. A routing problem, **not** a database one. On this instance the likely cause is a config still pointing at the retired `mygist-api` host — see [Infrastructure](/run/infrastructure#mygist-apithuradevqzzio-is-retired). |
+| Connection refused, or a DNS failure | The server or the network, not your config |
+| `no available server` from Cloudflare | A proxied hostname with nothing behind it. A routing problem, **not** a database one. On this instance the likely cause is a config still pointing at the retired `mygist-api` host. See [Infrastructure](/run/infrastructure#mygist-apithuradevqzzio-is-retired). |
 | `401` on whoami | The token is wrong, revoked, or not being sent. Check the client is passing `Authorization` and not stripping it. |
-| Both checks pass, client still blank | The client's configuration — see [Other clients](/use/clients) |
+| Both checks pass, client still blank | The client's configuration, covered in [Other clients](/use/clients) |
 
 <Callout type="warn">
 If you put a reverse proxy in front, check it is not rewriting `/mcp` or adding
@@ -81,7 +81,7 @@ Nearly every failure here arrives as a bare `401` or an OAuth error code that
 names neither the setting nor the fix, so match on the symptom rather than on
 the message.
 
-**Read the API's startup log first.** Where OAuth is configured, the API checks
+Read the API's startup log first. Where OAuth is configured, the API checks
 its own `AUTH_ISSUER` against what the auth service advertises and says so:
 
 ```text
@@ -96,7 +96,7 @@ reproducing anything.
 <Accordion title="Sign-in works, then every page 401s on /api">
 
 `AUTH_ISSUER` on the API does not match the `iss` claim the auth service signs.
-It is the public origin **plus `/auth`** — `https://your-instance/auth`, not
+It is the public origin **plus `/auth`**: `https://your-instance/auth`, not
 `https://your-instance`.
 
 The startup log says so directly, with both values:
@@ -134,7 +134,7 @@ The same defect, seen from the other end: the access token reached `/mcp` and
 failed verification there. Check `AUTH_ISSUER` first, then `AUTH_MCP_RESOURCE`.
 
 An access token's `aud` claim must equal `AUTH_MCP_RESOURCE` exactly, and both
-containers have to carry the identical string — no trailing slash on one and
+containers have to carry the identical string: no trailing slash on one and
 not the other.
 
 <Callout type="warn">
@@ -151,8 +151,8 @@ satisfies both on those builds. Upgrade.
 curl -s https://your-instance/.well-known/oauth-protected-resource
 ```
 
-A 404 means `AUTH_MCP_RESOURCE` is unset, which gates the entire OAuth surface
-— no discovery documents on the API, no OAuth endpoints on the auth service.
+A 404 means `AUTH_MCP_RESOURCE` is unset, which gates the entire OAuth surface:
+no discovery documents on the API, no OAuth endpoints on the auth service.
 That is the intended state for an instance that has not opted in; clients use
 [bearer tokens](/use/clients#connecting-with-a-token) instead.
 
@@ -176,7 +176,7 @@ server's response and so never learned where to send the browser back to. If
 you see it, you are on an older build.
 
 A 500 naming `invalid input syntax for type timestamp with time zone` at the
-same point in the flow is a second fixed bug with the same cause of confusion —
+same point in the flow is a second fixed bug with the same cause of confusion:
 token lifetimes are counts of seconds, and a time-span string produced a
 `NaN` expiry.
 
@@ -185,7 +185,7 @@ token lifetimes are counts of seconds, and a time-span string produced a
 <Accordion title="Sign-up is open when it should be closed, or closed when it should be open">
 
 `INVITE_ONLY` is read by **both** containers, and only the literal string
-`true` turns it on. `1`, `yes` and `on` are read as off — the gate fails open,
+`true` turns it on. `1`, `yes` and `on` are read as off, so the gate fails open,
 quietly.
 
 Set on only one container it is a gate on one of two doors: the auth service
@@ -246,7 +246,7 @@ Backfill it.
 <Accordion title="The raw JSON doesn't match what the editor shows">
 
 Almost always read-time normalisation. `persona_store` coerces a handful of
-shapes as data is read — every coercion is lossless and idempotent, and the
+shapes as data is read: every coercion is lossless and idempotent, and the
 editor shows the normalised form.
 
 This is not corruption, and there is nothing to do about it.
@@ -255,7 +255,8 @@ This is not corruption, and there is nothing to do about it.
 
 <Accordion title="An entry has no id">
 
-Some nested lists — a project's references, a hobby's specifics — have no ids by
+Some nested lists, such as a project's references or a hobby's specifics, have
+no ids by
 design, and are addressed through their parent instead.
 
 Rows written before an id backfill also lack them until the next time they are
@@ -269,8 +270,8 @@ Check `get_schema` for that entity. The field is probably not in the vocabulary,
 and a rejection is the correct outcome.
 
 Historically the most common cause was different: a field that was *documented*
-but never stored. The stored-key audit now makes that impossible to introduce —
-see [Section packs](/run/section-packs#guards).
+but never stored. The stored-key audit now makes that impossible to introduce; see
+[Section packs](/run/section-packs#guards).
 
 </Accordion>
 
@@ -278,7 +279,7 @@ see [Section packs](/run/section-packs#guards).
 
 They cannot. There is one copy, with no caching between clients.
 
-Check they are authenticating as the same account — two tokens can belong to two
+Check they are authenticating as the same account: two tokens can belong to two
 different users on the same server.
 
 </Accordion>
@@ -315,7 +316,7 @@ See [Infrastructure](/run/infrastructure#health-gating).
 
 <Accordion title="/docs 404s but /docs/ works">
 
-Fixed — the bare path now redirects. If you see it, you are on an older build.
+Fixed: the bare path now redirects. If you see it, you are on an older build.
 
 </Accordion>
 

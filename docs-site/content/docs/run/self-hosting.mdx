@@ -71,11 +71,11 @@ Everything is on one origin from there:
 | Path | What |
 |---|---|
 | `/` | Web UI |
-| `/api` | REST API — bearer auth, except `/api/health` |
+| `/api` | REST API: bearer auth, except `/api/health` |
 | `/mcp` | MCP endpoint |
 | `/docs` | This documentation |
 | `/api/docs`, `/api/redoc` | Swagger and ReDoc |
-| `/.well-known/oauth-*` | OAuth discovery documents — see [Reverse proxies](#reverse-proxies) |
+| `/.well-known/oauth-*` | OAuth discovery documents, covered in [Reverse proxies](#reverse-proxies) |
 
 ## Environment variables
 
@@ -99,16 +99,16 @@ does nothing.
 ### Search and embeddings
 
 All optional. Leave the provider variables unset and the server stays in
-FTS-only mode — see [Database](/run/database).
+FTS-only mode, as [Database](/run/database) describes.
 
 | Variable | Notes |
 |---|---|
 | `EMBEDDING_PROVIDER` | `voyage` (default) or `openai` |
 | `VOYAGE_API_KEY` | For `voyage` |
-| `EMBEDDING_API_URL` | For `openai` — the base URL of any OpenAI-compatible `/v1/embeddings` endpoint. Ollama, LM Studio, llama.cpp, vLLM, LocalAI and OpenAI itself all qualify. |
+| `EMBEDDING_API_URL` | For `openai`: the base URL of any OpenAI-compatible `/v1/embeddings` endpoint. Ollama, LM Studio, llama.cpp, vLLM, LocalAI and OpenAI itself all qualify. |
 | `EMBEDDING_API_KEY` | For `openai`. Omit for local servers that need none. |
 | `EMBEDDING_MODEL` | Default `voyage-4-lite` |
-| `EMBEDDING_DIM` | Default `1024`. Must match your model's output width — see the warning on [Database](/run/database#embedding_dim). |
+| `EMBEDDING_DIM` | Default `1024`. Must match your model's output width. See the warning on [Database](/run/database#embedding_dim). |
 
 <Callout type="warn">
 `backend/.env.example` used to list `DEBUG` and `MCP_TRANSPORT`. **Neither does
@@ -121,30 +121,30 @@ ignore them.
 
 ### Auth service
 
-These connect the API container to the auth container — the second one in
+These connect the API container to the auth container, the second one in
 [What you need](#what-you-need) above. All but the last two live on the API side
 only; the auth service has its own settings, documented in `auth/.env.example`.
 
 | Variable | Notes |
 |---|---|
-| `AUTH_SERVICE_URL` | Internal address of the auth container, e.g. `http://auth:3001`. Unset, `/auth/*` is not registered at all — sign-in, sign-up and password reset have nowhere to go. |
+| `AUTH_SERVICE_URL` | Internal address of the auth container, e.g. `http://auth:3001`. Unset, `/auth/*` is not registered at all, so sign-in, sign-up and password reset have nowhere to go. |
 | `AUTH_JWKS_URL` | Where the API fetches the auth service's signing keys, e.g. `http://auth:3001/auth/jwks`. Unset, JWT verification is inert: a browser session can no longer call `/api` and OAuth access tokens are rejected, but the legacy opaque tokens in the `tokens` table keep working exactly as before. |
-| `AUTH_ISSUER` | The auth service's issuer — its public origin **plus `/auth`**, e.g. `https://your-instance/auth`. Checked against the `iss` claim of every JWT the API is handed, of either kind. The suffix is not optional — see [The `/auth` suffix](#the-auth-suffix) below. |
-| `AUTH_AUDIENCE` | What a **session** JWT's `aud` claim must be, for `/api`. Falls back to `AUTH_ISSUER` when unset, which is what the auth service issues — leave it unset unless you have a reason not to. |
-| `AUTH_MCP_RESOURCE` | **Set this on both containers, or on neither.** The canonical URI of the **MCP** endpoint — `https://your-instance/mcp`, no trailing slash. An OAuth access token's `aud` claim must match this exactly to be accepted on `/mcp`, so the two containers have to agree on it character for character. Unset, OAuth is off on both sides: the API rejects OAuth access tokens outright and mounts none of the four `/.well-known` discovery routes, and the auth service registers no OAuth endpoints at all. |
-| `INVITE_ONLY` | **Both containers, or neither.** `true` closes sign-up: an account needs a code from the `invite_codes` table. Off by default. Only the literal string `true` turns it on, case-insensitively — `1`, `yes` and `on` are read as off, and set on only one container it is a gate on one of two doors. |
+| `AUTH_ISSUER` | The auth service's issuer: its public origin **plus `/auth`**, e.g. `https://your-instance/auth`. Checked against the `iss` claim of every JWT the API is handed, of either kind. The suffix is not optional. See [The `/auth` suffix](#the-auth-suffix) below. |
+| `AUTH_AUDIENCE` | What a **session** JWT's `aud` claim must be, for `/api`. Falls back to `AUTH_ISSUER` when unset, which is what the auth service issues; leave it unset unless you have a reason not to. |
+| `AUTH_MCP_RESOURCE` | **Set this on both containers, or on neither.** The canonical URI of the **MCP** endpoint: `https://your-instance/mcp`, no trailing slash. An OAuth access token's `aud` claim must match this exactly to be accepted on `/mcp`, so the two containers have to agree on it character for character. Unset, OAuth is off on both sides: the API rejects OAuth access tokens outright and mounts none of the four `/.well-known` discovery routes, and the auth service registers no OAuth endpoints at all. |
+| `INVITE_ONLY` | **Both containers, or neither.** `true` closes sign-up: an account needs a code from the `invite_codes` table. Off by default. Only the literal string `true` turns it on, case-insensitively; `1`, `yes` and `on` are read as off, and set on only one container it is a gate on one of two doors. |
 
 The first four make the browser sign-in flow work at all, and most self-hosted
 instances already have them set from the Better Auth setup. `AUTH_MCP_RESOURCE`
 is the one the OAuth feature adds, and it is additive: leave it unset and
-nothing about today's connections — the web UI, existing bearer tokens —
-changes.
+nothing about today's connections changes, including the web UI and existing
+bearer tokens.
 
 <Callout type="warn">
 `AUTH_MCP_RESOURCE` is what decides whether the **auth** container registers
 `/auth/oauth2/register`, which accepts **unauthenticated** client registrations
-by design — dynamic registration is how Claude and ChatGPT connect without a
-pre-issued client id.
+by design, because dynamic registration is how Claude and ChatGPT connect
+without a pre-issued client id.
 
 An instance that never opted into OAuth should not acquire that endpoint by
 upgrading, so the whole OAuth surface is gated on this one value. Set it on
@@ -163,8 +163,8 @@ AUTH_ISSUER=https://your-instance/auth      # correct
 AUTH_ISSUER=https://your-instance           # every JWT rejected
 ```
 
-Both kinds of JWT carry that same issuer — the session JWT the web UI uses for
-`/api`, and the OAuth access token an MCP client uses for `/mcp` — so one value
+Both kinds of JWT carry that same issuer, the session JWT the web UI uses for
+`/api` and the OAuth access token an MCP client uses for `/mcp`, so one value
 is correct for both. That is worth stating because it was not always true:
 Better Auth's JWT plugin defaults `iss` to the bare origin while its OAuth
 provider uses the origin plus base path, and the auth service now pins the
@@ -185,9 +185,9 @@ ERROR  auth issuer mismatch: OAuth cannot work.
 ```
 
 The check only ever logs. A mismatch has already broken every JWT by the time it
-runs, but bearer tokens and the parts of `/api` that need no session still work
-— refusing to start would take those down too, and widen the fault rather than
-report it. An auth service that is not up yet is retried for around twenty
+runs, but bearer tokens and the parts of `/api` that need no session still work.
+Refusing to start would take those down too, widening the fault instead of
+reporting it. An auth service that is not up yet is retried for around twenty
 seconds and then reported as *unchecked*, never as a mismatch.
 
 <Callout type="warn">
@@ -199,8 +199,9 @@ Upgrade rather than hunting for a value that works.
 ### Changing an auth setting
 
 Every variable above is read at startup, so a change takes effect when the
-container is **recreated** — not restarted, which reuses the existing container
-and its environment. Recreate both if you changed one of the two they share.
+container is **recreated**, not restarted; restarting reuses the existing
+container and its environment. Recreate both if you changed one of the two they
+share.
 
 Nobody is signed out by this. The browser session is a cookie, and the JWT the
 web UI presents to `/api` lives fifteen minutes and is re-derived from that
@@ -223,22 +224,29 @@ you blame the application.
 
 ## Reverse proxies
 
-Nothing special is required — **still one upstream, one port**, even though
+Nothing special is required: **still one upstream, one port**, even though
 there are now two containers. `/auth/*` is proxied to the auth service by the
-API rather than by your proxy, precisely so this stays true and you do not have
-to route by path. Two things must survive the hop:
+API itself, not by your proxy, precisely so this stays true and you do not have
+to route by path. Two things must survive the hop, and the OAuth discovery
+routes need nothing from you at all.
 
-**Do not strip or rewrite `/mcp`.** It is mounted at the root of the app so that
+### The `/mcp` path
+
+Do not strip or rewrite it. It is mounted at the root of the app so that
 it resolves exactly, with no redirect. A proxy that appends a trailing slash or
 issues a redirect will break clients that do not follow redirects on POST.
 
-**Pass `Authorization` through.** Both the REST API and the MCP endpoint
+### The `Authorization` header
+
+Pass it through. Both the REST API and the MCP endpoint
 authenticate on it. Some proxies strip unknown headers by default.
 
-**The OAuth discovery routes need nothing added, either.** The four documents
+### OAuth discovery routes
+
+These need nothing added. The four documents
 under `/.well-known/oauth-protected-resource` and
 `/.well-known/oauth-authorization-server` (with and without a trailing `/mcp`
-or `/auth`) are served by the API container itself — two directly, two
+or `/auth`) are served by the API container itself: two directly, two
 forwarded to the auth service the same way `/auth/*` already is. There is no
 third upstream and no extra path to route: the promise stays exactly what it
 says above.
