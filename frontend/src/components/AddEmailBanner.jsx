@@ -55,8 +55,13 @@ export function AddEmailBanner({ onAddEmail }) {
   };
 
   return (
-    <div className="flex items-start gap-3 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
-      <Mail className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    // items-center, not items-start. The row holds a 20px line of text beside a
+    // 36px `size="sm"` button, so top-aligning them puts the sentence 8px above
+    // the button's own label -- close enough to look like a mistake rather than
+    // a choice, which is what it was. Centring is also what every other
+    // row-with-a-button in the app does (see settings/AccountPanel).
+    <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+      <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <p>
           Add an email to your account so you can reset your password if you ever
