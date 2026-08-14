@@ -1,7 +1,8 @@
 # Auth slice — design
 
 Date: 2026-08-14
-Status: approved, not yet planned
+Status: shipped — see "What shipped" at the end
+Plan: `docs/superpowers/plans/2026-08-14-auth-slice.md`
 Umbrella: `docs/superpowers/specs/2026-08-10-app-migration-umbrella-design.md` (slice 5, second half)
 Prototype: `docs/superpowers/specs/2026-08-04-mygist-app-reshaped-design.md`
 First half: `docs/superpowers/specs/2026-08-14-settings-slice-design.md`
@@ -125,21 +126,23 @@ not have — `nth-last-2:`, the `has-data-[state=checked]:` shorthand, and
 Tailwind 3.4 with `tailwindcss-animate` as its only plugin. Adapting it means
 rewriting most of what makes it worth adapting.
 
-So: take its API and its `data-slot` convention, write a Tailwind-3 version in
-this codebase's existing idiom. About sixty lines in
-`frontend/src/components/ui/field.jsx`:
+So: take its idea, write a Tailwind-3 version in this codebase's existing idiom.
+Sixty-five lines in `frontend/src/components/ui/field.jsx`, one export:
 
-| Export | Renders |
-|---|---|
-| `Field` | the `space-y-1.5` group, `data-invalid` when it has an error |
-| `FieldLabel` | `Label` at `text-xs font-medium`, red when the group is invalid |
-| `FieldDescription` | the muted helper line |
-| `FieldError` | the message, `role="alert"`, `text-destructive`; renders nothing when there is no error |
+```jsx
+<Field id="welcome-password" label="Password" description="…" error={errors.password}>
+  {(control) => <Input {...control} type="password" value={…} onBlur={…} />}
+</Field>
+```
 
-The control keeps `aria-invalid` and `aria-describedby` pointing at whichever of
-description and error is present. That is not new ground:
-`landing/WaitlistForm.jsx:124-148` already does exactly this by hand, and its
-choices are the ones being generalised.
+The label, the help line and the error are `Field`'s own — passed as props
+rather than composed from four sibling exports, because that is what lets it
+compute `aria-describedby` from knowledge of which lines it actually rendered.
+An error takes that slot over from a description; the control gets
+`aria-invalid="true"` and the message gets `role="alert"`.
+
+That is not new ground: `landing/WaitlistForm.jsx:124-148` already does exactly
+this by hand, and its choices are the ones being generalised.
 
 `Input` gains one thing: an `aria-invalid:border-destructive` variant, so an
 invalid field is visible without the label having to carry it alone.
