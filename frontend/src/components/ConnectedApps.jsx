@@ -19,10 +19,10 @@
  *
  * Presentational only: `grants` and `onRevoke` are handed in as props so
  * this can be rendered and asserted on without a network (see
- * ConnectedApps.test.jsx). ConnectionSettings.jsx is what actually calls
+ * ConnectedApps.test.jsx). settings/AppsPanel.jsx is what actually calls
  * listConnectedApps()/revokeConnectedApp() and wires this up to the API.
  *
- * `grants` is the already-normalised shape ConnectionSettings produces from
+ * `grants` is the already-normalised shape AppsPanel produces from
  * GET /oauth2/get-consents:
  *   { id, clientName, scopes: string[] }
  *
@@ -52,7 +52,7 @@ export default function ConnectedApps({ grants, onRevoke }) {
       await onRevoke(id);
       setConfirmId(null);
     } catch {
-      // The caller (ConnectionSettings.jsx) already surfaced this -- a
+      // The caller (settings/AppsPanel.jsx) already surfaced this -- a
       // toast, typically. Swallowed here only so a failed revoke doesn't
       // become an unhandled rejection; skipping setConfirmId(null) above is
       // what actually matters, since it's what keeps this row in confirm
