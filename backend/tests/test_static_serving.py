@@ -74,6 +74,44 @@ def test_api_health_is_public(client):
     assert client.get("/api/health").status_code == 200
 
 
+def test_both_health_paths_are_public_and_agree(client):
+    """/health and /api/health must answer identically.
+
+    Nothing covered bare /health, which is how a second `@app.get("/health")`
+    survived above the real handler: FastAPI keeps the first route it matches,
+    so /health returned {"status": "ok"} while /api/health returned that plus
+    "service". Both Dockerfiles probe /health, so the stub was the one
+    orchestration saw. Asserting the bodies match is what makes a duplicate
+    registration fail here instead of shipping.
+    """
+    bare = client.get("/health")
+    prefixed = client.get("/api/health")
+
+    assert bare.status_code == 200
+    assert prefixed.status_code == 200
+    assert bare.json() == prefixed.json()
+    assert bare.json() == {"status": "ok", "service": "mygist"}
+
+
+def test_no_route_is_registered_twice(client):
+    """A path bound to two handlers is always a bug, and a silent one.
+
+    The second registration is unreachable, so the behaviour you get is
+    whichever decorator ran first -- which is source order, not intent.
+    """
+    from collections import Counter
+
+    import main
+
+    seen = Counter(
+        (route.path, method)
+        for route in main.app.routes
+        for method in getattr(route, "methods", None) or ()
+    )
+    duplicates = [pair for pair, n in seen.items() if n > 1]
+    assert not duplicates, f"these path/method pairs are registered twice: {duplicates}"
+
+
 def test_api_routes_still_require_a_token(client):
     assert client.get("/api/files").status_code == 401
 

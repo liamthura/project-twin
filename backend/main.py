@@ -221,8 +221,10 @@ async def auth_middleware(request: Request, call_next):
     # and moving them under /api to free up /docs for the documentation site
     # would otherwise have quietly put them behind a token.
     if path in (
+        # /healthz was listed here too and no route ever served it, so it was
+        # a public exemption for a 404. Add it back to health_check's decorators
+        # if something ever needs that spelling.
         "/health",
-        "/healthz",
         "/api/health",
         "/api/auth/register",
         "/api/auth/login",
@@ -431,11 +433,6 @@ async def security_headers(request: Request, call_next):
         response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
     return response
 
-# Health check
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
 class FileUpdate(BaseModel):
     """Request body for updating a file."""
     data: Dict[str, Any]
@@ -448,7 +445,16 @@ class FileUpdate(BaseModel):
 @app.get("/health")
 @app.get("/api/health")
 async def health_check():
-    """Health check endpoint for container orchestration."""
+    """Health check endpoint for container orchestration.
+
+    Both paths, one handler, deliberately. There used to be a second bare
+    `@app.get("/health")` defined earlier in this file, and because FastAPI
+    keeps the first route it matches, that one won: `/health` answered
+    `{"status": "ok"}` while `/api/health` answered the same thing plus
+    `"service"`. Two probes, two different bodies, and the `/health` registered
+    here was unreachable. Both Dockerfiles probe `/health`, so the shorter body
+    is what container orchestration actually saw.
+    """
     return {"status": "ok", "service": "mygist"}
 
 
