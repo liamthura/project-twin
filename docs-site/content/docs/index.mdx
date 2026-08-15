@@ -1,13 +1,13 @@
 ---
 title: MyGist
-description: Portable personal context for AI — one persona, every assistant, under your control.
+description: Portable personal context for AI. One persona, every assistant, under your control.
 ---
 
-Every new AI conversation starts from nothing. You explain your role again. Your
-stack again. How you like answers written, and what you are in the middle of.
+Every new AI conversation starts from nothing. You explain your role again, your
+stack again, how you like answers written, and what you are in the middle of.
 
-MyGist stores all of that once and hands it to any AI assistant that asks. Your
-context follows you between tools instead of being locked inside one of them.
+MyGist stores all of that once and hands it to any AI assistant that asks, so
+your context follows you between tools.
 
 <Screenshot
   caption="An assistant answering from a MyGist persona"
@@ -20,7 +20,7 @@ context follows you between tools instead of being locked inside one of them.
   <Card
     title="Using MyGist"
     href="/use"
-    description="Connect an AI client, fill in your persona, and keep it current. Start here if you just want to use it."
+    description="Connect an AI client, fill in your persona, and keep it current. Start here if you are using it."
   />
   <Card
     title="Running MyGist"
@@ -29,24 +29,22 @@ context follows you between tools instead of being locked inside one of them.
   />
 </Cards>
 
-## What it is, in one screen
+## What it is
 
-**Your data lives in your own Postgres database.** It is plain, readable JSON.
-You can view it, edit it, export it, and delete it. There is no proprietary
-format to get stuck in.
+Your data lives in your own Postgres database as plain, readable JSON. You can
+view it, edit it, export it, and delete it.
 
-**Assistants connect over [MCP](https://modelcontextprotocol.io)** — the Model
-Context Protocol, an open standard for giving AI clients access to tools and
-data. Claude Desktop, Claude Code and a growing list of others speak it.
+Assistants connect over [MCP](https://modelcontextprotocol.io), the Model
+Context Protocol. It is an open standard for giving AI clients access to tools
+and data, and Claude Desktop, Claude Code and a growing list of others speak it.
 
-**Nothing happens unless a client asks.** MyGist does not watch your
-conversations. It answers questions and it accepts changes, and it does neither
-on its own. [Capture](/use/capture) explains what that means day to day.
+Nothing happens unless a client asks. MyGist does not watch your conversations;
+it answers questions and accepts changes, and only when a client calls a tool.
+[Capture](/use/capture) explains what that means day to day.
 
-**Assistants read a slice, not the lot.** A client asks for a *scope* — say
-`professional` — and gets a summary sized for it. When it needs something
-specific, it searches instead of loading more. That is how a persona can grow
-for years without every conversation paying for it.
+Assistants read a slice. A client asks for a *scope*, say `professional`, and
+gets a summary sized for it; when it needs something specific it searches. That
+is how a persona can grow for years without every conversation paying for it.
 
 ## What you can store
 
@@ -62,15 +60,15 @@ Ten sections, covering the things that usually get re-explained:
 | **Lifestyle** | Hobbies, values, personality, routines |
 | **Circle** | People in your life and how you relate to them |
 | **Learning log** | Things you learned, decided, or realised |
-| **Media** *(optional)* | Films, books, music, games — taste, not a watchlist |
+| **Media** *(optional)* | Films, books, music, games: taste, not a watchlist |
 | **Aesthetics** *(optional)* | Visual styles you like and dislike |
 
 Each one is covered on [What goes in each section](/use/sections).
 
-## Two ways to edit
+## Editing your persona
 
-Talk to your assistant, or open the web editor. Both write to the same place,
-and neither is the "real" one.
+Talk to your assistant, or open the web editor. Both write to the same place, so
+it makes no difference which you use.
 
 <Screenshot
   caption="The MyGist web editor"

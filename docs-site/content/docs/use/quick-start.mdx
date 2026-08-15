@@ -7,7 +7,7 @@ By the end of this page you will have an account, an access token, a connected
 AI client, and a few real facts stored.
 
 <Callout>
-This page assumes a MyGist server is already running — either a hosted instance
+This page assumes a MyGist server is already running, either a hosted instance
 or one you started. If you need to stand one up first, follow
 [Self-hosting](/run/self-hosting) and come back here.
 </Callout>
@@ -56,7 +56,7 @@ There are two kinds of credential, and it helps to know which is which:
 | **Bearer token** | AI clients, scripts | Never, until you revoke it |
 
 Both point at the same persona. Every read and write is scoped to the account
-behind the credential — two accounts on one server cannot see each other.
+behind the credential, so two accounts on one server cannot see each other.
 
 </Step>
 
@@ -74,7 +74,7 @@ is for, like `claude-desktop` or `laptop-cli`.
 
 <Callout type="warn">
 The token is shown **once**, at the moment it is created. Copy it now. There is
-no way to read it back later — only to revoke it and issue a new one.
+no way to read it back later, only to revoke it and issue a new one.
 </Callout>
 
 Use a separate token for each client. Then revoking one does not disconnect
@@ -93,8 +93,8 @@ launching a local process. The token goes in an `Authorization` header.
 
 Edit the config file:
 
-- **macOS** — `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows** — `%APPDATA%\Claude\claude_desktop_config.json`
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json title="claude_desktop_config.json"
 {
@@ -111,7 +111,7 @@ Edit the config file:
 
 For a local server, use `http://127.0.0.1:1120/mcp`.
 
-Then restart Claude Desktop completely — quit it, do not just close the window.
+Then restart Claude Desktop completely: quit it, do not close the window.
 
 ### Claude Code
 
@@ -144,7 +144,7 @@ Ask the assistant something it can only answer by looking:
 > What do you know about me?
 
 A connected client calls `get_context` and answers from your persona. Your
-account is empty, so the honest answer is "almost nothing" — that is the correct
+account is empty, so the honest answer is "almost nothing". That is the correct
 first result, and it proves the connection works.
 
 <Screenshot
@@ -161,7 +161,7 @@ If the tools do not appear at all, jump to
 
 ## Put something in it
 
-An empty persona is not useful. Spend five minutes seeding it. Just say what is
+An empty persona is not much use. Spend five minutes seeding it. Say what is
 true:
 
 > I'm a backend developer at Acme, based in Manchester.
@@ -178,7 +178,7 @@ should see the tool calls happen, and a confirmation of what was stored.
   hint="A conversation where the user states a few facts and the assistant confirms each write."
 />
 
-Prefer clicking to typing? Everything is editable in the
+If you would rather click than type, everything is editable in the
 [web editor](/use/editor) too.
 
 </Step>
@@ -191,8 +191,8 @@ Start a fresh chat and ask something that needs the context:
 
 > Help me plan next week's work.
 
-A client that reads your persona first will already know your role, your current
-project, and that you want short answers. That is the whole point.
+A client that reads your persona first already knows your role, your current
+project, and that you want short answers, without you having said any of it.
 
 </Step>
 

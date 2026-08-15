@@ -1,25 +1,22 @@
 ---
 title: Concepts
-description: The four ideas everything else in these docs assumes — persona, sections, entities, ids.
+description: Persona, sections, entities and ids, the four ideas everything else in these docs assumes.
 ---
 
-Four words come up constantly. Ten minutes here saves a lot of confusion later.
+Four words come up constantly in the rest of these docs. This page defines them.
 
 ## Persona
 
-Your **persona** is everything MyGist stores about you.
-
-It is not a document or a profile page. It is structured data — one JSON blob
-per section, per account, in Postgres. That means it can be read a slice at a
-time, searched, and edited field by field.
+Your **persona** is everything MyGist stores about you: structured data, one
+JSON blob per section, per account, in Postgres. That shape is what lets it be
+read a slice at a time, searched, and edited field by field.
 
 You can see the raw version at any point. Ask your assistant for `get_raw`, or
-use **Account → Data → Export** in the web editor. Nothing about the format is
-proprietary.
+use **Account → Data → Export** in the web editor.
 
 ## Sections
 
-A persona is split into **sections** — profile, goals, knowledge, preferences,
+A persona is split into **sections**: profile, goals, knowledge, preferences,
 projects, lifestyle, circle, learning log, and two optional ones.
 
 Each section is defined by a single file in the repository called a **pack**
@@ -35,12 +32,12 @@ contains. There is one definition, and both are generated from it.
 
 Three sections are **always on** and cannot be switched off: profile,
 preferences, and learning log. Everything else can be disabled in the Sections
-manager, and two — media and aesthetics — start off and have to be turned on.
+manager. Two of them, media and aesthetics, start off and have to be turned on.
 
 [What goes in each section](/use/sections) walks through all ten.
 
 <Callout>
-Career aspirations used to live on the profile. They are goals now — a goal with
+Career aspirations used to live on the profile. They are goals now, with
 `type: "career"`. If you read something describing them as a profile list, it is
 out of date.
 </Callout>
@@ -75,7 +72,7 @@ get_schema(entity="hobby")      → one entity, with a worked example per action
 <Callout type="warn">
 These docs deliberately do **not** reproduce the entity table. It is generated
 from the same files the server enforces, and a hand-copied version of it has
-been wrong more than once. Ask `get_schema` — that copy cannot drift.
+been wrong more than once. Ask `get_schema`, because that copy cannot drift.
 
 If you are unsure whether a client is guessing, tell it: *"check `get_schema`
 first"*. That is usually enough to correct it.
@@ -96,9 +93,9 @@ get_entity(["proj_a1b2c3"])  → the full entry behind one id
 
 They are also how [links between entries](/use/relations) are stored.
 
-Not everything has one. Some nested lists — a project's references, a hobby's
-specifics — have no ids of their own and are reached through their parent
-entry instead.
+Not everything has one. Some nested lists, such as a project's references or a
+hobby's specifics, have no ids of their own and are reached through their parent
+entry.
 
 ## Putting it together
 

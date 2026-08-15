@@ -56,8 +56,8 @@ contribute nothing to context output.
 
 `full` is the fifth scope a client may ask for, and the loader rejects it here.
 `get_context(scope: "full")` returns every enabled section's whole file whatever
-the manifests say — the resolver answers before it reads a single pack's
-contributions — so an entry under `full` could never have an effect, and a
+the manifests say, because the resolver answers before it reads a single pack's
+contributions. An entry under `full` could never have an effect, and a
 `PackError` is a better answer than accepting one and ignoring it. Your section
 also gets its own scope token for free: `get_context(scope: "<key>")` works
 whether or not it contributes to any global scope.
@@ -536,7 +536,7 @@ drift the format exists to stop, so a third entry needs an argument rather than 
 commit.
 </Callout>
 
-## Where the authority is
+## Source of authority
 
 | Question | Ask |
 |---|---|

@@ -3,7 +3,8 @@ title: Relations
 description: Linking entries to each other, and the neighbours MyGist works out on its own.
 ---
 
-Entries can be connected in two ways. One you author. One is computed for you.
+Entries can be connected in two ways: links you author, and neighbours MyGist
+computes for you.
 
 ## Links you make
 
@@ -38,13 +39,13 @@ Separately, MyGist can work out which entries are *semantically* similar, using
 the search index.
 
 You do not author these and they are not stored anywhere. They are computed at
-read time, and they only exist where an embedding provider is configured — see
-[Search index](/run/search-index).
+read time, and they only exist where an embedding provider is configured, which
+[Search index](/run/search-index) covers.
 
 The distinction in one line:
 
-- **`related`** — what you said belongs together.
-- **`similar`** — what the index thinks belongs together.
+- **`related`** is what you said belongs together.
+- **`similar`** is what the index thinks belongs together.
 
 ## Reading either
 
@@ -70,9 +71,9 @@ of going silent.
 
 Mostly from the assistant. When you add something that closely matches an
 existing entry, the response carries a nudge suggesting a link. The client can
-act on it or ignore it — nothing is ever linked automatically.
+act on it or ignore it. Nothing is ever linked automatically.
 
-You can also just ask:
+You can also ask:
 
 > Link that learning-log entry to the Solterra project.
 
@@ -88,5 +89,5 @@ Links are most useful for things that would otherwise be found separately:
 - A person and the project you work on with them.
 
 They are not worth it as a general filing system. Ten links per entry is a low
-cap on purpose — semantic similarity already covers the loose associations, so
+cap on purpose: semantic similarity already covers the loose associations, so
 save explicit links for the connections that are not obvious from the text.

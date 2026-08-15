@@ -1,6 +1,6 @@
 ---
 title: Writing
-description: Adding, changing and removing entries — in conversation, or several at once.
+description: Adding, changing and removing entries, in conversation or several at once.
 ---
 
 You will almost never write JSON yourself. You say what changed, and the client
@@ -9,7 +9,7 @@ something goes in wrong you know how to correct it.
 
 ## In conversation
 
-Just state the fact:
+State the fact:
 
 > Add Rust to my skills as something I'm learning.
 > Update my Solterra project status to completed.
@@ -26,7 +26,7 @@ see the call happen and get a confirmation of what was stored.
   hint="A conversation where the user states a fact and the assistant shows the persona_modify call and its result."
 />
 
-## What a write actually looks like
+## What a write looks like
 
 Writes go through a tool called `persona_modify`. It takes three things: an
 **action**, an **entity**, and a **data** object.
@@ -46,15 +46,15 @@ The actions are:
 | `add` | Create a new entry |
 | `update` | Change an existing one, found by its identifying field |
 | `remove` | Delete one |
-| `link` / `unlink` | Connect two entries — see [Relations](/use/relations) |
+| `link` / `unlink` | Connect two entries, covered on [Relations](/use/relations) |
 
 Not every entity supports every action.
 
-## Ask the schema, don't guess
+## Discovering the schema
 
 `get_schema` is the authoritative list of what can be written. It is generated
-from the same files the server enforces, so it cannot disagree with what will
-actually be accepted.
+from the same files the server enforces, so it cannot disagree with what the
+server will accept.
 
 ```text
 get_schema()                  → every entity, grouped by section
@@ -64,8 +64,8 @@ get_schema(entity="hobby")    → one entity: required fields, optional fields,
 ```
 
 <Callout type="warn">
-Do not work from an entity table you found in a README — including this
-project's own older ones. The vocabulary has changed repeatedly: entities have
+Do not work from an entity table you found in a README, including this project's
+own older ones. The vocabulary has changed repeatedly: entities have
 gained `update` actions, fields have become required, and at least one field
 that was documented never existed at all.
 
@@ -87,7 +87,7 @@ publishes the canonical name.
 
 ## Updating and removing
 
-`update` and `remove` find the existing entry by its **identifying field** —
+`update` and `remove` find the existing entry by its **identifying field**,
 usually the name or title. So:
 
 > Update my Solterra project status to completed.
@@ -97,7 +97,7 @@ mention are left alone.
 
 <Callout>
 Identifying fields are matched leniently, but they do have to match. If an
-update reports that nothing was found, check the exact name that was stored —
+update reports that nothing was found, check the exact name that was stored.
 `get_context(detail="titles")` or the [web editor](/use/editor) will show you.
 </Callout>
 
@@ -123,12 +123,12 @@ separately:
 }
 ```
 
-Use it when one conversation produces several facts — a catch-up after a few
+Use it when one conversation produces several facts: a catch-up after a few
 weeks away, or seeding a new account.
 
 <Callout type="warn">
 A batch is **not** a transaction. If one operation fails, the others still
-apply. Read the per-operation results rather than assuming all-or-nothing.
+apply. Read the per-operation results; do not assume all-or-nothing.
 </Callout>
 
 ## Duplicate advisories
@@ -144,7 +144,7 @@ matches existing content is rewritten as an update before it ever reaches you.
 ## Editing by hand
 
 Everything writable over MCP is also editable in the web UI, and for a batch of
-corrections that is usually faster — six fields is a few clicks, against several
+corrections that is usually faster: six fields is a few clicks, against several
 turns of conversation. See [The web editor](/use/editor).
 
 ## Next

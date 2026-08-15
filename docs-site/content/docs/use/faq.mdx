@@ -19,7 +19,7 @@ This is covered properly on [Capture](/use/capture).
 
 <Accordion title="Where is my data actually stored?">
 
-In a Postgres database, as JSON — one row per section, per account. If you are
+In a Postgres database, as JSON: one row per section, per account. If you are
 self-hosting, that database is yours. If someone else hosts your instance, it is
 theirs, and you should trust them accordingly.
 
@@ -38,12 +38,12 @@ No. Every read and write is scoped to the account behind the credential.
 
 Two cases where it leaves the server:
 
-1. **To your AI client**, when it asks — that is the whole point, and it means
+1. **To your AI client**, when it asks. That is the whole point, and it means
    your persona reaches whatever provider is behind your client.
 2. **To an embedding provider**, if the instance is configured with one. Text is
    sent to compute search vectors. A self-hosted instance can use a local
-   embedding server, or none at all — see
-   [Database](/run/database#pgvector-and-life-without-it).
+   embedding server, or none at all, as
+   [Database](/run/database#pgvector) describes.
 
 </Accordion>
 
@@ -62,8 +62,8 @@ your account. Export first if you want a copy.
 
 <Accordion title="I told the assistant something and it wasn't saved.">
 
-Expected, unless you asked for it to be saved. Tools are passive — see
-[Capture](/use/capture).
+Expected, unless you asked for it to be saved. Tools are passive, which
+[Capture](/use/capture) explains.
 
 To have things noticed as you go, tell the client at the start of the
 conversation to call `propose_update` when it notices something durable. Those
@@ -86,7 +86,7 @@ Work through it in order:
 
 <Accordion title="It stored something in the wrong place.">
 
-Fix it in the [web editor](/use/editor) — that is immediate and unambiguous.
+Fix it in the [web editor](/use/editor), which is immediate and unambiguous.
 
 To stop it recurring, tell the client to check `get_schema` for the entity
 before writing. Guessing is the usual cause.
@@ -98,7 +98,7 @@ before writing. Guessing is the usual cause.
 Remove the extras in the editor.
 
 MyGist warns about near-duplicates when you add one, but it never blocks or
-merges automatically — see
+merges automatically. See
 [Duplicate advisories](/use/writing#duplicate-advisories). Capture suggestions
 are deduplicated more aggressively, and are rewritten into updates when they
 match something you already have.
@@ -110,14 +110,14 @@ match something you already have.
 Enough to stop repeating yourself, and no more. Every entry costs tokens in
 every conversation that reads it.
 
-Good test: would this still be true and still be useful next month? If not, it
-is probably a task or a mood, not context.
+A useful test is whether it would still be true and still be useful next month.
+If not, it is probably a task or a mood, not context.
 
 </Accordion>
 
 <Accordion title="Can I use it from more than one AI client?">
 
-Yes. Issue a token each and point them at the same URL. They share one persona
+Yes. Issue a token each, point them at the same URL, and they share one persona
 with no sync step, because there is only one copy.
 
 </Accordion>
@@ -130,7 +130,7 @@ with no sync step, because there is only one copy.
 
 <Accordion title="What is MCP?">
 
-The [Model Context Protocol](https://modelcontextprotocol.io) — an open standard
+The [Model Context Protocol](https://modelcontextprotocol.io), an open standard
 for connecting AI assistants to external tools and data. MyGist is an MCP
 server; your AI client is an MCP client.
 
@@ -140,18 +140,16 @@ Being a standard is the point: nothing about MyGist is tied to one AI vendor.
 
 <Accordion title="What's the difference between this and my client's built-in memory?">
 
-Built-in memory lives inside one product. Move tools, and it does not come with
-you.
+Built-in memory lives inside one product and stays there when you move tools.
 
-MyGist is a database you control, reachable by anything that speaks MCP. It is
-also structured rather than a pile of notes, which is what lets a client ask for
-a slice instead of everything.
+MyGist is a Postgres database you control, reachable by anything that speaks
+MCP, and structured enough that a client can ask for one slice of it.
 
 </Accordion>
 
 <Accordion title="What is an 'entity'?">
 
-The name of a form a client fills in to write something — `hobby`, `goal`,
+The name of a form a client fills in to write something: `hobby`, `goal`,
 `project`. It is not the same as where the data is stored. See
 [Concepts](/use/concepts#entities).
 
@@ -169,7 +167,7 @@ Ask your assistant: *"show me the MyGist schema for hobbies"*.
 
 <Accordion title="What's a 'scope'?">
 
-A named slice of your persona — `minimal`, `professional`, `personal`,
+A named slice of your persona: `minimal`, `professional`, `personal`,
 `learning`, `full`, or any single section. Clients ask for one instead of
 pulling everything. See [Reading](/use/reading).
 

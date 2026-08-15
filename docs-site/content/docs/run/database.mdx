@@ -14,23 +14,23 @@ Any Postgres you can reach. There is nothing vendor-specific in the schema.
 |---|---|
 | **Self-hosted with pgvector** | What this project runs in production, on its own VPS |
 | **A managed provider** | [Neon](https://neon.tech), Supabase, RDS and others all work; several ship pgvector already enabled |
-| **A local container** | For development — `backend/docker-compose.yml` provides one |
+| **A local container** | For development: `backend/docker-compose.yml` provides one |
 
 <Callout>
 Older documentation for this project described Neon as *the* production
 database. That stopped being true when it moved to a self-hosted instance. Neon
-is still a perfectly good managed option — it is one of several, not a
+is still a perfectly good managed option: one of several, not a
 requirement.
 </Callout>
 
-## pgvector, and life without it
+## pgvector
 
 The server enables the `vector` extension on startup if it is available.
 
 | | Search behaviour |
 |---|---|
-| **With pgvector and an embedding provider** | **Hybrid** — Postgres full-text search *and* vector similarity, so paraphrases and related concepts match, not just shared keywords |
-| **Without either** | **FTS-only** — nothing breaks and nothing needs configuring; you lose semantic matching |
+| **With pgvector and an embedding provider** | **Hybrid**: Postgres full-text search *and* vector similarity, so paraphrases and related concepts match, not just shared keywords |
+| **Without either** | **FTS-only**: nothing breaks and nothing needs configuring; you lose semantic matching |
 
 Both parts are needed for hybrid mode. The extension present but no provider
 configured still means FTS-only, because the vectors have to come from
@@ -38,7 +38,7 @@ somewhere.
 
 <Callout>
 FTS-only is a legitimate way to run this. If you would rather no persona text
-ever left your server, do not configure a provider — or point
+ever left your server, do not configure a provider, or point
 `EMBEDDING_API_URL` at a local embedding server such as Ollama.
 </Callout>
 
@@ -54,7 +54,7 @@ logs the mismatch and falls back to FTS-only rather than writing vectors that
 could never be compared.
 
 Changing to a model with a different width means recreating the column and
-[backfilling](/run/search-index) — and then **restarting the server**, because
+[backfilling](/run/search-index), and then **restarting the server**, because
 the decision is cached at startup.
 </Callout>
 
@@ -64,14 +64,14 @@ the decision is cached at startup.
 |---|---|
 | `users` | Accounts and password hashes |
 | `tokens` | Named bearer tokens, hashed, with last-used timestamps |
-| `persona_data` | One JSONB row per account per section — the personas themselves |
+| `persona_data` | One JSONB row per account per section: the personas themselves |
 | `persona_search` | The search index: per-entity rows, full-text vectors, and the optional `embedding` column |
 | `login_attempts` | Rate-limiting counters, keyed on the submitted username |
 | `alembic_version` | Migration bookkeeping |
 
 `persona_data` is the source of truth. `persona_search` is **derived** from it
-and can be rebuilt at any time — see [Search index](/run/search-index) — which
-makes it the safe thing to drop if it ever looks wrong.
+and can be rebuilt at any time, as [Search index](/run/search-index) describes,
+which makes it the safe thing to drop if it ever looks wrong.
 
 ## Backups
 
@@ -80,7 +80,7 @@ Persona data is ordinary rows. Back the database up however you normally would;
 
 For a per-account copy that needs no database access, the account dialog's
 **Data → Export** produces the whole persona as JSON, and **Import** takes it
-back — with a choice of replacing or merging. That is also the migration path
+back, with a choice of replacing or merging. That is also the migration path
 between instances, and it is the one to hand a user who wants their data out.
 
 ## Multi-tenancy
