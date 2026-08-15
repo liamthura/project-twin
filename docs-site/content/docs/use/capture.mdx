@@ -94,8 +94,11 @@ Two behaviours keep the queue usable over months.
 - **The same claim from three tools is one row.** Repeat proposals increment a
   counter instead of stacking up, so you see "seen 3×".
 
-Observations are also bounded: the newest 50 are kept, and rows you have never
-looked at are protected from being trimmed.
+Observations are bounded too. Past 50 pending ones, the queue is trimmed back to
+50, and the ones you have already opened go first, least-looked-at and oldest
+before the rest. Observations you have never opened are left alone until the
+queue passes 100, after which they are fair game as well. Clearing the tab
+occasionally is the way to keep anything you care about.
 
 ## Limits
 

@@ -60,14 +60,34 @@ the decision is cached at startup.
 
 ## What is stored
 
+In `public`:
+
 | Table | Holds |
 |---|---|
 | `users` | Accounts and password hashes |
 | `tokens` | Named bearer tokens, hashed, with last-used timestamps |
 | `persona_data` | One JSONB row per account per section: the personas themselves |
 | `persona_search` | The search index: per-entity rows, full-text vectors, and the optional `embedding` column |
+| `persona_proposals` | The review queue. Pending inbox items and observations, plus tombstones for anything rejected |
 | `login_attempts` | Rate-limiting counters, keyed on the submitted username |
+| `waitlist` | Addresses left on the landing page |
 | `alembic_version` | Migration bookkeeping |
+
+And a second schema, `better_auth`, for the auth service's own tables:
+
+| Table | Holds |
+|---|---|
+| `user`, `session`, `account` | Sign-in identities and browser sessions |
+| `verification` | Email verification and password-reset tokens |
+| `jwks` | The signing keys `/api` verifies session JWTs against |
+| `oauthClient`, `oauthConsent` | Registered MCP clients, and what you granted each |
+| `oauthAccessToken`, `oauthRefreshToken` | Live OAuth connections |
+
+The separate schema is deliberate. Better Auth's table names are generic, and
+`public.user` sitting next to MyGist's own `public.users` is a trap for whoever
+reads this database next. Alembic creates them, the sign-in tables in migration
+`0003` and the OAuth ones in `0006`, so one tool owns the whole schema and
+Better Auth's CLI never touches it.
 
 `persona_data` is the source of truth. `persona_search` is **derived** from it
 and can be rebuilt at any time, as [Search index](/run/search-index) describes,
