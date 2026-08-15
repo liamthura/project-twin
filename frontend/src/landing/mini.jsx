@@ -203,7 +203,7 @@ export function ProposalCard() {
  */
 export function ConsentPanel() {
   const scopes = [
-    { label: "Read your persona", help: "Always granted — a connection needs this to do anything.", on: true, locked: true },
+    { label: "Read your persona", help: "Always granted. A connection needs this to do anything.", on: true, locked: true },
     { label: "Suggest changes for your approval", help: "Changes wait for you to approve them before they apply.", on: true },
     { label: "Change your persona directly", help: "Applied immediately, without asking first.", on: false },
   ];
