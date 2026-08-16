@@ -12,6 +12,12 @@
  * `renderExpanded` rather than importing InstallCard directly: the picker knows
  * about rows and selection, and nothing about what installing involves. That
  * keeps the two testable apart, and the picker reusable from Settings later.
+ *
+ * This is the ARIA Authoring Practices Accordion pattern, not just a button
+ * that toggles a div. Someone navigating by region in JAWS, NVDA or VoiceOver
+ * jumps between landmarks rather than reading every row in order, so the panel
+ * needs its own region identity and a spoken link back to the header that
+ * opened it, not only the `aria-expanded` on that header.
  */
 import { ChevronDown } from "lucide-react";
 
@@ -54,12 +60,19 @@ export function ClientPicker({ clients, selectedId, onSelect, renderExpanded }) 
     <ul className="space-y-2">
       {clients.map((client) => {
         const open = client.id === selectedId;
+        // Derived from client.id rather than an index or generated id: it is
+        // already unique across the roster and stable across renders, so the
+        // aria-controls/aria-labelledby pair never drifts out of sync.
+        const triggerId = `client-picker-trigger-${client.id}`;
+        const panelId = `client-picker-panel-${client.id}`;
         return (
           <li key={client.id}>
             <MagicCard>
               <button
                 type="button"
+                id={triggerId}
                 aria-expanded={open}
+                aria-controls={panelId}
                 className="flex w-full items-center gap-3 px-3 py-3 text-left"
                 onClick={() => onSelect(open ? null : client.id)}
               >
@@ -77,7 +90,14 @@ export function ClientPicker({ clients, selectedId, onSelect, renderExpanded }) 
                 />
               </button>
               {open && (
-                <div className="border-t px-3 py-4">{renderExpanded(client)}</div>
+                <div
+                  id={panelId}
+                  role="region"
+                  aria-labelledby={triggerId}
+                  className="border-t px-3 py-4"
+                >
+                  {renderExpanded(client)}
+                </div>
               )}
             </MagicCard>
           </li>

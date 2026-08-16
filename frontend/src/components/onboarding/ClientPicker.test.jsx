@@ -64,10 +64,15 @@ describe("ClientPicker", () => {
     );
   });
 
-  it("stacks in one column rather than a grid", () => {
-    // Three identical cards in a row is a named AI-slop signature, and six
-    // would be worse. This pins the layout so a later tidy-up cannot quietly
-    // reintroduce it.
+  it("does not reach for a Tailwind grid-cols- utility", () => {
+    // This does not, and cannot, prove the rows stack in one column: jsdom
+    // does no layout, Tailwind's CSS is not loaded in this test environment,
+    // and getComputedStyle has no resolved grid-template-columns to read.
+    // What it catches is the actual regression this codebase would introduce:
+    // someone reaching for `grid grid-cols-3` again, which is a named
+    // AI-slop signature and the one concrete way this file has drifted
+    // before. A cheap tripwire against that one regression, not a layout
+    // guarantee.
     const { container } = render(
       <ClientPicker
         clients={INSTALLABLE_CLIENTS}
@@ -77,5 +82,22 @@ describe("ClientPicker", () => {
       />,
     );
     expect(container.querySelector('[class*="grid-cols-"]')).toBeNull();
+  });
+
+  it("links the open panel to its header both ways, for a screen reader", () => {
+    // aria-expanded alone only helps someone reading the list linearly.
+    // Navigating by region (a normal way to move around a list like this in
+    // JAWS, NVDA or VoiceOver) needs the button's aria-controls and the
+    // panel's id to be the same string, and the panel's aria-labelledby and
+    // the button's id to be the same string the other way. Asserting both
+    // attributes exist without checking they resolve to each other would
+    // pass even if the ids were swapped or simply wrong.
+    renderPicker({ selectedId: "cursor" });
+
+    const trigger = screen.getByRole("button", { name: /cursor/i });
+    const panel = screen.getByRole("region", { name: /cursor/i });
+
+    expect(trigger).toHaveAttribute("aria-controls", panel.id);
+    expect(panel).toHaveAttribute("aria-labelledby", trigger.id);
   });
 });
