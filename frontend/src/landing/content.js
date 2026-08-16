@@ -150,7 +150,7 @@ export const FAQ = {
       items: [
         {
           q: "Which AI clients does this work with?",
-          a: "Anything that speaks MCP: Claude, Codex, Raycast, Notion AI, Hermes. Clients that speak OAuth connect with nothing but the URL, through a consent screen; anything without a browser uses a scoped token.",
+          a: "Anything that speaks MCP: Claude, Codex, Cursor, Raycast, Notion AI, Hermes. Clients that speak OAuth connect with nothing but the URL, through a consent screen; anything without a browser uses a scoped token.",
         },
         {
           q: "How is this different from my client's built-in memory?",
