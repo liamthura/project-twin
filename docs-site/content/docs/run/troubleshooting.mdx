@@ -75,6 +75,80 @@ a trailing slash. The endpoint is mounted at the root of the app so it resolves
 exactly, and a redirect breaks clients that do not follow redirects on POST.
 </Callout>
 
+## A client sees the tools but never uses them
+
+The connection is fine, the tools are listed, and the assistant answers your
+questions from general knowledge as if MyGist were not there. Ask it to check
+MyGist and it works perfectly — which is the tell.
+
+`/api/usage` separates the three cases that look identical from the outside:
+
+```bash
+curl -s https://your-instance/api/usage -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+| What you see | What it means |
+|---|---|
+| No rows for that client | It never connected. A credential or config problem, not a triggering one. |
+| `initialize` but no `tools/list` | It is running on a **cached tool schema**. Some clients fetch the list once and reuse it across sessions, so a server-side change never reaches them. Fully quit and relaunch, or remove and re-add the server. |
+| `tools/list` but no `tools/call` | It has the current tools and is not reaching for them. This is the case below. |
+
+### Why this happens
+
+Tool selection behaves like retrieval: the tool whose description shares surface
+with the message tends to win. A documentation tool fires because the user's own
+message contains a library name. MyGist's triggers are not words in the message —
+they are facts about the conversation. "Help me plan my week" contains nothing
+resembling "persona", and a model with a perfectly answerable question in front
+of it will answer it.
+
+Failing to call also leaves no trace. A wrong API call gets corrected; a fluent,
+generic answer does not, so nothing self-repairs.
+
+### The fix: a standing instruction in the client
+
+An MCP server cannot compel a call. It can describe its tools well — and MyGist's
+descriptions say when to reach for them — but the only channel that reaches the
+model unconditionally on every turn is **the client's own system prompt**. Where
+a client offers custom instructions, a persona, or an agent config, that is the
+lever, and it is worth using rather than treating as a workaround.
+
+<Callout type="warn">
+"Remember to use MyGist" is the version that does not work. It is a rule with no
+trigger and no stated cost, and it loses to the pull of answering the question.
+Name the *moment*, and name what goes wrong without it.
+</Callout>
+
+Something like:
+
+```text
+MyGist holds this user's persona. You have no other way to know any of it,
+and a wrong guess about them reads perfectly fine, so it is never corrected.
+
+Call get_context before your first substantive answer whenever the conversation
+is about them rather than about the world: anything they call "my", anything
+they have done, use, decided, plan or care about. Call it too before writing in
+their voice, recommending a tool, planning their time, or reviewing their work.
+
+When they say something durable about themselves -- a tool they have switched
+to, a project's real status, a standing preference, a person who matters --
+call propose_update, quoting their words. It cannot write; it queues for review.
+
+Do not narrate either call.
+```
+
+Three things make that work where a reminder does not: it states the **cost** of
+not calling, it gives a **moment** to match against rather than a rule to
+remember, and it names the tools exactly.
+
+### If it still does not fire
+
+Some clients put only tool *names* in the model's context and fetch the full
+schema on demand. Where that is true, no amount of description work reaches the
+selection decision, and the client's own instructions are the only lever there
+is. A model on the smaller end also under-calls tools generally, which is worth
+ruling out by trying the same prompt on a stronger one.
+
 ## Sign-in and OAuth
 
 Nearly every failure here arrives as a bare `401` or an OAuth error code that
