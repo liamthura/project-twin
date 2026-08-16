@@ -1,5 +1,13 @@
+// canvas-confetti calls getContext("2d"), which jsdom does not implement. The
+// mock keeps every StepComplete test off that path; whether confetti fired is
+// asserted through this spy rather than through the canvas.
+const confettiCreateMock = vi.hoisted(() => vi.fn(() => Object.assign(vi.fn(), { reset: vi.fn() })));
+vi.mock("canvas-confetti", () => ({
+  default: Object.assign(vi.fn(), { create: confettiCreateMock }),
+}));
+
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { StepComplete } from "./StepComplete";
@@ -10,12 +18,16 @@ const filled = {
 };
 
 describe("StepComplete", () => {
-  it("counts what was actually filled, not what was offered", () => {
-    render(<StepComplete data={filled} onAdd={vi.fn()} onDone={vi.fn()} />);
+  it("counts what was actually filled, not what was offered", async () => {
+    const { container } = render(
+      <StepComplete data={filled} onAdd={vi.fn()} onDone={vi.fn()} />,
+    );
     // name and bio on profile, tone on preferences. preferred_name is empty and
     // must not be counted -- a count that included it would congratulate
-    // someone for a field they skipped.
-    expect(screen.getByText(/3 things saved/i)).toBeInTheDocument();
+    // someone for a field they skipped. The count itself is a NumberTicker: it
+    // renders the digit in its own node and settles onto it over a spring, so
+    // this reads the full container text rather than a single getByText node.
+    await waitFor(() => expect(container.textContent).toMatch(/3 things saved/i));
   });
 
   it("says so plainly when nothing was filled", () => {
@@ -70,5 +82,52 @@ describe("StepComplete", () => {
 
     await user.click(screen.getByRole("button", { name: /go to my persona/i }));
     expect(onDone).toHaveBeenCalled();
+  });
+});
+
+describe("StepComplete, the arrival", () => {
+  it("counts one saved field as one thing, not '1 things'", async () => {
+    const { container } = render(
+      <StepComplete
+        data={{ profile: { name: "Liam" } }}
+        onAdd={vi.fn()}
+        onDone={vi.fn()}
+      />,
+    );
+    // The digit is its own node (NumberTicker) and settles over a spring
+    // rather than on the first render, so this reads the full container text
+    // rather than a single getByText node, once the count has settled.
+    await waitFor(() => expect(container.textContent).toMatch(/1 thing saved/));
+    expect(container.textContent).not.toMatch(/1 things saved/);
+  });
+
+  it("still pluralises more than one", () => {
+    render(
+      <StepComplete
+        data={{ profile: { name: "Liam", current_role: "Specialist" } }}
+        onAdd={vi.fn()}
+        onDone={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/things saved/)).toBeInTheDocument();
+  });
+
+  it("celebrates arriving with something saved", () => {
+    render(
+      <StepComplete
+        data={{ profile: { name: "Liam" } }}
+        onAdd={vi.fn()}
+        onDone={vi.fn()}
+      />,
+    );
+    expect(confettiCreateMock).toHaveBeenCalled();
+  });
+
+  it("does not celebrate an empty persona", () => {
+    // Nothing was saved. Confetti over that is a party for a job not done, and
+    // the copy beside it already says as much.
+    confettiCreateMock.mockClear();
+    render(<StepComplete data={{}} onAdd={vi.fn()} onDone={vi.fn()} />);
+    expect(confettiCreateMock).not.toHaveBeenCalled();
   });
 });

@@ -15,8 +15,10 @@ import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Confetti } from "@/components/ui/confetti";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberTicker } from "@/components/ui/number-ticker";
 
 // A value someone actually gave us. An empty string is a field they passed
 // over, and counting it would congratulate them for skipping.
@@ -66,6 +68,13 @@ export function StepComplete({ data, onAdd, onDone }) {
 
   return (
     <div className="space-y-8">
+      {/* Only when something was actually saved. Confetti over an empty
+          persona celebrates a job not done, and the sentence underneath it
+          says so in the same breath. StrictMode double-invokes this effect in
+          dev, so a fire, reset, fire flash there is expected and harmless --
+          canvas-confetti guards re-entry with canvas.__confetti_initialized. */}
+      {saved > 0 && <Confetti />}
+
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="h-5 w-5 text-success" />
@@ -73,11 +82,18 @@ export function StepComplete({ data, onAdd, onDone }) {
             That's the basics
           </h1>
         </div>
-        <p className="text-muted-foreground">
-          {saved > 0
-            ? `${saved} things saved. Everything is editable later, and an assistant can fill in the rest.`
-            : "Nothing saved yet — which is fine. You can fill this in whenever, or let an assistant do it."}
-        </p>
+        {saved > 0 ? (
+          <p className="text-muted-foreground">
+            <NumberTicker value={saved} className="font-medium" />{" "}
+            {saved === 1 ? "thing" : "things"} saved. Everything is editable
+            later, and an assistant can fill in the rest.
+          </p>
+        ) : (
+          <p className="text-muted-foreground">
+            Nothing saved yet, which is fine. You can fill this in whenever, or
+            let an assistant do it.
+          </p>
+        )}
       </div>
 
       <div className="space-y-5 rounded-lg border p-4">
