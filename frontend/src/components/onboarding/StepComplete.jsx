@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import { Confetti } from "@/components/ui/confetti";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NumberTicker } from "@/components/ui/number-ticker";
 
 // A value someone actually gave us. An empty string is a field they passed
 // over, and counting it would congratulate them for skipping.
@@ -83,10 +82,16 @@ export function StepComplete({ data, onAdd, onDone }) {
           </h1>
         </div>
         {saved > 0 ? (
+          // A NumberTicker count-up was tried here and removed: the noun is
+          // picked off the final value while the ticker is still walking up
+          // to it, so mid-animation frames read "1 things saved" -- the exact
+          // bug this screen exists to fix, just made transient (measured
+          // ~51ms at saved=3, and worse at smaller counts, which this screen
+          // usually shows). The count is rendered directly instead.
           <p className="text-muted-foreground">
-            <NumberTicker value={saved} className="font-medium" />{" "}
-            {saved === 1 ? "thing" : "things"} saved. Everything is editable
-            later, and an assistant can fill in the rest.
+            {`${Intl.NumberFormat("en-GB").format(saved)} ${
+              saved === 1 ? "thing" : "things"
+            } saved. Everything is editable later, and an assistant can fill in the rest.`}
           </p>
         ) : (
           <p className="text-muted-foreground">
