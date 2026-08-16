@@ -61,10 +61,10 @@ export function MagicCard({ children, className }) {
       }
     };
     window.addEventListener("blur", clear);
-    window.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       window.removeEventListener("blur", clear);
-      window.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [reset]);
 

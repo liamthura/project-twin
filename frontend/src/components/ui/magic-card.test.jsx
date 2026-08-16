@@ -1,10 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { act } from "react";
 
 import { MagicCard } from "./magic-card.jsx";
 
 describe("MagicCard", () => {
+  afterEach(() => {
+    // Restore visibilityState to avoid leaking test state into other tests.
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+  });
   it("renders its children", () => {
     render(
       <MagicCard>
@@ -62,13 +69,13 @@ describe("MagicCard", () => {
       expect(container.innerHTML).toMatch(/100px/);
     }, { timeout: 1000 });
 
-    // Stub visibilityState to "hidden" and dispatch the event on window.
+    // Stub visibilityState to "hidden" and dispatch the event on document.
     act(() => {
       Object.defineProperty(document, "visibilityState", {
         configurable: true,
         value: "hidden",
       });
-      window.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event("visibilitychange"));
     });
 
     // The spotlight must have reset to off-card position (-200px).
