@@ -7,6 +7,7 @@
  * manifest.
  */
 import { FieldsRenderer } from "@/renderers/FieldsRenderer";
+import { BlurFade } from "@/components/ui/blur-fade";
 
 import { nodeAt } from "./manifestNode";
 
@@ -15,7 +16,7 @@ import { nodeAt } from "./manifestNode";
 // missing.
 const PROFILE_ROOT = [];
 
-export function StepAboutYou({ packs, data, onChange }) {
+export function StepAboutYou({ packs, data, onChange, onDelegate }) {
   const node = nodeAt(packs, "profile", PROFILE_ROOT);
 
   if (!node) {
@@ -26,30 +27,58 @@ export function StepAboutYou({ packs, data, onChange }) {
           This step is not available on this server. Carry on — you can fill this
           in from Profile whenever it is.
         </p>
+        {/* Welcome promised this and Connect delivered it, two screens ago. Someone
+            who starts typing and regrets it should not have to walk backwards to
+            find the offer again. A quiet link, not a button: it competes with
+            Continue, and Continue is the expected move here. */}
+        {onDelegate && (
+          <button
+            type="button"
+            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            onClick={onDelegate}
+          >
+            Let my assistant fill this in instead
+          </button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">About you</h1>
-        <p className="text-muted-foreground">
-          Nothing here is required, and everything saves as you type. Fill in
-          what is useful and move on.
-        </p>
+    <BlurFade>
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight">About you</h1>
+          <p className="text-muted-foreground">
+            Nothing here is required, and everything saves as you type. Fill in
+            what is useful and move on.
+          </p>
+        </div>
+        {/* `value` is the whole section object and `onValue` gets the whole
+            replacement: FieldsRenderer spreads what is stored on every write, so
+            the lists this step never shows -- work experience, education --
+            survive an edit rather than being replaced by seven scalars. */}
+        <FieldsRenderer
+          node={node}
+          entity={node.element?.entity}
+          value={data}
+          onValue={onChange}
+          packKey="onboarding-profile"
+        />
+        {/* Welcome promised this and Connect delivered it, two screens ago. Someone
+            who starts typing and regrets it should not have to walk backwards to
+            find the offer again. A quiet link, not a button: it competes with
+            Continue, and Continue is the expected move here. */}
+        {onDelegate && (
+          <button
+            type="button"
+            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            onClick={onDelegate}
+          >
+            Let my assistant fill this in instead
+          </button>
+        )}
       </div>
-      {/* `value` is the whole section object and `onValue` gets the whole
-          replacement: FieldsRenderer spreads what is stored on every write, so
-          the lists this step never shows -- work experience, education --
-          survive an edit rather than being replaced by seven scalars. */}
-      <FieldsRenderer
-        node={node}
-        entity={node.element?.entity}
-        value={data}
-        onValue={onChange}
-        packKey="onboarding-profile"
-      />
-    </div>
+    </BlurFade>
   );
 }
