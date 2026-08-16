@@ -9,15 +9,28 @@
  * context for the one string someone came to take away, so each kind ends in
  * something copyable: the command, the deeplink, or the address.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy, ExternalLink } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { AnimatedSpan, Terminal } from "@/components/ui/terminal";
 
+// Two seconds, then back to the real label. Without this a card left open
+// says "Copied" forever, and the picker shows several of these at once -- copy
+// Claude Code's command, then Cursor's link, and Claude Code's button would
+// still claim a copy nobody just made.
+const COPIED_RESET_MS = 2000;
+
 function CopyButton({ value, label, children, variant = "outline" }) {
   const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef(null);
+
+  // The card that owns this button can close mid countdown -- a client picker
+  // collapsing a row, say -- and the timeout must not then call setState on a
+  // component that is no longer mounted.
+  useEffect(() => () => clearTimeout(timeoutRef.current), []);
+
   return (
     <Button
       variant={variant}
@@ -27,6 +40,8 @@ function CopyButton({ value, label, children, variant = "outline" }) {
       onClick={() => {
         navigator.clipboard?.writeText(value);
         setCopied(true);
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => setCopied(false), COPIED_RESET_MS);
       }}
     >
       {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -76,7 +91,7 @@ function Steps({ items }) {
 
 export function InstallCard({ client, url }) {
   const payload = client.install(url);
-  if (!payload) return null;
+  if (!payload || payload.length === 0) return null;
 
   if (client.kind === "deeplink") {
     return (

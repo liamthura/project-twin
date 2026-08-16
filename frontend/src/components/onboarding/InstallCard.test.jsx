@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { CLIENTS } from "@/lib/clients.js";
@@ -31,6 +31,25 @@ describe("InstallCard, a command client", () => {
       `codex mcp add mygist --url ${TEST_URL}\ncodex mcp login mygist`,
     );
   });
+
+  it("resets to its label after the copied state times out", () => {
+    // fireEvent, not userEvent: userEvent awaits promises that vitest's fake
+    // clock also owns, so the click never settles and the test hangs before
+    // reaching an assertion.
+    vi.useFakeTimers();
+    try {
+      render(<InstallCard client={client("codex")} url={TEST_URL} />);
+      const button = screen.getByRole("button", { name: /copy command/i });
+
+      fireEvent.click(button);
+      expect(screen.getByText("Copied")).toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(2000));
+      expect(screen.getByText("Copy command")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("InstallCard, a deeplink client", () => {
@@ -56,7 +75,13 @@ describe("InstallCard, a steps client", () => {
   it("numbers the steps and shows the address to paste", () => {
     render(<InstallCard client={client("claude-desktop")} url={TEST_URL} />);
 
-    expect(screen.getByText(/add custom connector/i)).toBeInTheDocument();
+    const items = screen.getAllByRole("listitem");
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringMatching(/^1.*Connectors/),
+      expect.stringMatching(/^2.*Add custom connector/),
+      expect.stringMatching(/^3.*Paste the address/),
+      expect.stringMatching(/^4.*Claude opens/),
+    ]);
     expect(screen.getByText(TEST_URL)).toBeInTheDocument();
   });
 
