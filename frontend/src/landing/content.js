@@ -12,6 +12,7 @@
  * The same rule applies to prose. Nothing here describes behaviour that is not
  * in the repository, and the `source` fields say where to check.
  */
+import { hasMark } from "@/lib/clients.js";
 
 export const HERO = {
   eyebrow: "Portable context for AI",
@@ -22,8 +23,6 @@ export const HERO = {
   note: "Invite-only while it's small. One email when your invite lands.",
   signIn: { prefix: "Already have a code?", label: "Sign in." },
 };
-
-import { hasMark } from "@/lib/clients.js";
 
 /**
  * Clients named in the README as speaking MCP. Chips, in the hero.
