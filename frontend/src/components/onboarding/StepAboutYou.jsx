@@ -16,7 +16,7 @@ import { nodeAt } from "./manifestNode";
 // missing.
 const PROFILE_ROOT = [];
 
-export function StepAboutYou({ packs, data, onChange, onDelegate }) {
+export function StepAboutYou({ packs, data, onChange, onOfferAssistant }) {
   const node = nodeAt(packs, "profile", PROFILE_ROOT);
 
   if (!node) {
@@ -31,11 +31,11 @@ export function StepAboutYou({ packs, data, onChange, onDelegate }) {
             who starts typing and regrets it should not have to walk backwards to
             find the offer again. A quiet link, not a button: it competes with
             Continue, and Continue is the expected move here. */}
-        {onDelegate && (
+        {onOfferAssistant && (
           <button
             type="button"
             className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-            onClick={onDelegate}
+            onClick={onOfferAssistant}
           >
             Let my assistant fill this in instead
           </button>
@@ -45,7 +45,7 @@ export function StepAboutYou({ packs, data, onChange, onDelegate }) {
   }
 
   return (
-    <BlurFade>
+    <BlurFade duration={0.24}>
       <div className="space-y-6">
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">About you</h1>
@@ -69,11 +69,11 @@ export function StepAboutYou({ packs, data, onChange, onDelegate }) {
             who starts typing and regrets it should not have to walk backwards to
             find the offer again. A quiet link, not a button: it competes with
             Continue, and Continue is the expected move here. */}
-        {onDelegate && (
+        {onOfferAssistant && (
           <button
             type="button"
             className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-            onClick={onDelegate}
+            onClick={onOfferAssistant}
           >
             Let my assistant fill this in instead
           </button>

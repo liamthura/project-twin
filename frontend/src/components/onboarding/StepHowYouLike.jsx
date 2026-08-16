@@ -21,7 +21,7 @@ import { nodeAt } from "./manifestNode";
 const COMMUNICATION_DEFAULT = ["communication", "default"];
 const RESPONSE_FORMAT = ["response_format"];
 
-export function StepHowYouLike({ packs, data, onChange, onDelegate }) {
+export function StepHowYouLike({ packs, data, onChange, onOfferAssistant }) {
   const communication = nodeAt(packs, "preferences", COMMUNICATION_DEFAULT);
   const responseFormat = nodeAt(packs, "preferences", RESPONSE_FORMAT);
 
@@ -39,11 +39,11 @@ export function StepHowYouLike({ packs, data, onChange, onDelegate }) {
             who starts typing and regrets it should not have to walk backwards to
             find the offer again. A quiet link, not a button: it competes with
             Continue, and Continue is the expected move here. */}
-        {onDelegate && (
+        {onOfferAssistant && (
           <button
             type="button"
             className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-            onClick={onDelegate}
+            onClick={onOfferAssistant}
           >
             Let my assistant fill this in instead
           </button>
@@ -58,7 +58,7 @@ export function StepHowYouLike({ packs, data, onChange, onDelegate }) {
   const writeAt = (path) => (next) => onChange(setAt(data || {}, path, next));
 
   return (
-    <BlurFade>
+    <BlurFade duration={0.24}>
       <div className="space-y-8">
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -98,11 +98,11 @@ export function StepHowYouLike({ packs, data, onChange, onDelegate }) {
             who starts typing and regrets it should not have to walk backwards to
             find the offer again. A quiet link, not a button: it competes with
             Continue, and Continue is the expected move here. */}
-        {onDelegate && (
+        {onOfferAssistant && (
           <button
             type="button"
             className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-            onClick={onDelegate}
+            onClick={onOfferAssistant}
           >
             Let my assistant fill this in instead
           </button>

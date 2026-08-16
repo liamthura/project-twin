@@ -211,7 +211,7 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
               packs={packs}
               data={data.profile || {}}
               onChange={(next) => write("profile", next)}
-              onDelegate={() => go("connect")}
+              onOfferAssistant={() => go("connect")}
             />
           )}
 
@@ -220,7 +220,7 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
               packs={packs}
               data={data.preferences || {}}
               onChange={(next) => write("preferences", next)}
-              onDelegate={() => go("connect")}
+              onOfferAssistant={() => go("connect")}
             />
           )}
 

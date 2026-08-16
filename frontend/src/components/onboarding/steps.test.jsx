@@ -106,35 +106,35 @@ describe.each([
   ["without it", []],
 ])("the field steps offer the way out of typing (%s)", (_label, packsForCase) => {
   it("offers it on About you", async () => {
-    const onDelegate = vi.fn();
+    const onOfferAssistant = vi.fn();
     const user = userEvent.setup();
     render(
       <StepAboutYou
         packs={packsForCase}
         data={{}}
         onChange={vi.fn()}
-        onDelegate={onDelegate}
+        onOfferAssistant={onOfferAssistant}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: /let my assistant fill this in/i }));
-    expect(onDelegate).toHaveBeenCalled();
+    expect(onOfferAssistant).toHaveBeenCalled();
   });
 
   it("offers it on How you like", async () => {
-    const onDelegate = vi.fn();
+    const onOfferAssistant = vi.fn();
     const user = userEvent.setup();
     render(
       <StepHowYouLike
         packs={packsForCase}
         data={{}}
         onChange={vi.fn()}
-        onDelegate={onDelegate}
+        onOfferAssistant={onOfferAssistant}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: /let my assistant fill this in/i }));
-    expect(onDelegate).toHaveBeenCalled();
+    expect(onOfferAssistant).toHaveBeenCalled();
   });
 
   it("stays out of the way when there is nowhere to go", () => {
