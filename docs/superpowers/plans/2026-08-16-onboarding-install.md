@@ -52,7 +52,7 @@ Create `frontend/src/lib/clients.test.js`:
 import { describe, it, expect } from "vitest";
 import { CLIENTS, INSTALLABLE_CLIENTS, hasMark } from "./clients.js";
 
-const URL = "https://example.test/mcp";
+const TEST_URL = "https://example.test/mcp";
 const byId = (id) => CLIENTS.find((c) => c.id === id);
 
 describe("the roster", () => {
@@ -88,42 +88,42 @@ describe("the roster", () => {
 
 describe("command clients", () => {
   it("puts the live server address in the Claude Code command", () => {
-    expect(byId("claude-code").install(URL)).toEqual([
-      `claude mcp add --transport http mygist ${URL}`,
+    expect(byId("claude-code").install(TEST_URL)).toEqual([
+      `claude mcp add --transport http mygist ${TEST_URL}`,
     ]);
   });
 
   it("gives Codex both lines, because add without login leaves a server that 401s", () => {
-    expect(byId("codex").install(URL)).toEqual([
-      `codex mcp add mygist --url ${URL}`,
+    expect(byId("codex").install(TEST_URL)).toEqual([
+      `codex mcp add mygist --url ${TEST_URL}`,
       "codex mcp login mygist",
     ]);
   });
 
   it("asks Hermes for oauth explicitly", () => {
-    expect(byId("hermes").install(URL)).toEqual([
-      `hermes mcp add mygist --url ${URL} --auth oauth`,
+    expect(byId("hermes").install(TEST_URL)).toEqual([
+      `hermes mcp add mygist --url ${TEST_URL} --auth oauth`,
     ]);
   });
 
   it("never hardcodes a host", () => {
     for (const client of INSTALLABLE_CLIENTS.filter((c) => c.kind === "command")) {
-      expect(client.install(URL).join(" ")).toContain(URL);
+      expect(client.install(TEST_URL).join(" ")).toContain(TEST_URL);
     }
   });
 });
 
 describe("the Cursor deeplink", () => {
   it("carries a base64 config Cursor can read back", () => {
-    const link = byId("cursor").install(URL);
+    const link = byId("cursor").install(TEST_URL);
     expect(link.startsWith("cursor://anysphere.cursor-deeplink/mcp/install?")).toBe(true);
 
     const config = new URL(link).searchParams.get("config");
-    expect(JSON.parse(atob(config))).toEqual({ type: "http", url: URL });
+    expect(JSON.parse(atob(config))).toEqual({ type: "http", url: TEST_URL });
   });
 
   it("names the server so it is identifiable in Cursor's list", () => {
-    const link = byId("cursor").install(URL);
+    const link = byId("cursor").install(TEST_URL);
     expect(new URL(link).searchParams.get("name")).toBe("mygist");
   });
 });
@@ -131,7 +131,7 @@ describe("the Cursor deeplink", () => {
 describe("steps clients", () => {
   it("gives every steps client something to follow", () => {
     for (const client of INSTALLABLE_CLIENTS.filter((c) => c.kind === "steps")) {
-      const steps = client.install(URL);
+      const steps = client.install(TEST_URL);
       expect(Array.isArray(steps)).toBe(true);
       expect(steps.length).toBeGreaterThan(0);
       for (const step of steps) expect(step.trim()).not.toBe("");
@@ -681,37 +681,37 @@ import userEvent from "@testing-library/user-event";
 import { CLIENTS } from "@/lib/clients.js";
 import { InstallCard } from "./InstallCard.jsx";
 
-const URL = "https://example.test/mcp";
+const TEST_URL = "https://example.test/mcp";
 const client = (id) => CLIENTS.find((c) => c.id === id);
 
 describe("InstallCard, a command client", () => {
   it("shows the command in full", async () => {
-    render(<InstallCard client={client("claude-code")} url={URL} />);
+    render(<InstallCard client={client("claude-code")} url={TEST_URL} />);
     expect(
-      await screen.findByText(`claude mcp add --transport http mygist ${URL}`),
+      await screen.findByText(`claude mcp add --transport http mygist ${TEST_URL}`),
     ).toBeInTheDocument();
   });
 
   it("shows both of Codex's lines", async () => {
-    render(<InstallCard client={client("codex")} url={URL} />);
-    expect(await screen.findByText(`codex mcp add mygist --url ${URL}`)).toBeInTheDocument();
+    render(<InstallCard client={client("codex")} url={TEST_URL} />);
+    expect(await screen.findByText(`codex mcp add mygist --url ${TEST_URL}`)).toBeInTheDocument();
     expect(screen.getByText("codex mcp login mygist")).toBeInTheDocument();
   });
 
   it("copies every line at once, newline separated", async () => {
     const user = userEvent.setup();
-    render(<InstallCard client={client("codex")} url={URL} />);
+    render(<InstallCard client={client("codex")} url={TEST_URL} />);
 
     await user.click(screen.getByRole("button", { name: /copy command/i }));
     await expect(navigator.clipboard.readText()).resolves.toBe(
-      `codex mcp add mygist --url ${URL}\ncodex mcp login mygist`,
+      `codex mcp add mygist --url ${TEST_URL}\ncodex mcp login mygist`,
     );
   });
 });
 
 describe("InstallCard, a deeplink client", () => {
   it("offers a labelled button that opens the client", () => {
-    render(<InstallCard client={client("cursor")} url={URL} />);
+    render(<InstallCard client={client("cursor")} url={TEST_URL} />);
 
     const link = screen.getByRole("link", { name: /add to cursor/i });
     expect(link.getAttribute("href")).toMatch(
@@ -721,7 +721,7 @@ describe("InstallCard, a deeplink client", () => {
 
   it("still offers the raw link, for a browser that will not hand off the scheme", async () => {
     const user = userEvent.setup();
-    render(<InstallCard client={client("cursor")} url={URL} />);
+    render(<InstallCard client={client("cursor")} url={TEST_URL} />);
 
     await user.click(screen.getByRole("button", { name: /copy link/i }));
     await expect(navigator.clipboard.readText()).resolves.toMatch(/^cursor:\/\//);
@@ -730,18 +730,18 @@ describe("InstallCard, a deeplink client", () => {
 
 describe("InstallCard, a steps client", () => {
   it("numbers the steps and shows the address to paste", () => {
-    render(<InstallCard client={client("claude-desktop")} url={URL} />);
+    render(<InstallCard client={client("claude-desktop")} url={TEST_URL} />);
 
     expect(screen.getByText(/add custom connector/i)).toBeInTheDocument();
-    expect(screen.getByText(URL)).toBeInTheDocument();
+    expect(screen.getByText(TEST_URL)).toBeInTheDocument();
   });
 
   it("offers the address for copying", async () => {
     const user = userEvent.setup();
-    render(<InstallCard client={client("raycast")} url={URL} />);
+    render(<InstallCard client={client("raycast")} url={TEST_URL} />);
 
     await user.click(screen.getByRole("button", { name: /copy server address/i }));
-    await expect(navigator.clipboard.readText()).resolves.toBe(URL);
+    await expect(navigator.clipboard.readText()).resolves.toBe(TEST_URL);
   });
 });
 
@@ -749,7 +749,7 @@ describe("InstallCard", () => {
   it("renders nothing for a client with no install path", () => {
     // `unlisted` reaches here only through a bug, and rendering an empty card
     // would look like a card that failed to load.
-    const { container } = render(<InstallCard client={client("notion")} url={URL} />);
+    const { container } = render(<InstallCard client={client("notion")} url={TEST_URL} />);
     expect(container).toBeEmptyDOMElement();
   });
 });
@@ -1148,28 +1148,28 @@ Create `frontend/src/components/onboarding/installPrompt.test.js`:
 import { describe, it, expect } from "vitest";
 import { installPrompt } from "./installPrompt.js";
 
-const URL = "https://example.test/mcp";
+const TEST_URL = "https://example.test/mcp";
 
 describe("installPrompt", () => {
   it("carries the live address rather than a placeholder", () => {
-    expect(installPrompt(URL)).toContain(URL);
+    expect(installPrompt(TEST_URL)).toContain(TEST_URL);
   });
 
   it("names the transport, because a client that guesses stdio fails silently", () => {
-    expect(installPrompt(URL)).toMatch(/http/i);
+    expect(installPrompt(TEST_URL)).toMatch(/http/i);
   });
 
   it("says there is no token, so nothing goes hunting for one", () => {
-    expect(installPrompt(URL)).toMatch(/oauth/i);
+    expect(installPrompt(TEST_URL)).toMatch(/oauth/i);
   });
 
   it("asks for the permission the review queue depends on", () => {
-    expect(installPrompt(URL)).toMatch(/suggest/i);
+    expect(installPrompt(TEST_URL)).toMatch(/suggest/i);
   });
 
   it("uses no dashes as punctuation", () => {
     // House style: regular hyphens only, and none standing in for a comma.
-    expect(installPrompt(URL)).not.toMatch(/[–—]/);
+    expect(installPrompt(TEST_URL)).not.toMatch(/[–—]/);
   });
 });
 ```
