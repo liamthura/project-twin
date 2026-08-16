@@ -3,6 +3,7 @@ import { readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CLIENTS, INSTALLABLE_CLIENTS, hasMark, LOGO_SLUGS } from "./clients.js";
+import { CLIENTS as HERO_CHIPS } from "@/landing/content.js";
 
 const TEST_URL = "https://example.test/mcp";
 const byId = (id) => CLIENTS.find((c) => c.id === id);
@@ -58,6 +59,17 @@ describe("the roster", () => {
     for (const file of files) {
       expect(LOGO_SLUGS.has(file), `${file}.svg exists on disk`).toBe(true);
     }
+  });
+
+  it("keeps hero-chip slugs and roster slugs in step, in both directions", () => {
+    // Names and slugs are still hand-typed in each list on purpose -- they
+    // answer different questions, "who speaks MCP" vs. "who has install
+    // steps" -- but a slug naming a client the other list has never heard of
+    // is the one real drift risk left once `mark` derives from here.
+    const rosterSlugs = new Set(CLIENTS.map((c) => c.slug));
+    const heroSlugs = new Set(HERO_CHIPS.map((c) => c.slug));
+    for (const slug of heroSlugs) expect(rosterSlugs.has(slug), slug).toBe(true);
+    for (const slug of rosterSlugs) expect(heroSlugs.has(slug), slug).toBe(true);
   });
 });
 
