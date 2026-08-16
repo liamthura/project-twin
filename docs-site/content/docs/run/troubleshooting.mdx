@@ -128,6 +128,48 @@ Set the same value on both containers and recreate them.
 
 </Accordion>
 
+<Accordion title="VALIDATION_ERROR: Redirect URI must use HTTPS (HTTP allowed only for loopback hosts)">
+
+The client's registration was refused, before any browser opened. Nothing is
+wrong with the instance: the redirect URI the client asked to register is one
+the standard does not permit.
+
+| Redirect URI | |
+|---|---|
+| `https://anything/callback` | accepted |
+| `http://127.0.0.1:9876/callback` | accepted |
+| `http://localhost:9876/callback` | accepted |
+| `myapp://oauth/callback` — a private-use scheme | accepted |
+| `http://0.0.0.0:9876/callback` | **refused** |
+| `http://192.168.1.50:9876/callback` | **refused** |
+| `http://app.example.com/callback` | **refused** |
+
+The rule is RFC 8252 §7.3 and the OAuth 2.1 security BCP: a native app
+redirects to a loopback address or to a private-use scheme, and plain `http` to
+any other host is refused because the authorization code would cross the
+network in clear text. It is enforced by Better Auth and is not configurable
+here, which is the correct outcome for a server holding personal data.
+
+<Callout>
+`0.0.0.0` is the trap. It is an *unspecified* address, not a loopback one, and
+a client that binds `0.0.0.0` and then reuses that string in its callback URL
+is refused while the same client on `127.0.0.1` is accepted.
+</Callout>
+
+Two causes, and the fix differs:
+
+- **A self-hosted client reached over plain HTTP.** Its redirect URI is its own
+  origin, so a client you open at `http://192.168.1.50:3000` can never register.
+  Put it behind HTTPS, or reach it at `http://127.0.0.1:3000` when it runs on
+  the same machine.
+- **A client that hardcodes a non-loopback callback host.** A bug in that
+  client. Where the callback host is configurable, set it to `127.0.0.1`.
+
+A refused registration stores nothing, so there is no partial state to clean up
+and retrying costs nothing once the URI changes.
+
+</Accordion>
+
 <Accordion title="A client finishes consent, then reports its credentials were rejected">
 
 The same defect, seen from the other end: the access token reached `/mcp` and
