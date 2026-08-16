@@ -25,6 +25,30 @@ def _seed(monkeypatch=None, provider=None):
     })
 
 
+def test_titles_mode_does_not_swallow_the_primary_aesthetic(as_user):
+    """The hooks select which entries survive; titles mode stubs what is left.
+
+    In the other order the aesthetics hook reads `primary` off an entry that
+    stubbing has already reduced to {id, title, updated_at}, finds no primary,
+    and drops the whole section -- so `minimal` silently lost the user's design
+    language whenever a client asked for titles. _stub_titles' own docstring
+    said it was "applied after all other filters"; it was applied before two.
+    """
+    import settings_store
+    settings_store.set_enabled_optins(["aesthetics"])
+    persona_store.save("aesthetics", {
+        "styles": [
+            {"id": "aesthetic_1", "name": "Playful Editorial", "primary": True},
+            {"id": "aesthetic_2", "name": "Brutalist", "primary": False},
+        ],
+    })
+    out = server.get_scoped_context("minimal", detail="titles")
+    styles = out["context"]["aesthetics"]["styles"]
+    assert [s["title"] for s in styles] == ["Playful Editorial"]
+    # Still stubbed: titles mode is honoured, the hook just ran first.
+    assert set(styles[0]) <= {"id", "title", "updated_at"}
+
+
 def test_titles_mode_reduces_id_list_entities_to_id_and_title(as_user):
     _seed()
     out = server.get_scoped_context("professional", detail="titles")

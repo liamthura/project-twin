@@ -446,9 +446,6 @@ def get_scoped_context(
     # get_entity and get_raw are the surfaces that resolve/return it.
     result = _strip_related(result)
 
-    if detail == "titles":
-        result = _stub_titles(result)
-
     # Goals hook (2/2): when no goal-bearing scope was requested (i.e. goals
     # rode in via minimal only), reduce to ≤5 active-goal {id, title} stubs.
     def _goal_stub(g):
@@ -490,6 +487,17 @@ def get_scoped_context(
                     result.pop("aesthetics", None)
             else:
                 result["aesthetics"]["styles"] = [primary]
+
+    # Last, so it stubs whatever the hooks above chose to keep -- which is what
+    # _stub_titles' own docstring has always claimed ("applied after all other
+    # filters"). It used to run before these two, and the aesthetics hook then
+    # read `primary` off an entry already reduced to {id, title, updated_at},
+    # found none, and dropped the section: `minimal` silently lost the user's
+    # design language for any client that asked for titles. The goals hook
+    # survived the old order only by accident, because its own stub carries a
+    # `title` that flatten_entity happens to read.
+    if detail == "titles":
+        result = _stub_titles(result)
 
     scope_label = scope if isinstance(scope, str) else ",".join(scope)
     scope_desc = (
