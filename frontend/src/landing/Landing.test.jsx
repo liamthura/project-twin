@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vite
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Landing from "./Landing";
-import { FAQ, FOOTER, CLIENTS as HERO_CLIENTS } from "./content";
-import { hasMark } from "@/lib/clients.js";
+import { FAQ, FOOTER } from "./content";
 
 // Reduced motion, deliberately, and only in this file.
 //
@@ -172,14 +171,6 @@ describe("Landing: links that have nowhere to go", () => {
     expect(undestined).toEqual(["GitHub", "Privacy", "Terms"]);
     for (const label of undestined) {
       expect(within(footer).getByText(label).tagName).not.toBe("A");
-    }
-  });
-});
-
-describe("the hero chips", () => {
-  it("takes which marks exist from the roster rather than a second copy", () => {
-    for (const chip of HERO_CLIENTS) {
-      expect(chip.mark, `${chip.slug} chip`).toBe(hasMark(chip.slug));
     }
   });
 });

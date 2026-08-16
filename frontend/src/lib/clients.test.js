@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { CLIENTS, INSTALLABLE_CLIENTS, hasMark } from "./clients.js";
+import { readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { CLIENTS, INSTALLABLE_CLIENTS, hasMark, LOGO_SLUGS } from "./clients.js";
 
 const TEST_URL = "https://example.test/mcp";
 const byId = (id) => CLIENTS.find((c) => c.id === id);
@@ -32,6 +35,29 @@ describe("the roster", () => {
     expect(hasMark("notion")).toBe(true);
     expect(hasMark("codex")).toBe(false);
     expect(hasMark("hermes")).toBe(false);
+  });
+
+  it("keeps LOGO_SLUGS in step with public/landing/logos/, in both directions", () => {
+    // A slug in LOGO_SLUGS with no file renders a broken image; a file with no
+    // slug in LOGO_SLUGS renders a monogram over a real mark that sits unused.
+    // Resolved relative to this file, not the working directory, so it holds
+    // regardless of where the test runner is invoked from. Built from
+    // fileURLToPath + path.join rather than `new URL(rel, import.meta.url)`:
+    // Vite statically rewrites that exact pattern into a dev-server asset URL
+    // (http://localhost:.../@fs/...), which is no longer a file:// URL that
+    // node:fs can read.
+    const here = dirname(fileURLToPath(import.meta.url));
+    const logosDir = join(here, "../../public/landing/logos");
+    const files = readdirSync(logosDir)
+      .filter((name) => name.endsWith(".svg"))
+      .map((name) => name.replace(/\.svg$/, ""));
+
+    for (const slug of LOGO_SLUGS) {
+      expect(files, `${slug} is in LOGO_SLUGS`).toContain(slug);
+    }
+    for (const file of files) {
+      expect(LOGO_SLUGS.has(file), `${file}.svg exists on disk`).toBe(true);
+    }
   });
 });
 

@@ -35,7 +35,7 @@
  * source their owners point at returns 403 to automated requests. Those two
  * render name-only rather than as an invented glyph.
  */
-const LOGO_SLUGS = new Set(["claude", "raycast", "notion"]);
+export const LOGO_SLUGS = new Set(["claude", "raycast", "notion"]);
 
 export function hasMark(slug) {
   return LOGO_SLUGS.has(slug);
