@@ -23,20 +23,28 @@ export const HERO = {
   signIn: { prefix: "Already have a code?", label: "Sign in." },
 };
 
+import { hasMark } from "@/lib/clients.js";
+
 /**
  * Clients named in the README as speaking MCP. Chips, in the hero.
  *
- * `mark` says whether a logo file exists in public/landing/logos/. Simple Icons
- * does not carry OpenAI (pulled over a trademark request) or Hermes, and
- * worldvectorlogo -- the source the owner asked for -- returns 403 to every
- * automated request. Those two are name-only rather than an invented glyph.
+ * `mark` says whether a logo file exists in public/landing/logos/, and comes
+ * from `lib/clients.js` rather than from a boolean typed here. The install
+ * roster needs the same fact, and two copies of it drift the day a missing
+ * logo finally lands: `design/logos/README.md` names two that are still
+ * outstanding.
+ *
+ * This list is deliberately NOT the install roster. It answers "who speaks
+ * MCP", which includes Notion AI, and the roster answers "who do we have
+ * install steps for", which does not.
  */
 export const CLIENTS = [
-  { name: "Claude", slug: "claude", mark: true },
-  { name: "Codex", slug: "codex", mark: false },
-  { name: "Raycast", slug: "raycast", mark: true },
-  { name: "Notion AI", slug: "notion", mark: true },
-  { name: "Hermes", slug: "hermes", mark: false },
+  { name: "Claude", slug: "claude", mark: hasMark("claude") },
+  { name: "Codex", slug: "codex", mark: hasMark("codex") },
+  { name: "Cursor", slug: "cursor", mark: hasMark("cursor") },
+  { name: "Raycast", slug: "raycast", mark: hasMark("raycast") },
+  { name: "Notion AI", slug: "notion", mark: hasMark("notion") },
+  { name: "Hermes", slug: "hermes", mark: hasMark("hermes") },
 ];
 
 export const STEPS = {

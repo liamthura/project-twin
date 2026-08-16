@@ -93,10 +93,11 @@ function ProductShot() {
  * Clients, as chips. Unconnected by any drawn line, deliberately: a line
  * implies a direction of travel the protocol does not have.
  *
- * Two of the five have no mark here. Simple Icons does not carry OpenAI (pulled
- * over a trademark request) or Hermes, and the source the owner asked for sits
- * behind bot protection. Those two render as their name alone rather than as an
- * invented glyph.
+ * Not every chip has a mark. Whether one does comes from `hasMark` in
+ * `lib/clients.js`: Simple Icons does not carry OpenAI (pulled over a
+ * trademark request) or Hermes, the source the owner asked for sits behind
+ * bot protection, and Cursor has no logo file yet either. Those render as
+ * their name alone rather than as an invented glyph.
  */
 function ClientChips() {
   return (
