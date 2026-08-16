@@ -15,6 +15,7 @@ The service's own baseURL is set to the public origin, so it never infers
 anything from forwarded headers and this stays a dumb passthrough.
 """
 
+import json
 import logging
 import os
 from http.cookiejar import CookieJar
@@ -142,6 +143,111 @@ def build_response(upstream: httpx.Response) -> Response:
     return response
 
 
+# ---------------------------------------------------------------------------
+# Registration errors, made actionable
+#
+# Better Auth refuses a redirect URI that is http:// on a non-loopback host, per
+# RFC 8252 section 7.3 and the OAuth 2.1 BCP. The refusal is correct. Its message
+# is not usable: it states the rule, names neither the URI that broke it nor what
+# to do, and it arrives at the one moment a person is stuck with no other signal.
+#
+# The load-bearing property of everything below: IT NEVER DECIDES ANYTHING. The
+# upstream has already refused by the time any of this runs, and nothing here can
+# turn a refusal into an acceptance or the reverse. So the local host classifier
+# cannot drift into a security problem -- if it ever disagreed with Better Auth's,
+# the worst case is a message that omits the specific URI and falls back to the
+# general explanation. That asymmetry is why it is safe to restate the rule here
+# rather than import it across a language boundary.
+# ---------------------------------------------------------------------------
+
+_REGISTER_SUFFIX = "/oauth2/register"
+
+
+def _is_loopback_host(host: str) -> bool:
+    """RFC 8252 loopback, plus the RFC 6761 `.localhost` names Better Auth allows.
+
+    Mirrors @better-auth/core's isLoopbackHost. Used only to point at which URI
+    in a rejected list was the offending one.
+    """
+    import ipaddress
+
+    host = host.strip().lower().rstrip(".")
+    if host.startswith("[") and "]" in host:
+        host = host[1: host.index("]")]
+    elif host.count(":") == 1:
+        host = host.split(":", 1)[0]
+    if host == "localhost" or host.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _rejected_redirect_uris(body: bytes) -> list[str]:
+    """The redirect_uris in a registration request that the rule forbids."""
+    from urllib.parse import urlsplit
+
+    try:
+        uris = json.loads(body or b"{}").get("redirect_uris") or []
+    except (ValueError, AttributeError):
+        return []
+    out = []
+    for uri in uris:
+        if not isinstance(uri, str):
+            continue
+        parts = urlsplit(uri)
+        if parts.scheme == "http" and not _is_loopback_host(parts.netloc):
+            out.append(uri)
+    return out
+
+
+def _redirect_uri_help(rejected: list[str]) -> str:
+    named = f" Yours: {', '.join(rejected)}." if rejected else ""
+    return (
+        "This server accepts a redirect URI that is https:// on any host, "
+        "http:// on a loopback host only (127.0.0.1, [::1], localhost), or a "
+        f"private-use scheme such as myapp://callback.{named} "
+        "A client whose dashboard you reach at a non-loopback address -- over a "
+        "tunnel, a VPN, or a reverse proxy -- derives its callback from that "
+        "origin, so give that origin HTTPS and the callback follows. On a "
+        "tailnet, `tailscale serve` issues a real certificate for exactly this. "
+        "Where the client lets you set the callback explicitly, "
+        "http://127.0.0.1:<port>/callback is always accepted. "
+        "Nothing was stored, so retrying costs nothing."
+    )
+
+
+def explain_registration_refusal(body: bytes, upstream: httpx.Response) -> Optional[Response]:
+    """Rewrite a redirect-URI refusal into something a person can act on.
+
+    Returns None for anything else, so every other response passes through
+    untouched. `code` and the upstream's own sentence are preserved and appended
+    to rather than replaced, because a client may already match on them.
+    """
+    if upstream.status_code != 400:
+        return None
+    try:
+        payload = upstream.json()
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    message = str(payload.get("message", ""))
+    if "redirect" not in message.lower() or "https" not in message.lower():
+        return None
+
+    rejected = _rejected_redirect_uris(body)
+    enriched = dict(payload)
+    enriched["message"] = f"{message}. {_redirect_uri_help(rejected)}"
+    enriched["rejected_redirect_uris"] = rejected
+    enriched["docs"] = "https://mygist.thuradev.qzz.io/docs/run/troubleshooting"
+    logger.info(
+        "rejected client registration: redirect_uris=%s", rejected or "unparsed"
+    )
+    return JSONResponse(enriched, status_code=400)
+
+
 async def forward(upstream_path: str, request: Request) -> Response:
     """Send a request to the auth service at `upstream_path`, verbatim.
 
@@ -151,12 +257,13 @@ async def forward(upstream_path: str, request: Request) -> Response:
     which /auth/{path} cannot express.
     """
     base = SERVICE_URL.rstrip("/")
+    body = await request.body()
     try:
         upstream = await _http().request(
             request.method,
             f"{base}{upstream_path}",
             params=request.query_params,
-            content=await request.body(),
+            content=body,
             headers=_request_headers(request),
             # Redirects are part of the auth flow -- OAuth callbacks, and the
             # post-sign-in bounce. Following them here would resolve them
@@ -170,6 +277,10 @@ async def forward(upstream_path: str, request: Request) -> Response:
         return JSONResponse(
             {"error": "Authentication service unavailable"}, status_code=503
         )
+    if upstream_path.endswith(_REGISTER_SUFFIX):
+        explained = explain_registration_refusal(body, upstream)
+        if explained is not None:
+            return explained
     return build_response(upstream)
 
 

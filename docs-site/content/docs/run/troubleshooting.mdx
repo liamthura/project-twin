@@ -150,23 +150,49 @@ any other host is refused because the authorization code would cross the
 network in clear text. It is enforced by Better Auth and is not configurable
 here, which is the correct outcome for a server holding personal data.
 
-<Callout>
-`0.0.0.0` is the trap. It is an *unspecified* address, not a loopback one, and
-a client that binds `0.0.0.0` and then reuses that string in its callback URL
-is refused while the same client on `127.0.0.1` is accepted.
+## The usual cause: the client's own dashboard is not on loopback
+
+Nearly always this is a client with a web UI that you reach at something other
+than `localhost` — over a tunnel, a VPN such as Tailscale, or a reverse proxy.
+Such a client builds its OAuth callback from **the origin you opened it at**, so
+opening it at `http://your-host:9119` produces
+`http://your-host:9119/…/callback`, and that can never register.
+
+The same client used entirely on one machine works, which is what makes this
+confusing: nothing about the client changed, only the address you reached it at.
+
+### Fixes, best first
+
+**Give the client's dashboard an HTTPS origin.** The callback follows it, and
+this fixes every strict provider at once rather than this one. On a tailnet,
+`tailscale serve` issues a real certificate for exactly this case; behind a
+reverse proxy, terminate TLS and point the client's public-URL setting at the
+HTTPS name.
+
+**Or pin the callback to loopback.** Where a client lets you set the redirect
+URI explicitly, `http://127.0.0.1:<port>/callback` is always accepted, even when
+the dashboard itself is reached remotely. Contained, but it only fixes this one
+server.
+
+<Callout type="warn">
+If a client picks a **new random callback port** on a later attempt while
+reusing a cached `client_id`, registration succeeds and the authorization then
+fails on a redirect-URI mismatch. Clear the client's stored credentials for this
+server and let it register again.
 </Callout>
 
-Two causes, and the fix differs:
-
-- **A self-hosted client reached over plain HTTP.** Its redirect URI is its own
-  origin, so a client you open at `http://192.168.1.50:3000` can never register.
-  Put it behind HTTPS, or reach it at `http://127.0.0.1:3000` when it runs on
-  the same machine.
-- **A client that hardcodes a non-loopback callback host.** A bug in that
-  client. Where the callback host is configurable, set it to `127.0.0.1`.
+<Callout>
+`0.0.0.0` is refused for the same reason, and is worth knowing separately: it is
+an *unspecified* address, not a loopback one. A client that binds `0.0.0.0` and
+reuses that string in its callback is refused where `127.0.0.1` is accepted.
+</Callout>
 
 A refused registration stores nothing, so there is no partial state to clean up
 and retrying costs nothing once the URI changes.
+
+The refusal names the offending URI and the accepted shapes in its `message`,
+with the list repeated in `rejected_redirect_uris` — so the response itself
+should tell you which of your URIs was the problem.
 
 </Accordion>
 
