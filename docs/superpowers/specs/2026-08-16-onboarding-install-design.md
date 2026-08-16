@@ -75,11 +75,19 @@ New file, `frontend/src/lib/clients.js`, exporting one array:
 shape that kind needs: a URL string, an array of command strings, or an array of
 step strings.
 
-`frontend/src/landing/content.js` currently keeps its own `CLIENTS` array for
-the hero chips. That becomes a derived view of this roster, filtered and mapped,
-rather than a second list. Two lists of the same clients in one frontend drift,
-and the landing page already carries a comment explaining which marks exist,
-which is roster metadata living in the wrong file.
+`frontend/src/landing/content.js` keeps its own `CLIENTS` array for the hero
+chips. Only `mark` derives from the roster, via the shared `hasMark()`; names
+and slugs stay hand-typed in both files, because the two lists answer
+different questions. The hero chips name every client that speaks MCP,
+Notion AI included. The roster names every client this screen has install
+steps for, which Notion AI is deliberately not in. Collapsing them into one
+list would either put a card-less chip through the install-card code path or
+drop Notion AI from the hero section, and neither is what shipped. What did
+move out of the landing file is `mark`: it used to be a boolean typed by hand
+per chip, and now comes from `hasMark()` in `lib/clients.js`, so a logo landing
+in `public/landing/logos/` only has to be recorded once. The real drift risk
+left is a slug appearing in one list and not the other; `clients.test.js`
+asserts both directions.
 
 The two missing marks stay missing. `design/logos/README.md` records why
 (`openai.svg` pulled from Simple Icons over a trademark request, Hermes never
@@ -152,7 +160,7 @@ feature.
 
 ## The other four steps
 
-**Welcome.** Unchanged. See "Two components dropped on inspection" below:
+**Welcome.** Unchanged. See "Three components dropped on inspection" below:
 `WelcomeVisual` already is the beam diagram, and does it better than the
 component that was going to replace it.
 
@@ -161,15 +169,18 @@ component that was going to replace it.
 it" escape made reachable here rather than only on Connect. Someone who starts
 typing and regrets it currently has to go back a step to find the offer.
 
-**Complete.** Confetti on arrival (owner's call, 2026-08-16), and a
-`number-ticker` on the count of what got saved, which `StepComplete` already
-computes as `saved` and currently prints as flat text. Confetti fires once per
-mount and not at all under `prefers-reduced-motion`.
+**Complete.** Confetti on arrival (owner's call, 2026-08-16), on the count of
+what got saved, which `StepComplete` already computes as `saved`. A
+`number-ticker` counted that value up on arrival and was pulled after
+shipping; see "Three components dropped on inspection". Confetti fires once
+per mount and not at all under `prefers-reduced-motion`.
 
-## Two components dropped on inspection
+## Three components dropped on inspection
 
-Both were in the approved spec. Reading the registry source removed the case for
-them, and the reasons are recorded here so nobody re-adds them.
+All three were in the approved spec. `animated-beam` and `border-beam` were
+dropped before landing, on reading the registry source; `number-ticker`
+shipped and was then pulled once its animation was seen doing the wrong
+thing on screen. The reasons are recorded here so nobody re-adds any of them.
 
 **`animated-beam` is a downgrade on what Welcome already has.**
 `WelcomeVisual.jsx` is already the diagram this was meant to introduce: three
@@ -191,8 +202,18 @@ palette is `#ffaa40` to `#9c40ff`, which is the orange-to-purple AI gradient on
 the banned-signatures list. All of that to decorate a card whose arrival moment
 confetti is already carrying.
 
-The revised budget is `terminal`, `magic-card`, `confetti`, `number-ticker`, and
-the already-vendored `blur-fade`.
+**`number-ticker` counted up to the wrong noun.** The noun ("thing"/"things")
+is picked off the FINAL value, but the ticker walks the number up to it over
+the entrance, so mid-animation frames read the wrong plural: "1 things saved"
+was on screen for roughly 51ms measured at `saved=3`, and worse at smaller
+counts -- a critically damped spring moves fastest through the early
+integers, and small counts are nearly all this screen ever shows. That is the
+same disagreement Complete exists to fix, made transient. Dropped rather than
+patched, and it had no other consumer: `StepComplete` prints the count
+directly instead.
+
+The revised budget is `terminal`, `magic-card`, `confetti`, and the
+already-vendored `blur-fade`.
 
 ## Magic UI components
 
@@ -209,8 +230,10 @@ motion component with zeroed values.
 | `terminal` | command cards | chrome only, see below |
 | `magic-card` | picker rows | drop `next-themes` and orb mode, retint |
 | `confetti` | Complete | drop `ConfettiButton`, gate on reduced motion |
-| `number-ticker` | Complete | `text-foreground`, `en-GB`, reduced motion |
 | `blur-fade` | step entrances | already vendored, no change |
+
+`number-ticker` was vendored and then removed; see "Three components dropped on
+inspection".
 
 **Terminal ships without its typing animation.** The registry component's
 headline feature is `TypingAnimation`, which reveals text one character at a
@@ -247,8 +270,8 @@ entrance 240ms ease-out, exit 180ms ease-in, nothing over 300ms.
 
 Ambient loops (`animated-beam`, `border-beam`) are exempt from the 300ms ceiling
 because it governs response to input, not atmosphere. They are not exempt from
-`prefers-reduced-motion`, which disables every beam, the confetti, and the
-ticker's count-up outright rather than shortening them.
+`prefers-reduced-motion`, which disables every beam and the confetti outright
+rather than shortening them.
 
 ## Files
 
@@ -261,7 +284,9 @@ New:
 - `frontend/src/components/ui/terminal.jsx`
 - `frontend/src/components/ui/magic-card.jsx`
 - `frontend/src/components/ui/confetti.jsx`
-- `frontend/src/components/ui/number-ticker.jsx`
+
+Vendored and then removed: `frontend/src/components/ui/number-ticker.jsx`, see
+"Three components dropped on inspection".
 
 Changed:
 
@@ -271,7 +296,8 @@ Changed:
 - `frontend/src/components/onboarding/StepComplete.jsx` - the arrival treatment.
 - `frontend/src/components/onboarding/StepAboutYou.jsx`,
   `StepHowYouLike.jsx` - entrances and the delegate escape.
-- `frontend/src/landing/content.js` - `CLIENTS` derived from the roster.
+- `frontend/src/landing/content.js` - `CLIENTS`' `mark` field derived from the
+  roster via `hasMark()`; names and slugs stay hand-typed, see above.
 
 Unchanged, and deliberately so: `WelcomeVisual.jsx`.
 

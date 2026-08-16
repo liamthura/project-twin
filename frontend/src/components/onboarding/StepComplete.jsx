@@ -15,6 +15,7 @@ import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Confetti } from "@/components/ui/confetti";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -66,6 +67,13 @@ export function StepComplete({ data, onAdd, onDone }) {
 
   return (
     <div className="space-y-8">
+      {/* Only when something was actually saved. Confetti over an empty
+          persona celebrates a job not done, and the sentence underneath it
+          says so in the same breath. StrictMode double-invokes this effect in
+          dev, so a fire, reset, fire flash there is expected and harmless --
+          canvas-confetti guards re-entry with canvas.__confetti_initialized. */}
+      {saved > 0 && <Confetti />}
+
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="h-5 w-5 text-success" />
@@ -73,11 +81,24 @@ export function StepComplete({ data, onAdd, onDone }) {
             That's the basics
           </h1>
         </div>
-        <p className="text-muted-foreground">
-          {saved > 0
-            ? `${saved} things saved. Everything is editable later, and an assistant can fill in the rest.`
-            : "Nothing saved yet — which is fine. You can fill this in whenever, or let an assistant do it."}
-        </p>
+        {saved > 0 ? (
+          // A NumberTicker count-up was tried here and removed: the noun is
+          // picked off the final value while the ticker is still walking up
+          // to it, so mid-animation frames read "1 things saved" -- the exact
+          // bug this screen exists to fix, just made transient (measured
+          // ~51ms at saved=3, and worse at smaller counts, which this screen
+          // usually shows). The count is rendered directly instead.
+          <p className="text-muted-foreground">
+            {`${Intl.NumberFormat("en-GB").format(saved)} ${
+              saved === 1 ? "thing" : "things"
+            } saved. Everything is editable later, and an assistant can fill in the rest.`}
+          </p>
+        ) : (
+          <p className="text-muted-foreground">
+            Nothing saved yet, which is fine. You can fill this in whenever, or
+            let an assistant do it.
+          </p>
+        )}
       </div>
 
       <div className="space-y-5 rounded-lg border p-4">

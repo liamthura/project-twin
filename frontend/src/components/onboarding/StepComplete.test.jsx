@@ -1,4 +1,12 @@
-import { describe, it, expect, vi } from "vitest";
+// canvas-confetti calls getContext("2d"), which jsdom does not implement. The
+// mock keeps every StepComplete test off that path; whether confetti fired is
+// asserted through this spy rather than through the canvas.
+const confettiCreateMock = vi.hoisted(() => vi.fn(() => Object.assign(vi.fn(), { reset: vi.fn() })));
+vi.mock("canvas-confetti", () => ({
+  default: Object.assign(vi.fn(), { create: confettiCreateMock }),
+}));
+
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -70,5 +78,56 @@ describe("StepComplete", () => {
 
     await user.click(screen.getByRole("button", { name: /go to my persona/i }));
     expect(onDone).toHaveBeenCalled();
+  });
+});
+
+describe("StepComplete, the arrival", () => {
+  // Nothing in vitest.config.js clears mocks between tests, and this file has
+  // several renders of StepComplete before these run -- without this, a
+  // confetti assertion could pass on a call left over from an earlier test
+  // rather than on its own render.
+  beforeEach(() => {
+    confettiCreateMock.mockClear();
+  });
+
+  it("counts one saved field as one thing, not '1 things'", () => {
+    render(
+      <StepComplete
+        data={{ profile: { name: "Liam" } }}
+        onAdd={vi.fn()}
+        onDone={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/1 thing saved/)).toBeInTheDocument();
+    expect(screen.queryByText(/1 things saved/)).not.toBeInTheDocument();
+  });
+
+  it("still pluralises more than one", () => {
+    render(
+      <StepComplete
+        data={{ profile: { name: "Liam", current_role: "Specialist" } }}
+        onAdd={vi.fn()}
+        onDone={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/things saved/)).toBeInTheDocument();
+  });
+
+  it("celebrates arriving with something saved", () => {
+    render(
+      <StepComplete
+        data={{ profile: { name: "Liam" } }}
+        onAdd={vi.fn()}
+        onDone={vi.fn()}
+      />,
+    );
+    expect(confettiCreateMock).toHaveBeenCalled();
+  });
+
+  it("does not celebrate an empty persona", () => {
+    // Nothing was saved. Confetti over that is a party for a job not done, and
+    // the copy beside it already says as much.
+    render(<StepComplete data={{}} onAdd={vi.fn()} onDone={vi.fn()} />);
+    expect(confettiCreateMock).not.toHaveBeenCalled();
   });
 });

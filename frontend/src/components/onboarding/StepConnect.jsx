@@ -18,11 +18,17 @@
  * path to a 404. `/api/instance` reports it, and this screen recommends
  * accordingly rather than recommending something that cannot work here.
  *
+ * The client picker replaced four generic numbered steps that named Claude and
+ * left every other client to the docs site. `lib/clients.js` explains why the
+ * card's primary action differs per client: of the six, exactly one has a real
+ * deeplink, and six identical Install buttons would promise the same gesture
+ * six times and deliver it once.
+ *
  * The fork at the end is the point of the whole screen. Once something is
  * connected there are two honest answers to "who fills this in", and the flow
  * asks rather than assuming.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy, ExternalLink, Loader2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -35,9 +41,13 @@ import {
   listTokens,
   mcpUrl,
 } from "@/lib/api.js";
+import { INSTALLABLE_CLIENTS } from "@/lib/clients.js";
 
 import { AUTOFILL_PROMPT } from "./autofillPrompt";
+import { ClientPicker } from "./ClientPicker";
 import { connectionStatus } from "./connectionStatus";
+import { COPIED_RESET_MS, CopyButton, InstallCard, Steps } from "./InstallCard";
+import { installPrompt } from "./installPrompt";
 
 // Read plus propose, and deliberately not write. A first connection made from
 // an onboarding screen should be able to SUGGEST and nothing more -- the reader
@@ -45,29 +55,6 @@ import { connectionStatus } from "./connectionStatus";
 // letting a client change things unasked. persona:read is added server-side
 // regardless; see db.create_token.
 const FIRST_TOKEN_SCOPES = ["persona:propose"];
-
-function CopyButton({ value, label, children }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      className="shrink-0"
-      aria-label={label}
-      onClick={() => {
-        navigator.clipboard?.writeText(value);
-        setCopied(true);
-      }}
-    >
-      {copied ? (
-        <Check className="h-3.5 w-3.5" />
-      ) : (
-        <Copy className="h-3.5 w-3.5" />
-      )}
-      {children && <span className="ml-1.5">{copied ? "Copied" : children}</span>}
-    </Button>
-  );
-}
 
 function CopyRow({ id, label, value, hint }) {
   return (
@@ -116,23 +103,6 @@ function DocsLink({ path, children }) {
   );
 }
 
-// Numbered rather than prose, because this is a procedure someone carries out
-// in another application with this screen still open beside it.
-function Steps({ items }) {
-  return (
-    <ol className="space-y-2 text-sm">
-      {items.map((item, i) => (
-        <li key={i} className="flex gap-3">
-          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-            {i + 1}
-          </span>
-          <span className="leading-relaxed text-muted-foreground">{item}</span>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 export function StepConnect({ onDelegate, onFillManually }) {
   const [connection, setConnection] = useState(null);
   const [oauthAvailable, setOauthAvailable] = useState(false);
@@ -141,6 +111,15 @@ export function StepConnect({ onDelegate, onFillManually }) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [promptCopied, setPromptCopied] = useState(false);
+  const [picked, setPicked] = useState(null);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [installCopied, setInstallCopied] = useState(false);
+  const installCopiedTimeoutRef = useRef(null);
+
+  // Same defect InstallCard's own copy button already had to fix: without a
+  // reset, this reads "Copied" forever once clicked, and the two controls
+  // would sit on one screen behaving oppositely.
+  useEffect(() => () => clearTimeout(installCopiedTimeoutRef.current), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -181,7 +160,7 @@ export function StepConnect({ onDelegate, onFillManually }) {
   if (connection === null) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />
       </div>
     );
   }
@@ -206,35 +185,77 @@ export function StepConnect({ onDelegate, onFillManually }) {
       </div>
 
       {recommendOauth && (
-        <div className="space-y-4 rounded-lg border border-primary/40 bg-primary/5 p-4">
+        <div className="space-y-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium">Add it to your client</p>
-              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-                recommended
-              </span>
-            </div>
+            <p className="text-sm font-medium">Add MyGist to your client</p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Your client sends you here to sign in, so there is no key to copy
-              or keep safe. You can see it by name and disconnect it whenever
-              you like.
+              Your client sends you here to sign in, so there is no key to copy or
+              keep safe. You can see it by name and disconnect it whenever you like.
             </p>
           </div>
 
-          <Steps
-            items={[
-              "Copy the address below.",
-              "In your client, add a custom MCP connector and paste it in. In Claude that is Settings, then Connectors, then Add custom connector.",
-              "Your client opens MyGist and asks you to sign in.",
-              "Approve the connection. Choose the option that lets it suggest changes.",
-            ]}
+          <ClientPicker
+            clients={INSTALLABLE_CLIENTS}
+            selectedId={picked}
+            onSelect={(id) => {
+              setPicked(id);
+              // ClientPicker already keeps its own rows to one open at a time;
+              // this keeps the fallback in that same discipline, so picking a
+              // client does not leave a second copyable route open beside it.
+              if (id !== null) setShowPrompt(false);
+            }}
+            renderExpanded={(client) => <InstallCard client={client} url={address} />}
           />
 
-          <CopyRow
-            id="onboarding-mcp-url"
-            label="Server address"
-            value={address}
-          />
+          {/* The escape hatch, and the reason the roster can stay short. Closed by
+              default: it is the answer for a minority, and open it would compete
+              with the six rows that are the answer for everyone else. A toggle
+              rather than a one-way reveal, with aria-expanded, for the same
+              reason ClientPicker's own rows are: once open there has to be a
+              way back. */}
+          <button
+            type="button"
+            aria-expanded={showPrompt}
+            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            onClick={() => {
+              setShowPrompt((prev) => !prev);
+              // Opening the fallback while a client card is open is the same
+              // two-routes-at-once problem as above, the other way round.
+              setPicked(null);
+            }}
+          >
+            My client isn't listed
+          </button>
+
+          {showPrompt && (
+            <div className="space-y-3 rounded-lg border p-4">
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Paste this into your client and it can add MyGist itself.
+              </p>
+              <p className="rounded-md border bg-muted/50 p-3 text-xs leading-relaxed">
+                {installPrompt(address)}
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard?.writeText(installPrompt(address));
+                  setInstallCopied(true);
+                  clearTimeout(installCopiedTimeoutRef.current);
+                  installCopiedTimeoutRef.current = setTimeout(
+                    () => setInstallCopied(false),
+                    COPIED_RESET_MS,
+                  );
+                }}
+              >
+                {installCopied ? (
+                  <Check className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Copy className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                )}
+                {installCopied ? "Copied" : "Copy prompt for my client"}
+              </Button>
+            </div>
+          )}
 
           <DocsLink path="/use/clients/#connecting-over-oauth">
             Need help connecting?
@@ -250,7 +271,15 @@ export function StepConnect({ onDelegate, onFillManually }) {
             <button
               type="button"
               className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-              onClick={() => setShowKeyPath(true)}
+              onClick={() => {
+                setShowKeyPath(true);
+                // The picker and the fallback prompt already clear each other;
+                // without this, picking Raycast then opening this leaves the
+                // Raycast steps and the key steps on screen together -- two
+                // contradictory procedures for the same client.
+                setPicked(null);
+                setShowPrompt(false);
+              }}
             >
               My client can't sign in. Use a key instead
             </button>
@@ -275,9 +304,13 @@ export function StepConnect({ onDelegate, onFillManually }) {
                 ]}
               />
 
-              <Button onClick={generate} disabled={generating}>
+              <Button
+                onClick={generate}
+                disabled={generating}
+                aria-label={generating ? "Creating a key" : undefined}
+              >
                 {generating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
                   "Create a key"
                 )}
@@ -318,7 +351,7 @@ export function StepConnect({ onDelegate, onFillManually }) {
 
       {connected && !token && (
         <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-4 text-sm">
-          <Check className="h-4 w-4 shrink-0 text-success" />
+          <Check className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />
           <span>
             {connection.state === "connected"
               ? `Connected · ${connection.name || "a client"}`
@@ -338,7 +371,7 @@ export function StepConnect({ onDelegate, onFillManually }) {
         {connection.canPropose ? (
           <div className="space-y-3 rounded-lg border p-4">
             <div className="flex items-start gap-3">
-              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
               <div className="space-y-1">
                 <p className="text-sm font-medium">Let your assistant do it</p>
                 <p className="text-xs leading-relaxed text-muted-foreground">
@@ -359,9 +392,9 @@ export function StepConnect({ onDelegate, onFillManually }) {
                 }}
               >
                 {promptCopied ? (
-                  <Check className="mr-1.5 h-4 w-4" />
+                  <Check className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 ) : (
-                  <Copy className="mr-1.5 h-4 w-4" />
+                  <Copy className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 )}
                 {promptCopied ? "Copied" : "Copy prompt"}
               </Button>

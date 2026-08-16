@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const listTokensMock = vi.hoisted(() => vi.fn());
@@ -45,21 +45,43 @@ describe("StepConnect, where clients can sign in", () => {
     getInstanceMock.mockResolvedValue({ invite_only: false, mcp_oauth: true });
   });
 
-  it("recommends signing in, and shows the address without a key", async () => {
+  it("offers a client to pick rather than generic instructions", async () => {
     renderStep();
 
-    expect(await screen.findByText(/recommended/i)).toBeInTheDocument();
-    expect(screen.getByText("https://example.test/mcp")).toBeInTheDocument();
-    // The key path is still reachable, but it is not what the screen leads with.
+    expect(await screen.findByRole("button", { name: /claude code/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cursor/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /raycast/i })).toBeInTheDocument();
+    // The key path is reachable, but it is not what the screen leads with.
     expect(screen.queryByRole("button", { name: /create a key/i })).not.toBeInTheDocument();
   });
 
-  it("spells the setup out as numbered steps", async () => {
+  it("shows the command once a command client is picked", async () => {
+    const user = userEvent.setup();
     renderStep();
-    await screen.findByText(/recommended/i);
 
-    expect(screen.getByText(/add a custom mcp connector/i)).toBeInTheDocument();
-    expect(screen.getByText(/asks you to sign in/i)).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /claude code/i }));
+    expect(
+      screen.getByText("claude mcp add --transport http mygist https://example.test/mcp"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the deeplink once Cursor is picked", async () => {
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /cursor/i }));
+    expect(screen.getByRole("link", { name: /add to cursor/i })).toBeInTheDocument();
+  });
+
+  it("offers a prompt for a client that is not on the list", async () => {
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /isn't listed/i }));
+    await user.click(screen.getByRole("button", { name: /copy prompt for my client/i }));
+    await expect(navigator.clipboard.readText()).resolves.toContain(
+      "https://example.test/mcp",
+    );
   });
 
   it("keeps the key path for a client that cannot sign in", async () => {
@@ -70,7 +92,106 @@ describe("StepConnect, where clients can sign in", () => {
     expect(screen.getByRole("button", { name: /create a key/i })).toBeInTheDocument();
   });
 
-  it("stops recommending a connection once one exists", async () => {
+  it("resets the fallback copy button to its label after the copied state times out", async () => {
+    // Same shape as InstallCard.test.jsx's own version of this: fireEvent,
+    // not userEvent, once fake timers are in, because userEvent awaits
+    // promises that vitest's fake clock also owns, so the click never
+    // settles before the assertion.
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /isn't listed/i }));
+    const button = await screen.findByRole("button", {
+      name: /copy prompt for my client/i,
+    });
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(button);
+      expect(screen.getByText("Copied")).toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(2000));
+      expect(screen.getByText("Copy prompt for my client")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("toggles the fallback open and closed, and aria-expanded follows it both ways", async () => {
+    // The old version only ever revealed the panel once clicked, with no way
+    // back and no aria-expanded at all. Clicking the trigger a SECOND time is
+    // the case that version would still have passed every other test on.
+    const user = userEvent.setup();
+    renderStep();
+
+    const trigger = await screen.findByRole("button", { name: /isn't listed/i });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("button", { name: /copy prompt for my client/i }),
+    ).toBeInTheDocument();
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("button", { name: /copy prompt for my client/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("closes the fallback once a client is picked from the list", async () => {
+    // ClientPicker already keeps its own rows to one open at a time; the
+    // fallback has to honour that discipline too, or picking Claude Code
+    // leaves the fallback's own copyable prompt open beside it.
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /isn't listed/i }));
+    expect(
+      screen.getByRole("button", { name: /copy prompt for my client/i }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /claude code/i }));
+    expect(
+      screen.queryByRole("button", { name: /copy prompt for my client/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("closes the picked client's card once the fallback is opened", async () => {
+    // The same rule, the other way round: opening the fallback while a
+    // client's install card is open would put two copyable routes on screen.
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /claude code/i }));
+    expect(
+      screen.getByText("claude mcp add --transport http mygist https://example.test/mcp"),
+    ).toBeInTheDocument();
+
+    await user.click(await screen.findByRole("button", { name: /isn't listed/i }));
+    expect(
+      screen.queryByText("claude mcp add --transport http mygist https://example.test/mcp"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("closes the picked client's card once the key path is opened", async () => {
+    // The picker and the fallback prompt already clear each other. Without the
+    // same rule here, picking Raycast then asking for a key leaves Raycast's
+    // steps and the key's steps on screen together -- two contradictory
+    // procedures for the same client.
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /raycast/i }));
+    expect(screen.getByText(/open raycast settings/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /can't sign in/i }));
+    expect(screen.queryByText(/open raycast settings/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create a key/i })).toBeInTheDocument();
+  });
+
+  it("stops offering a connection once one exists", async () => {
     // Instructions for a job already done are noise.
     listConnectedAppsMock.mockResolvedValue([
       { id: "g1", clientId: "c1", clientName: "Claude", scopes: ["persona:propose"] },
@@ -78,7 +199,7 @@ describe("StepConnect, where clients can sign in", () => {
     renderStep();
 
     expect(await screen.findByText(/connected · Claude/i)).toBeInTheDocument();
-    expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /claude code/i })).not.toBeInTheDocument();
   });
 });
 
@@ -90,17 +211,25 @@ describe("StepConnect, where clients cannot sign in", () => {
       await screen.findByText(/does not offer sign-in for clients/i),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /create a key/i })).toBeInTheDocument();
-    expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
+    // No picker at all: every card on it tells someone to sign in, and this
+    // instance mounts no discovery routes for them to sign in against.
+    expect(screen.queryByRole("button", { name: /claude code/i })).not.toBeInTheDocument();
   });
 
-  it("recommends nothing when the instance cannot be reached", async () => {
+  it("shows no picker when the instance cannot be reached", async () => {
     // getInstance falls back to mcp_oauth: false. Recommending sign-in on an
     // instance that mounts no discovery routes sends someone into a 404.
     getInstanceMock.mockResolvedValue({ invite_only: false, mcp_oauth: false });
     renderStep();
 
     await screen.findByRole("button", { name: /create a key/i });
-    expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /claude code/i })).not.toBeInTheDocument();
+    // installPrompt() asserts OAuth unconditionally, which is only true inside
+    // the mcp_oauth-gated block above. This pins the fallback itself to that
+    // gate, not just the picker: moving the escape hatch out from under it
+    // would still pass every other assertion here while shipping that false
+    // claim to a self-hosted instance.
+    expect(screen.queryByRole("button", { name: /isn't listed/i })).not.toBeInTheDocument();
   });
 });
 
@@ -119,6 +248,24 @@ describe("StepConnect", () => {
     // anyone where to point their client.
     expect(screen.getByText("https://example.test/mcp")).toBeInTheDocument();
     expect(screen.getByText("mg_secret_value")).toBeInTheDocument();
+  });
+
+  it("keeps each childless copy button's own name after copying, rather than a shared 'Copied'", async () => {
+    // These buttons have no visible text of their own -- aria-label is their
+    // entire accessible name. Tracking it to "Copied", the way a button WITH
+    // visible text should, would collapse "Copy server address" and "Copy key"
+    // into the same indistinguishable label.
+    const user = userEvent.setup();
+    renderStep();
+    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+
+    const copyAddress = screen.getByRole("button", { name: /copy server address/i });
+    await user.click(copyAddress);
+    expect(copyAddress).toHaveAttribute("aria-label", "Copy server address");
+
+    const copyKey = screen.getByRole("button", { name: /copy key/i });
+    await user.click(copyKey);
+    expect(copyKey).toHaveAttribute("aria-label", "Copy key");
   });
 
   it("asks for propose and not write on a first connection", async () => {
@@ -186,6 +333,28 @@ describe("StepConnect", () => {
     expect(onFillManually).toHaveBeenCalled();
   });
 
+  it("keeps an accessible name on the create-a-key button while it is generating", async () => {
+    // While generating, the button's only visible content is a bare spinner
+    // icon. Without an aria-label for that state the button would have no
+    // accessible name at all -- a screen reader user could not tell the
+    // button is even there, let alone busy.
+    let resolveCreate;
+    createTokenMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+    expect(
+      await screen.findByRole("button", { name: /creating a key/i }),
+    ).toBeInTheDocument();
+
+    resolveCreate({ id: "t1", label: "my assistant", token: "mg_secret_value" });
+  });
+
   it("reports a failed key rather than looking like nothing happened", async () => {
     createTokenMock.mockRejectedValue(new Error("Token limit reached"));
     const user = userEvent.setup();
@@ -197,10 +366,11 @@ describe("StepConnect", () => {
 });
 
 describe("StepConnect, the documentation link", () => {
-  it("points at the OAuth section when that is what it recommended", async () => {
+  it("points at the OAuth section when a client can sign in", async () => {
     getInstanceMock.mockResolvedValue({ invite_only: false, mcp_oauth: true });
     renderStep();
 
+    await screen.findByRole("button", { name: /claude code/i });
     const link = await screen.findByRole("link", { name: /need help connecting/i });
     expect(link).toHaveAttribute(
       "href",
