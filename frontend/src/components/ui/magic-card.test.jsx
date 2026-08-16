@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act } from "react";
 
 import { MagicCard } from "./magic-card.jsx";
 
@@ -38,5 +39,41 @@ describe("MagicCard", () => {
         new MouseEvent("pointermove", { bubbles: true, clientX: 10, clientY: 10 }),
       );
     }).not.toThrow();
+  });
+
+  it("resets the spotlight when the page becomes hidden", async () => {
+    // When switching tabs, blur does not fire (the window keeps OS focus),
+    // but visibilitychange does. The spotlight must reset to avoid being
+    // frozen at the last pointer position.
+    const { container } = render(
+      <MagicCard>
+        <p>Claude Code</p>
+      </MagicCard>,
+    );
+    const card = container.firstChild;
+
+    // Fire pointermove to light the spotlight at (100, 100).
+    act(() => {
+      fireEvent.pointerMove(card, { clientX: 100, clientY: 100 });
+    });
+
+    // Wait for the motion value to update and serialize in the style.
+    await waitFor(() => {
+      expect(container.innerHTML).toMatch(/100px/);
+    }, { timeout: 1000 });
+
+    // Stub visibilityState to "hidden" and dispatch the event on window.
+    act(() => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        value: "hidden",
+      });
+      window.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    // The spotlight must have reset to off-card position (-200px).
+    await waitFor(() => {
+      expect(container.innerHTML).toMatch(/-200px/);
+    }, { timeout: 1000 });
   });
 });
