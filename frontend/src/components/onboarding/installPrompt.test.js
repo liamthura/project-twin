@@ -16,8 +16,12 @@ describe("installPrompt", () => {
   });
 
   it("says there is no token, so nothing goes hunting for one", () => {
-    // Must explicitly state no token to paste, not just mention OAuth
-    expect(installPrompt(TEST_URL)).toMatch(/no token/i);
+    // Must explicitly state no token to paste, and must not instruct pasting
+    // or supplying one. A prompt that says "no token at first, but paste when
+    // asked" would match /no token/i alone, so we pair positive and negative.
+    const prompt = installPrompt(TEST_URL);
+    expect(prompt).toMatch(/no token/i);
+    expect(prompt).not.toMatch(/paste.*token|supply.*token|provide.*token/i);
   });
 
   it("asks for the permission the review queue depends on", () => {
