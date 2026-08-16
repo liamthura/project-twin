@@ -428,3 +428,24 @@ def entity_update_times(user_id, entity_ids) -> dict:
             (user_id, ids),
         ).fetchall()
     return {r["entity_id"]: r["updated_at"].date().isoformat() for r in rows}
+
+
+def section_counts(user_id) -> dict:
+    """{file_type: indexed entity count} for one user, in one query.
+
+    The denominator behind get_context's `not_in_this_scope`: how much of each
+    section exists at all, measured against how much a given scope returned.
+
+    persona_search is deliberately the source rather than the stored files. It
+    holds exactly the entries search_context can find, so the counts describe
+    what the accompanying note actually tells the caller to reach for -- and a
+    section that has never been indexed contributes nothing rather than a number
+    that would send the model looking for something it cannot get.
+    """
+    with db.get_pool().connection() as conn:
+        rows = conn.execute(
+            "select file_type, count(*) as n from persona_search"
+            " where user_id = %s group by file_type",
+            (user_id,),
+        ).fetchall()
+    return {r["file_type"]: r["n"] for r in rows}

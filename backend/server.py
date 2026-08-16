@@ -341,6 +341,34 @@ def _files_for_scope(fields) -> list[str]:
         return list(persona_store.VALID_FILES)
     return list(fields.keys())
 
+def _not_in_this_scope(result: dict) -> dict:
+    """Per-section counts of indexed entries this payload does not carry.
+
+    Counted the same way the index is built (top-level id_lists only, entries
+    with an id), so the two halves of the subtraction are comparable. Any
+    negative difference -- an entry indexed but no longer stored, or an entry
+    with no indexable text -- is dropped rather than reported.
+    """
+    totals = search_index.section_counts(db.current_user_id.get())
+    enabled = settings_store.enabled_sections()
+    out = {}
+    for key, total in totals.items():
+        spec = SECTION_REGISTRY.get(key)
+        if spec is None or key not in enabled:
+            continue
+        section = result.get(key)
+        returned = 0
+        if isinstance(section, dict):
+            for list_key, _prefix in spec.id_lists:
+                returned += sum(
+                    1 for entity in (section.get(list_key) or [])
+                    if isinstance(entity, dict) and entity.get("id")
+                )
+        if total - returned > 0:
+            out[key] = total - returned
+    return out
+
+
 def get_scoped_context(
     scope: Union[str, List[str]] = "minimal",
     topic: str = None,
@@ -473,7 +501,6 @@ def get_scoped_context(
         "scope": scope_label,
         "scope_description": scope_desc,
         "topic_filter": topic,
-        "token_estimate": 0,
         "context": result
     }
     # Freshness advisory: top-of-mind is the one list that silently rots.
@@ -488,10 +515,25 @@ def get_scoped_context(
                 f"{stale} top-of-mind item(s) unchanged for over 30 days — "
                 "consider reviewing or removing them"
             ]
-    # Estimate against the full wrapper (the actual payload the caller receives),
-    # not just the inner context. The few chars the final estimate value itself
-    # adds are absorbed by the //4 heuristic.
-    payload["token_estimate"] = len(json.dumps(payload, ensure_ascii=False)) // 4
+    # What this scope did NOT return, and the two follow-ups that reach it. A
+    # tool result is the one place where "was this worth calling" is already
+    # settled and attention is high, which makes it the only moment
+    # propose_update can be reminded of at all. One short static string: a
+    # footer that escalated with how well the model was behaving would be a
+    # footer that nags.
+    #
+    # A token estimate used to sit in this slot. It measured the payload the
+    # model was already holding -- by the time it could read the number it had
+    # paid for every token counted, and it cannot un-load a scope. These counts
+    # point the other way, at what has NOT been paid for yet, with an action
+    # attached. See the design spec, section 4.
+    left_behind = _not_in_this_scope(result)
+    if left_behind:
+        payload["not_in_this_scope"] = left_behind
+    payload["note"] = (
+        "search_context(query) then get_entity(id) reaches anything not here. "
+        "Heard something durable? propose_update. Do not narrate either."
+    )
     return payload
 
 def _parse_learning_ts(timestamp) -> datetime:
@@ -2792,49 +2834,36 @@ def get_entity_schema(entity: str = None, file: str = None) -> dict:
 # =============================================================================
 
 # This string is injected into the system prompt of EVERY conversation in every
-# client that connects, which makes it the most expensive prose in the codebase
-# and the only channel that reaches a client with no plugin system. It used to
-# spend six of its ten lines re-listing the tools the client already has in its
-# tool schema.
+# client that connects, which makes it the most expensive prose in the codebase.
 #
-# So it now carries only what the tool descriptions cannot: when to reach for
-# them, and where the skills are. Keep it under about forty lines. Growing it is
-# easy to do and hard to notice.
+# It is also the LEAST RELIABLE channel the server has, and that is a measured
+# fact rather than a suspicion: on 2026-08-16 production served the current copy
+# while every Claude Code session on the author's machine for the previous
+# fortnight -- including one connected to a server verified serving it -- still
+# carried the version from before commit b756039. `tools/list` is fetched per
+# session; this evidently is not.
+#
+# So: NOTHING MAY LIVE ONLY HERE. It may summarise and it may point; it may not
+# be the only place a behaviour is specified. The trigger phrases moved to
+# propose_update's description for exactly that reason. Keep it under about
+# forty lines, and see
+# docs/superpowers/specs/2026-08-16-tool-triggering-design.md.
 mcp = FastMCP(
     "mygist",
     instructions="""MyGist is the user's portable personal context. It is theirs, it
 outlives this conversation, and every other assistant they use reads it.
 
-START HERE
 Call get_context before your first substantive answer, at the smallest scope that
-answers the question -- "minimal" covers most things and already carries their
-name, bio, top-of-mind and preferences. To find one entry use search_context then
-get_entity rather than widening the scope. "full" is a debug and export surface.
-Then act on what you read: reading a persona and answering exactly as you would
-have anyway is the most common failure with one connected.
+answers the question. Then act on what you read: reading a persona and answering
+exactly as you would have anyway is the most common failure with one connected.
 
 THE RULE
 Asked writes, inferred proposes.
 - They asked you to record something -> persona_modify (or persona_batch).
 - You worked it out from what they said -> propose_update, which cannot write and
   puts it in their review queue.
-No third case. "They would obviously want this" is the inferred case in disguise,
-and that queue is what makes MyGist safe to leave connected.
-
-PROPOSE WHEN YOU HEAR
-"we've switched to X" / "I've started using X"     -> domain, work_skill
-"I've been doing X for a month"                   -> domain level, hobby, interest
-"we shipped it" / "that's done" / "I've parked it" -> project status
-"always give me X first" / "stop doing Y"         -> response_format
-"I can't stand X" / "I love X"                    -> dislike, like
-"my sister just started a PhD"                    -> connection
-"I want to be running 10k by March"               -> goal
-"I'm useless after 3pm"                           -> energy_peak, sleep
-"I got the job" / "I've left"                     -> work_experience
-Anything about them still true in a month is a candidate. Every proposal needs
-evidence in their own words -- if you cannot quote them, do not send it. An empty
-review queue usually means nobody was looking, not that there was nothing to say.
-Send one propose_update with a list, not one call per item.
+No third case. That queue is what makes MyGist safe to leave connected, and
+propose_update's own description lists what to listen for.
 
 SKILLS
 Four skills cover the above in full, at skill://mygist/<name>/SKILL.md, or
@@ -2864,7 +2893,68 @@ mcp_prompts.register(mcp)
 # TOOL DEFINITIONS
 # =============================================================================
 
-@mcp.tool()
+# The description an MCP client actually receives. Built here rather than left
+# as a docstring for one reason: the section list is generated from the loaded
+# packs (see sections.describe_sections), and a docstring cannot interpolate.
+#
+# It leads with an ARGUMENT rather than a rule. "Call this FIRST at conversation
+# start" states no cost for not calling, and a rule with no stated cost loses to
+# the pull of answering the question in front of you. Context7's most effective
+# line is the same shape -- "use even when you think you know the answer, your
+# training data may not reflect recent changes" -- and it fires reliably in
+# clients where this tool does not.
+_GET_CONTEXT_DESCRIPTION = f"""Load the user's persona before you answer.
+
+You have never met this user. Nothing in your training data contains them, and
+nothing in this conversation will tell you what you are missing -- an answer
+built on a guess about them reads perfectly fine, so it is never corrected.
+That is the failure this tool prevents.
+
+CALL THIS the moment the conversation is about them rather than about the
+world: anything they call "my", anything they have done, use, decided, plan or
+care about. Their persona covers the following -- each key is also a `scope`,
+and each line is worded as the user sees it in their own settings, so "you"
+there means them:
+{sections.describe_sections()}
+
+Call it too before any task where a wrong guess about them ends up in the
+output: writing in their voice, recommending a tool, planning their week,
+reviewing their code, drafting something they will send.
+
+Start with "minimal" -- the smallest scope, and enough for most questions.
+
+DO NOT CALL for general knowledge, or for code that has nothing to do with
+them. To find one entry, use search_context then get_entity -- never widen the
+scope to go looking.
+
+SCOPES (global):
+    minimal       Quick questions, greetings, code help: name, bio, top_of_mind, preferences
+    professional  Career, projects, technical: profile, skills, projects, code_style
+    personal      Life advice, hobbies, wellness: hobbies, personality, connections
+    learning      Skill development, roadmaps: skills, learning_log (last 60 days)
+    full          Complete dump -- prefer a targeted scope plus search_context
+
+SECTION SCOPES: any key in the list above. A section scope returns that whole
+section plus the always-on preferences (tone, detail_level, likes_dislikes,
+learning_style). Pass a list to union scopes, e.g. ["lifestyle", "circle"].
+
+ARGS:
+    scope: a global scope name, a section key, or a list of them
+    topic: Filter to items matching this topic (e.g. "react", "cooking")
+    include_inactive: Include inactive/paused items
+    days: Limit learning_log to last N days
+    limit: Max learning_log entries to return
+    detail: "full" (default) or "titles" -- titles mode reduces every id-list
+        entity to a lightweight {{"id", "title"}} stub for browsing before
+        pulling full detail via get_entity
+
+RETURNS:
+    The scoped persona, plus `not_in_this_scope`: per-section counts of what
+    this scope left behind, and a note on how to reach it.
+"""
+
+
+@mcp.tool(description=_GET_CONTEXT_DESCRIPTION)
 def get_context(
     scope: Union[str, List[str]] = "minimal",
     topic: Optional[str] = None,
@@ -2873,43 +2963,10 @@ def get_context(
     limit: Optional[int] = None,
     detail: str = "full"
 ) -> str:
-    """
-    Retrieve scoped persona context. Call this FIRST at conversation start.
-
-    WHEN TO USE:
-        - Start of any conversation (always)
-        - When you need user preferences to tailor responses
-        - To FIND specific entries (a project, a note, a person), do NOT pull a large scope — use search_context, then get_entity.
-
-    SCOPES (global):
-        - minimal: Quick questions, greetings, code help. Returns: name, bio, top_of_mind, preferences
-        - professional: Career, projects, technical. Returns: profile, skills, projects, code_style
-        - personal: Life advice, hobbies, wellness. Returns: hobbies, personality, connections
-        - learning: Skill development, roadmaps. Returns: skills, learning_log (last 60 days)
-        - full: complete dump — prefer targeted scopes plus search_context.
-
-    SECTION SCOPES: profile | knowledge | preferences | projects | lifestyle | circle | learning_log
-        - A section scope returns that whole section plus your always-on
-          preferences (tone, detail_level, likes_dislikes, learning_style).
-
-    MULTIPLE: pass a list to union scopes, e.g. ["lifestyle", "circle"].
-
-    ARGS:
-        scope: a global scope name, a section key, or a list of them
-        topic: Filter to items matching this topic (e.g., "react", "cooking")
-        include_inactive: Include inactive/paused items
-        days: Limit learning_log to last N days
-        limit: Max learning_log entries to return
-        detail: "full" (default) or "titles" — titles mode reduces every
-            id-list entity to a lightweight {"id", "title"} stub for
-            browsing before pulling full detail via get_entity
-
-    RETURNS:
-        Filtered persona data based on scope + user preferences (tone, detail_level, likes_dislikes)
-    """
+    """Internal. Clients see _GET_CONTEXT_DESCRIPTION above, not this."""
     result = get_scoped_context(scope, topic, include_inactive, days, limit, detail)
-    # Compact serialization keeps the returned string consistent with the
-    # token_estimate computed in get_scoped_context, and shrinks the payload.
+    # Compact serialization: no indent, and no ASCII escaping of characters a
+    # persona is full of.
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -2958,10 +3015,14 @@ def search_context(query: str, sections: Union[str, List[str], None] = None,
                     limit: int = 10, days: Optional[int] = None) -> str:
     """Search the persona for relevant entries by meaning and keywords.
 
-    PREFERRED way to find specific persona content — returns small ranked
-    snippets instead of whole sections. Follow up with get_entity(entity_id)
-    for full detail on a hit. Modes: "hybrid" (FTS + embeddings) or "fts"
-    (no embedding provider configured).
+    CALL THIS when they refer to something they told you before, or ask what
+    they decided, tried, read, used, chose, or are working on. Those verbs mean
+    a stored entry probably exists, and this is far cheaper than widening a
+    get_context scope to go looking for it.
+
+    Returns small ranked snippets rather than whole sections. Follow up with
+    get_entity(entity_id) for full detail on a hit. Modes: "hybrid" (FTS +
+    embeddings) or "fts" (no embedding provider configured).
 
     `days` filters per-entity: each indexed entry is included or excluded by
     its own last-change time, never by excluding a whole section, and it
@@ -3002,6 +3063,10 @@ def search_context(query: str, sections: Union[str, List[str], None] = None,
     out = search_index.search(user_id, query.strip(), sections, limit,
                                exclude_sections=list(disabled), days=days)
     out["query"] = query.strip()
+    # Read tools only. persona_modify and propose_update already return
+    # receipts, and a nudge on a write is a nudge to write more.
+    out["note"] = ("get_entity(id) for full detail on a hit. Heard something "
+                   "durable? propose_update. Do not narrate either.")
     return json.dumps(out, indent=2)
 
 
@@ -3573,10 +3638,30 @@ def _validate_proposal(p: dict) -> tuple[dict | None, dict | None]:
 def propose_update(proposals: list, client: str) -> str:
     """Propose durable persona changes you inferred from the conversation.
 
-    This NEVER writes. Every proposal lands in the user's review queue, and
-    they approve, reject, or promote it themselves. To write immediately --
-    only when the user has explicitly asked you to record something -- use
-    persona_modify instead.
+    PROPOSE WHEN YOU HEAR:
+        "we've switched to X" / "I've started using X"      -> domain, work_skill
+        "I've been doing X for a month"                     -> domain level, hobby
+        "we shipped it" / "that's done" / "I've parked it"  -> project status
+        "always give me X first" / "stop doing Y"           -> response_format
+        "I can't stand X" / "I love X"                      -> dislike, like
+        "my sister just started a PhD"                      -> connection
+        "I want to be running 10k by March"                 -> goal
+        "I'm useless after 3pm"                             -> energy_peak, sleep
+        "I got the job" / "I've left"                       -> work_experience
+    Anything about them still true in a month is a candidate. Send ONE call with
+    a list, not one call per item. An empty review queue usually means nobody was
+    looking, not that there was nothing to say.
+
+    THE RULE: asked writes, inferred proposes. They asked you to record it ->
+    persona_modify. You worked it out from what they said -> here. No third case;
+    "they would obviously want this" is the inferred case in disguise. This tool
+    NEVER writes -- every proposal lands in the user's review queue and they
+    approve, reject or promote it themselves, which is what makes MyGist safe to
+    leave connected.
+
+    DO NOT PROPOSE session summaries, moods, one-off task instructions, things
+    the user only asked about, praise, or anything you would struggle to quote
+    them on. When in doubt, do not propose -- an unreviewed queue helps nobody.
 
     ARGS:
         proposals (required): list of proposal objects, see KINDS below
@@ -3595,18 +3680,6 @@ def propose_update(proposals: list, client: str) -> str:
             {kind: "note", section_hint: "preferences", text: "...",
              rationale: "...", evidence: "...", confidence: 0.6}
 
-    HOW MUCH TO SEND IN `data`:
-        add    -- every required field, plus any optional field you actually
-                  know. Do not invent values to fill out the shape.
-        update -- the identifier (and the parent, where the entity has one) to
-                  locate the row, plus ONLY the fields that change. Resending
-                  fields you are not changing is the most common mistake here,
-                  and the user sees the result: a review row padded with values
-                  that are already on record.
-        remove -- the identifier and parent only. Nothing else is read.
-
-        This is the same shape get_schema's examples show for persona_modify.
-
     REQUIRED ON EVERY PROPOSAL:
         rationale -- why this is durable, in your words. ONE SENTENCE. The user
             reads it while deciding, next to a dozen others, so it has to be
@@ -3616,13 +3689,11 @@ def propose_update(proposals: list, client: str) -> str:
             If you cannot quote them, you have inferred too far and should not
             propose.
 
-    PROPOSE when the user reveals something still true next month: a skill
-    level that has actually moved, a project's real status, a person who
-    matters to them, a standing preference about how they want to be answered.
-
-    DO NOT PROPOSE session summaries, moods, one-off task instructions, things
-    the user only asked about, praise, or anything you would struggle to quote
-    them on. When in doubt, do not propose -- an unreviewed queue helps nobody.
+    HOW MUCH TO SEND IN `data`:
+        add    -- every required field, plus any optional field you actually know.
+        update -- the identifier (and parent, if it has one), plus ONLY what changes.
+        remove -- the identifier and parent. Nothing else is read.
+        Why, with worked examples: skill://mygist/mygist-writing/SKILL.md
 
     RETURN:
         {"results": [{n, result, ...}]} where result is one of:

@@ -44,11 +44,13 @@ def test_titles_mode_leaves_non_entity_scalars_untouched(as_user):
     assert profile["bio"] == "Mathematician and writer, first programmer."
 
 
-def test_titles_token_estimate_smaller_than_full(as_user):
+def test_titles_mode_returns_a_smaller_payload_than_full(as_user):
     _seed()
-    full = server.get_scoped_context("professional", detail="full")
-    titles = server.get_scoped_context("professional", detail="titles")
-    assert titles["token_estimate"] < full["token_estimate"]
+    # Asserted on the serialised string the caller actually receives. This used
+    # to read `token_estimate`, which was that same length over four.
+    full = server.get_context.fn(scope="professional", detail="full")
+    titles = server.get_context.fn(scope="professional", detail="titles")
+    assert len(titles) < len(full)
 
 
 def test_detail_bogus_errors(as_user):

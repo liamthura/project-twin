@@ -26,7 +26,7 @@ def _seed(monkeypatch, provider):
 def test_topic_filters_id_lists_keeps_other_fields(as_user, monkeypatch):
     _seed(monkeypatch, None)
     # get_scoped_context returns the full payload wrapper (scope,
-    # scope_description, topic_filter, token_estimate, context) as
+    # scope_description, topic_filter, context, note) as
     # characterized by test_context_efficiency.test_scopes_return_stable_shape;
     # the brief's shorthand `out["projects"]` is adapted to `out["context"]["projects"]`.
     out = server.get_scoped_context("professional", topic="rust")

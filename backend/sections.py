@@ -98,3 +98,23 @@ def all_scope_names() -> list[str]:
 def toggleable_sections() -> set:
     """Registry sections a user may enable/disable (everything not always-on)."""
     return set(SECTION_REGISTRY) - ALWAYS_ON_SECTIONS
+
+
+def describe_sections(indent: str = "    ") -> str:
+    """One line per loaded pack: its scope key, and the pack's own description.
+
+    Rendered into get_context's tool description at import time so the list
+    cannot go stale the first time somebody installs a pack -- a section present
+    in the data and absent from the only text telling a model to look for it is
+    a silent hole.
+
+    Built from LOADED packs, never from a user's enabled sections: a tool
+    description is public and identical for every caller on an instance, which
+    is the same reason skill:// resources are not scope-gated while the tools
+    are. The key doubles as the `scope` argument.
+    """
+    width = max(len(key) for key in PACK_META)
+    return "\n".join(
+        f"{indent}{key.ljust(width)}  {meta['description']}"
+        for key, meta in PACK_META.items()
+    )

@@ -36,7 +36,11 @@ def test_scopes_return_stable_shape(as_user):
     _seed()
     for scope in ALL_SCOPES:
         out = json.loads(get_context(scope=scope))
-        assert set(out.keys()) == {"scope", "scope_description", "topic_filter", "token_estimate", "context"}
+        # `not_in_this_scope` and `advisories` depend on what is seeded and
+        # indexed, so the shape is required-plus-optional rather than exact.
+        required = {"scope", "scope_description", "topic_filter", "context", "note"}
+        optional = {"not_in_this_scope", "advisories"}
+        assert required <= set(out.keys()) <= required | optional
         assert out["scope"] == scope
 
 
@@ -91,12 +95,9 @@ def test_resolve_scope_fields_preserves_legacy_key_order():
         assert list(server._resolve_scope_fields(scope).keys()) == keys
 
 
-def test_token_estimate_reflects_returned_payload(as_user):
-    store.save("profile", {**SECTION_REGISTRY["profile"].default, "name": "A", "bio": "x"*400})
-    raw = server.get_context.fn(scope="full")          # exact string the caller receives
-    est = json.loads(raw)["token_estimate"]
-    actual = len(raw) // 4
-    assert abs(est - actual) <= max(10, int(actual * 0.10)), (est, actual)
+# `test_token_estimate_reflects_returned_payload` lived here. The field it
+# asserted about is gone -- see tests/test_context_footer.py for what replaced
+# it, and the design spec's section 4 for why.
 
 
 # ---------------------------------------------------------------------------

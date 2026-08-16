@@ -1,18 +1,25 @@
+"""What a client actually receives for each tool.
+
+Reads `.description`, not `.fn.__doc__`. For most tools those are the same
+string, but get_context's description is built at import time so it can
+interpolate the generated section list -- and the description is the half a
+client sees either way, so it is the half worth asserting on.
+"""
 import server
 
 
-def test_get_context_docstring_steers_to_search():
-    doc = server.get_context.fn.__doc__
+def test_get_context_steers_to_search():
+    doc = server.get_context.description
     assert "search_context" in doc and "get_entity" in doc
 
 
 def test_full_scope_demoted():
-    doc = server.get_context.fn.__doc__
+    doc = server.get_context.description
     assert "Complex questions" not in doc
 
 
 def test_get_raw_docstring_steers():  # locks the earlier steer in place
-    assert "search_context" in server.get_raw.fn.__doc__
+    assert "search_context" in server.get_raw.description
 
 
 # ---------------------------------------------------------------------------
@@ -28,17 +35,17 @@ def test_get_raw_docstring_steers():  # locks the earlier steer in place
 
 
 def test_persona_modify_names_the_proposal_path():
-    doc = server.persona_modify.fn.__doc__
+    doc = server.persona_modify.description
     assert "propose_update" in doc
 
 
 def test_persona_modify_says_when_it_is_the_wrong_tool():
-    doc = server.persona_modify.fn.__doc__.lower()
+    doc = server.persona_modify.description.lower()
     assert "explicit" in doc or "asked" in doc
 
 
 def test_persona_batch_names_the_proposal_path():
-    assert "propose_update" in server.persona_batch.fn.__doc__
+    assert "propose_update" in server.persona_batch.description
 
 
 def test_get_schema_names_the_proposal_path(clean_database, as_user):
@@ -54,4 +61,4 @@ def test_the_schema_overview_names_the_proposal_path(clean_database, as_user):
 
 
 def test_propose_update_still_names_the_direct_path():
-    assert "persona_modify" in server.propose_update.fn.__doc__
+    assert "persona_modify" in server.propose_update.description
