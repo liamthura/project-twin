@@ -16,8 +16,12 @@ import { cn } from "@/lib/utils";
  * measured at 1400 to 1600ms to settle, roughly six times this project's
  * 300ms entrance budget: a count-up is an entrance, not an ambient loop, so it
  * gets no exemption from that budget. `{ damping: 40, stiffness: 400 }` is
- * near critical at four times the natural frequency, measured settling by
- * 210ms with no overshoot (it never reads 8 on the way to 7).
+ * exactly critical (damping ratio 1.0) at twice the natural frequency of the
+ * registry default, measured settling by 210ms with no overshoot (it never
+ * reads 8 on the way to 7). Critical, not merely fast, is the actual
+ * requirement: this displays an integer count, and a slightly underdamped
+ * spring would show a value above the target mid-flight, which reads as a
+ * bug rather than as polish.
  *
  * Reduced motion prints the number and stops. A count-up is decoration on a
  * value that is correct before the animation starts.
