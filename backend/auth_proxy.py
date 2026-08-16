@@ -241,7 +241,10 @@ def explain_registration_refusal(body: bytes, upstream: httpx.Response) -> Optio
     enriched = dict(payload)
     enriched["message"] = f"{message}. {_redirect_uri_help(rejected)}"
     enriched["rejected_redirect_uris"] = rejected
-    enriched["docs"] = "https://mygist.thuradev.qzz.io/docs/run/troubleshooting"
+    # Relative, not absolute. The docs ship in the same image on the same
+    # origin, and an absolute URL here would send every self-hosted instance's
+    # users to whichever hostname happened to be in the author's editor.
+    enriched["docs"] = "/docs/run/troubleshooting"
     logger.info(
         "rejected client registration: redirect_uris=%s", rejected or "unparsed"
     )

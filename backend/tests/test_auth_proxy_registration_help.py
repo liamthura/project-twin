@@ -55,6 +55,11 @@ class TestItExplains:
         # The real topology behind this: a dashboard reached over a tunnel.
         assert "tunnel" in message and "tailscale serve" in message
 
+    def test_the_docs_link_is_relative_to_this_instance(self):
+        """An absolute URL would send self-hosters' users to someone else's box."""
+        out = auth_proxy.explain_registration_refusal(_body("http://box:9119/cb"), _upstream(REFUSAL))
+        assert json.loads(out.body)["docs"].startswith("/docs/")
+
     def test_an_unparseable_body_still_explains_the_rule(self):
         """The guidance is the point; the named URI is a bonus."""
         out = auth_proxy.explain_registration_refusal(b"not json", _upstream(REFUSAL))
