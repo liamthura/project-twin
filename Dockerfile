@@ -78,6 +78,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ .
 
+# The same stamp the web stage bakes into the UI's version label, carried into
+# the runtime environment so /api/instance can report it without a credential.
+# ARG does not cross a FROM, so this pair is declared again rather than reused.
+ARG APP_COMMIT
+ARG SOURCE_COMMIT
+ENV APP_COMMIT=$APP_COMMIT
+ENV SOURCE_COMMIT=$SOURCE_COMMIT
+
 # main.py serves these; see register_static_routes(). The Node stages are
 # discarded, so only the built output lands in the final image.
 COPY --from=web /build/frontend/dist ./static

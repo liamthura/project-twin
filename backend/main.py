@@ -518,6 +518,17 @@ def invite_only() -> bool:
     return os.getenv("INVITE_ONLY", "").lower() == "true"
 
 
+def build_commit() -> str:
+    """The commit this image was built from, or "dev" when nothing stamped it.
+
+    Both names are accepted because both are in use: APP_COMMIT is what the
+    Dockerfile declares, SOURCE_COMMIT is what Coolify injects. The frontend's
+    version label already reads the same pair at build time; this is the same
+    answer for anyone who cannot open the UI.
+    """
+    return os.getenv("APP_COMMIT") or os.getenv("SOURCE_COMMIT") or "dev"
+
+
 @app.get("/api/instance")
 async def instance():
     """What this instance is like, before anyone has a credential.
@@ -533,10 +544,14 @@ async def instance():
     reads this to decide which connection method to recommend, because
     recommending the one that cannot work here would be worse than recommending
     neither.
+
+    `commit` is the build stamp, so "is this deploy live" costs one GET rather
+    than a token and a handshake.
     """
     return {
         "invite_only": invite_only(),
         "mcp_oauth": jwt_auth.mcp_resource_configured(),
+        "commit": build_commit(),
     }
 
 
