@@ -1,7 +1,9 @@
 # Onboarding rework and per-client install - design
 
 Date: 2026-08-16
-Status: draft, awaiting owner review
+Status: approved 2026-08-16. Revised the same day, after reading the registry
+sources, to drop `animated-beam` and `border-beam`. See "Two components dropped
+on inspection".
 Supersedes nothing. Builds on:
 `docs/superpowers/specs/2026-08-14-onboarding-slice-design.md` (the flow this
 extends), and the `connect` step added after it.
@@ -150,38 +152,78 @@ feature.
 
 ## The other four steps
 
-**Welcome.** `WelcomeVisual` is replaced by an `animated-beam` figure: client
-marks on the left, the MyGist mark in the centre, beams travelling inward. It
-states the product's claim, that context travels from one client to many, in the
-one place a paragraph is doing that work today. Copy and the delegate offer are
-unchanged.
+**Welcome.** Unchanged. See "Two components dropped on inspection" below:
+`WelcomeVisual` already is the beam diagram, and does it better than the
+component that was going to replace it.
 
 **About you** and **How you like.** Structure unchanged. Two changes only:
 `blur-fade` entrances at the motion budget below, and the "let your assistant do
 it" escape made reachable here rather than only on Connect. Someone who starts
 typing and regrets it currently has to go back a step to find the offer.
 
-**Complete.** Confetti on arrival (owner's call, 2026-08-16), over a summary card
-carrying a `border-beam` that runs once and a `number-ticker` on the count of
-what got saved. Confetti fires once per arrival, never on re-entry, and not at
-all under `prefers-reduced-motion`.
+**Complete.** Confetti on arrival (owner's call, 2026-08-16), and a
+`number-ticker` on the count of what got saved, which `StepComplete` already
+computes as `saved` and currently prints as flat text. Confetti fires once per
+mount and not at all under `prefers-reduced-motion`.
+
+## Two components dropped on inspection
+
+Both were in the approved spec. Reading the registry source removed the case for
+them, and the reasons are recorded here so nobody re-adds them.
+
+**`animated-beam` is a downgrade on what Welcome already has.**
+`WelcomeVisual.jsx` is already the diagram this was meant to introduce: three
+sources, one hub, three clients, with current flowing along the connectors. It
+animates `stroke-dashoffset` in CSS, so `globals.css`'s reduced-motion block
+zeroes it for free, and the stroke never changes shape so nothing reflows. Its
+header comment argues both choices explicitly. Magic UI's `animated-beam`
+measures endpoints with refs and animates in JavaScript, so it would need its own
+`prefers-reduced-motion` branch and would be the one thing still moving for a
+reader who asked everything to stop. Swapping a better implementation for a
+branded one is not a design pass.
+
+**`border-beam` costs more than it returns.** It is written for Tailwind 4
+throughout: `border-(length:--border-beam-width)`, `mask-[...]`,
+`mask-intersect`, `[mask-clip:padding-box,border-box]`, `bg-linear-to-l`,
+`from-(--color-from)`. None of those exist in Tailwind 3, and the mask in
+particular does not have a clean v3 arbitrary-property equivalent. Its default
+palette is `#ffaa40` to `#9c40ff`, which is the orange-to-purple AI gradient on
+the banned-signatures list. All of that to decorate a card whose arrival moment
+confetti is already carrying.
+
+The revised budget is `terminal`, `magic-card`, `confetti`, `number-ticker`, and
+the already-vendored `blur-fade`.
 
 ## Magic UI components
 
 Vendored as JSX into `frontend/src/components/ui/`, the way `blur-fade.jsx` and
 `safari.jsx` already are. Not installed as a dependency.
 
-| Component | Where | Why it survives the taste rules |
-|---|---|---|
-| `terminal` | command cards | real chrome, which the aesthetic notes ask for by name |
-| `animated-beam` | Welcome | its stated purpose is showing an integration |
-| `magic-card` | picker rows | spotlight on hover, no glow, no gradient |
-| `border-beam` | Complete summary | used once, tinted to a semantic token |
-| `confetti` | Complete | owner's explicit choice |
-| `number-ticker` | Complete | plain numerals |
-| `blur-fade` | all steps | already vendored |
+`blur-fade.jsx` is the precedent and the pattern to copy. Its header records the
+two changes every vendored file needs: JSX rather than TSX, and a
+`useReducedMotion()` early return that renders a plain `<div>` instead of a
+motion component with zeroed values.
 
-Rejected, with the rule each one breaks:
+| Component | Where | What has to change on the way in |
+|---|---|---|
+| `terminal` | command cards | chrome only, see below |
+| `magic-card` | picker rows | drop `next-themes` and orb mode, retint |
+| `confetti` | Complete | drop `ConfettiButton`, gate on reduced motion |
+| `number-ticker` | Complete | `text-foreground`, `en-GB`, reduced motion |
+| `blur-fade` | step entrances | already vendored, no change |
+
+**Terminal ships without its typing animation.** The registry component's
+headline feature is `TypingAnimation`, which reveals text one character at a
+time on a `setInterval`. That is wrong for a command someone came here to copy:
+the text is incomplete and unselectable while it types, and it delays the only
+thing the card exists to hand over. What is worth having is the chrome, the
+title bar and the mono body, which is exactly what the aesthetic notes mean by
+real product chrome rather than "fake UI assembled from styled divs". So vendor
+`Terminal` and `AnimatedSpan`, use `sequence={false}`, and leave
+`TypingAnimation` out of the file entirely rather than importing and not calling
+it.
+
+Rejected outright, with the rule each one breaks:
 
 - `neon-gradient-card`, and anything glowing: "neon and outer glows" is banned.
 - `animated-gradient-text`, `dia-text-reveal`: "gradient text on large headings"
@@ -191,8 +233,12 @@ Rejected, with the rule each one breaks:
 
 Constraints on every vendored file: React 18 and Tailwind 3, JSX not TSX,
 `hsl(var(--token))` semantic colours only, never a raw hex. Magic UI ships React
-19 and Tailwind 4 idioms in places and those need converting on the way in, not
-patching afterwards.
+19 and Tailwind 4 idioms throughout and those get converted on the way in, not
+patched afterwards. The known ones: `max-h-100` and `bg-linear-to-*` are v4-only
+utilities, `var(--color-background)` is the v4 theme variable rather than this
+project's `hsl(var(--background))`, and `magic-card` imports `next-themes`,
+which this app does not use and does not need since only its orb mode reads the
+theme.
 
 ### Motion budget
 
@@ -213,9 +259,7 @@ New:
 - `frontend/src/components/onboarding/ClientPicker.jsx` (+ test)
 - `frontend/src/components/onboarding/InstallCard.jsx` (+ test)
 - `frontend/src/components/ui/terminal.jsx`
-- `frontend/src/components/ui/animated-beam.jsx`
 - `frontend/src/components/ui/magic-card.jsx`
-- `frontend/src/components/ui/border-beam.jsx`
 - `frontend/src/components/ui/confetti.jsx`
 - `frontend/src/components/ui/number-ticker.jsx`
 
@@ -224,15 +268,17 @@ Changed:
 - `frontend/src/components/onboarding/StepConnect.jsx` - picker and card replace
   the generic steps block. Token path, instance gating and the fork all stay.
 - `frontend/src/components/onboarding/StepConnect.test.jsx` - rewritten.
-- `frontend/src/components/onboarding/WelcomeVisual.jsx` - the beam figure.
 - `frontend/src/components/onboarding/StepComplete.jsx` - the arrival treatment.
 - `frontend/src/components/onboarding/StepAboutYou.jsx`,
   `StepHowYouLike.jsx` - entrances and the delegate escape.
 - `frontend/src/landing/content.js` - `CLIENTS` derived from the roster.
 
-`confetti` pulls `canvas-confetti`, which is the one new runtime dependency in
-the feature. Everything else is self-contained JSX over `motion`, which is
-already a dependency.
+Unchanged, and deliberately so: `WelcomeVisual.jsx`.
+
+`confetti` pulls `canvas-confetti`, the one new runtime dependency in the
+feature. Everything else is self-contained JSX over `motion`, which is already a
+dependency. `canvas-confetti` calls `getContext("2d")`, which jsdom does not
+implement, so every test that mounts `StepComplete` mocks the module.
 
 ## Testing
 
