@@ -26,8 +26,8 @@ Open the instance in a browser. On the welcome screen, choose **Create an
 account**, pick a username, and set a password of at least 8 characters.
 
 <Screenshot
+  src="/screenshots/welcome-signup.png"
   caption="The welcome screen, with 'Create an account' selected"
-  hint="The unauthenticated landing state of the SPA, showing the username and password fields."
 />
 
 <Accordions>
@@ -110,12 +110,12 @@ Needed for a client that has no browser to open, one that has not implemented
 remote MCP authorization yet, or an instance with OAuth switched off. It is the
 same access, configured by hand.
 
-Start by creating the token. Open **Account → API tokens** and make one, named
+Start by creating the token. Open **Account → Tokens** and make one, named
 for what it is for, like `claude-desktop` or `laptop-cli`.
 
 <Screenshot
-  caption="Account → API tokens, with a new token being created"
-  hint="The token list showing existing tokens with their last-used dates, plus the create-token field."
+  src="/screenshots/settings-tokens-new.png"
+  caption="Account → Tokens, with a new token just created"
 />
 
 <Callout type="warn">
@@ -182,8 +182,8 @@ account is empty, so the honest answer is "almost nothing". That is the correct
 first result, and it proves the connection works.
 
 <Screenshot
+  src="/screenshots/chat-fresh-account.png"
   caption="A fresh account answering honestly"
-  hint="The assistant reporting it found very little, with the get_context tool call expanded."
 />
 
 If the tools do not appear at all, jump to
@@ -208,8 +208,8 @@ The assistant picks the right entity for each and calls `persona_modify`. You
 should see the tool calls happen, and a confirmation of what was stored.
 
 <Screenshot
+  src="/screenshots/chat-several-writes.png"
   caption="Several facts being written in one conversation"
-  hint="A conversation where the user states a few facts and the assistant confirms each write."
 />
 
 If you would rather click than type, everything is editable in the

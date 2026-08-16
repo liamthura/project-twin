@@ -1,109 +1,123 @@
 ---
 title: Infrastructure
-description: The deployment layer that lives in dashboards rather than in the repository.
+description: The deployment layer that lives in a dashboard rather than in the repository.
 ---
 
-This page exists because none of what it describes is in the codebase. It is
-dashboard state, and dashboard state is what gets forgotten.
+Everything the repository can specify, it specifies: the image, the migrations,
+the ports the process binds. What is left over lives in whatever platform you
+deploy on — a build setting, a port mapping, a DNS record — and that is the part
+nobody can read out of the code six months later.
+
+This page is about that leftover layer. It is deliberately not tied to one
+platform: substitute your own, and the things that go wrong are the same.
 
 <Callout>
-Everything here is specific to how *this* instance is deployed. If you are
-self-hosting your own, none of it is required, so see
-[Self-hosting](/run/self-hosting) for what actually is.
+None of this is required to run MyGist. [Self-hosting](/run/self-hosting) is the
+short path — Postgres, two containers, done. Read this when you are putting a
+deployment behind a domain and want to know which settings bite.
 </Callout>
 
-## The deployment
+## The shape
+
+Most hosted deployments end up in the same four layers, whatever the products
+are called:
 
 ```text
-Cloudflare  (DNS + proxy, TLS terminates here)
+an edge or proxy      DNS, TLS, and a public hostname
       ↓
-Coolify on a VPS  (builds and runs the container)
+a build platform      builds the image on push, runs the container
       ↓
-one container  →  /   /api   /mcp   /docs
+the API container     /   /api   /mcp   /docs   (+ /auth, proxied internally)
       ↓
-Postgres + pgvector  (same host)
+Postgres              with pgvector, if you want hybrid search
 ```
 
-## Cloudflare
+The middle two are the ones with settings you cannot commit.
 
-One hostname, `mygist.thuradev.qzz.io`. It is proxied through Cloudflare
-rather than pointing at the origin directly, so the origin IP stays private and
-TLS terminates at the edge.
+## What the platform has to get right
 
-### `mygist-api.thuradev.qzz.io` is retired
+Four settings, and each has a failure that looks like something else.
 
-The API and MCP endpoint once had their own hostname, separate from the UI. The
-single-container merge made that unnecessary, and it has now been retired
-outright.
-
-<Callout type="warn">
-Anything still configured against `mygist-api` is broken, not degraded. A
-client config is not something you can migrate on someone else's behalf, so the
-only fix is for each client to be repointed at `mygist.thuradev.qzz.io/mcp` by
-hand.
-
-If you are the one who retired it, that is a decision to communicate as well as
-make.
-</Callout>
-
-<Callout>
-While the DNS record survives its origin, the hostname returns Cloudflare's
-**`no available server`** instead of a DNS failure: a 503 from the edge, with
-nothing behind it.
-
-That reads like a database or application problem and is neither. It means a
-route with nothing attached. **Removing the DNS record is the tidy end of a
-retirement**: until it goes, the name keeps resolving and keeps answering 503,
-which is a slower and more confusing way to tell someone the host is gone than a
-clean NXDOMAIN.
-</Callout>
-
-## Coolify
-
-Deploys trigger on pushes to `main`.
-
-| Setting | Value |
-|---|---|
-| Build context | The **repository root** |
-| Dockerfile | `./Dockerfile` |
-| Container port | **1120** |
-| Trigger | Push to `main` |
+| Setting | Value | If it is wrong |
+|---|---|---|
+| Build context | The **repository root** | The build fails outright, which is the honest case |
+| Dockerfile | `./Dockerfile` | As above |
+| Container port | **1120** | Every request 502s while the container is perfectly healthy |
+| Commit stamp | `APP_COMMIT` or `SOURCE_COMMIT` build arg | You cannot tell what is deployed |
 
 <Callout type="warn">
-The container port is 1120, not 8000. It was 8000 until it was moved off the
-generic default.
-
-Nothing in the repository can enforce this end of it: the platform's own port
-mapping lives in a dashboard. If a deploy goes out and the proxy still points at
-8000, every request 502s while the container itself is perfectly healthy.
+The container port is **1120**, not 8000 or 8080. Nothing in the repository can
+enforce the other end of it: the platform's port mapping lives in a dashboard,
+so a proxy still pointing at the wrong port produces a 502 on every request
+while the container itself reports healthy. It reads like an application fault
+and is not one.
 </Callout>
 
-The context is the repository root because the image builds the frontend and
-the documentation before assembling the Python image.
+The build context is the repository root because earlier stages build the web UI
+and this documentation and copy their output into the final image. Pointing it
+at `backend/` builds a different, API-only image.
 
-`SOURCE_COMMIT` is injected at build time and ends up as the version label in
-the web UI, which is how you tell what is actually deployed.
+`APP_COMMIT` and `SOURCE_COMMIT` are both accepted as build args, and whichever
+one your platform injects ends up as the version label in the web UI. It is the
+cheapest way to answer "is this deploy actually live".
 
 ### Health gating
 
-The image's `HEALTHCHECK` has a **10-second start period**, and that is what
-makes a deploy report healthy at around 10 seconds rather than around 31.
+The image's `HEALTHCHECK` sets a **10-second start period**, which is what makes
+a deploy report healthy at around ten seconds rather than around thirty.
 
-Without it there is a window where a perfectly working container is still marked
-unhealthy and the platform answers 502. Worth remembering before blaming the
-application for a flaky deploy.
+Without a start period there is a window where a working container is still
+marked unhealthy and the platform answers 502. Worth knowing before you go
+looking for the fault in the application.
+
+## DNS and TLS
+
+One hostname is enough. The API, the MCP endpoint, the UI and these docs all
+come out of one container on one origin, so there is nothing to split across
+subdomains.
+
+Proxying the record rather than pointing it at the origin directly keeps the
+origin IP private and terminates TLS at the edge. That is a preference, not a
+requirement — a certificate on the origin works too.
+
+### Retiring a hostname
+
+If you ever split the API onto its own subdomain and later merge it back, the
+old name needs retiring properly, and that is worth doing deliberately.
+
+<Callout type="warn">
+A client configuration is not something you can migrate on someone's behalf.
+Every client pointed at the old hostname has to be repointed by hand, so a
+retirement is a thing to announce, not just to do.
+</Callout>
+
+<Callout>
+While a proxied DNS record outlives its origin, the hostname does not fail
+cleanly. It answers the proxy's own error — Cloudflare's is
+**`no available server`** — which is a 503 from the edge with nothing behind it.
+
+That reads like a database or application problem and is neither: it means a
+route with nothing attached. **Deleting the DNS record is the tidy end of a
+retirement.** Until it goes, the name keeps resolving and keeps answering 503,
+which is a slower and more confusing way to say "this host is gone" than a clean
+NXDOMAIN.
+</Callout>
 
 ## Database
 
-Self-hosted Postgres with pgvector, on the same VPS.
+Any reachable Postgres, managed or self-hosted. [Database](/run/database) covers
+the trade-offs, what pgvector buys you, and what happens without it.
 
-Older documentation describing Neon as the production database is out of date,
-though Neon remains a fine option for anyone else.
+The one deployment-shaped detail: the container runs `alembic upgrade head`
+before it binds a port, so a failed migration stops the deploy rather than
+leaving a half-migrated database serving traffic. A platform that health-checks
+aggressively during that window will see the container as down. It is not.
 
-## Keeping this page current
+## Keeping a record
 
-If you move any of this, update this page in the same change.
+Whatever you choose, write it down somewhere versioned, and update it in the
+same change that moves it.
 
-The failure mode is that six months later nobody can say where the DNS record
-points, and the only way to find out is to
-log into three dashboards.
+The failure mode is specific and common: six months later nobody can say where
+the DNS record points or which port the proxy targets, and the only way to find
+out is to log into three dashboards.

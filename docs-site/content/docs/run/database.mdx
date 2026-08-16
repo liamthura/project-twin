@@ -12,15 +12,14 @@ Any Postgres you can reach. There is nothing vendor-specific in the schema.
 
 | Option | Notes |
 |---|---|
-| **Self-hosted with pgvector** | What this project runs in production, on its own VPS |
+| **Self-hosted with pgvector** | Full control, and pgvector is one `CREATE EXTENSION` away |
 | **A managed provider** | [Neon](https://neon.tech), Supabase, RDS and others all work; several ship pgvector already enabled |
 | **A local container** | For development: `backend/docker-compose.yml` provides one |
 
 <Callout>
-Older documentation for this project described Neon as *the* production
-database. That stopped being true when it moved to a self-hosted instance. Neon
-is still a perfectly good managed option: one of several, not a
-requirement.
+Older documentation for this project named one managed provider as *the*
+database. It never was a requirement, and nothing in the schema depends on one.
+Pick whichever Postgres you would rather operate.
 </Callout>
 
 ## pgvector

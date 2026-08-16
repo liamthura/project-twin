@@ -11,13 +11,13 @@ It is often the faster tool. Correcting six fields is a few clicks, against
 several turns of conversation.
 
 <Screenshot
+  src="/screenshots/editor-section-open.png"
   caption="The editor, with a section open"
-  hint="The main view: the section tab strip along the top, one section's card open with a list of entries."
 />
 
 ## Getting around
 
-Sections appear as tabs. Within a section:
+Sections appear in the rail down the left. Within a section:
 
 - **Lists** show one row per entry. Click a row to expand it and see its fields.
 - **Scalar fields** such as your name, role and bio are plain forms.
@@ -36,8 +36,8 @@ batch of edits and commit them in one go. The status then reads *Unsaved
 changes* until you press it.
 
 <Screenshot
+  src="/screenshots/editor-entry-expanded.png"
   caption="An expanded list entry"
-  hint="One row expanded to show its detail fields, tag inputs and nested lists."
 />
 
 The editor is **generated from the same section packs** the server writes
@@ -51,12 +51,12 @@ The editor works on a small screen. A few things move:
 
 - Entry titles get the full width of the row, and status chips drop to a second
   line underneath.
-- Section navigation collapses from the wide tab strip into a dropdown.
+- Section navigation collapses from the rail into a dropdown.
 
 <Screenshot
+  src="/screenshots/editor-phone.png"
   caption="The editor on a phone"
   ratio="9 / 16"
-  hint="A narrow-viewport view showing the collapsed section dropdown and a list entry with its chip on the second row."
 />
 
 ## Sections
@@ -73,20 +73,22 @@ offered to AI clients and stops appearing in the editor, and comes back
 unchanged when you re-enable it.
 
 <Screenshot
+  src="/screenshots/sections-manager.png"
   caption="The Sections manager"
-  hint="The toggle list showing enabled, opt-in and locked-on sections."
 />
 
 ## Account
 
-The account dialog has three tabs.
+The settings dialog has five tabs: **Account**, **Server**, **Tokens**,
+**Connected apps** and **Data**. Three of them matter for day-to-day use.
 
-### Connection
+### Account and server
 
-Which server you are pointed at, and your password. Set one if you registered
-without, or change the one you have. Minimum eight characters.
+Your password, under Account: set one if you registered without, or change the
+one you have. Minimum eight characters. **Server** is which instance the UI is
+pointed at, for a browser that is not being served by the instance itself.
 
-### API tokens
+### Tokens
 
 Issue named tokens for AI clients, see when each was last used, and revoke any
 of them.
@@ -100,14 +102,14 @@ Use one token per client, so revoking a token from a machine you no longer have
 does not disconnect everything else.
 
 <Screenshot
-  caption="The API tokens tab"
-  hint="The token list with names and last-used dates, and the create-token control."
+  src="/screenshots/settings-tokens.png"
+  caption="The Tokens tab"
 />
 
 ### Data
 
-**Export** downloads your whole persona as JSON: the same structured data the
-tools read.
+**Export** downloads your whole persona as a zip of JSON files, one per section:
+the same structured data the tools read.
 
 **Import** takes one back. Two modes:
 
@@ -120,8 +122,8 @@ Export then import is also how you move between servers. It needs no database
 access at either end.
 
 <Screenshot
+  src="/screenshots/settings-data.png"
   caption="The Data tab"
-  hint="Export button plus the import control with the replace/merge segmented choice."
 />
 
 ## Editor-only actions

@@ -1,9 +1,15 @@
 import { ImageIcon } from 'lucide-react';
 
+/** The site is served under a basePath, and Next does not rewrite a plain
+ *  `<img src>` the way it rewrites pages and next/image. Written by hand here,
+ *  from the one value next.config declares. */
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+
 interface ScreenshotProps {
   /**
-   * Path under `public/`, e.g. `/screenshots/editor-sections.png`. Omit it and
-   * the component renders a labelled placeholder instead of a broken image.
+   * Path under `public/`, e.g. `/screenshots/editor-sections.png`. The
+   * basePath is added for you. Omit it and the component renders a labelled
+   * placeholder instead of a broken image.
    */
   src?: string;
   /** Alt text. Falls back to `caption` when not given. */
@@ -13,7 +19,9 @@ interface ScreenshotProps {
   caption: string;
   /** Extra direction for whoever takes the shot — which screen, which state. */
   hint?: string;
-  /** Tailwind aspect-ratio value for the placeholder box. */
+  /** Aspect ratio, e.g. `"9 / 16"`. Sizes the placeholder box, and caps the
+   *  width of a portrait image so a phone shot is not stretched across the
+   *  whole prose column. */
   ratio?: string;
 }
 
@@ -65,16 +73,27 @@ export function Screenshot({ src, alt, caption, hint, ratio = '16 / 10' }: Scree
     );
   }
 
+  // A portrait shot left to fill the column renders a 390px-wide phone at
+  // ~680px, which reads as a tablet with very large text. Capped to something
+  // phone-sized and centred; landscape keeps the full column.
+  const portrait = parseRatio(ratio) < 1;
+
   return (
     <figure className="my-6">
       {/* Plain <img>: the site is a static export with image optimisation off,
           so next/image would add sizing requirements and buy nothing. */}
       <img
-        src={src}
+        src={src.startsWith('/') ? `${BASE_PATH}${src}` : src}
         alt={alt ?? caption}
-        className="rounded-lg border border-fd-border bg-fd-muted/40"
+        className={`rounded-lg border border-fd-border bg-fd-muted/40 ${
+          portrait ? 'mx-auto max-w-[320px]' : ''
+        }`}
         loading="lazy"
       />
+      {/* The conversation figures under public/screenshots/chat-* are drawn
+          rather than captured -- see that directory's README for what is real
+          in them and what is not. Nothing marks them in the page: a badge on
+          every caption reads as a disclaimer and cheapens the figure. */}
       <figcaption className="mt-2 text-center text-sm text-fd-muted-foreground">
         {caption}
       </figcaption>

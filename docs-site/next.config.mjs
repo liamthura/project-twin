@@ -2,6 +2,13 @@ import { createMDX } from 'fumadocs-mdx/next';
 
 const withMDX = createMDX();
 
+// Where FastAPI mounts this site. Declared once and passed through `env` below,
+// because Next rewrites the URLs it controls -- pages, next/image, next/link --
+// and nothing else. A plain <img src="/screenshots/x.png"> is left alone, and
+// on the real origin "/" is the SPA, so the image 404s. Anything reaching for a
+// file in public/ has to add this prefix itself.
+const basePath = '/docs';
+
 /** @type {import('next').NextConfig} */
 const config = {
   // A static export, copied into the API image and served by FastAPI. Next is
@@ -14,7 +21,11 @@ const config = {
   // Without this, every asset URL and internal link would resolve against "/",
   // which is the SPA. The site's own pages sit at its root -- see lib/shared.ts
   // for why they are not under a second /docs.
-  basePath: '/docs',
+  basePath,
+
+  // The same value, readable from component code. One declaration, so the
+  // prefix a <img> builds by hand cannot drift from the one Next serves under.
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
 
   // StaticFiles(html=True) resolves a directory to its index.html, so emitting
   // `page/index.html` rather than `page.html` is what makes /docs/page/ work
