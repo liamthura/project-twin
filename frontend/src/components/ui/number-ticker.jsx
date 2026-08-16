@@ -1,0 +1,49 @@
+import { useEffect, useRef } from "react";
+import { useInView, useMotionValue, useReducedMotion, useSpring } from "motion/react";
+
+import { cn } from "@/lib/utils";
+
+/**
+ * Magic UI's `number-ticker`, adapted.
+ *
+ * Three changes from the registry version. It is JSX. Its colour comes from
+ * `text-foreground` rather than `text-black dark:text-white`, which ignored
+ * every token in globals.css and would have been wrong on any surface that is
+ * not the page canvas. And it formats with `en-GB`, matching the rest of the
+ * app.
+ *
+ * Reduced motion prints the number and stops. A count-up is decoration on a
+ * value that is correct before the animation starts.
+ */
+export function NumberTicker({ value, startValue = 0, delay = 0, className, ...props }) {
+  const ref = useRef(null);
+  const reduced = useReducedMotion();
+  const motionValue = useMotionValue(startValue);
+  const springValue = useSpring(motionValue, { damping: 60, stiffness: 100 });
+  const isInView = useInView(ref, { once: true, margin: "0px" });
+
+  useEffect(() => {
+    if (reduced || !isInView) return undefined;
+    const timer = setTimeout(() => motionValue.set(value), delay * 1000);
+    return () => clearTimeout(timer);
+  }, [motionValue, isInView, delay, value, reduced]);
+
+  useEffect(() => {
+    if (reduced) return undefined;
+    return springValue.on("change", (latest) => {
+      if (ref.current) {
+        ref.current.textContent = Intl.NumberFormat("en-GB").format(Math.round(latest));
+      }
+    });
+  }, [springValue, reduced]);
+
+  return (
+    <span
+      ref={ref}
+      className={cn("inline-block tabular-nums text-foreground", className)}
+      {...props}
+    >
+      {reduced ? Intl.NumberFormat("en-GB").format(value) : startValue}
+    </span>
+  );
+}
