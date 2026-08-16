@@ -70,17 +70,42 @@ sentence somebody just typed.
 that might not.** That single inversion explains all three failures, and
 correcting it is mostly moving prose between files.
 
-### The instructions may not be arriving at all
+### The instructions are not arriving. Measured, not suspected.
 
-A session connected to `https://mygist.thuradev.qzz.io/mcp` on 2026-08-16
-received the **pre-`b756039`** instructions string — the ten-line version that
+An authenticated `initialize` against `https://mygist.thuradev.qzz.io/mcp` on
+2026-08-16 returns the **current 44-line string**. Production is not stale. The
+rewrite shipped, deployed, and is being served right now.
+
+It has reached no one.
+
+Every Claude Code session on this machine in the last fortnight — seven of
+them, across four projects, including the session that ran this probe — carries
+the **pre-`b756039`** ten-line version in its system prompt: the one that
 re-lists six tools and ends "Always call get_context at the start of
-conversations to personalize responses". Not the 44-line rewrite that shipped
-on 2026-08-14.
+conversations to personalize responses".
 
-Either production is stale or the client cached it. `/api/version` is behind
-auth, so it could not be settled from outside. Either way the point stands: the
-channel carrying every trigger is the one nobody can check.
+| Session | Instructions received |
+|---|---|
+| 08-04 → 08-14 (5 sessions) | old — legitimately, they predate the deploy |
+| 08-16 02:11, connected to a server verified serving the new string | **old** |
+
+So the failure is client-side and it does not self-heal. Whatever the exact
+mechanism — a cache with no invalidation is the obvious candidate — the
+consequence is the same and it is structural:
+
+> **`instructions` is written once and delivered whenever. A user who connected
+> MyGist in July can still be reading July's copy in December, and no deploy
+> will change that.**
+
+This is the single strongest argument in the document. Every trigger MyGist has
+lives in that string. `tools/list` is fetched per session; `instructions`
+evidently is not. Moving the triggers into tool descriptions is not a
+refinement — it is the difference between shipping them and not.
+
+**One step to confirm the mechanism** before implementation: reconnect the
+server in a client (`/mcp` in Claude Code) and re-check. If a reconnect fixes
+it, the cache invalidates on reconnection and never otherwise, which is the
+same conclusion with a known trigger.
 
 ## What this does not change
 
@@ -208,26 +233,36 @@ in the channel least likely to arrive.
 third case. Every proposal needs evidence in the user's own words — if you
 cannot quote them, do not send it.
 
-**Bottom: a skeleton, and a pointer.** The full `HOW MUCH TO SEND IN data`
-prose — the add/update/remove rules about which fields to send — moves into
-`get_schema`'s digest, which exists to answer "what shape" and already carries
-usage instructions (`server.py:2611`). The description keeps only the two
-`KINDS` skeletons and one line: call `get_schema` for the entity vocabulary and
-the field rules.
+**Bottom: the field rules, compressed to their actionable core.**
 
-That material is already half-duplicated — the current description ends the
-section with *"This is the same shape get_schema's examples show for
-persona_modify"* — so this removes a second copy that can drift, as well as
-clearing the trigger's path.
+```
+add    -- every required field, plus any optional field you actually know.
+update -- the identifier (and parent, if it has one), plus ONLY what changes.
+remove -- the identifier and parent. Nothing else is read.
+```
 
-**The risk, stated:** a model that decides to propose and does **not** call
-`get_schema` first will guess the field rules and send an over-padded `update`.
-Two things contain it. `propose_update` already validates per item and returns
-`invalid` without sinking the batch (`server.py:3631`). And the failure is
-visible to the user — an over-padded proposal shows up as a review row carrying
-values already on record, which is a legible symptom rather than a silent one.
-If it turns out to be common, the field rules come back as three lines, not
-thirty.
+`get_schema` gains nothing, and the mechanics do not move there.
+
+The tempting version of this was to push `HOW MUCH TO SEND IN data` into
+`get_schema`'s digest and leave a pointer. It is the wrong move for two
+reasons.
+
+**It designs against the diagnosis.** The finding of this whole document is
+that models under-call MyGist's tools. Putting a required second call on the
+propose path adds a step to the chain that is already the least reliable one,
+and it breaks in exactly the wrong direction — a model that cannot be bothered
+to call `get_schema` does not send a malformed proposal, it sends none.
+
+**The explanation already has a home.** What makes the current section long is
+not the rules, it is the reasoning around them: *"Resending fields you are not
+changing is the most common mistake here, and the user sees the result: a review
+row padded with values that are already on record."* That paragraph is already
+in `backend/skills/mygist-writing/SKILL.md:67`, a skill whose own frontmatter
+advertises *"how much to send on an update"*. Moving it to `get_schema` would
+make a third copy of material that already exists in two places.
+
+So the description keeps the three lines that change what gets sent, and points
+at the skill — not at another tool call — for why.
 
 ### 3. `search_context` — a when, not a comparison
 
@@ -292,26 +327,33 @@ Constraints that keep it from becoming noise:
 - **Read tools only.** `persona_modify` and `propose_update` already return
   receipts, and a nudge on a write is a nudge to write more.
 
-### 5. The `instructions` string shrinks
+### 5. The `instructions` string shrinks, and stops being load-bearing
 
 With `PROPOSE WHEN YOU HEAR` moved into `propose_update`, the string returns to
 what the comment at `server.py:2795` says it should be: a pointer to the skills
 and nothing the tool descriptions already carry.
+
+That is now a correctness requirement, not tidiness. Given the delivery
+evidence, **nothing may live only in this string.** Anything it is the sole
+carrier of is something an unknown share of users will never see. It may
+summarise and it may point; it may not be the only place a behaviour is
+specified.
 
 `test_skill_resources.py:138` asserts `20 <= len(lines) <= 45`. The rewrite will
 land near the floor, so the assertion needs checking rather than assuming —
 lower the floor if the shortened string is genuinely complete, and do not pad
 it to satisfy a test.
 
-### 6. Make deploy drift visible
+### 6. Make build drift visible
 
 `/api/instance` (`main.py:521`) is unauthenticated and already returns
 `invite_only` and `mcp_oauth`. It gains the commit stamp the image is built
 with.
 
-Small, and directly caused by this investigation: the reason nobody noticed
-production might be serving a two-day-old instructions string is that there was
-no way to ask.
+Kept, though the investigation cleared the deploy: the first hour of this went
+on a question — *"is production even running this code?"* — that should have
+cost one unauthenticated GET, and instead needed a bearer token and a JSON-RPC
+handshake to answer. The next investigation gets the cheap version.
 
 ### 7. Guards
 
@@ -341,15 +383,19 @@ the next spec does not re-derive it.
 
 ## Order of work
 
-1. `/api/instance` commit stamp, and settle whether production is stale. Doing
-   anything else first risks writing prose for a channel that is not arriving.
-2. Generated section block, with its guard.
-3. `get_context` description.
-4. `propose_update` restructure, `search_context` when-clause.
-5. `instructions` shrink, and the floor on its test.
-6. Result footers, and `token_estimate` out in the same change — they touch the
+The question step 1 used to be — *is production stale?* — is answered. It is
+not. Everything below is about the channel, not the deploy.
+
+1. Generated section block, with its guard.
+2. `get_context` description.
+3. `propose_update` restructure, `search_context` when-clause.
+4. `instructions` shrink, and the floor on its test.
+5. Result footers, and `token_estimate` out in the same change — they touch the
    same payload builder, and shipping them apart means editing
    `get_scoped_context` and its tests twice.
+6. `/api/instance` commit stamp. Last, because nothing depends on it.
 
-Steps 2–6 are one deploy. Step 1 is worth landing on its own so the answer to
-"is this live" exists before there is something to check.
+One deploy. Then reconnect a client and confirm from a fresh session that the
+new descriptions arrive — which they should, since `tools/list` is fetched per
+session, and which is worth seeing rather than assuming given what this
+investigation found about the channel that is not.
