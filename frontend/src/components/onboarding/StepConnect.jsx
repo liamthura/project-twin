@@ -46,7 +46,7 @@ import { INSTALLABLE_CLIENTS } from "@/lib/clients.js";
 import { AUTOFILL_PROMPT } from "./autofillPrompt";
 import { ClientPicker } from "./ClientPicker";
 import { connectionStatus } from "./connectionStatus";
-import { COPIED_RESET_MS, InstallCard } from "./InstallCard";
+import { COPIED_RESET_MS, CopyButton, InstallCard, Steps } from "./InstallCard";
 import { installPrompt } from "./installPrompt";
 
 // Read plus propose, and deliberately not write. A first connection made from
@@ -55,36 +55,6 @@ import { installPrompt } from "./installPrompt";
 // letting a client change things unasked. persona:read is added server-side
 // regardless; see db.create_token.
 const FIRST_TOKEN_SCOPES = ["persona:propose"];
-
-function CopyButton({ value, label, children }) {
-  const [copied, setCopied] = useState(false);
-  // WCAG 2.5.3 Label in Name governs a control that HAS a visible text label:
-  // the accessible name must track it, or a screen reader keeps announcing
-  // "Copy X" over a button that now reads "Copied". Every call site of this
-  // component (CopyRow) is childless -- aria-label IS the button's only
-  // content -- so tracking would replace "Copy server address" or "Copy key"
-  // with a generic "Copied" that never resets and cannot be told apart.
-  const accessibleLabel = copied && children ? "Copied" : label;
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      className="shrink-0"
-      aria-label={accessibleLabel}
-      onClick={() => {
-        navigator.clipboard?.writeText(value);
-        setCopied(true);
-      }}
-    >
-      {copied ? (
-        <Check className="h-3.5 w-3.5" aria-hidden="true" />
-      ) : (
-        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-      )}
-      {children && <span className="ml-1.5">{copied ? "Copied" : children}</span>}
-    </Button>
-  );
-}
 
 function CopyRow({ id, label, value, hint }) {
   return (
@@ -130,23 +100,6 @@ function DocsLink({ path, children }) {
       {children}
       <ExternalLink className="h-3 w-3" aria-hidden="true" />
     </a>
-  );
-}
-
-// Numbered rather than prose, because this is a procedure someone carries out
-// in another application with this screen still open beside it.
-function Steps({ items }) {
-  return (
-    <ol className="space-y-2 text-sm">
-      {items.map((item, i) => (
-        <li key={i} className="flex gap-3">
-          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-            {i + 1}
-          </span>
-          <span className="leading-relaxed text-muted-foreground">{item}</span>
-        </li>
-      ))}
-    </ol>
   );
 }
 
@@ -318,7 +271,15 @@ export function StepConnect({ onDelegate, onFillManually }) {
             <button
               type="button"
               className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-              onClick={() => setShowKeyPath(true)}
+              onClick={() => {
+                setShowKeyPath(true);
+                // The picker and the fallback prompt already clear each other;
+                // without this, picking Raycast then opening this leaves the
+                // Raycast steps and the key steps on screen together -- two
+                // contradictory procedures for the same client.
+                setPicked(null);
+                setShowPrompt(false);
+              }}
             >
               My client can't sign in. Use a key instead
             </button>

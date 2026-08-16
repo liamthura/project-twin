@@ -25,7 +25,7 @@ import { AnimatedSpan, Terminal } from "@/components/ui/terminal";
 // number rather than carrying a second one that could drift from it.
 export const COPIED_RESET_MS = 2000;
 
-function CopyButton({ value, label, children, variant = "outline" }) {
+export function CopyButton({ value, label, children, variant = "outline" }) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef(null);
 
@@ -89,7 +89,10 @@ function AddressRow({ id, url }) {
   );
 }
 
-function Steps({ items }) {
+// Numbered rather than prose, because this is a procedure someone carries out
+// in another application with this screen still open beside it. Also used by
+// StepConnect's key path, which is why it is exported rather than kept local.
+export function Steps({ items }) {
   return (
     <ol className="space-y-2 text-sm">
       {items.map((item, i) => (

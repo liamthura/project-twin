@@ -175,6 +175,22 @@ describe("StepConnect, where clients can sign in", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("closes the picked client's card once the key path is opened", async () => {
+    // The picker and the fallback prompt already clear each other. Without the
+    // same rule here, picking Raycast then asking for a key leaves Raycast's
+    // steps and the key's steps on screen together -- two contradictory
+    // procedures for the same client.
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /raycast/i }));
+    expect(screen.getByText(/open raycast settings/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /can't sign in/i }));
+    expect(screen.queryByText(/open raycast settings/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create a key/i })).toBeInTheDocument();
+  });
+
   it("stops offering a connection once one exists", async () => {
     // Instructions for a job already done are noise.
     listConnectedAppsMock.mockResolvedValue([
@@ -238,8 +254,7 @@ describe("StepConnect", () => {
     // These buttons have no visible text of their own -- aria-label is their
     // entire accessible name. Tracking it to "Copied", the way a button WITH
     // visible text should, would collapse "Copy server address" and "Copy key"
-    // into the same indistinguishable label, and leave it stuck there for good
-    // because this component has no reset timer.
+    // into the same indistinguishable label.
     const user = userEvent.setup();
     renderStep();
     await user.click(await screen.findByRole("button", { name: /create a key/i }));
