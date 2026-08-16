@@ -45,21 +45,43 @@ describe("StepConnect, where clients can sign in", () => {
     getInstanceMock.mockResolvedValue({ invite_only: false, mcp_oauth: true });
   });
 
-  it("recommends signing in, and shows the address without a key", async () => {
+  it("offers a client to pick rather than generic instructions", async () => {
     renderStep();
 
-    expect(await screen.findByText(/recommended/i)).toBeInTheDocument();
-    expect(screen.getByText("https://example.test/mcp")).toBeInTheDocument();
-    // The key path is still reachable, but it is not what the screen leads with.
+    expect(await screen.findByRole("button", { name: /claude code/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cursor/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /raycast/i })).toBeInTheDocument();
+    // The key path is reachable, but it is not what the screen leads with.
     expect(screen.queryByRole("button", { name: /create a key/i })).not.toBeInTheDocument();
   });
 
-  it("spells the setup out as numbered steps", async () => {
+  it("shows the command once a command client is picked", async () => {
+    const user = userEvent.setup();
     renderStep();
-    await screen.findByText(/recommended/i);
 
-    expect(screen.getByText(/add a custom mcp connector/i)).toBeInTheDocument();
-    expect(screen.getByText(/asks you to sign in/i)).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /claude code/i }));
+    expect(
+      screen.getByText("claude mcp add --transport http mygist https://example.test/mcp"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the deeplink once Cursor is picked", async () => {
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /cursor/i }));
+    expect(screen.getByRole("link", { name: /add to cursor/i })).toBeInTheDocument();
+  });
+
+  it("offers a prompt for a client that is not on the list", async () => {
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /isn't listed/i }));
+    await user.click(screen.getByRole("button", { name: /copy prompt for my client/i }));
+    await expect(navigator.clipboard.readText()).resolves.toContain(
+      "https://example.test/mcp",
+    );
   });
 
   it("keeps the key path for a client that cannot sign in", async () => {
@@ -70,7 +92,7 @@ describe("StepConnect, where clients can sign in", () => {
     expect(screen.getByRole("button", { name: /create a key/i })).toBeInTheDocument();
   });
 
-  it("stops recommending a connection once one exists", async () => {
+  it("stops offering a connection once one exists", async () => {
     // Instructions for a job already done are noise.
     listConnectedAppsMock.mockResolvedValue([
       { id: "g1", clientId: "c1", clientName: "Claude", scopes: ["persona:propose"] },
@@ -78,7 +100,7 @@ describe("StepConnect, where clients can sign in", () => {
     renderStep();
 
     expect(await screen.findByText(/connected · Claude/i)).toBeInTheDocument();
-    expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /claude code/i })).not.toBeInTheDocument();
   });
 });
 
@@ -90,17 +112,19 @@ describe("StepConnect, where clients cannot sign in", () => {
       await screen.findByText(/does not offer sign-in for clients/i),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /create a key/i })).toBeInTheDocument();
-    expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
+    // No picker at all: every card on it tells someone to sign in, and this
+    // instance mounts no discovery routes for them to sign in against.
+    expect(screen.queryByRole("button", { name: /claude code/i })).not.toBeInTheDocument();
   });
 
-  it("recommends nothing when the instance cannot be reached", async () => {
+  it("shows no picker when the instance cannot be reached", async () => {
     // getInstance falls back to mcp_oauth: false. Recommending sign-in on an
     // instance that mounts no discovery routes sends someone into a 404.
     getInstanceMock.mockResolvedValue({ invite_only: false, mcp_oauth: false });
     renderStep();
 
     await screen.findByRole("button", { name: /create a key/i });
-    expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /claude code/i })).not.toBeInTheDocument();
   });
 });
 
@@ -197,11 +221,12 @@ describe("StepConnect", () => {
 });
 
 describe("StepConnect, the documentation link", () => {
-  it("points at the OAuth section when that is what it recommended", async () => {
+  it("points at the OAuth section when a client can sign in", async () => {
     getInstanceMock.mockResolvedValue({ invite_only: false, mcp_oauth: true });
     renderStep();
 
-    const link = await screen.findByRole("link", { name: /need help connecting/i });
+    await screen.findByRole("button", { name: /claude code/i });
+    const link = screen.getAllByRole("link", { name: /need help connecting/i })[0];
     expect(link).toHaveAttribute(
       "href",
       `${window.location.origin}/docs/use/clients/#connecting-over-oauth`,

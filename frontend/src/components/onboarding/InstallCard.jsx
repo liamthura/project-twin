@@ -31,12 +31,17 @@ function CopyButton({ value, label, children, variant = "outline" }) {
   // component that is no longer mounted.
   useEffect(() => () => clearTimeout(timeoutRef.current), []);
 
+  // aria-label tracks the same swap the visible text makes, below. Left static
+  // it would keep announcing "Copy X" over a button that now reads "Copied",
+  // a WCAG 2.5.3 Label in Name mismatch.
+  const accessibleLabel = copied ? "Copied" : label;
+
   return (
     <Button
       variant={variant}
       size="sm"
       className="shrink-0"
-      aria-label={label}
+      aria-label={accessibleLabel}
       onClick={() => {
         navigator.clipboard?.writeText(value);
         setCopied(true);
@@ -44,7 +49,11 @@ function CopyButton({ value, label, children, variant = "outline" }) {
         timeoutRef.current = setTimeout(() => setCopied(false), COPIED_RESET_MS);
       }}
     >
-      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? (
+        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+      )}
       {children && <span className="ml-1.5">{copied ? "Copied" : children}</span>}
     </Button>
   );

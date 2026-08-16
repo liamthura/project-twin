@@ -18,6 +18,12 @@
  * path to a 404. `/api/instance` reports it, and this screen recommends
  * accordingly rather than recommending something that cannot work here.
  *
+ * The client picker replaced four generic numbered steps that named Claude and
+ * left every other client to the docs site. `lib/clients.js` explains why the
+ * card's primary action differs per client: of the six, exactly one has a real
+ * deeplink, and six identical Install buttons would promise the same gesture
+ * six times and deliver it once.
+ *
  * The fork at the end is the point of the whole screen. Once something is
  * connected there are two honest answers to "who fills this in", and the flow
  * asks rather than assuming.
@@ -35,9 +41,13 @@ import {
   listTokens,
   mcpUrl,
 } from "@/lib/api.js";
+import { INSTALLABLE_CLIENTS } from "@/lib/clients.js";
 
 import { AUTOFILL_PROMPT } from "./autofillPrompt";
+import { ClientPicker } from "./ClientPicker";
 import { connectionStatus } from "./connectionStatus";
+import { InstallCard } from "./InstallCard";
+import { installPrompt } from "./installPrompt";
 
 // Read plus propose, and deliberately not write. A first connection made from
 // an onboarding screen should be able to SUGGEST and nothing more -- the reader
@@ -48,21 +58,25 @@ const FIRST_TOKEN_SCOPES = ["persona:propose"];
 
 function CopyButton({ value, label, children }) {
   const [copied, setCopied] = useState(false);
+  // aria-label tracks the same swap the visible text makes, below. Left static
+  // it would keep announcing "Copy X" over a button that now reads "Copied",
+  // a WCAG 2.5.3 Label in Name mismatch.
+  const accessibleLabel = copied ? "Copied" : label;
   return (
     <Button
       variant="outline"
       size="sm"
       className="shrink-0"
-      aria-label={label}
+      aria-label={accessibleLabel}
       onClick={() => {
         navigator.clipboard?.writeText(value);
         setCopied(true);
       }}
     >
       {copied ? (
-        <Check className="h-3.5 w-3.5" />
+        <Check className="h-3.5 w-3.5" aria-hidden="true" />
       ) : (
-        <Copy className="h-3.5 w-3.5" />
+        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
       )}
       {children && <span className="ml-1.5">{copied ? "Copied" : children}</span>}
     </Button>
@@ -141,6 +155,9 @@ export function StepConnect({ onDelegate, onFillManually }) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [promptCopied, setPromptCopied] = useState(false);
+  const [picked, setPicked] = useState(null);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [installCopied, setInstallCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,35 +223,57 @@ export function StepConnect({ onDelegate, onFillManually }) {
       </div>
 
       {recommendOauth && (
-        <div className="space-y-4 rounded-lg border border-primary/40 bg-primary/5 p-4">
+        <div className="space-y-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium">Add it to your client</p>
-              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-                recommended
-              </span>
-            </div>
+            <p className="text-sm font-medium">Add MyGist to your client</p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Your client sends you here to sign in, so there is no key to copy
-              or keep safe. You can see it by name and disconnect it whenever
-              you like.
+              Your client sends you here to sign in, so there is no key to copy or
+              keep safe. You can see it by name and disconnect it whenever you like.
             </p>
           </div>
 
-          <Steps
-            items={[
-              "Copy the address below.",
-              "In your client, add a custom MCP connector and paste it in. In Claude that is Settings, then Connectors, then Add custom connector.",
-              "Your client opens MyGist and asks you to sign in.",
-              "Approve the connection. Choose the option that lets it suggest changes.",
-            ]}
+          <ClientPicker
+            clients={INSTALLABLE_CLIENTS}
+            selectedId={picked}
+            onSelect={setPicked}
+            renderExpanded={(client) => <InstallCard client={client} url={address} />}
           />
 
-          <CopyRow
-            id="onboarding-mcp-url"
-            label="Server address"
-            value={address}
-          />
+          {/* The escape hatch, and the reason the roster can stay short. Closed by
+              default: it is the answer for a minority, and open it would compete
+              with the six rows that are the answer for everyone else. */}
+          {!showPrompt ? (
+            <button
+              type="button"
+              className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              onClick={() => setShowPrompt(true)}
+            >
+              My client isn't listed
+            </button>
+          ) : (
+            <div className="space-y-3 rounded-lg border p-4">
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Paste this into your client and it can add MyGist itself.
+              </p>
+              <p className="rounded-md border bg-muted/50 p-3 text-xs leading-relaxed">
+                {installPrompt(address)}
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard?.writeText(installPrompt(address));
+                  setInstallCopied(true);
+                }}
+              >
+                {installCopied ? (
+                  <Check className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Copy className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                )}
+                {installCopied ? "Copied" : "Copy prompt for my client"}
+              </Button>
+            </div>
+          )}
 
           <DocsLink path="/use/clients/#connecting-over-oauth">
             Need help connecting?
@@ -359,9 +398,9 @@ export function StepConnect({ onDelegate, onFillManually }) {
                 }}
               >
                 {promptCopied ? (
-                  <Check className="mr-1.5 h-4 w-4" />
+                  <Check className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 ) : (
-                  <Copy className="mr-1.5 h-4 w-4" />
+                  <Copy className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 )}
                 {promptCopied ? "Copied" : "Copy prompt"}
               </Button>
