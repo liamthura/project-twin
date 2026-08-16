@@ -38,9 +38,13 @@ describe("Terminal", () => {
     expect(container.querySelector(".bg-green-500")).toBeNull();
   });
 
-  it("uses no Tailwind 4 utilities", () => {
-    // max-h-100 and bg-linear-to-* exist in v4 only. This project is on v3, and
-    // a v4 class fails silently as an unknown class rather than loudly.
+  it("does not reach for two known Tailwind v4 utilities", () => {
+    // This does not, and cannot, prove the file has zero v4-only classes: it
+    // greps innerHTML for exactly max-h-100 and bg-linear-to-*, so any other
+    // v4 utility slips through unnoticed. What it catches is the regression
+    // that has actually happened to a vendored registry component before:
+    // an upstream diff reintroducing one of these two. A cheap tripwire
+    // against that one regression, not a Tailwind-version guarantee.
     const { container } = render(
       <Terminal title="Codex">
         <AnimatedSpan>codex mcp add mygist</AnimatedSpan>
