@@ -9,15 +9,22 @@ describe("installPrompt", () => {
   });
 
   it("names the transport, because a client that guesses stdio fails silently", () => {
-    expect(installPrompt(TEST_URL)).toMatch(/http/i);
+    // Must explicitly say "over HTTP", not just have it in the URL
+    const prompt = installPrompt(TEST_URL);
+    const withoutUrl = prompt.replace(TEST_URL, "");
+    expect(withoutUrl).toMatch(/over HTTP/i);
   });
 
   it("says there is no token, so nothing goes hunting for one", () => {
-    expect(installPrompt(TEST_URL)).toMatch(/oauth/i);
+    // Must explicitly state no token to paste, not just mention OAuth
+    expect(installPrompt(TEST_URL)).toMatch(/no token/i);
   });
 
   it("asks for the permission the review queue depends on", () => {
-    expect(installPrompt(TEST_URL)).toMatch(/suggest/i);
+    // Must keep suggest permission AND uncheck direct write
+    const prompt = installPrompt(TEST_URL);
+    expect(prompt).toMatch(/Suggest changes for your approval/);
+    expect(prompt).toMatch(/uncheck.*Change your persona directly/i);
   });
 
   it("uses no dashes as punctuation", () => {

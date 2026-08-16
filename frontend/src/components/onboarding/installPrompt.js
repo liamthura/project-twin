@@ -16,13 +16,19 @@
  *
  * A function, not a constant like `AUTOFILL_PROMPT` beside it. That one is the
  * same words on every instance; this one carries an address that is not.
+ *
+ * This prompt asserts OAuth unconditionally. It is correct only on an instance
+ * where `mcp_oauth` is true (see getInstance() in the backend). Any caller must
+ * gate on that flag before showing this prompt, or the agent will hit a 401
+ * when OAuth discovery is not mounted.
  */
 export function installPrompt(url) {
   return (
     `Add an MCP server named mygist at ${url}, over HTTP. ` +
     "It signs clients in with OAuth, so there is no token to paste. " +
-    "Open the sign-in link it gives you, approve the connection, and keep the " +
-    "permission to suggest changes. " +
-    "If you cannot add it yourself, tell me where that setting lives in this client."
+    "Open the sign-in link it gives you and approve the connection. Keep " +
+    "'Suggest changes for your approval' checked, and uncheck 'Change your " +
+    "persona directly'. If you cannot add it yourself, tell me where that " +
+    "setting lives in this client."
   );
 }
