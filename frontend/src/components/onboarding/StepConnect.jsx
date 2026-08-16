@@ -28,7 +28,7 @@
  * connected there are two honest answers to "who fills this in", and the flow
  * asks rather than assuming.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy, ExternalLink, Loader2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,7 @@ import { INSTALLABLE_CLIENTS } from "@/lib/clients.js";
 import { AUTOFILL_PROMPT } from "./autofillPrompt";
 import { ClientPicker } from "./ClientPicker";
 import { connectionStatus } from "./connectionStatus";
-import { InstallCard } from "./InstallCard";
+import { COPIED_RESET_MS, InstallCard } from "./InstallCard";
 import { installPrompt } from "./installPrompt";
 
 // Read plus propose, and deliberately not write. A first connection made from
@@ -58,10 +58,13 @@ const FIRST_TOKEN_SCOPES = ["persona:propose"];
 
 function CopyButton({ value, label, children }) {
   const [copied, setCopied] = useState(false);
-  // aria-label tracks the same swap the visible text makes, below. Left static
-  // it would keep announcing "Copy X" over a button that now reads "Copied",
-  // a WCAG 2.5.3 Label in Name mismatch.
-  const accessibleLabel = copied ? "Copied" : label;
+  // WCAG 2.5.3 Label in Name governs a control that HAS a visible text label:
+  // the accessible name must track it, or a screen reader keeps announcing
+  // "Copy X" over a button that now reads "Copied". Every call site of this
+  // component (CopyRow) is childless -- aria-label IS the button's only
+  // content -- so tracking would replace "Copy server address" or "Copy key"
+  // with a generic "Copied" that never resets and cannot be told apart.
+  const accessibleLabel = copied && children ? "Copied" : label;
   return (
     <Button
       variant="outline"
@@ -158,6 +161,12 @@ export function StepConnect({ onDelegate, onFillManually }) {
   const [picked, setPicked] = useState(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [installCopied, setInstallCopied] = useState(false);
+  const installCopiedTimeoutRef = useRef(null);
+
+  // Same defect InstallCard's own copy button already had to fix: without a
+  // reset, this reads "Copied" forever once clicked, and the two controls
+  // would sit on one screen behaving oppositely.
+  useEffect(() => () => clearTimeout(installCopiedTimeoutRef.current), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -198,7 +207,7 @@ export function StepConnect({ onDelegate, onFillManually }) {
   if (connection === null) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />
       </div>
     );
   }
@@ -235,22 +244,37 @@ export function StepConnect({ onDelegate, onFillManually }) {
           <ClientPicker
             clients={INSTALLABLE_CLIENTS}
             selectedId={picked}
-            onSelect={setPicked}
+            onSelect={(id) => {
+              setPicked(id);
+              // ClientPicker already keeps its own rows to one open at a time;
+              // this keeps the fallback in that same discipline, so picking a
+              // client does not leave a second copyable route open beside it.
+              if (id !== null) setShowPrompt(false);
+            }}
             renderExpanded={(client) => <InstallCard client={client} url={address} />}
           />
 
           {/* The escape hatch, and the reason the roster can stay short. Closed by
               default: it is the answer for a minority, and open it would compete
-              with the six rows that are the answer for everyone else. */}
-          {!showPrompt ? (
-            <button
-              type="button"
-              className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-              onClick={() => setShowPrompt(true)}
-            >
-              My client isn't listed
-            </button>
-          ) : (
+              with the six rows that are the answer for everyone else. A toggle
+              rather than a one-way reveal, with aria-expanded, for the same
+              reason ClientPicker's own rows are: once open there has to be a
+              way back. */}
+          <button
+            type="button"
+            aria-expanded={showPrompt}
+            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            onClick={() => {
+              setShowPrompt((prev) => !prev);
+              // Opening the fallback while a client card is open is the same
+              // two-routes-at-once problem as above, the other way round.
+              setPicked(null);
+            }}
+          >
+            My client isn't listed
+          </button>
+
+          {showPrompt && (
             <div className="space-y-3 rounded-lg border p-4">
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Paste this into your client and it can add MyGist itself.
@@ -263,6 +287,11 @@ export function StepConnect({ onDelegate, onFillManually }) {
                 onClick={() => {
                   navigator.clipboard?.writeText(installPrompt(address));
                   setInstallCopied(true);
+                  clearTimeout(installCopiedTimeoutRef.current);
+                  installCopiedTimeoutRef.current = setTimeout(
+                    () => setInstallCopied(false),
+                    COPIED_RESET_MS,
+                  );
                 }}
               >
                 {installCopied ? (
@@ -314,9 +343,13 @@ export function StepConnect({ onDelegate, onFillManually }) {
                 ]}
               />
 
-              <Button onClick={generate} disabled={generating}>
+              <Button
+                onClick={generate}
+                disabled={generating}
+                aria-label={generating ? "Creating a key" : undefined}
+              >
                 {generating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
                   "Create a key"
                 )}
@@ -357,7 +390,7 @@ export function StepConnect({ onDelegate, onFillManually }) {
 
       {connected && !token && (
         <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-4 text-sm">
-          <Check className="h-4 w-4 shrink-0 text-success" />
+          <Check className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />
           <span>
             {connection.state === "connected"
               ? `Connected · ${connection.name || "a client"}`
@@ -377,7 +410,7 @@ export function StepConnect({ onDelegate, onFillManually }) {
         {connection.canPropose ? (
           <div className="space-y-3 rounded-lg border p-4">
             <div className="flex items-start gap-3">
-              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
               <div className="space-y-1">
                 <p className="text-sm font-medium">Let your assistant do it</p>
                 <p className="text-xs leading-relaxed text-muted-foreground">

@@ -32,6 +32,19 @@ describe("InstallCard, a command client", () => {
     );
   });
 
+  it("tracks the visible 'Copied' text in its accessible name, since this button has one", async () => {
+    // WCAG 2.5.3 Label in Name: this button has visible text ("Copy command"),
+    // so the accessible name must swap with it or a screen reader keeps
+    // hearing "Copy command" over a button that now visibly reads "Copied".
+    const user = userEvent.setup();
+    render(<InstallCard client={client("codex")} url={TEST_URL} />);
+
+    const button = screen.getByRole("button", { name: /copy command/i });
+    expect(button).toHaveAttribute("aria-label", "Copy command");
+    await user.click(button);
+    expect(button).toHaveAttribute("aria-label", "Copied");
+  });
+
   it("resets to its label after the copied state times out", () => {
     // fireEvent, not userEvent: userEvent awaits promises that vitest's fake
     // clock also owns, so the click never settles and the test hangs before
@@ -91,6 +104,18 @@ describe("InstallCard, a steps client", () => {
 
     await user.click(screen.getByRole("button", { name: /copy server address/i }));
     await expect(navigator.clipboard.readText()).resolves.toBe(TEST_URL);
+  });
+
+  it("keeps its own name after copying rather than a shared 'Copied'", async () => {
+    // No visible text on this button -- aria-label is its only content -- so
+    // unlike "Copy command" above, it must NOT track the copied state, or every
+    // icon-only copy button on the page would read the same thing at once.
+    const user = userEvent.setup();
+    render(<InstallCard client={client("raycast")} url={TEST_URL} />);
+
+    const button = screen.getByRole("button", { name: /copy server address/i });
+    await user.click(button);
+    expect(button).toHaveAttribute("aria-label", "Copy server address");
   });
 });
 

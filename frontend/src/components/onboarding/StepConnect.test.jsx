@@ -125,6 +125,12 @@ describe("StepConnect, where clients cannot sign in", () => {
 
     await screen.findByRole("button", { name: /create a key/i });
     expect(screen.queryByRole("button", { name: /claude code/i })).not.toBeInTheDocument();
+    // installPrompt() asserts OAuth unconditionally, which is only true inside
+    // the mcp_oauth-gated block above. This pins the fallback itself to that
+    // gate, not just the picker: moving the escape hatch out from under it
+    // would still pass every other assertion here while shipping that false
+    // claim to a self-hosted instance.
+    expect(screen.queryByRole("button", { name: /isn't listed/i })).not.toBeInTheDocument();
   });
 });
 
@@ -143,6 +149,25 @@ describe("StepConnect", () => {
     // anyone where to point their client.
     expect(screen.getByText("https://example.test/mcp")).toBeInTheDocument();
     expect(screen.getByText("mg_secret_value")).toBeInTheDocument();
+  });
+
+  it("keeps each childless copy button's own name after copying, rather than a shared 'Copied'", async () => {
+    // These buttons have no visible text of their own -- aria-label is their
+    // entire accessible name. Tracking it to "Copied", the way a button WITH
+    // visible text should, would collapse "Copy server address" and "Copy key"
+    // into the same indistinguishable label, and leave it stuck there for good
+    // because this component has no reset timer.
+    const user = userEvent.setup();
+    renderStep();
+    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+
+    const copyAddress = screen.getByRole("button", { name: /copy server address/i });
+    await user.click(copyAddress);
+    expect(copyAddress).toHaveAttribute("aria-label", "Copy server address");
+
+    const copyKey = screen.getByRole("button", { name: /copy key/i });
+    await user.click(copyKey);
+    expect(copyKey).toHaveAttribute("aria-label", "Copy key");
   });
 
   it("asks for propose and not write on a first connection", async () => {
@@ -210,6 +235,28 @@ describe("StepConnect", () => {
     expect(onFillManually).toHaveBeenCalled();
   });
 
+  it("keeps an accessible name on the create-a-key button while it is generating", async () => {
+    // While generating, the button's only visible content is a bare spinner
+    // icon. Without an aria-label for that state the button would have no
+    // accessible name at all -- a screen reader user could not tell the
+    // button is even there, let alone busy.
+    let resolveCreate;
+    createTokenMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+    expect(
+      await screen.findByRole("button", { name: /creating a key/i }),
+    ).toBeInTheDocument();
+
+    resolveCreate({ id: "t1", label: "my assistant", token: "mg_secret_value" });
+  });
+
   it("reports a failed key rather than looking like nothing happened", async () => {
     createTokenMock.mockRejectedValue(new Error("Token limit reached"));
     const user = userEvent.setup();
@@ -226,7 +273,7 @@ describe("StepConnect, the documentation link", () => {
     renderStep();
 
     await screen.findByRole("button", { name: /claude code/i });
-    const link = screen.getAllByRole("link", { name: /need help connecting/i })[0];
+    const link = await screen.findByRole("link", { name: /need help connecting/i });
     expect(link).toHaveAttribute(
       "href",
       `${window.location.origin}/docs/use/clients/#connecting-over-oauth`,

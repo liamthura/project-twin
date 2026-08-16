@@ -20,7 +20,10 @@ import { AnimatedSpan, Terminal } from "@/components/ui/terminal";
 // says "Copied" forever, and the picker shows several of these at once -- copy
 // Claude Code's command, then Cursor's link, and Claude Code's button would
 // still claim a copy nobody just made.
-const COPIED_RESET_MS = 2000;
+//
+// Exported so StepConnect's own copy-with-a-timeout button reuses the same
+// number rather than carrying a second one that could drift from it.
+export const COPIED_RESET_MS = 2000;
 
 function CopyButton({ value, label, children, variant = "outline" }) {
   const [copied, setCopied] = useState(false);
@@ -31,10 +34,13 @@ function CopyButton({ value, label, children, variant = "outline" }) {
   // component that is no longer mounted.
   useEffect(() => () => clearTimeout(timeoutRef.current), []);
 
-  // aria-label tracks the same swap the visible text makes, below. Left static
-  // it would keep announcing "Copy X" over a button that now reads "Copied",
-  // a WCAG 2.5.3 Label in Name mismatch.
-  const accessibleLabel = copied ? "Copied" : label;
+  // WCAG 2.5.3 Label in Name governs a control that HAS a visible text label:
+  // the accessible name must track it, or a screen reader keeps announcing
+  // "Copy X" over a button that now reads "Copied". A childless button has no
+  // visible text at all -- aria-label IS its only content -- so tracking here
+  // would replace the one thing distinguishing it from every other icon-only
+  // copy button on screen with a generic "Copied" that never resets.
+  const accessibleLabel = copied && children ? "Copied" : label;
 
   return (
     <Button
