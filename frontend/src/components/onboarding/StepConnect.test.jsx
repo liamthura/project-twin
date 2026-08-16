@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const listTokensMock = vi.hoisted(() => vi.fn());
@@ -90,6 +90,89 @@ describe("StepConnect, where clients can sign in", () => {
 
     await user.click(await screen.findByRole("button", { name: /can't sign in/i }));
     expect(screen.getByRole("button", { name: /create a key/i })).toBeInTheDocument();
+  });
+
+  it("resets the fallback copy button to its label after the copied state times out", async () => {
+    // Same shape as InstallCard.test.jsx's own version of this: fireEvent,
+    // not userEvent, once fake timers are in, because userEvent awaits
+    // promises that vitest's fake clock also owns, so the click never
+    // settles before the assertion.
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /isn't listed/i }));
+    const button = await screen.findByRole("button", {
+      name: /copy prompt for my client/i,
+    });
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(button);
+      expect(screen.getByText("Copied")).toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(2000));
+      expect(screen.getByText("Copy prompt for my client")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("toggles the fallback open and closed, and aria-expanded follows it both ways", async () => {
+    // The old version only ever revealed the panel once clicked, with no way
+    // back and no aria-expanded at all. Clicking the trigger a SECOND time is
+    // the case that version would still have passed every other test on.
+    const user = userEvent.setup();
+    renderStep();
+
+    const trigger = await screen.findByRole("button", { name: /isn't listed/i });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("button", { name: /copy prompt for my client/i }),
+    ).toBeInTheDocument();
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("button", { name: /copy prompt for my client/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("closes the fallback once a client is picked from the list", async () => {
+    // ClientPicker already keeps its own rows to one open at a time; the
+    // fallback has to honour that discipline too, or picking Claude Code
+    // leaves the fallback's own copyable prompt open beside it.
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /isn't listed/i }));
+    expect(
+      screen.getByRole("button", { name: /copy prompt for my client/i }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /claude code/i }));
+    expect(
+      screen.queryByRole("button", { name: /copy prompt for my client/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("closes the picked client's card once the fallback is opened", async () => {
+    // The same rule, the other way round: opening the fallback while a
+    // client's install card is open would put two copyable routes on screen.
+    const user = userEvent.setup();
+    renderStep();
+
+    await user.click(await screen.findByRole("button", { name: /claude code/i }));
+    expect(
+      screen.getByText("claude mcp add --transport http mygist https://example.test/mcp"),
+    ).toBeInTheDocument();
+
+    await user.click(await screen.findByRole("button", { name: /isn't listed/i }));
+    expect(
+      screen.queryByText("claude mcp add --transport http mygist https://example.test/mcp"),
+    ).not.toBeInTheDocument();
   });
 
   it("stops offering a connection once one exists", async () => {
