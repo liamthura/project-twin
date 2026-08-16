@@ -101,12 +101,20 @@ describe("StepHowYouLike", () => {
   });
 });
 
-describe("the field steps offer the way out of typing", () => {
+describe.each([
+  ["with the pack", packs],
+  ["without it", []],
+])("the field steps offer the way out of typing (%s)", (_label, packsForCase) => {
   it("offers it on About you", async () => {
     const onDelegate = vi.fn();
     const user = userEvent.setup();
     render(
-      <StepAboutYou packs={[]} data={{}} onChange={vi.fn()} onDelegate={onDelegate} />,
+      <StepAboutYou
+        packs={packsForCase}
+        data={{}}
+        onChange={vi.fn()}
+        onDelegate={onDelegate}
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: /let my assistant fill this in/i }));
@@ -117,7 +125,12 @@ describe("the field steps offer the way out of typing", () => {
     const onDelegate = vi.fn();
     const user = userEvent.setup();
     render(
-      <StepHowYouLike packs={[]} data={{}} onChange={vi.fn()} onDelegate={onDelegate} />,
+      <StepHowYouLike
+        packs={packsForCase}
+        data={{}}
+        onChange={vi.fn()}
+        onDelegate={onDelegate}
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: /let my assistant fill this in/i }));
@@ -127,7 +140,7 @@ describe("the field steps offer the way out of typing", () => {
   it("stays out of the way when there is nowhere to go", () => {
     // No handler means the flow did not wire one, and a button that does
     // nothing is worse than no button.
-    render(<StepAboutYou packs={[]} data={{}} onChange={vi.fn()} />);
+    render(<StepAboutYou packs={packsForCase} data={{}} onChange={vi.fn()} />);
     expect(
       screen.queryByRole("button", { name: /let my assistant fill this in/i }),
     ).not.toBeInTheDocument();
