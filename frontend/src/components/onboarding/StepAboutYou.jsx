@@ -24,7 +24,7 @@ export function StepAboutYou({ packs, data, onChange, onOfferAssistant }) {
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold tracking-tight">About you</h1>
         <p className="text-muted-foreground">
-          This step is not available on this server. Carry on — you can fill this
+          This step is not available on this server. Carry on. You can fill this
           in from Profile whenever it is.
         </p>
         {/* Welcome promised this and Connect delivered it, two screens ago. Someone

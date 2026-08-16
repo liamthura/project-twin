@@ -32,7 +32,7 @@ export function StepHowYouLike({ packs, data, onChange, onOfferAssistant }) {
           How you like answers
         </h1>
         <p className="text-muted-foreground">
-          This step is not available on this server. Carry on — you can fill this
+          This step is not available on this server. Carry on. You can fill this
           in from Preferences whenever it is.
         </p>
         {/* Welcome promised this and Connect delivered it, two screens ago. Someone
