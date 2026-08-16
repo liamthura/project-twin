@@ -543,7 +543,7 @@ Expected: FAIL, `Failed to resolve import "./magic-card.jsx"`
 Create `frontend/src/components/ui/magic-card.jsx`:
 
 ```jsx
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import { motion, useMotionTemplate, useMotionValue, useReducedMotion } from "motion/react";
 
 import { cn } from "@/lib/utils";
@@ -593,12 +593,29 @@ export function MagicCard({ children, className }) {
     [mouseX, mouseY],
   );
 
-  // A pointer that leaves the window never fires pointerleave on the card, so
-  // the spotlight would stay frozen where it was last seen.
+  // A pointer that leaves the window never fires pointerleave on the card.
+  // blur alone is not enough: switching to another tab fires visibilitychange
+  // but not blur, because the window keeps OS focus. So the spotlight would
+  // stay frozen at the last pointer position until a genuine pointer event
+  // recalculates it. Both listeners reset the spotlight when focus is lost.
+  //
+  // Note the two different targets. `blur` is a window event; `visibilitychange`
+  // is dispatched at the document. Registering the second one on window happens
+  // to work through bubbling, but a test written against it dispatches at window
+  // too and then proves nothing about the path a browser actually takes.
   useEffect(() => {
     const clear = () => reset();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        clear();
+      }
+    };
     window.addEventListener("blur", clear);
-    return () => window.removeEventListener("blur", clear);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("blur", clear);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [reset]);
 
   const border = useMotionTemplate`
