@@ -40,6 +40,7 @@ import auth_preflight
 import auth_proxy
 import db
 import jwt_auth
+import mcp_activity
 import persona_store
 import proposals_store
 import scopes
@@ -660,6 +661,22 @@ async def login(body: LoginRequest):
 @app.get("/api/auth/whoami")
 async def whoami(request: Request):
     return {"user_id": db.current_user_id.get(), "username": request.state.username}
+
+
+@app.get("/api/usage")
+async def usage():
+    """What each connected client has actually done, for this account.
+
+    The answer to "is my assistant using MyGist at all", which until now could
+    only be guessed at from the outside. `tools/list` is the row worth reading
+    first: a client that has never fetched it is running on a cached tool
+    schema, and no deploy will reach it.
+
+    Counters only -- method names, tool names, the client's own label. Nothing
+    from arguments and no persona content, which is why this needs no scope
+    beyond the read every other /api GET already requires.
+    """
+    return {"activity": mcp_activity.usage(db.current_user_id.get())}
 
 
 @app.post("/api/auth/set-password")
