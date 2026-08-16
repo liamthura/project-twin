@@ -98,14 +98,40 @@ consequence is the same and it is structural:
 > will change that.**
 
 This is the single strongest argument in the document. Every trigger MyGist has
-lives in that string. `tools/list` is fetched per session; `instructions`
-evidently is not. Moving the triggers into tool descriptions is not a
-refinement — it is the difference between shipping them and not.
+lives in that string, so none of them has ever reached anyone. Moving the
+triggers into tool descriptions is not a refinement — it is the difference
+between shipping them and not.
 
-**One step to confirm the mechanism** before implementation: reconnect the
-server in a client (`/mcp` in Claude Code) and re-check. If a reconnect fixes
-it, the cache invalidates on reconnection and never otherwise, which is the
-same conclusion with a known trigger.
+### What the reconnect actually showed — added 2026-08-16, post-deploy
+
+An earlier draft of this section said *"`tools/list` is fetched per session;
+`instructions` evidently is not"*, and proposed a reconnect as the one step to
+confirm the mechanism. The reconnect was run. **That sentence was wrong, and it
+is worth keeping the correction rather than quietly deleting the claim.**
+
+After `/mcp` reconnected a live session to a server verified serving the new
+build:
+
+| | |
+|---|---|
+| Tool **results** | new — `not_in_this_scope`, `note`, no `token_estimate` |
+| Tool **descriptions** | **still the pre-deploy text** |
+
+So descriptions are cached client-side too, and reconnecting does not
+invalidate them. The channel hierarchy at the top of this section still holds in
+its ordering — results are the most reliable thing the server controls, and they
+are landing — but the line between "descriptions arrive" and "instructions do
+not" is softer than it was drawn.
+
+Two candidates remain, indistinguishable from inside a session: the client
+caching `tools/list` across reconnects, or the harness snapshotting its tool
+registry at session start and not rebuilding it on reconnect. **The decisive
+test is a genuinely fresh session**, which has not been run at the time of
+writing.
+
+This does not change what to build. It changes one claim about why it works:
+tool descriptions reach a *new* session reliably, and the design should not be
+read as promising they reach an *existing* one.
 
 ## What this does not change
 
@@ -395,7 +421,9 @@ not. Everything below is about the channel, not the deploy.
    `get_scoped_context` and its tests twice.
 6. `/api/instance` commit stamp. Last, because nothing depends on it.
 
-One deploy. Then reconnect a client and confirm from a fresh session that the
-new descriptions arrive — which they should, since `tools/list` is fetched per
-session, and which is worth seeing rather than assuming given what this
-investigation found about the channel that is not.
+One deploy. Then confirm from a **fresh session** — not a reconnected one — that
+the new descriptions arrive.
+
+Done, and the distinction turned out to matter: a reconnected session got the
+new tool *results* and the old tool *descriptions*. See "What the reconnect
+actually showed" above.
