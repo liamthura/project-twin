@@ -126,4 +126,17 @@ describe("InstallCard", () => {
     const { container } = render(<InstallCard client={client("notion")} url={TEST_URL} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("renders nothing for any client whose install() returns an empty payload", () => {
+    // The guard checked above is keyed to `notion` specifically. This pins the
+    // guard itself: any client whose install() returns nothing rendable -- not
+    // just that one -- must produce an empty card rather than a broken one.
+    const { container } = render(
+      <InstallCard
+        client={{ id: "x", name: "X", kind: "command", install: () => [] }}
+        url={TEST_URL}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
 });
