@@ -979,11 +979,76 @@ async def list_proposals(kind: str = "entity"):
     return {"proposals": proposals_store.list_pending(kind)}
 
 
+@app.get("/api/sweep")
+async def sweep_status():
+    """When the unattended sweep last ran, and what it found.
+
+    A background process with no surface is one nobody can tell has silently
+    stopped -- and this one's failure mode looks exactly like a persona with
+    nothing wrong with it. `null` means it has never run here.
+    """
+    return {"last_sweep": settings_store.get_settings().get("last_sweep")}
+
+
+@app.get("/api/history/{file_type}")
+async def list_history(file_type: str):
+    """Previous versions of one section, newest first.
+
+    Deliberately REST-only, with no MCP tool alongside it: an agent that can
+    revert can undo a rejection, and "anything you reject is never raised again"
+    is a guarantee this product makes. History is a user affordance.
+    """
+    if file_type not in VALID_FILES:
+        raise HTTPException(status_code=404, detail=f"{file_type} not found")
+    return {"history": persona_store.history(file_type)}
+
+
+@app.post("/api/history/{file_type}/revert/{history_id}")
+async def revert_history(file_type: str, history_id: int):
+    """Restore one section to a previous version.
+
+    Itself reversible: the revert goes through persona_store.save(), so the
+    version it replaces is snapshotted like any other write.
+    """
+    if file_type not in VALID_FILES:
+        raise HTTPException(status_code=404, detail=f"{file_type} not found")
+    if not persona_store.revert(file_type, history_id):
+        raise HTTPException(status_code=404, detail="no such version")
+    return {"status": "reverted", "section": file_type}
+
+
+@app.get("/api/proposals/for/{entity_id}")
+async def proposals_for_entity(entity_id: str):
+    """Why is this in my persona?
+
+    The resolved proposals that produced one entity, with the client that
+    proposed it, its reasoning, and the user's own words as evidence. Answerable
+    only because approve and promote now record the entity id rather than the
+    entity type.
+    """
+    return {"proposals": proposals_store.for_entity(entity_id)}
+
+
 @app.get("/api/proposals/count")
 async def count_proposals():
     """How many proposals are waiting. Drives the sidebar dot, so it is polled
     from every tab -- and unlike listing, it does not mark anything seen."""
     return proposals_store.pending_counts()
+
+
+def _written_entity_id() -> Optional[str]:
+    """The entity id the write that just ran assigned, or None.
+
+    Read from db.last_write, which persona_store.save() fills by diffing the
+    section before and after -- so this works for every entity in every section
+    without execute_modify's thirty branches having to return anything new.
+
+    Only ever one id: an approve or a promote performs a single add. Anything
+    else means the diff saw something this cannot attribute, and None is the
+    honest answer.
+    """
+    added = (db.last_write.get() or {}).get("added") or []
+    return added[0] if len(added) == 1 else None
 
 
 def _load_pending(proposal_id: str) -> dict:
@@ -1009,7 +1074,10 @@ async def approve_proposal(proposal_id: str, body: Optional[ResolveRequest] = No
     if result.startswith("❌"):
         raise HTTPException(status_code=400, detail=result)
 
-    proposals_store.resolve(proposal_id, "approved")
+    # The id, not the type. This is the only link back from a line in the
+    # persona to the quote that justified it.
+    proposals_store.resolve(proposal_id, "approved",
+                            promoted_to=_written_entity_id())
     return {
         "status": "approved",
         "result": result,
@@ -1058,7 +1126,10 @@ async def promote_proposal(proposal_id: str, body: ResolveRequest):
     if result.startswith("❌"):
         raise HTTPException(status_code=400, detail=result)
 
-    proposals_store.resolve(proposal_id, "promoted", promoted_to=entity)
+    # Prefer the assigned id over the entity type: `project_c140959c` makes the
+    # ledger reversible, where `project` only says what kind of thing it became.
+    proposals_store.resolve(proposal_id, "promoted",
+                            promoted_to=_written_entity_id() or entity)
     return {"status": "promoted", "result": result, "section": section}
 
 

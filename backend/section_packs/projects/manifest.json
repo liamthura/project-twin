@@ -5,6 +5,7 @@
   "description": "Active work and side projects",
   "core": false,
   "position": 40,
+  "stale_after_days": 120,
   "defaults": {
     "projects": [],
     "top_of_mind": []

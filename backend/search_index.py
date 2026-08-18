@@ -414,6 +414,43 @@ def resolve_titles(user_id, entity_ids) -> dict:
             for r in rows}
 
 
+def entity_text(user_id, entity_id) -> str:
+    """The indexed flat text of one entity, or "" if it is not indexed.
+
+    Deliberately not folded into search()'s result rows: those go straight out
+    to the caller as search_context output, and every hit carrying its full text
+    would cost tokens on the read path to serve one advisory on the write path.
+    A primary-key lookup on a write is cheaper than that.
+    """
+    with db.get_pool().connection() as conn:
+        row = conn.execute(
+            "select text from persona_search where user_id = %s and entity_id = %s",
+            (user_id, entity_id),
+        ).fetchone()
+    return row["text"] if row else ""
+
+
+def bump_read_count(user_id, entity_ids) -> None:
+    """Count a deliberate fetch of specific entities. Silent on any failure.
+
+    get_entity only. Scope reads pull whole sections, so counting them would say
+    nothing about which entries earned their place -- which is the only question
+    this column exists to answer.
+    """
+    ids = [i for i in entity_ids if i]
+    if not ids:
+        return
+    try:
+        with db.get_pool().connection() as conn:
+            conn.execute(
+                "update persona_search set read_count = read_count + 1"
+                " where user_id = %s and entity_id = any(%s)",
+                (user_id, ids),
+            )
+    except Exception:
+        logger.debug("read_count bump failed", exc_info=True)
+
+
 def entity_update_times(user_id, entity_ids) -> dict:
     """{entity_id: 'YYYY-MM-DD'} for the given ids, from the same
     persona_search.updated_at the `days` recency filter uses. Ids missing

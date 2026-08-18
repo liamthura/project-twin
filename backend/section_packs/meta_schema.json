@@ -82,6 +82,11 @@
       "additionalProperties": {
         "$ref": "#/$defs/quarantinedEntity"
       }
+    },
+    "stale_after_days": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Optional. After this many days without a change, an entity in this section is marked stale on read and becomes a retirement candidate for scripts/sweep.py. Omit it and the section never goes stale, which is the right answer for anything that does not expire on a timer -- a name, a taste, a dated log entry."
     }
   },
   "$defs": {

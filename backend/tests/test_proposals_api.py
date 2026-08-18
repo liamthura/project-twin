@@ -176,8 +176,16 @@ def test_promotion_records_provenance_even_without_a_tags_field(clean_database):
         "entity": "domain", "data": {"name": "Recommendation-first", "level": "advanced"},
     })
     assert r.status_code == 200
-    assert ps.get(pid)["promoted_to"] == "domain"
+    # The entity ID, not the entity type. `domain` would only say what kind of
+    # thing the note became; the id is what makes the ledger reversible, so
+    # "why is this in my persona" has an answer for this specific entry.
+    promoted_to = ps.get(pid)["promoted_to"]
+    assert promoted_to.startswith("domain_"), promoted_to
     assert ps.get(pid)["status"] == "promoted"
+
+    # ...and that link resolves back the other way.
+    found = ps.for_entity(promoted_to)
+    assert [p["id"] for p in found] == [pid]
 
 
 def test_promoting_clears_it_from_the_queue(clean_database):

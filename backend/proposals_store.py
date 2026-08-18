@@ -120,6 +120,26 @@ def _evict(user_id: str) -> None:
             )
 
 
+def for_entity(entity_id: str) -> list[dict]:
+    """Resolved proposals that produced one entity, newest first.
+
+    The reverse of the write path: given a line in the persona, which agent
+    proposed it, when, on what reasoning, and quoting what the user said. Only
+    finds rows resolved after `promoted_to` began holding the entity id -- older
+    rows recorded the entity TYPE and cannot be attributed to one entry.
+    """
+    if not entity_id:
+        return []
+    with db.get_pool().connection() as conn:
+        rows = conn.execute(
+            f"select {_COLUMNS} from persona_proposals"
+            " where user_id = %s and promoted_to = %s"
+            " order by resolved_at desc nulls last, created_at desc",
+            (db.current_user_id.get(), entity_id),
+        ).fetchall()
+    return [dict(r, id=str(r["id"])) for r in rows]
+
+
 def list_pending(kind: str, mark_seen: bool = True) -> list[dict]:
     """Pending proposals of one kind, newest first.
 

@@ -27,7 +27,7 @@ import logging
 # import io
 # import shutil
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional, Literal, Union, List
 import uuid
 
@@ -446,6 +446,7 @@ def get_scoped_context(
     # strip it from every id-list entry regardless of include_inactive/detail.
     # get_entity and get_raw are the surfaces that resolve/return it.
     result = _strip_related(result)
+    result = _mark_stale(result)
 
     # Goals hook (2/2): when no goal-bearing scope was requested (i.e. goals
     # rode in via minimal only), reduce to ≤5 active-goal {id, title} stubs.
@@ -698,6 +699,52 @@ def _stub_titles(data: dict) -> dict:
             if isinstance(s, dict) and s.get("id") in times:
                 s["updated_at"] = times[s["id"]]
     return data
+
+def _mark_stale(data: dict) -> dict:
+    """Flag entities that have sat unchanged past their section's window.
+
+    Reads persona_search.updated_at, the same per-entity timestamp the `days`
+    filter uses -- no new storage, and the threshold is manifest-owned
+    (`stale_after_days`), so a section that declares nothing never goes stale.
+    That is the default: a name or a taste does not expire on a timer.
+
+    A field on the entity rather than a line in the footer. The footer is one
+    short static string by design (a footer that varies with how well the model
+    is behaving nags); a field varies with the DATA, as `not_in_this_scope`'s
+    counts already do, and costs nothing on the entities where it does not fire.
+
+    Note the separate top-of-mind advisory in get_scoped_context is not this and
+    is not redundant with it: that list rots on a 30-day clock of its own, which
+    is a tighter promise than the section's window for `project` entities.
+    """
+    targets = []
+    for ft in [k for k in data if k in sections.SECTION_REGISTRY]:
+        spec = sections.SECTION_REGISTRY[ft]
+        if not spec.stale_after_days:
+            continue
+        section_data = data.get(ft)
+        if not isinstance(section_data, dict):
+            continue
+        for list_key, _prefix in spec.id_lists:
+            for item in section_data.get(list_key) or []:
+                if isinstance(item, dict) and item.get("id"):
+                    targets.append((item, item["id"], spec.stale_after_days))
+    if not targets:
+        return data
+    try:
+        times = search_index.entity_update_times(
+            db.current_user_id.get(), [eid for _i, eid, _w in targets])
+    except Exception:
+        # Derived data. A marker that fails to compute must not fail the read.
+        logger.warning("staleness lookup failed", exc_info=True)
+        return data
+    today = datetime.now(timezone.utc).date()
+    for item, entity_id, window in targets:
+        when = times.get(entity_id)
+        if when and (today - date.fromisoformat(when)).days > window:
+            item["stale"] = True
+    return data
+
 
 def _strip_related(data: dict) -> dict:
     """Strip the `related` key from every id-list entity in `data` (token
@@ -3105,6 +3152,11 @@ def _resolve_entity(entity_id: str) -> str:
             times = search_index.entity_update_times(db.current_user_id.get(), [entity_id])
             if entity_id in times:
                 payload["updated_at"] = times[entity_id]
+            _mark_stale({file_type: data})
+            # A deliberate fetch of one entry, which is the only read that says
+            # anything about whether that entry earns its place. Scope reads pull
+            # whole sections and are counted nowhere.
+            search_index.bump_read_count(db.current_user_id.get(), [entity_id])
             return json.dumps(payload, indent=2)
     return f"❌ Entity {entity_id} not found in {file_type}.{list_key}"
 
@@ -3182,6 +3234,10 @@ def get_entity(entity_id: Union[str, List[str]], include_related: bool = False) 
             independent of this flag; an id whose target has since been
             deleted still appears, as `{"id", "title": None, "section":
             None}`, rather than being silently dropped.
+
+    An entity carrying `"stale": true` has not changed in longer than its
+    section allows for. It is a prompt to check, not a verdict: if the user
+    mentions it, confirm it still holds and propose_update if it does not.
     """
     if isinstance(entity_id, str):
         result = _resolve_entity(entity_id)
@@ -3263,6 +3319,17 @@ def get_schema(
 # "close enough to plausibly be the same thing," so a near-identical text
 # match is required before the write-time nudge fires.
 DUPLICATE_DISTANCE_CUTOFF = 0.4
+
+# How much of a matched entity's stored text the advisory quotes. Enough to tell
+# a duplicate from a contradiction; an agent that needs the whole thing has
+# get_entity.
+MATCH_TEXT_CHARS = 300
+
+# Bounds on the "what did this replace" note. An update touching many entities is
+# a batch or a migration, and pasting all of it back would bury the receipt.
+OVERWRITE_NOTE_ENTITIES = 3
+OVERWRITE_NOTE_FIELDS = 4
+OVERWRITE_NOTE_CHARS = 120
 
 # Top-level id-list entities eligible for the advisory duplicate check on
 # "add": entity name -> (file_type, list_key). Built by cross-referencing
@@ -3379,13 +3446,29 @@ def _find_strong_match(file_type: str, entity_data: dict,
                 | {file_type})
         hits = search_index.search(user_id, query, section_filter, limit=3,
                                    exclude_sections=exclude_sections)
+
+        def _match(hit):
+            # The stored text, not just the title. Without it the caller knows
+            # only that something similar exists and has to spend a get_entity
+            # round trip to find out whether it actually disagrees -- which is
+            # the decision the advisory exists to prompt.
+            #
+            # flatten_entity writes the title as the first line of the indexed
+            # text, so the leading copy is dropped: quoting a title back beside
+            # itself is noise, and for a title-only entity (top_of_mind) it
+            # leaves nothing, which is the correct answer there.
+            text = search_index.entity_text(user_id, hit["entity_id"])
+            if hit["title"] and text.startswith(hit["title"]):
+                text = text[len(hit["title"]):]
+            return {"entity_id": hit["entity_id"], "title": hit["title"],
+                    "distance": hit["distance"], "file_type": hit["section"],
+                    "text": " ".join(text.split())[:MATCH_TEXT_CHARS]}
+
         for hit in hits["results"]:
             if hit["distance"] is not None and hit["distance"] <= DUPLICATE_DISTANCE_CUTOFF:
-                return {"entity_id": hit["entity_id"], "title": hit["title"],
-                        "distance": hit["distance"], "file_type": hit["section"]}
+                return _match(hit)
             if flattened_title and hit["title"].lower() == flattened_title.lower():
-                return {"entity_id": hit["entity_id"], "title": hit["title"],
-                        "distance": hit["distance"], "file_type": hit["section"]}
+                return _match(hit)
         return None
     except Exception:
         logger.warning("duplicate-advisory check failed for file_type=%s",
@@ -3400,12 +3483,38 @@ def _advisory_note(match: dict, supports_update: bool) -> str:
     -- if not (e.g. top_of_mind, which is add/remove-only), suggesting
     action="update" would be actionable advice for a dead end, so the
     closing clause degrades to a plain duplicate flag instead (same prefix,
-    spec wording preserved verbatim for the update-capable case)."""
+    spec wording preserved verbatim for the update-capable case).
+
+    Carries the matched entity's stored text where there is any, so the caller
+    can tell a duplicate from a contradiction without a second lookup."""
     prefix = (f' Note: resembles existing {match["entity_id"]} '
               f'"{match["title"]}" ')
+    if match.get("text"):
+        prefix += f'(on file: {match["text"]}) '
     if supports_update:
         return prefix + '— if this is the same item, use action="update" instead.'
     return prefix + '— it may be a duplicate.'
+
+
+def _overwrite_note() -> str:
+    """What the update just displaced, read from db.last_write.
+
+    Answers the question the add-side advisory cannot: not "what does this
+    resemble" -- an update names its target, so it always resembles itself --
+    but "what did this replace". Computed generically in persona_store.save()
+    from the two section blobs, so every entity in every section is covered
+    without thirty per-branch edits.
+    """
+    changed = (db.last_write.get() or {}).get("changed") or {}
+    if not changed:
+        return ""
+    parts = []
+    for entity_id, was in list(changed.items())[:OVERWRITE_NOTE_ENTITIES]:
+        fields = ", ".join(
+            f"{field}={_as_text(old)[:OVERWRITE_NOTE_CHARS]!r}"
+            for field, old in list(was.items())[:OVERWRITE_NOTE_FIELDS])
+        parts.append(f"{entity_id} was {fields}")
+    return " Replaced: " + "; ".join(parts) + "."
 
 
 def _cross_section_nudge(file_type: str, entity_data: dict):
@@ -3459,7 +3568,14 @@ def _augment_add_result(action: str, entity_lower: str, data: dict,
     dup_fired = (bool(match) and not result.startswith("❌")
                  and not result.startswith("✅ Updated stance:"))
     if dup_fired:
+        # No conflict proposal filed here, deliberately. At this moment the
+        # advisory has not been read yet, so an agent that resolves it on the
+        # next line would have a row in the inbox describing a problem it just
+        # fixed. The sweep's near-duplicate check finds the same condition and
+        # confirms both entries still exist first -- later, but never wrong.
         return result + _advisory_note(match, supports_update)
+    if action == "update" and result.startswith("✅"):
+        return result + _overwrite_note()
     if action == "add" and entity_lower in ADVISORY_ENTITIES and result.startswith("✅") and not result.startswith("✅ Updated stance:"):
         file_type, _list_key = ADVISORY_ENTITIES[entity_lower]
         try:
@@ -3747,6 +3863,9 @@ def propose_update(proposals: list, client: str) -> str:
                 entry["result"] = "conflicts_with_existing"
                 entry["existing_entity"] = {
                     "entity_id": match["entity_id"], "title": match["title"],
+                    # The comment above promises they should not have to go and
+                    # look up what it currently says. A title does not say it.
+                    "text": match.get("text") or None,
                 }
         results.append(entry)
 
