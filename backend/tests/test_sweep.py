@@ -178,3 +178,63 @@ def test_a_section_without_a_window_never_goes_quiet(clean_database, as_user):
                           {"name": "Sam", "relationship": "friend"})
     _age_the_index(3000)
     assert sweep_mod.sweep_user(db.current_user_id.get())["found"] == 0
+
+
+def test_near_duplicate_pair_is_proposed(clean_database, as_user, monkeypatch):
+    """The one check that needs pgvector, so the one worth exercising before it
+    is pointed at real data. Two projects whose text embeds identically."""
+    import embeddings
+    import search_index
+    from tests.test_search_query import VocabProvider
+
+    if not db.VECTOR_AVAILABLE:
+        import pytest
+        pytest.skip("no pgvector: check_near_duplicates is skipped by design")
+
+    monkeypatch.setattr(embeddings, "get_provider", lambda: VocabProvider())
+    persona_store.save("projects", {
+        # "js" and "javascript" embed to the same vector under VocabProvider, so
+        # these two land at distance 0 -- well inside DUPLICATE_DISTANCE_CUTOFF.
+        "projects": [
+            {"name": "Ledger", "description": "A js dashboard"},
+            {"name": "Ledger rewrite", "description": "A javascript dashboard"},
+        ],
+        "current_learning": [], "top_of_mind": [],
+    })
+    search_index._EXECUTOR.submit(lambda: None).result(timeout=10)
+    search_index.sync_index(db.current_user_id.get(), "projects",
+                            persona_store.load("projects"), embed_sync=True)
+
+    result = sweep_mod.sweep_user(db.current_user_id.get())
+    assert result["filed"] == 1
+    note = _notes()[0]
+    assert "look like the same thing" in note
+    assert "Ledger" in note and "Ledger rewrite" in note
+
+
+def test_near_duplicates_reports_each_pair_once(clean_database, as_user, monkeypatch):
+    """The self-join uses b.entity_id > a.entity_id. Without that every pair
+    arrives twice, mirrored, and the inbox gets two rows saying the same thing."""
+    import embeddings
+    import search_index
+    from tests.test_search_query import VocabProvider
+
+    if not db.VECTOR_AVAILABLE:
+        import pytest
+        pytest.skip("no pgvector")
+
+    monkeypatch.setattr(embeddings, "get_provider", lambda: VocabProvider())
+    persona_store.save("projects", {
+        "projects": [
+            {"name": "A", "description": "A js dashboard"},
+            {"name": "B", "description": "A javascript dashboard"},
+            {"name": "C", "description": "A rust parser"},
+        ],
+        "current_learning": [], "top_of_mind": [],
+    })
+    search_index._EXECUTOR.submit(lambda: None).result(timeout=10)
+    search_index.sync_index(db.current_user_id.get(), "projects",
+                            persona_store.load("projects"), embed_sync=True)
+
+    # One pair (A/B), not two rows for it, and C pairs with nothing.
+    assert sweep_mod.sweep_user(db.current_user_id.get())["filed"] == 1
