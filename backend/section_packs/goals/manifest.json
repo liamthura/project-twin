@@ -5,6 +5,7 @@
   "description": "What you're working toward — type, status, and target date",
   "core": false,
   "position": 15,
+  "stale_after_days": 120,
   "defaults": {
     "goals": []
   },

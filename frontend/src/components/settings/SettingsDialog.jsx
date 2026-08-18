@@ -32,6 +32,7 @@ import { ServerPanel } from "./ServerPanel";
 import { TokenPanel } from "./TokenPanel";
 import { AppsPanel } from "./AppsPanel";
 import { DataPanel } from "./DataPanel";
+import { HistoryPanel } from "./HistoryPanel";
 
 export function SettingsDialog({
   isOpen,
@@ -122,6 +123,7 @@ export function SettingsDialog({
         )}
         {activeTab === "tokens" && isSignedIn && <TokenPanel isOpen />}
         {activeTab === "apps" && isSignedIn && <AppsPanel isOpen />}
+        {activeTab === "history" && isSignedIn && <HistoryPanel />}
         {activeTab === "data" && isSignedIn && <DataPanel />}
       </DialogContent>
     </Dialog>

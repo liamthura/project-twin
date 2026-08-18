@@ -107,11 +107,16 @@ def register(mcp) -> None:
             # Recorded BEFORE dispatch, deliberately. The question this answers
             # is "did the client ask", and a tools/list that the server then
             # failed to serve is still a client that asked.
+            client = client_label(context)
             record(
-                client_label(context),
+                client,
                 getattr(context, "method", "") or "",
                 getattr(getattr(context, "message", None), "name", "") or "",
             )
+            # Published for persona_history's written_by. Set here because this
+            # is already the one place that works the label out, and every MCP
+            # request passes through it.
+            db.current_client.set(client)
             return await call_next(context)
 
     mcp.add_middleware(ActivityMiddleware())

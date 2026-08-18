@@ -85,8 +85,14 @@ def test_add_near_dupe_gets_advisory_but_still_writes(as_user, monkeypatch):
     # Locks the verbatim spec wording (entity_id/title interpolated, no
     # emoji, no distance field, plain double-quoted title) so drift in the
     # message format is caught here rather than by a loose substring check.
+    #
+    # The `(on file: ...)` clause is the whole point of the advisory: without
+    # the stored text the caller can tell that something similar exists but not
+    # whether it CONTRADICTS what is being written, which is the decision this
+    # message is trying to prompt. Note it does not repeat the title.
     assert re.search(
         r' Note: resembles existing project_\w+ "Ledger"'
+        r' \(on file: A JavaScript dashboard\)'
         r' — if this is the same item, use action="update" instead\.',
         out,
     )

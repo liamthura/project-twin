@@ -5,6 +5,7 @@
   "description": "Domains you know and topics you track",
   "core": false,
   "position": 20,
+  "stale_after_days": 365,
   "defaults": {
     "domains": [],
     "mental_tabs": []

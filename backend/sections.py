@@ -18,6 +18,10 @@ class SectionSpec:
     default: dict                  # skeleton persona blob for the section
     id_lists: tuple = ()           # ((list_key, id_prefix), ...)
     context_fields: dict = field(default_factory=dict)  # {scope_name: [field, ...]}
+    # Days without a change before an entity here reads as stale. None means
+    # never, which is the default and the right answer for most sections: a name
+    # or a taste does not expire on a timer.
+    stale_after_days: int | None = None
 
 
 # Global scope name -> human description.
@@ -59,6 +63,7 @@ SECTION_REGISTRY = {
         default=copy.deepcopy(m["defaults"]),
         id_lists=tuple(tuple(pair) for pair in m["id_lists"]),
         context_fields=m.get("scope_contributions", {}),
+        stale_after_days=m.get("stale_after_days"),
     )
     for key, m in _MANIFESTS.items()
 }

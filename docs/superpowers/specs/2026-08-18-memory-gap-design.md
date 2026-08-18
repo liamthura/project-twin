@@ -1,7 +1,8 @@
 # Closing the memory gap on mem0 and Honcho — design
 
 Date: 2026-08-18
-Status: designed, not implemented
+Status: implemented, 2026-08-18. Three things changed during the build; see
+**What the build changed** at the end.
 
 ## Why
 
@@ -57,9 +58,11 @@ one says. That is a field, not a feature.
 `persona_proposals` already has `kind`, `fingerprint`, `seen_count`, `status`,
 and the guarantee that a rejected proposal is never raised again. Contradiction,
 staleness, capture and the unattended sweep are not four subsystems. They are four
-producers feeding one review-gated inbox that already exists — which is why the
-whole of this document adds one table, one column and one script rather than a
-memory engine.
+views of one review-gated inbox that already exists — which is why the whole of
+this document adds one table, one column and one script rather than a memory
+engine. (As built, the sweep is the only new producer: it absorbed the
+contradiction and staleness jobs both, for the reason given in **What the build
+changed**.)
 
 It also sets the constraint every unit below is held to: **a new producer may file
 a proposal; nothing new may write to the persona.** The inbox is the only thing
@@ -134,7 +137,12 @@ agent has ever read is a far stronger retire candidate than an old timestamp
 alone. MyGist counts tool calls in `mcp_activity` but has no per-entity read
 count.
 
-## 1. The conflict advisory carries what it conflicts with — and outlives the turn
+## 1. The conflict advisory carries what it conflicts with
+
+> Built without the durable half. The write-time conflict proposal described
+> under "The conflict also outlives the turn" was dropped during
+> implementation and the sweep took the job over; see **What the build
+> changed**.
 
 ### Current state, verified
 
@@ -557,3 +565,43 @@ The sequencing is not arbitrary. Unit 2 gives every later step an undo, and unit
 is the only part of this that acts without the user in the room — so it lands last,
 on top of history, a review gate it cannot bypass, and a test asserting it holds no
 write access.
+
+## What the build changed
+
+Three deviations, all in the direction of less code.
+
+**No write-time conflict proposal.** Unit 1 was to file a `conflict`-kind
+proposal the moment `_find_strong_match` fired. Building it made the flaw
+obvious: at that moment the advisory has not been read yet, so an agent that
+resolves the collision on its very next call would leave behind a row in the
+inbox describing a problem it had already fixed. False positives, in the one
+surface whose value depends on being worth opening. The sweep's near-duplicate
+check finds the same condition and confirms both entries still exist first —
+later, but never wrong. The `conflict` kind was dropped with it, so
+`_validate_proposal` and the frontend are untouched.
+
+**No `file_what_you_heard` prompt.** It already exists, as `catch_up`. The
+design was written having seen only the prompt *names* in `mcp_prompts.py`; the
+text of `CATCH_UP` is the specced prompt almost line for line, down to reading
+`mygist-capture` first and sending one call rather than one per item. Unit 4
+therefore needed nothing built, and the activity query it turns on is a
+diagnostic to run rather than code to ship — `GET /api/usage` already exposes
+the counters it reads.
+
+**The update advisory did not need history to store anything.** The design said
+history was what made the update side possible. Half right: it needed history's
+*write point*, not its rows. `persona_store.save()` reads the previous blob to
+snapshot it, and that same read yields the changed-field diff — published on a
+`last_write` contextvar that `_overwrite_note` and the promote route both read.
+One computation, three consumers, and no per-branch edits across the thirty
+entity branches in `execute_modify`.
+
+Also settled while building: staleness is a field on the entity in `get_context`
+and `get_entity`, and **not** on `search_context`. Search returns snippets for
+triage and the agent fetches what it wants next; that fetch marks staleness
+already, so putting it on search would be a second query on the hottest read
+path for information arriving one step early. The `stale_after_days` windows
+shipped as designed (projects 120, goals 120, knowledge 365, everything else
+none), and the separate 30-day top-of-mind advisory in `get_scoped_context` was
+left alone — that list rots on a tighter clock than the section's own window,
+which is a different promise rather than a contradiction.

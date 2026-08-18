@@ -15,6 +15,7 @@ export const SETTINGS_TABS = [
   { id: "server", label: "Server", needsCredential: false },
   { id: "tokens", label: "Tokens", needsCredential: true },
   { id: "apps", label: "Connected apps", needsCredential: true },
+  { id: "history", label: "History", needsCredential: true },
   { id: "data", label: "Data", needsCredential: true },
 ];
 

@@ -480,11 +480,87 @@ def load(file_type: str) -> dict:
     return _normalize(file_type, row["data"])
 
 
+# How many previous versions of each section to keep. Whole-section snapshots,
+# so this is 20 copies of a section's JSON per section per user.
+# ponytail: whole-section snapshots, move to jsonb diffs only if a section's
+# blob ever gets big enough to notice.
+HISTORY_KEEP = 20
+
+# Fields the write path stamps itself, so a change to them says nothing about
+# what the caller actually did. Reporting "last_updated changed" on every single
+# update would bury the one field that matters.
+_BOOKKEEPING = frozenset({"last_updated", "added_date", "updated_at"})
+
+
+def _entities(file_type: str, data: dict) -> dict:
+    """{entity_id: entity} for every id-bearing entity in a section blob.
+
+    Driven off `spec.id_lists`, the same declaration search_index.flatten_section
+    walks, so a new section pack is covered without touching this.
+    """
+    spec = sections.SECTION_REGISTRY.get(file_type)
+    if spec is None:
+        return {}
+    found = {}
+    for list_key, _prefix in spec.id_lists:
+        for entity in data.get(list_key) or []:
+            if isinstance(entity, dict) and entity.get("id"):
+                found[entity["id"]] = entity
+    return found
+
+
+def _diff(file_type: str, before: dict, after: dict) -> dict:
+    """What changed between two versions of one section.
+
+    `changed` maps an entity id to the PREVIOUS value of each field that moved,
+    which is what an update advisory needs: not what it is now (the caller just
+    supplied that) but what it displaced. A field cleared entirely counts, since
+    that is the most destructive shape an overwrite takes.
+    """
+    old, new = _entities(file_type, before), _entities(file_type, after)
+    changed = {}
+    for entity_id, entity in new.items():
+        previous = old.get(entity_id)
+        if previous is None:
+            continue
+        was = {k: v for k, v in previous.items()
+               if k not in _BOOKKEEPING and v != entity.get(k)}
+        if was:
+            changed[entity_id] = was
+    return {"added": [i for i in new if i not in old], "changed": changed}
+
+
 def save(file_type: str, data: dict) -> bool:
-    """Save (upsert) one persona file for the current user."""
+    """Save (upsert) one persona file for the current user.
+
+    Also snapshots the version being displaced into persona_history and records
+    what changed in db.last_write. Both come off the same read of the previous
+    row: this is the only point in the system holding what the persona said and
+    what it is about to say at the same time.
+    """
     _assign_ids(file_type, data)
     user_id = db.current_user_id.get()
     with db.get_pool().connection() as conn:
+        previous = conn.execute(
+            "select data from persona_data where user_id = %s and file_type = %s",
+            (user_id, file_type),
+        ).fetchone()
+        if previous is not None:
+            # Same transaction as the upsert below, so a section is never
+            # overwritten without its predecessor being kept.
+            conn.execute(
+                "insert into persona_history (user_id, file_type, data, written_by)"
+                " values (%s, %s, %s, %s)",
+                (user_id, file_type, json.dumps(previous["data"]),
+                 db.current_client.get()),
+            )
+            conn.execute(
+                "delete from persona_history where user_id = %s and file_type = %s"
+                " and id not in (select id from persona_history"
+                " where user_id = %s and file_type = %s"
+                " order by replaced_at desc, id desc limit %s)",
+                (user_id, file_type, user_id, file_type, HISTORY_KEEP),
+            )
         conn.execute(
             """
             insert into persona_data (user_id, file_type, data, updated_at)
@@ -494,6 +570,8 @@ def save(file_type: str, data: dict) -> bool:
             """,
             (user_id, file_type, json.dumps(data)),
         )
+    db.last_write.set(
+        _diff(file_type, previous["data"] if previous else {}, data))
     try:
         import search_index
         search_index.sync_index(user_id, file_type, data)
@@ -502,6 +580,49 @@ def save(file_type: str, data: dict) -> bool:
             "search index sync failed for %s (persona write succeeded)", file_type
         )
     return True
+
+
+def history(file_type: str) -> list[dict]:
+    """Previous versions of one section, newest first."""
+    if file_type not in VALID_FILES:
+        return []
+    with db.get_pool().connection() as conn:
+        rows = conn.execute(
+            "select id, written_by, replaced_at, data from persona_history"
+            " where user_id = %s and file_type = %s"
+            " order by replaced_at desc, id desc",
+            (db.current_user_id.get(), file_type),
+        ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "written_by": r["written_by"] or None,
+            "replaced_at": r["replaced_at"].isoformat(),
+            "entity_count": len(_entities(file_type, r["data"])),
+        }
+        for r in rows
+    ]
+
+
+def revert(file_type: str, history_id: int) -> bool:
+    """Restore one section to a previous version. False if there is no such row.
+
+    Routed through save() rather than writing persona_data directly, so the
+    version being replaced is itself snapshotted and the search index re-syncs by
+    the existing path. A revert is therefore reversible, and there is no second
+    write path to keep correct.
+    """
+    if file_type not in VALID_FILES:
+        return False
+    with db.get_pool().connection() as conn:
+        row = conn.execute(
+            "select data from persona_history"
+            " where id = %s and user_id = %s and file_type = %s",
+            (history_id, db.current_user_id.get(), file_type),
+        ).fetchone()
+    if row is None:
+        return False
+    return save(file_type, copy.deepcopy(row["data"]))
 
 
 def get_all() -> dict:

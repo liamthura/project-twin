@@ -3,12 +3,13 @@ import { describe, it, expect } from "vitest";
 import { SETTINGS_TABS, isTabAvailable, defaultTab } from "./settingsTabs.js";
 
 describe("the tabs", () => {
-  it("are the prototype's four, plus Data", () => {
+  it("are the prototype's four, plus History and Data", () => {
     expect(SETTINGS_TABS.map((t) => t.id)).toEqual([
       "account",
       "server",
       "tokens",
       "apps",
+      "history",
       "data",
     ]);
   });

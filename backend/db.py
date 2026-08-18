@@ -43,6 +43,24 @@ EMBEDDING_DIM: int = _parse_dim(os.environ)
 # (and, transitively, by server.py's MCP tools) to scope data to the caller.
 current_user_id: ContextVar[str] = ContextVar("current_user_id")
 
+# The MCP client behind this request, as it named itself on initialize. Set by
+# mcp_activity's middleware, which already computes the label for its counters.
+# Empty for web-UI writes and scripts, which is the honest answer -- they are
+# not a client and should not be attributed to one.
+current_client: ContextVar[str] = ContextVar("current_client", default="")
+
+# What the last persona_store.save() did: {"added": [entity_id],
+# "changed": {entity_id: {field: previous_value}}}.
+#
+# A contextvar rather than a return value because the two things that need it
+# sit two layers above the only place that can compute it. server.py's tools
+# want "what did this update overwrite" for the advisory, and main.py's promote
+# route wants the id an add just assigned -- and save() is the single point
+# holding both the previous blob and the incoming one. Threading it back
+# through execute_modify would mean changing the return type of thirty entity
+# branches to carry something twenty-nine of them ignore.
+last_write: ContextVar[dict] = ContextVar("last_write", default={})
+
 
 class DuplicateUsernameError(Exception):
     pass

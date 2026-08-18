@@ -497,6 +497,21 @@ async function revokeConnectedApp(consentId) {
 
 // Pending proposals of one kind. Listing marks them seen server-side, which
 // is what protects a row from eviction -- so this is not a free read.
+// Previous versions of one section. Newest first, and the newest is the state
+// BEFORE the most recent write -- the current state is not in here.
+async function listHistory(section) {
+  const data = await api(`/history/${encodeURIComponent(section)}`);
+  return data.history || [];
+}
+
+// Restore a section to a previous version. Itself reversible: the revert goes
+// through the same write path, so the version it replaces is kept too.
+async function revertHistory(section, historyId) {
+  return api(`/history/${encodeURIComponent(section)}/revert/${historyId}`, {
+    method: "POST",
+  });
+}
+
 async function listProposals(kind) {
   const data = await api(`/proposals?kind=${encodeURIComponent(kind)}`);
   return data.proposals || [];
@@ -559,4 +574,6 @@ export {
   revokeToken,
   listConnectedApps,
   revokeConnectedApp,
+  listHistory,
+  revertHistory,
 };
