@@ -1,3 +1,5 @@
+from datetime import date
+
 import db
 import embeddings
 import persona_store
@@ -95,3 +97,25 @@ def test_lazy_heal_builds_missing_index(as_user, monkeypatch):
         conn.execute("delete from persona_search where user_id = %s", (uid,))
     out = search_index.search(uid, "mentor", None, 10)
     assert out["results"] and out["results"][0]["title"] == "Ada"
+
+
+def test_every_hit_carries_its_date(as_user, monkeypatch):
+    """A search hit must say how old it is.
+
+    Without this, a persona whose newest entry is from last week and whose most
+    semantically relevant entry is from eight months ago returns the old one with
+    nothing to mark it as old -- and an agent asked "what have I been working on
+    lately" reports it as current. The column is already in the row (the `days`
+    predicate filters on it), so this costs no extra query.
+    """
+    _seed(monkeypatch, VocabProvider())
+    uid = db.current_user_id.get()
+    for mode_provider in (None, VocabProvider()):
+        monkeypatch.setattr(embeddings, "get_provider", lambda: mode_provider)
+        out = search_index.search(uid, "rust cli", None, 10)
+        assert out["results"], f"no results in {out['mode']} mode"
+        for hit in out["results"]:
+            # Both SQL branches, because the fts-only and hybrid selects are
+            # written out separately and only one of them is easy to remember.
+            assert hit["updated_at"], f"{out['mode']} mode dropped updated_at"
+            date.fromisoformat(hit["updated_at"])  # a real date, not a timestamp blob

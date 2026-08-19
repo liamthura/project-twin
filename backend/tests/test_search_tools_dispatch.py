@@ -31,9 +31,11 @@ def test_search_context_via_dispatch(seeded):
     payload = json.loads(result.content[0].text)
     assert payload["mode"] == "fts"
     assert payload["results"][0]["title"] == "Ledger"
+    # updated_at included: ranking is relevance-only, so a caller cannot tell a
+    # stale hit from a fresh one without it.
     assert set(payload["results"][0]) == {"entity_id", "section", "title",
                                           "snippet", "score", "fts_hit",
-                                          "distance"}
+                                          "distance", "updated_at"}
 
 
 def test_search_context_bad_section_errors(seeded):

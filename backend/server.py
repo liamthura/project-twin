@@ -3086,6 +3086,19 @@ def search_context(query: str, sections: Union[str, List[str], None] = None,
     get_entity(entity_id) for full detail on a hit. Modes: "hybrid" (FTS +
     embeddings) or "fts" (no embedding provider configured).
 
+    PASS `days` WHENEVER THE QUESTION IS ABOUT NOW: "lately", "recently",
+    "currently", "these days", "at the moment", "still", "what am I working on".
+    Ranking is relevance-only -- it has no idea what "lately" means, and will
+    happily put an eighteen-month-old entry above last week's because the older
+    one happens to word things more like the query. `days=30` (or 90) is the only
+    thing that makes a recency question return recent entries.
+
+    Every hit carries `updated_at`. Read it before you describe anything as
+    current: a result set mixes ages freely, and a stale entry reported as
+    today's news is the failure this field exists to prevent. If the dates come
+    back older than the question implies, say so rather than answering as though
+    they were fresh.
+
     `days` filters per-entity: each indexed entry is included or excluded by
     its own last-change time, never by excluding a whole section, and it
     only sees data that's in the search index (non-entity fields aren't
