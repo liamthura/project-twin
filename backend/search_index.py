@@ -240,7 +240,7 @@ def search(user_id, query, section_filter, limit, exclude_sections=None, days=No
                       and (%(days)s::int is null or updated_at >= now() - make_interval(days => %(days)s))
                     limit %(cand)s
                 )
-                select p.entity_id, p.file_type, p.title,
+                select p.entity_id, p.file_type, p.title, p.updated_at,
                        ts_headline('english', p.text,
                                    websearch_to_tsquery('english', %(query)s)) as snippet,
                        1.0 / (%(k)s + fts.r) as score
@@ -283,8 +283,8 @@ def search(user_id, query, section_filter, limit, exclude_sections=None, days=No
                     from fts full outer join vec
                       using (user_id, file_type, entity_id)
                 )
-                select p.entity_id, p.file_type, p.title, m.score,
-                       m.fts_hit, m.distance,
+                select p.entity_id, p.file_type, p.title, p.updated_at,
+                       m.score, m.fts_hit, m.distance,
                        case when m.fts_hit then
                            ts_headline('english', p.text,
                                        websearch_to_tsquery('english', %(query)s))
@@ -303,6 +303,12 @@ def search(user_id, query, section_filter, limit, exclude_sections=None, days=No
         "results": [
             {"entity_id": r["entity_id"], "section": r["file_type"],
              "title": r["title"], "snippet": r["snippet"],
+             # When the entry last changed. Ranking is relevance-only, so a
+             # result set freely mixes last week with eighteen months ago -- and
+             # without this the caller cannot tell, which is how an old entry
+             # gets reported as current. Free: the column is already in the row,
+             # since the `days` predicate filters on it.
+             "updated_at": r["updated_at"].date().isoformat(),
              "score": float(r["score"]),
              "fts_hit": bool(r["fts_hit"]) if "fts_hit" in r.keys() else True,
              "distance": float(r["distance"])
