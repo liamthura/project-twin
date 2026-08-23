@@ -51,6 +51,18 @@ const T = {
     // assumed to follow the mode.
     'ground-inverse': [28,25,23],
     'on-inverse': [245,245,244],
+    // The closing CTA's waitlist pill. Neither of these is a token: the pill
+    // is `bg-on-inverse/10` sitting on the indigo gradient that sits on
+    // ground-inverse, so its effective colour is a composite of three layers
+    // and was sampled off the rendered page rather than derived. Hand-computed
+    // like `switch-off`, and for the same reason -- this script has no alpha
+    // model, and one pair does not justify growing one.
+    'pill-inverse': [75,75,75],
+    // placeholder:text-on-inverse/70 composited over that pill. It was /40,
+    // which measured 2.71, and the field's real <label> is sr-only -- so the
+    // placeholder is the only label a sighted visitor gets and has to carry
+    // 4.5 alone.
+    'pill-placeholder': [194,194,192],
   },
   Dark: {
     paper: [18,18,17], card: [26,26,25], muted: [36,36,35], ink: [245,245,244],
@@ -67,6 +79,10 @@ const T = {
     'switch-off-on-muted': [69,68,66],
     'ground-inverse': [39,35,33],
     'on-inverse': [245,245,244],
+    // Same two composites. The closing section does not invert, so these
+    // repeat rather than darkening -- that is the point of them being here.
+    'pill-inverse': [75,75,75],
+    'pill-placeholder': [194,194,192],
   },
 };
 
@@ -125,6 +141,7 @@ const PAIRS = [
   // The marketing surface, present so that a token shared between the two
   // pages can never again be checked on only one of them.
   ['on-inverse / ground-inverse','on-inverse','ground-inverse', 4.5, 'text', 'landing dark break section'],
+  ['pill placeholder / pill','pill-placeholder','pill-inverse', 4.5, 'text', 'closing CTA field -- its only visible label'],
 ];
 
 // KNOWN_FAILURES is NOT a way to silence a real problem -- it is a small,

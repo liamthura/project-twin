@@ -42,6 +42,26 @@ export function hasMark(slug) {
 }
 
 /**
+ * Slugs whose mark is a single dark fill, and which therefore need inverting
+ * to stay visible on a dark ground.
+ *
+ * A fact about the file, kept beside the fact about whether the file exists,
+ * for the same reason: the hero chips and anything else that renders a mark
+ * need the same answer, and a second copy drifts.
+ *
+ * The hero applied `dark:invert` to every mark. `claude.svg` is `#D97757` and
+ * `raycast.svg` is `#FF6363`, so in dark mode Claude rendered cyan and Raycast
+ * pale blue -- three recoloured third-party trademarks on a page that is
+ * otherwise careful not to draw a mark it does not have.
+ * `design/logos/README.md`: keep the marks unmodified apart from size.
+ */
+export const MONOCHROME_SLUGS = new Set(["notion"]);
+
+export function isMonochrome(slug) {
+  return MONOCHROME_SLUGS.has(slug);
+}
+
+/**
  * Cursor's one-click install link.
  *
  * The config is the same shape as an entry in `mcp.json`, JSON-stringified and

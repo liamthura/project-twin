@@ -26,6 +26,7 @@ level rather than by nudging individual layers.
 | link | card | interactive text in cards | 4.5 | 5.55 | 4.93 |
 | on-primary | indigo | button labels | 4.5 | 5.55 | 4.60 |
 | on-inverse | ground-inverse | closing CTA and footer text | 4.5 | 16.07 | 14.32 |
+| on-inverse/70 | waitlist pill | closing CTA placeholder | 4.5 | 4.89 | 4.89 |
 
 ## What was wrong, and why
 
@@ -110,6 +111,30 @@ The full reasoning, and the app-side defect found alongside this one, are in
 `docs/superpowers/specs/2026-08-10-app-redesign-phase-2-design.md`.
 `design/app-contrast.mjs` now carries this page's `ground-inverse` surface, so a
 token shared between the two pages cannot again be checked on only one of them.
+
+**The hero field was mounted on the section, and this table could not see it.**
+`Hero.jsx` painted `hero-field-light.webp` at `inset-0` across the whole hero
+while its own docstring six lines above said the field was a pool behind the
+mockup. Two opposing specs in one file, and the wash won. Measured off the
+rendered page in light mode: the eyebrow at **3.72**, the body copy at **3.33**
+and the invite-only note -- the sentence doing all the trust work at the moment
+of the ask -- at **3.21**, against a 4.5 floor. Dark mode passed at 5.95, which
+is why it survived review.
+
+The table did not catch it because the table checks `muted-fg` against **paper**
+and the shipped page was not using paper. That is the blind spot worth naming:
+every row here is a token against a token, so a composite -- type over artwork,
+or type over a translucent fill over artwork -- is invisible to it no matter how
+many pairs are added. The fix was to make the composite stop existing: the field
+now lives on the `ProductShot` wrapper, so hero copy is back on paper at 5.10 and
+the pair is checkable once, which is what the rule below was always for.
+
+**The closing CTA's placeholder was its own label at 2.71.** `WaitlistForm`
+renders the real `<label>` as `sr-only`, so on the inverse pill a sighted
+visitor has nothing but the placeholder -- and it was set at
+`text-on-inverse/40` over `bg-on-inverse/10`. It is a composite, so it was never
+in this table either. Now `/70`, measuring **4.89**, and both layers are carried
+in `design/app-contrast.mjs` as hand-computed values next to `switch-off`.
 
 ## Not measured
 

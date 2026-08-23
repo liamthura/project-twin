@@ -112,6 +112,8 @@ frontend/test-results
 # Local agent tooling — not part of the project
 .claude/
 .agents/
+.codex/
+.impeccable/
 skills-lock.json
 
 # Local database dumps taken before container surgery

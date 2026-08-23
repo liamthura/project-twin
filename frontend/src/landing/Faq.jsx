@@ -30,7 +30,13 @@ export function Faq() {
         <div className="mt-14 space-y-12">
           {FAQ.groups.map((group) => (
             <div key={group.label} className="md:flex md:gap-10">
-              <h3 className="mb-4 shrink-0 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground md:mb-0 md:w-[280px]">
+              {/* Sticky and narrower. At 280px, fixed, it reserved a column
+                  the width of the label and left it empty for the full height
+                  of the group -- three thin labels in a wide void. Sticking it
+                  to the viewport means the label is beside whichever question
+                  you are actually reading, which is the job it was doing
+                  badly. */}
+              <h3 className="mb-4 shrink-0 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground md:sticky md:top-24 md:mb-0 md:w-[200px] md:self-start">
                 {group.label}
               </h3>
               <div className="min-w-0 flex-1 divide-y divide-border border-t border-border">
@@ -99,7 +105,15 @@ function FaqItem({ item }) {
           {/* Measure capped so a long answer does not run the full column. */}
           <p
             className={cn(
-              "max-w-[680px] pb-6 text-[15px] leading-relaxed text-muted-foreground transition-opacity duration-300 motion-reduce:transition-none",
+              // Measured, not guessed. 680px at 15px produced full lines of
+              // 93 to 99 characters, well past the 65-75 a reading measure
+              // wants. `ch` is used so the cap tracks the face and size, but
+              // note it is NOT one character: `ch` is the width of "0", which
+              // in Geist at 15px is ~9.9px against an average character of
+              // ~7.0px. 68ch measured 676px and 96 characters -- all but
+              // identical to the 680px it replaced. 51ch is the value that
+              // actually lands at ~72.
+              "max-w-[51ch] pb-6 text-[15px] leading-relaxed text-muted-foreground transition-opacity duration-300 motion-reduce:transition-none",
               open ? "opacity-100" : "opacity-0",
             )}
             // Kept out of the accessibility tree and out of tab order while

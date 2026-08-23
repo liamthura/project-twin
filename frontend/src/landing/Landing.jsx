@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Nav } from "./Nav";
 import { Hero } from "./Hero";
 import { HowItWorks } from "./HowItWorks";
@@ -19,6 +21,11 @@ import { Footer } from "./Footer";
  * page selling durable, boring infrastructure should not fidget.
  */
 export default function Landing({ onSignIn }) {
+  // Lifted here because the hero and the closing CTA are the same action in
+  // two places. Not persisted: a reload asking again is the honest answer,
+  // since the page has no way to know who is reading it.
+  const [joined, setJoined] = useState(false);
+
   return (
     <div className="min-h-dvh bg-background">
       {/* The signature element: a 12px gradient band, full-bleed to the
@@ -28,14 +35,14 @@ export default function Landing({ onSignIn }) {
         className="h-3 w-full bg-[url('/landing/edge-strip-light.webp')] bg-cover bg-center dark:bg-[url('/landing/edge-strip-dark.webp')]"
       />
 
-      <Nav onSignIn={onSignIn} onJoin={scrollToWaitlist} />
+      <Nav onSignIn={onSignIn} onJoin={scrollToWaitlist} joined={joined} />
 
       <main>
-        <Hero onSignIn={onSignIn} />
+        <Hero onSignIn={onSignIn} onJoined={() => setJoined(true)} />
         <HowItWorks />
         <Bento />
         <Faq />
-        <Closing />
+        <Closing joined={joined} onJoined={() => setJoined(true)} />
       </main>
 
       <Footer />

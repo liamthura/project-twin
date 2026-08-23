@@ -3,8 +3,55 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>MyGist</title>
+    <title>MyGist — explain yourself once</title>
+    <meta
+      name="description"
+      content="MyGist keeps your role, your stack and how you like answers written in one place, and hands it to whichever assistant you open."
+    />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!--
+      Link unfurls. An invite-only beta with no paid acquisition grows by one
+      person pasting the URL to another, so this handful of tags is the surface
+      that does the most work per line on the whole page. Without them every
+      share rendered as a bare grey link reading "MyGist".
+
+      og:image is absolute and points at the hosted instance on purpose.
+      Relative image URLs are resolved by most scrapers but not reliably by
+      all, and the link being shared is the hosted one. A self-hosted instance
+      serving its own /og.jpg should change this origin to its own; nothing
+      else here is host-specific.
+
+      The card itself is generated from the real page by `npm run og`, so it
+      cannot drift from the hero it depicts. See frontend/scripts/generate-og.mjs.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MyGist" />
+    <meta property="og:url" content="https://mygist.thuradev.qzz.io/" />
+    <meta property="og:title" content="MyGist — explain yourself once" />
+    <meta
+      property="og:description"
+      content="MyGist keeps your role, your stack and how you like answers written in one place, and hands it to whichever assistant you open."
+    />
+    <meta property="og:image" content="https://mygist.thuradev.qzz.io/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="The MyGist editor showing a tone preference, and an assistant using it to draft a reply."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MyGist — explain yourself once" />
+    <meta
+      name="twitter:description"
+      content="MyGist keeps your role, your stack and how you like answers written in one place, and hands it to whichever assistant you open."
+    />
+    <meta name="twitter:image" content="https://mygist.thuradev.qzz.io/og.jpg" />
+
+    <!-- Matches the page grounds either side of the theme switch, so mobile
+         browser chrome does not sit on a colour the page never uses. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fafaf9" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121211" />
     <script>
       (function () {
         var theme = localStorage.getItem("mygist_theme") || "system";
