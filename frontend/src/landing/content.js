@@ -22,6 +22,19 @@ export const HERO = {
   emailPlaceholder: "you@email.com",
   note: "Invite-only while it's small. One email when your invite lands.",
   signIn: { prefix: "Already have a code?", label: "Sign in." },
+  /**
+   * The caption under the client chips, moved out of Hero.jsx so it sits with
+   * the rest of the copy deck.
+   *
+   * MCP is defined here because this is where the page first uses it, and for
+   * three builds it was never defined at all -- it appeared as the payoff line
+   * under the hero's proof, to an audience that is half people who have never
+   * heard of it. Twelve words costs the developer half of the audience nothing
+   * and stops the other half deciding they are in the wrong place.
+   */
+  clientsCaption: "One URL. Any assistant that speaks MCP picks it up.",
+  clientsNote:
+    "MCP is the open standard AI clients use to plug into outside tools.",
 };
 
 /**
@@ -53,11 +66,21 @@ export const STEPS = {
   items: [
     {
       title: "Write your gist.",
-      body: "Your role, your stack, how you want answers written. Edit it by hand or in the web UI.",
+      // Not "edit it by hand", which was the old wording: to someone who has
+      // never seen the product that means editing JSON, and it reads as
+      // harder rather than as more flexible. Both real doors, named plainly.
+      body: "Your role, your stack, how you want answers written. Type it into the web editor, or tell an assistant and approve what it suggests.",
     },
     {
       title: "Connect a client.",
-      body: "Paste one URL. Clients that speak OAuth get a consent screen where you pick what they may do. Anything without a browser uses a scoped token.",
+      // Was: "Paste one URL. Clients that speak OAuth get a consent screen
+      // where you pick what they may do. Anything without a browser uses a
+      // scoped token." Three unfamiliar terms in one thirty-word sentence, in
+      // the section whose entire job is making this sound easy. The three
+      // choices named here are the real ones, verbatim from Consent.jsx; OAuth
+      // and scoped tokens still live in the FAQ, which is where the person who
+      // wants them looks.
+      body: "Paste one URL into your assistant's settings. It asks what it may do — read your gist, suggest changes for your approval, or change it directly — and you choose.",
     },
     {
       title: "It travels.",
@@ -77,9 +100,32 @@ export const STEPS = {
 export const BENTO = {
   eyebrow: "What it does",
   headline: "Everything your assistants can ask for.",
+  /**
+   * Seven tiles at one weight, in one flat grid, served two audiences asking
+   * opposite questions -- "is this safe" and "is this powerful" -- and made
+   * the reader rank them. Two labelled groups of four and three, both within
+   * the four-item chunk that scanning tolerates.
+   *
+   * `group` keys into GROUPS below. Row spans still sum to three within each
+   * group, which is what keeps the grid intact: 2+1 and 2+1 in the first,
+   * 1+1+1 in the second.
+   */
+  groups: [
+    { key: "read", label: "What assistants can do with it" },
+    { key: "extend", label: "What you can do with it" },
+  ],
+  /**
+   * Every tile above names the file its claim was checked against, and until
+   * now that was invisible to the reader. One page-level line rather than a
+   * path under each tile: the discipline is worth showing, seven file paths on
+   * a marketing page is not, and half the audience does not read paths.
+   */
+  sourcing:
+    "Every claim on this page names the file it was checked against.",
   tiles: [
     {
       id: "scoped-reads",
+      group: "read",
       span: 2,
       title: "Scoped reads",
       body: "An assistant asks for a named scope and gets that slice. Minimal is your name and role; professional adds your tone rules and what you're working on.",
@@ -87,6 +133,7 @@ export const BENTO = {
     },
     {
       id: "search",
+      group: "read",
       span: 1,
       title: "Search",
       body: "MyGist returns ranked snippets first and fetches a whole entry only when one is needed, so a long persona never floods the conversation.",
@@ -94,6 +141,7 @@ export const BENTO = {
     },
     {
       id: "sections",
+      group: "extend",
       span: 1,
       title: "Your sections",
       body: "Ten sections to start with, and adding an eleventh is one declarative file, so your gist can hold whatever you keep track of.",
@@ -101,6 +149,7 @@ export const BENTO = {
     },
     {
       id: "proposals",
+      group: "read",
       span: 2,
       title: "Proposals",
       body: "Nothing lands until you say so. An assistant that notices something durable proposes it, with its reasoning and a quote from you, and you approve, edit, or reject it for good.",
@@ -108,6 +157,7 @@ export const BENTO = {
     },
     {
       id: "consent",
+      group: "read",
       span: 1,
       title: "Consent",
       body: "Connecting takes one URL, and on the consent screen you choose whether a client can read, suggest changes for you to approve, or write directly.",
@@ -115,6 +165,7 @@ export const BENTO = {
     },
     {
       id: "skills",
+      group: "extend",
       span: 1,
       title: "Skills",
       body: "Four short guides ship with MyGist, covering how to read a gist and what's worth proposing, so behaviour holds up whichever client you're in.",
@@ -122,6 +173,7 @@ export const BENTO = {
     },
     {
       id: "self-host",
+      group: "extend",
       span: 1,
       title: "Run it yourself",
       body: "One Docker image serves the editor, the API and the MCP endpoint. Point it at your own Postgres and nobody else is hosting your data.",
@@ -136,8 +188,10 @@ export const BENTO = {
  * docs-site/content/docs/use/faq.mdx (the canonical FAQ, already grouped by
  * topic), the rest from README.md and Consent.jsx.
  *
- * The first question in each group ships open, so three answers are readable
- * without a click and the disclosure pattern is still obvious.
+ * Every question ships closed. An earlier cut opened the first of each group
+ * so three answers were readable without a click; `Faq.jsx` records the
+ * decision to change it, and `Landing.test.jsx` asserts all nine are shut.
+ * This comment said the opposite for as long as both of those were true.
  */
 export const FAQ = {
   eyebrow: "FAQ",
@@ -211,6 +265,19 @@ export const CLOSING = {
   headline: "Stop starting from nothing.",
   sub: "Leave your email and we'll send an invite when a slot opens.",
   cta: "Join the waitlist",
+  /**
+   * The hero carries an invite note and the closing CTA did not, so the page
+   * asked a second time with strictly less reassurance than the first -- at
+   * the point where a visitor has just read nine FAQ answers about what
+   * happens to their data. Reassurance should increase toward the ask.
+   */
+  note: "One email when your invite lands, and nothing else.",
+  /** Linked, not just named. Pointing at a privacy page from the one place a
+   *  visitor is deciding whether to hand over an address, and then making them
+   *  go and find it in the footer, is a dead end at the worst moment. */
+  noteLink: { label: "What we store", href: "/docs/privacy" },
+  /** Shown instead of a second field once the hero's form has been used. */
+  done: "You're on the list. We'll email you when a slot opens.",
 };
 
 export const FOOTER = {
@@ -236,11 +303,13 @@ export const FOOTER = {
       ],
     },
     {
+      // Privacy has a real page now. Terms is gone rather than greyed out:
+      // there is no paid product and no account to govern while the gate is
+      // up, so a Terms link was advertising an absence rather than reserving
+      // a slot -- and "Privacy" and "Terms" both dead, directly under an email
+      // field, was the last thing a visitor saw.
       label: "Legal",
-      links: [
-        { label: "Privacy", href: null },
-        { label: "Terms", href: null },
-      ],
+      links: [{ label: "Privacy", href: "/docs/privacy" }],
     },
   ],
 };

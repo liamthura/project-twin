@@ -18,8 +18,19 @@ import { cn } from "@/lib/utils";
  * The server gives the same answer whether or not the address is already on
  * the list, so this cannot report "already joined" and must not try: doing so
  * would turn the form into a membership oracle.
+ *
+ * `onJoined` fires once the post succeeds. The page uses it to stop the second
+ * copy of this form asking again; the form keeps its own state either way, so
+ * a caller that passes nothing behaves exactly as before.
  */
-export function WaitlistForm({ label, tone = "default", align = "start", onSubmit, className }) {
+export function WaitlistForm({
+  label,
+  tone = "default",
+  align = "start",
+  onSubmit,
+  onJoined,
+  className,
+}) {
   const id = useId();
   const [email, setEmail] = useState("");
   const [state, setState] = useState("idle");
@@ -61,6 +72,10 @@ export function WaitlistForm({ label, tone = "default", align = "start", onSubmi
       await send(email);
       setState("done");
       setMessage("You're on the list. We'll email you when a slot opens.");
+      // Tells the page, so the other copy of this form stops asking. Two
+      // instances holding their own state meant joining in the hero left the
+      // closing CTA showing an empty field and a second request.
+      onJoined?.();
     } catch (err) {
       setState("error");
       setMessage(
@@ -127,7 +142,11 @@ export function WaitlistForm({ label, tone = "default", align = "start", onSubmi
             // The pill owns the border and the focus ring, so the input inside
             // it has neither -- two rings on one control reads as a mistake.
             "h-10 flex-1 border-0 bg-transparent px-4 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-            inverse && "text-on-inverse placeholder:text-on-inverse/40",
+            // /70, not /40. The real label is `sr-only`, so on the inverse
+            // pill the placeholder is the only label a sighted visitor gets
+            // and it has to clear 4.5 on its own: /40 measured 2.71 against
+            // the pill's `bg-on-inverse/10`, /70 measures 4.89.
+            inverse && "text-on-inverse placeholder:text-on-inverse/70",
           )}
         />
         <Button

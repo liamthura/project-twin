@@ -10,6 +10,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "fixtures": "node scripts/generate-pack-fixtures.mjs",
+    "og": "node scripts/generate-og.mjs",
     "test": "node scripts/run-tests.mjs",
     "test:watch": "vitest",
     "test:storybook": "node scripts/run-tests.mjs --project=storybook",

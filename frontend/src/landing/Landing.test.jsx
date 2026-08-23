@@ -159,7 +159,7 @@ describe("Landing: the waitlist field", () => {
 });
 
 describe("Landing: links that have nowhere to go", () => {
-  it("renders GitHub, Privacy and Terms as text, not as dead anchors", () => {
+  it("renders a destinationless link as text, not as a dead anchor", () => {
     render(<Landing />);
     const footer = screen.getByRole("contentinfo");
 
@@ -168,10 +168,27 @@ describe("Landing: links that have nowhere to go", () => {
       .filter((l) => l.href === null)
       .map((l) => l.label);
 
-    expect(undestined).toEqual(["GitHub", "Privacy", "Terms"]);
+    // Privacy has a real page now and Terms was removed rather than left
+    // greyed out, so GitHub is the only one left -- the repository is still
+    // private, which is the reason recorded next to it in content.js.
+    expect(undestined).toEqual(["GitHub"]);
     for (const label of undestined) {
       expect(within(footer).getByText(label).tagName).not.toBe("A");
     }
+  });
+
+  it("points Privacy at a page that exists", () => {
+    // The last thing a visitor saw, directly after handing over an email
+    // address, used to be a greyed-out Privacy link. For a UK product
+    // collecting addresses that is a gap, not just a missing nicety.
+    render(<Landing />);
+    const footer = screen.getByRole("contentinfo");
+
+    expect(within(footer).getByRole("link", { name: "Privacy" })).toHaveAttribute(
+      "href",
+      "/docs/privacy",
+    );
+    expect(within(footer).queryByText("Terms")).toBeNull();
   });
 });
 
@@ -183,5 +200,45 @@ describe("Landing: sign in", () => {
 
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     expect(onSignIn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Landing: the hero pair", () => {
+  it("keeps both mock frames out of the accessibility tree", () => {
+    // The frames are decorative product imagery. Without aria-hidden the
+    // editor mock's own headings land between the hero h1 and the first
+    // section h2, and its invented persona strings read out as if they were
+    // the visitor's own. That shipped once: the real outline was
+    // `h1 -> h3 Profile -> h2 Three steps.`
+    render(<Landing />);
+
+    const outline = screen
+      .getAllByRole("heading")
+      .map((h) => Number(h.tagName.slice(1)));
+
+    expect(outline[0]).toBe(1);
+    // No h3 before the first h2 -- i.e. nothing from a mock jumped the queue.
+    expect(outline.indexOf(2)).toBeLessThan(outline.indexOf(3));
+
+    // And every string the frames invent sits inside an aria-hidden subtree.
+    // Checked via closest() rather than queryByText returning null: text
+    // queries do not filter on aria-hidden, so a null assertion here would
+    // pass just as happily if the copy had been deleted.
+    for (const copy of [/Northgate newsletter feedback/, /No exclamation marks/]) {
+      expect(screen.getByText(copy).closest('[aria-hidden="true"]')).not.toBeNull();
+    }
+  });
+
+  it("names no chat client in the assistant frame", () => {
+    // docs-site/public/screenshots/README.md: no client's chrome, no product
+    // name. The frame is drawn precisely so the page is not claiming a
+    // partnership or borrowing somebody's trademark.
+    const { container } = render(<Landing />);
+    const assistant = container.querySelector('[aria-hidden="true"] .shadow-xl');
+
+    expect(assistant).not.toBeNull();
+    for (const name of ["Claude", "ChatGPT", "Cursor", "Codex", "Copilot"]) {
+      expect(assistant.textContent).not.toContain(name);
+    }
   });
 });

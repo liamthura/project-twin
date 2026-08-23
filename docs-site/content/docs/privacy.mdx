@@ -1,0 +1,65 @@
+---
+title: Privacy
+description: What MyGist stores, why it stores it, and how to get rid of it.
+---
+
+Short version. If you join the waitlist, MyGist stores your email address and
+nothing else. If you have an account, your persona lives in a Postgres database
+as readable JSON, and you can export or delete all of it whenever you like.
+
+## The waitlist
+
+Leaving your address on the front page stores one row, holding your email
+address, the date you joined, and the date an invite was sent if one has been.
+The address is trimmed and lower-cased first, so the same address cannot take
+two slots.
+
+It is used for one thing, which is sending you an invite when a slot opens.
+There is no mailing list and no newsletter attached to it.
+
+Joining twice is not an error and does not store anything twice. The server
+also answers the same way whether or not an address is already on the list,
+deliberately, so that the form cannot be used to find out whether somebody
+you know has signed up.
+
+To be taken off the list before an invite arrives, email
+[liam@thuradev.qzz.io](mailto:liam@thuradev.qzz.io) and the row is deleted.
+
+## Your persona
+
+Once you have an account, everything you put in MyGist lives in a Postgres
+database as JSON, one row per section. You can read all of it, export all of
+it, and delete all of it — **Account → Data → Export**, or ask your assistant
+for `get_raw`. [FAQ](/use/faq) covers this in more detail.
+
+Every read and write is scoped to the account behind the credential, so other
+people using the same server cannot see your persona.
+
+If you are running your own instance, that database is yours and this page
+describes somebody else's server. If somebody else hosts your instance, the
+database is theirs, and you should trust them accordingly.
+
+## What leaves the server
+
+Two cases, both covered on [Capture](/use/capture) and in the
+[FAQ](/use/faq).
+
+**To your AI client, when it asks.** That is the entire point of MyGist, and it
+means your persona reaches whatever provider is behind the client you connected.
+Nothing is sent unless a client calls a tool — there is no background process
+reading your conversations.
+
+**To an embedding provider, if the instance is configured with one.** Text is
+sent away to compute search vectors. A self-hosted instance can use a local
+embedding server, or none at all. [Database](/run/database) explains how.
+
+## What there is not
+
+No analytics, no tracking pixels, and no third-party scripts on the front page
+or in the app. No advertising. Nothing is sold or shared.
+
+## Changes
+
+MyGist is invite-only and small, and this page will change as it grows. It
+describes how the thing behaves today rather than reserving rights for later.
+Questions go to [liam@thuradev.qzz.io](mailto:liam@thuradev.qzz.io).

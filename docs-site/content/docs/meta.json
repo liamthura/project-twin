@@ -1,3 +1,8 @@
 {
-  "pages": ["index", "use", "run"]
+  "pages": [
+    "index",
+    "use",
+    "run",
+    "privacy"
+  ]
 }
