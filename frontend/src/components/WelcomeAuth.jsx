@@ -18,6 +18,8 @@ import {
   requestPasswordReset,
   isCompleteInvite,
   normaliseInvite,
+  startSsoSignIn,
+  SSO_LABEL,
 } from "@/lib/session.js";
 import { InviteGate, AcceptedInvite } from "@/components/InviteGate";
 import { AuthShell } from "@/components/AuthShell";
@@ -42,6 +44,14 @@ import {
 function inviteFromUrl() {
   if (typeof window === "undefined") return "";
   return normaliseInvite(new URLSearchParams(window.location.search).get("invite"));
+}
+
+/** Better Auth appends `?error=<code>` when it sends a failed federated
+ *  sign-in to `errorCallbackURL`. Read once at mount, like the invite code:
+ *  it cannot change while the page is open. */
+function ssoErrorFromUrl() {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("error") || "";
 }
 
 // Better Auth is same-origin only: its session cookie cannot be set from, or
@@ -137,6 +147,15 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
   // Whether this instance requires an invite code. Null until asked, so the
   // sign-up form is not rendered and then replaced by a gate a moment later.
   const [inviteOnly, setInviteOnly] = useState(null);
+  // Whether this instance federates sign-in. Null until asked, so the password
+  // form is not rendered and then withdrawn a moment later.
+  const [sso, setSso] = useState(null);
+  // The escape hatch. Shown permanently, not only during the migration window:
+  // it covers everyone who has an account and has not linked yet -- which
+  // includes whoever is about to link for the first time.
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [ssoError] = useState(ssoErrorFromUrl);
+  const [ssoPending, setSsoPending] = useState(false);
   const [acceptedInvite, setAcceptedInvite] = useState("");
   const [linkInvite] = useState(inviteFromUrl);
   const [pending, setPending] = useState(false);
@@ -187,11 +206,14 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
   useEffect(() => {
     if (isDetached(serverUrl)) {
       setInviteOnly(false);
+      setSso(false);
       return;
     }
     let cancelled = false;
     getInstance().then((info) => {
-      if (!cancelled) setInviteOnly(info?.invite_only === true);
+      if (cancelled) return;
+      setInviteOnly(info?.invite_only === true);
+      setSso(info?.sso === true);
     });
     return () => {
       cancelled = true;
@@ -250,6 +272,39 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
   // The gate stands between "create an account" and the account form, and only
   // while this instance actually requires one.
   const needsInvite = mode === "signup" && inviteOnly === true && !acceptedInvite;
+
+  // Detached mode is excluded for the same reason reset is: Better Auth is
+  // same-origin only, and its session cookie cannot be set from another site.
+  const ssoAvailable = sso === true && !isDetached(serverUrl) && mode !== "forgot";
+  // The password form yields to the button, but never disappears.
+  const passwordFormShown = !ssoAvailable || showPasswordForm;
+
+  const handleSso = async () => {
+    setFormError(null);
+    setSsoPending(true);
+    try {
+      // /sign-in is a real, bookmarkable path that is also where an OAuth flow
+      // is interrupted. client_id is what tells the two apart -- the same test
+      // App.jsx makes before resuming a flow after a password sign-in.
+      const query = window.location.search;
+      const isOAuthRequest = new URLSearchParams(query).has("client_id");
+      await startSsoSignIn({
+        callbackURL: isOAuthRequest ? `/auth/oauth2/authorize${query}` : "/",
+        // A brand-new account lands on Welcome rather than an empty Profile.
+        // A redirect flow has no onSuccess to decide that in, so the provider
+        // is told up front.
+        newUserCallbackURL: "/#/onboarding/welcome",
+        // Back where you started, so the banner appears in the framing the
+        // person was already in.
+        errorCallbackURL: `${window.location.pathname}${query}`,
+      });
+    } catch (err) {
+      setFormError(err.message);
+      setSsoPending(false);
+    }
+    // No `finally`: on success the browser is already leaving, and clearing the
+    // spinner would flash the button back to life on the way out.
+  };
 
   const switchMode = (next) => {
     setMode(next);
@@ -478,152 +533,203 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
           <AcceptedInvite code={acceptedInvite} onChange={() => setAcceptedInvite("")} />
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <Field
-            id="welcome-username"
-            label={acceptsEmail ? "Username or email" : "Username"}
-            error={shown("username")}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                autoComplete="username"
-                value={username}
-                onChange={change(setUsername, "username")}
-                onBlur={blur("username")}
-                placeholder={acceptsEmail ? "yourname or you@example.com" : "yourname"}
-              />
-            )}
-          </Field>
-          <Field id="welcome-password" label="Password" error={shown("password")}>
-            {(control) => (
-              <Input
-                {...control}
-                type="password"
-                autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                value={password}
-                // Clears Confirm's message too: fixing this field is what makes
-                // a mismatch under the next one stale.
-                onChange={change(setPassword, "password", "confirmPassword")}
-                onBlur={blur("password")}
-                placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
-              />
-            )}
-          </Field>
-          {mode === "signup" && (
-            <Field
-              id="welcome-confirm-password"
-              label="Confirm password"
-              error={shown("confirmPassword")}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={change(setConfirmPassword, "confirmPassword")}
-                  onBlur={blur("confirmPassword")}
-                  placeholder="Re-enter password"
-                />
-              )}
-            </Field>
-          )}
+        {/* A failed federated sign-in, explained where it happened. The cause
+            is most often a username collision -- someone signed in through the
+            provider without linking first -- and the remedy is always the
+            same, so the copy names it rather than decoding the error. */}
+        {ssoError && (
+          <div className="space-y-1 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+            <p className="text-sm font-medium">
+              Could not sign you in with {SSO_LABEL}.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              If you already have a MyGist account, sign in with your password
+              and link {SSO_LABEL} from Settings. Signing in with {SSO_LABEL}{" "}
+              first would have started a second, empty account.
+            </p>
+            <p className="text-xs text-muted-foreground/70">{ssoError}</p>
+          </div>
+        )}
 
-          {showServer && (
-            <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-left">
-              <Label className="text-xs font-medium">Server</Label>
-              <div className="flex rounded-lg bg-muted p-0.5">
+        {ssoAvailable && (
+          <div className="space-y-3">
+            <Button
+              type="button"
+              className="w-full"
+              onClick={handleSso}
+              disabled={ssoPending}
+            >
+              {ssoPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                `Continue with ${SSO_LABEL}`
+              )}
+            </Button>
+
+            {!showPasswordForm && (
+              <p className="text-center text-xs text-muted-foreground">
                 <button
                   type="button"
-                  onClick={() => setConnectionType("cloud")}
-                  className={segmentClass(connectionType === "cloud")}
+                  onClick={() => setShowPasswordForm(true)}
+                  className="underline hover:text-foreground"
                 >
-                  <Globe className="h-4 w-4" />
-                  Cloud
+                  Sign in with a password instead
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setConnectionType("self-hosted")}
-                  className={segmentClass(connectionType === "self-hosted")}
-                >
-                  <Server className="h-4 w-4" />
-                  Self-hosted
-                </button>
-              </div>
-              {connectionType === "self-hosted" && (
+              </p>
+            )}
+          </div>
+        )}
+
+        {passwordFormShown && (
+          <>
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              <Field
+                id="welcome-username"
+                label={acceptsEmail ? "Username or email" : "Username"}
+                error={shown("username")}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    autoComplete="username"
+                    value={username}
+                    onChange={change(setUsername, "username")}
+                    onBlur={blur("username")}
+                    placeholder={acceptsEmail ? "yourname or you@example.com" : "yourname"}
+                  />
+                )}
+              </Field>
+              <Field id="welcome-password" label="Password" error={shown("password")}>
+                {(control) => (
+                  <Input
+                    {...control}
+                    type="password"
+                    autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                    value={password}
+                    // Clears Confirm's message too: fixing this field is what makes
+                    // a mismatch under the next one stale.
+                    onChange={change(setPassword, "password", "confirmPassword")}
+                    onBlur={blur("password")}
+                    placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
+                  />
+                )}
+              </Field>
+              {mode === "signup" && (
                 <Field
-                  id="welcome-server-url"
-                  label="Server URL"
-                  error={shown("selfHostedUrl")}
+                  id="welcome-confirm-password"
+                  label="Confirm password"
+                  error={shown("confirmPassword")}
                 >
                   {(control) => (
                     <Input
                       {...control}
-                      placeholder="https://your-mygist-server.com/api"
-                      value={selfHostedUrl}
-                      onChange={change(setSelfHostedUrl, "selfHostedUrl")}
-                      onBlur={blur("selfHostedUrl")}
+                      type="password"
+                      autoComplete="new-password"
+                      value={confirmPassword}
+                      onChange={change(setConfirmPassword, "confirmPassword")}
+                      onBlur={blur("confirmPassword")}
+                      placeholder="Re-enter password"
                     />
                   )}
                 </Field>
               )}
-            </div>
-          )}
 
-          {formError && <p className="text-xs text-destructive">{formError}</p>}
+              {showServer && (
+                <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-left">
+                  <Label className="text-xs font-medium">Server</Label>
+                  <div className="flex rounded-lg bg-muted p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setConnectionType("cloud")}
+                      className={segmentClass(connectionType === "cloud")}
+                    >
+                      <Globe className="h-4 w-4" />
+                      Cloud
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConnectionType("self-hosted")}
+                      className={segmentClass(connectionType === "self-hosted")}
+                    >
+                      <Server className="h-4 w-4" />
+                      Self-hosted
+                    </button>
+                  </div>
+                  {connectionType === "self-hosted" && (
+                    <Field
+                      id="welcome-server-url"
+                      label="Server URL"
+                      error={shown("selfHostedUrl")}
+                    >
+                      {(control) => (
+                        <Input
+                          {...control}
+                          placeholder="https://your-mygist-server.com/api"
+                          value={selfHostedUrl}
+                          onChange={change(setSelfHostedUrl, "selfHostedUrl")}
+                          onBlur={blur("selfHostedUrl")}
+                        />
+                      )}
+                    </Field>
+                  )}
+                </div>
+              )}
 
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : mode === "signup" ? (
-              "Create account"
-            ) : (
-              "Sign in"
-            )}
-          </Button>
-        </form>
+              {formError && <p className="text-xs text-destructive">{formError}</p>}
 
-        <p className="text-center text-xs text-muted-foreground">
-          {mode === "signup" ? (
-            <>
-              Already have an account?{" "}
-              <button
-                type="button"
-                onClick={() => switchMode("signin")}
-                className="underline hover:text-foreground"
-              >
-                Sign in
-              </button>
-            </>
-          ) : (
-            <>
-              New to MyGist?{" "}
-              <button
-                type="button"
-                onClick={() => switchMode("signup")}
-                className="underline hover:text-foreground"
-              >
-                Create an account
-              </button>
-              {/* Reset runs through Better Auth, which is same-origin only.
-                  Detached mode talks to the old endpoints, which have no reset
-                  at all -- offering it there would be a dead end. */}
-              {!isDetached(serverUrl) && (
+              <Button type="submit" className="w-full" disabled={pending}>
+                {pending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : mode === "signup" ? (
+                  "Create account"
+                ) : (
+                  "Sign in"
+                )}
+              </Button>
+            </form>
+
+            <p className="text-center text-xs text-muted-foreground">
+              {mode === "signup" ? (
                 <>
-                  <br />
+                  Already have an account?{" "}
                   <button
                     type="button"
-                    onClick={() => switchMode("forgot")}
+                    onClick={() => switchMode("signin")}
                     className="underline hover:text-foreground"
                   >
-                    Forgot your password?
+                    Sign in
                   </button>
                 </>
+              ) : (
+                <>
+                  New to MyGist?{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode("signup")}
+                    className="underline hover:text-foreground"
+                  >
+                    Create an account
+                  </button>
+                  {/* Reset runs through Better Auth, which is same-origin only.
+                      Detached mode talks to the old endpoints, which have no reset
+                      at all -- offering it there would be a dead end. */}
+                  {!isDetached(serverUrl) && (
+                    <>
+                      <br />
+                      <button
+                        type="button"
+                        onClick={() => switchMode("forgot")}
+                        className="underline hover:text-foreground"
+                      >
+                        Forgot your password?
+                      </button>
+                    </>
+                  )}
+                </>
               )}
-            </>
-          )}
-        </p>
+            </p>
+          </>
+        )}
 
         {/* "Use an access token instead" used to share this row. Deleted per the
             prototype's change 5 -- Better Auth supersedes it -- and the cost is
