@@ -11,7 +11,7 @@
  * whether one does, and restoring the getting-started card brings back a card
  * rather than data.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Loader2, LogOut, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -19,10 +19,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
-import { clearConfig, setPassword } from "@/lib/api.js";
-import { signOut } from "@/lib/session.js";
+import { clearConfig, getInstance, setPassword } from "@/lib/api.js";
+import { listAccounts, signOut } from "@/lib/session.js";
 import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
 import { EmailSettings } from "@/components/EmailSettings";
+import { LinkedAccounts } from "@/components/LinkedAccounts";
 
 // Matches MIN_PASSWORD_LENGTH in backend/main.py and Better Auth's own minimum.
 // Checked here so the failure arrives before a round trip, not instead of the
@@ -44,12 +45,27 @@ export function AccountPanel({
   // card is already on screen.
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
+  // Fetched here rather than inside LinkedAccounts, because the password form
+  // below needs the same two answers -- and two components asking the same
+  // question is two answers free to disagree.
+  const [sso, setSso] = useState(false);
+  const [accounts, setAccounts] = useState([]);
+
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState(null);
+
+  const loadAccounts = useCallback(async () => {
+    const [instance, list] = await Promise.all([
+      getInstance().catch(() => null),
+      listAccounts().catch(() => []),
+    ]);
+    setSso(instance?.sso === true);
+    setAccounts(list);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -63,10 +79,11 @@ export function AccountPanel({
         // already or genuinely unavailable, and a control that might do nothing
         // is worse than no control.
       });
+    loadAccounts();
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
+  }, [isOpen, loadAccounts]);
 
   const handleSignOut = async () => {
     // The session cookie is HttpOnly, so only the service can revoke it.
@@ -113,6 +130,12 @@ export function AccountPanel({
     });
   };
 
+  // An account with a linked provider and no password has nothing to change,
+  // and this form cannot set a first one. Offering it would be offering a
+  // control that cannot work.
+  const hasPassword = accounts.some((a) => a.providerId === "credential");
+  const offerPasswordChange = !sso || hasPassword;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/50 p-3 text-sm">
@@ -133,68 +156,72 @@ export function AccountPanel({
 
       <EmailSettings />
 
-      <div className="border-t pt-4">
-        <button
-          type="button"
-          onClick={() => setShowPasswordForm((v) => !v)}
-          className="flex w-full items-center justify-between text-sm font-medium"
-        >
-          Change password
-          {showPasswordForm ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          )}
-        </button>
-        {showPasswordForm && (
-          <form onSubmit={handleSetPassword} className="mt-3 space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="current-password">Current password</Label>
-              <Input
-                id="current-password"
-                type="password"
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Leave empty if you have not set a password before.
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="new-password">New password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                autoComplete="new-password"
-                placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="confirm-new-password">Confirm new password</Label>
-              <Input
-                id="confirm-new-password"
-                type="password"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-            </div>
-            {passwordError && (
-              <p className="text-xs text-destructive">{passwordError}</p>
+      <LinkedAccounts accounts={accounts} sso={sso} onChanged={loadAccounts} />
+
+      {offerPasswordChange && (
+        <div className="border-t pt-4">
+          <button
+            type="button"
+            onClick={() => setShowPasswordForm((v) => !v)}
+            className="flex w-full items-center justify-between text-sm font-medium"
+          >
+            Change password
+            {showPasswordForm ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
             )}
-            <Button type="submit" size="sm" disabled={passwordSaving}>
-              {passwordSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "Update password"
+          </button>
+          {showPasswordForm && (
+            <form onSubmit={handleSetPassword} className="mt-3 space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="current-password">Current password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty if you have not set a password before.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-password">New password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="confirm-new-password">Confirm new password</Label>
+                <Input
+                  id="confirm-new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+              {passwordError && (
+                <p className="text-xs text-destructive">{passwordError}</p>
               )}
-            </Button>
-          </form>
-        )}
-      </div>
+              <Button type="submit" size="sm" disabled={passwordSaving}>
+                {passwordSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Update password"
+                )}
+              </Button>
+            </form>
+          )}
+        </div>
+      )}
 
       <div className="space-y-3 border-t pt-4">
         <p className="text-sm font-medium">Preferences</p>

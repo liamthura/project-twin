@@ -3,7 +3,14 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 
 vi.mock("@/lib/api.js", async (importOriginal) => {
   const actual = await importOriginal();
-  return { ...actual, setPassword: vi.fn(async () => ({})), clearConfig: vi.fn() };
+  return {
+    ...actual,
+    setPassword: vi.fn(async () => ({})),
+    clearConfig: vi.fn(),
+    // Default to an instance with no SSO, so every pre-existing test keeps
+    // seeing the password form it always saw.
+    getInstance: vi.fn(async () => ({ sso: false })),
+  };
 });
 
 // EmailSettings reaches for the session on mount. Stubbed to "no session",
@@ -12,6 +19,13 @@ vi.mock("@/lib/session.js", () => ({
   signOut: vi.fn(async () => {}),
   getSession: vi.fn(async () => null),
   isPlaceholderEmail: vi.fn(() => false),
+  listAccounts: vi.fn(async () => []),
+  // LinkedAccounts renders under this panel and needs these too -- this mock
+  // is a full replacement rather than a partial one built on importOriginal.
+  SSO_PROVIDER_ID: "authentik",
+  SSO_LABEL: "TDev Door",
+  startSsoLink: vi.fn(async () => {}),
+  unlinkAccount: vi.fn(async () => ({})),
 }));
 
 vi.mock("@/lib/onboarding.js", () => ({
@@ -23,8 +37,8 @@ vi.mock("@/components/ui/use-toast", () => ({
   useToast: () => ({ toast: vi.fn() }),
 }));
 
-import { setPassword } from "@/lib/api.js";
-import { signOut } from "@/lib/session.js";
+import { getInstance, setPassword } from "@/lib/api.js";
+import { listAccounts, signOut } from "@/lib/session.js";
 import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
 import { AccountPanel } from "./AccountPanel";
 
@@ -44,6 +58,11 @@ const open = (props = {}) =>
 beforeEach(() => {
   vi.clearAllMocks();
   getOnboarding.mockResolvedValue({ dismissed: false, steps: {} });
+  // Same reasoning as getOnboarding above: a per-test override (SSO on, an
+  // authentik account) must not leak into the next test via a mock that
+  // clearAllMocks leaves in place.
+  getInstance.mockResolvedValue({ sso: false });
+  listAccounts.mockResolvedValue([]);
 });
 
 describe("who you are", () => {
@@ -228,5 +247,40 @@ describe("changing the password", () => {
     fireEvent.click(screen.getByRole("button", { name: /update password/i }));
 
     expect(await screen.findByText(/Current password is wrong/)).toBeInTheDocument();
+  });
+});
+
+describe("AccountPanel with SSO", () => {
+  it("stops offering a password change to an account that has no password", async () => {
+    // Nothing here can set the FIRST password on an SSO-only account -- the
+    // form posts a change, and there is nothing to change. Offering it is
+    // offering a control that cannot work.
+    getInstance.mockResolvedValue({ sso: true });
+    listAccounts.mockResolvedValue([{ id: "a2", providerId: "authentik" }]);
+
+    render(<AccountPanel isOpen username="liam" />);
+
+    await waitFor(() =>
+      expect(screen.queryByText(/change password/i)).not.toBeInTheDocument(),
+    );
+  });
+
+  it("keeps offering it while a password still exists", async () => {
+    getInstance.mockResolvedValue({ sso: true });
+    listAccounts.mockResolvedValue([
+      { id: "a1", providerId: "credential" },
+      { id: "a2", providerId: "authentik" },
+    ]);
+
+    render(<AccountPanel isOpen username="liam" />);
+    expect(await screen.findByText(/change password/i)).toBeInTheDocument();
+  });
+
+  it("is unchanged on an instance without SSO", async () => {
+    getInstance.mockResolvedValue({ sso: false });
+    listAccounts.mockResolvedValue([]);
+
+    render(<AccountPanel isOpen username="liam" />);
+    expect(await screen.findByText(/change password/i)).toBeInTheDocument();
   });
 });
