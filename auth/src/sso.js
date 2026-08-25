@@ -156,6 +156,15 @@ async function findProvider(context, id) {
  * and expiry are `jose`'s job; the three checks after it are the ones that
  * separate a logout token from an ID token, and skipping them turns an
  * id_token captured from an ordinary sign-in into a remote sign-out button.
+ *
+ * `algorithms` below is defence in depth, not the load-bearing check: jose's
+ * JWKS resolver already refuses `none` and any HMAC algorithm before it will
+ * even resolve a key. What IS load-bearing is `issuer` and `audience` being
+ * non-undefined -- jose skips those checks entirely when an option is
+ * `undefined`, and they are guaranteed non-undefined today only because
+ * `idToken` is built as one unit by genericOAuth from a single discovery
+ * document. If that ever stops being true, this endpoint's entire security
+ * rests on whatever replaces it still being true.
  */
 export async function verifyLogoutToken(provider, token) {
   const idToken = provider?.idToken;
@@ -171,6 +180,18 @@ export async function verifyLogoutToken(provider, token) {
     issuer: idToken.issuer,
     audience: idToken.audience,
     algorithms: idToken.algorithms,
+
+    // jose treats `exp` as optional (jwt_claims_set.js checks it only `if
+    // (exp !== undefined)`), and OIDC Back-Channel Logout 1.0 section 2.4
+    // does not require a logout token to carry one -- only `iat` and `jti`
+    // are REQUIRED. Without maxTokenAge, a logout token that omits exp would
+    // verify forever, and with no jti replay cache that would make a
+    // captured token an unlimited, repeatable "end this user's sessions"
+    // button. maxTokenAge is what actually bounds the token's life here; that
+    // bound is what makes deliberately not keeping a jti cache defensible
+    // rather than negligent.
+    maxTokenAge: "5 minutes",
+    requiredClaims: ["iat", "jti"],
   });
 
   if (!payload.events || typeof payload.events !== "object") {
@@ -248,15 +269,14 @@ export function backchannelLogoutPlugin() {
             accountId: claims.sub,
           });
 
-          // 200 for an unknown subject, deliberately. A different answer would
-          // tell whoever holds a valid token for another tenant which subjects
-          // have MyGist accounts, and there is nothing for the caller to do
-          // about it either way.
+          // 200 for an unknown subject, deliberately: OIDC Back-Channel
+          // Logout 1.0 section 2.8 mandates it, and there is nothing the
+          // caller could do with a different answer either way.
           if (owner?.kind === "owned") {
             await ctx.context.internalAdapter.deleteUserSessions(owner.user.id);
           }
 
-          // Section 2.8: 200 with no body, and no caching.
+          // Section 2.8: 200, an empty JSON body, and no caching.
           ctx.setHeader("Cache-Control", "no-store");
           return ctx.json({});
         },

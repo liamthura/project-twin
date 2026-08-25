@@ -36,6 +36,13 @@ test("the whole SSO surface is gated on AUTH_OIDC_DISCOVERY_URL", () => {
   assert.equal(ssoDiscoveryUrl({ AUTH_OIDC_DISCOVERY_URL: "  " }), "");
   assert.deepEqual(ssoPlugins({}), []);
   assert.equal(ssoDiscoveryUrl(ENV), ENV.AUTH_OIDC_DISCOVERY_URL);
+
+  // The receiver comes and goes with the provider: with the gate OPEN,
+  // ssoPlugins must also register the logout endpoint. genericOAuth()
+  // constructs without a network call -- its fetch is inside `init` -- so
+  // this is safe to assert here.
+  const openPlugins = ssoPlugins(ENV);
+  assert.ok(openPlugins.some((plugin) => plugin.id === "mygist-sso-logout"));
 });
 
 test("a discovery URL without credentials fails at boot, not at first sign-in", () => {
@@ -181,6 +188,7 @@ test("a token from the wrong issuer is refused", async () => {
     .setIssuer("https://evil.example/")
     .setAudience(AUDIENCE)
     .setIssuedAt()
+    .setJti("unique-token-id")
     .sign(privateKey);
   await assert.rejects(() => verifyLogoutToken(provider, token));
 });
@@ -195,6 +203,7 @@ test("a token for a different audience is refused", async () => {
     .setIssuer(ISSUER)
     .setAudience("some-other-app")
     .setIssuedAt()
+    .setJti("unique-token-id")
     .sign(privateKey);
   await assert.rejects(() => verifyLogoutToken(provider, token));
 });
@@ -210,11 +219,32 @@ test("an ID token replayed as a logout token is refused", async () => {
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
     .setIssuedAt()
+    .setJti("unique-token-id")
     .sign(privateKey);
   await assert.rejects(() => verifyLogoutToken(provider, noEvent), /event/i);
 
   const withNonce = await logoutToken(privateKey, { nonce: "abc" });
   await assert.rejects(() => verifyLogoutToken(provider, withNonce), /nonce/i);
+});
+
+test("a token with the wrong event type is refused", async () => {
+  // Deleting the LOGOUT_EVENT membership check from verifyLogoutToken must
+  // fail this test: a payload with a non-empty `events` object of the WRONG
+  // type is the case that guards against, and the "ID token replayed" test
+  // above (whose noEvent token has no events claim at all) does not exercise
+  // it -- that one is caught earlier by the "no events claim" guard.
+  const { privateKey, provider } = await localProvider();
+  const token = await new SignJWT({
+    events: { "http://schemas.openid.net/event/some-other-event": {} },
+    sub: "authentik-user-uuid",
+  })
+    .setProtectedHeader({ alg: "RS256", kid: "test-key" })
+    .setIssuer(ISSUER)
+    .setAudience(AUDIENCE)
+    .setIssuedAt()
+    .setJti("unique-token-id")
+    .sign(privateKey);
+  await assert.rejects(() => verifyLogoutToken(provider, token), /event/i);
 });
 
 test("a logout token with no subject is refused", async () => {
@@ -227,6 +257,7 @@ test("a logout token with no subject is refused", async () => {
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
     .setIssuedAt()
+    .setJti("unique-token-id")
     .sign(privateKey);
   await assert.rejects(() => verifyLogoutToken(provider, token), /sub/i);
 });
