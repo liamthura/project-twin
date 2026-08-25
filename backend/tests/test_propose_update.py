@@ -125,6 +125,70 @@ def test_an_alias_only_payload_is_kept_rather_than_stripped_to_nothing(clean_dat
     assert "Pick a licence" in stored.values()
 
 
+def test_a_supplied_field_is_never_dropped_for_being_undeclared(clean_database, as_user):
+    """The filter exists to remove what normalize_data ADDED, not what the
+    caller sent.
+
+    `goal` declares title/target_date/why/notes/type/status/custom_type -- no
+    `description`. Filtering on "is it declared" therefore discarded a
+    description the agent had written, silently: the proposal reached the queue
+    missing the content it was written to carry, and nothing said so. The
+    executor accepts far more spellings than the schema declares (`proficiency`,
+    `state`, `is_active`), so "undeclared" cannot mean "unwanted".
+    """
+    import proposals_store
+    _call([{
+        "kind": "entity", "action": "add", "entity": "goal",
+        "data": {
+            "title": "One auth provider across a self-hosted app ecosystem",
+            "status": "active",
+            "description": "Federate every app to a single IdP.",
+        },
+        "rationale": "r", "evidence": "e",
+    }])
+    [row] = proposals_store.list_pending("entity")
+    assert row["data"]["description"] == "Federate every app to a single IdP."
+    # ...and normalize_data's alias artifact is still stripped, which is the
+    # behaviour the filter was actually there for.
+    assert "name" not in row["data"]
+
+
+def test_a_proposal_with_no_identifier_is_invalid(clean_database, as_user):
+    """The one incompleteness a reviewer cannot repair.
+
+    Other missing required fields are left to execute_modify at approval time,
+    in front of the person who can supply them -- an agent that hears "I'm now
+    a Senior Engineer at Acme" should not have to invent a `period` to say so.
+    But with no identifier the card has nothing to title itself with and the
+    executor has nothing to match on, so it is refused while retrying is still
+    cheap.
+    """
+    import proposals_store
+    result = _call([{
+        "kind": "entity", "action": "add", "entity": "project",
+        "data": {"description": "Federate every app to a single IdP."},
+        "rationale": "r", "evidence": "e",
+    }])
+    assert result["results"][0]["result"] == "invalid"
+    assert "name" in result["results"][0]["reason"]
+    assert proposals_store.list_pending("entity") == []
+
+
+def test_an_identifier_sent_under_an_alias_still_counts(clean_database, as_user):
+    """Alias resolution happens in execute_modify, not normalize_data, so the
+    declared spelling is not the only valid one. `top_of_mind` declares `item`
+    and executes perfectly from a bare `name` -- rejecting that would refuse a
+    payload the rest of the suite proves works."""
+    import proposals_store
+    result = _call([{
+        "kind": "entity", "action": "add", "entity": "top_of_mind",
+        "data": {"name": "Pick a licence"},
+        "rationale": "r", "evidence": "e",
+    }])
+    assert result["results"][0]["result"] == "stored"
+    assert len(proposals_store.list_pending("entity")) == 1
+
+
 def test_the_queue_is_not_readable_over_mcp(clean_database, as_user):
     names = {t.lower() for t in dir(server)}
     for forbidden in ("list_proposals", "get_proposals", "resolve_proposal"):
