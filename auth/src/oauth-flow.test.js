@@ -172,7 +172,11 @@ async function registerClient() {
     scope: PERSONA_SCOPES.join(" "),
   });
   const body = await res.json().catch(() => null);
-  assert.equal(res.status, 200, `registration failed: ${JSON.stringify(body)}`);
+  // 201, not 200: Better Auth 1.7 made this endpoint answer with the status
+  // RFC 7591 section 3.2.1 requires for a created registration. Asserted
+  // exactly rather than as `res.ok`, because the status IS the contract a
+  // client reads and a silent slide back to 200 is worth failing on.
+  assert.equal(res.status, 201, `registration failed: ${JSON.stringify(body)}`);
   return body;
 }
 
