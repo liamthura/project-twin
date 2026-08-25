@@ -476,7 +476,7 @@ Follow `~/.claude/projects/.../memory/verify-mcp-against-running-preview.md` —
 
 Each of these must pass:
 
-1. Register a new OAuth client via `/auth/oauth2/register`, and confirm it is stored **with** `offline_access` in its scopes (the `oauthRegistrationScopePlugin` case — without it, the refresh grant fails later with `invalid_scope`).
+1. Register a new OAuth client via `/auth/oauth2/register`, and confirm it is stored **with** `offline_access` in its scopes (1.7 overwrites a dynamic registration's requested scope with the server's own `scopes` list, which contains it — see `auth/src/oauth.js` — so a client that never asked for it still gets stored able to hold a refresh token).
 2. Authorize → consent → token, as a fresh client.
 3. Refresh the access token using the refresh token.
 4. Call `/mcp` with the resulting access token and get a real tool response.
@@ -495,7 +495,7 @@ List all eight with their outcome. A regression pass that is not written down di
 
 ```bash
 gh pr create --title "chore: better-auth 1.7.1" \
-  --body "$(printf 'Phase 1 of the Authentik SSO design. No SSO code in this branch.\n\n## MCP OAuth regression\n\n1. Client registration with offline_access: \n2. Authorize -> consent -> token: \n3. Refresh: \n4. Tool call over /mcp: \n5. Revoke connection: \n6. Pre-upgrade client still works: \n7. SPA session -> JWT exchange: \n')"
+  --body "$(printf 'Phase 1 of the Authentik SSO design. No SSO code in this branch.\n\n## MCP OAuth regression\n\n1. Client registration with offline_access: \n2. Authorize -> consent -> token: \n3. Refresh: \n4. Tool call over /mcp: \n5. Revoke connection: \n6. Pre-upgrade client still works: \n7. SPA session -> JWT exchange: \n8. Pre-backfill client still completes authorize -> token: \n')"
 ```
 
 Fill each line with the outcome before opening it, not after.
@@ -506,5 +506,5 @@ Fill each line with the outcome before opening it, not after.
 
 - `0010_better_auth_17` is applied, re-runnable, and reversible.
 - `cd auth && npm test` and `cd backend && python -m pytest -q` both green.
-- All seven MCP OAuth checks pass and are recorded in the PR.
+- All eight MCP OAuth checks pass and are recorded in the PR.
 - No SSO code in the diff.

@@ -11,7 +11,22 @@ account on (issuer, accountId) instead of (providerId, accountId), and the
 generated migration deliberately refuses to choose issuers for you. Every
 account this database has today is a credential account written by
 scripts/seed_better_auth.py or by sign-up, so there is exactly one issuer to
-assign and no collision to resolve: accountId is a uuid primary key.
+assign, and no collision to resolve when it is: `accountId` is not `account`'s
+primary key (`id` is) -- for a credential account it holds the owning user's
+uuid, which is unique because it is `user.id`. Assigning every row the same
+issuer therefore cannot collide on (issuer, accountId): two rows sharing an
+issuer would need to also share a userId, and a user has at most one
+credential account.
+
+Only `oauthClientResource` gets a dedupe pass below before its unique index;
+`account` does not, and that is not an oversight. The dedupe exists because a
+specific race is possible there and provably is not here: `oauthClientResource`
+rows come from a concurrent boot-time backfill (auth/src/preflight.js) that an
+earlier version of this branch made non-atomic, so two containers starting at
+once could each insert the same pair. `account` rows come only from sign-up
+and the seed script, never from a racing backfill, and the UPDATE above is
+idempotent -- so there is no analogous history of duplicate-producing writes
+for it to clean up.
 
 Add nullable, backfill, then constrain. Adding the column NOT NULL in one step
 would fail against any database that already has rows -- which is every

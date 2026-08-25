@@ -75,7 +75,7 @@ export async function preflight(pool, auth) {
   }
 
   // to_regclass returns null rather than raising for a missing relation, so one
-  // query answers for all five without a try/catch per table.
+  // query answers for all seven without a try/catch per table.
   const { rows } = await pool.query(
     `select t.name, to_regclass('better_auth.' || quote_ident(t.name)) is not null as present
        from unnest($1::text[]) as t(name)`,
