@@ -16,7 +16,9 @@
  * The redirect URI Authentik must be given is therefore
  * `<origin>/auth/callback/authentik`, with no `oauth2` segment in it.
  */
+import { APIError, createAuthEndpoint } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import { jwtVerify } from "jose";
 
 /** Matches the Application slug on Authentik, and the `providerId` stored on
  *  every federated account row. Changing it re-keys every linked account. */
@@ -118,5 +120,147 @@ export function ssoConfig(env = process.env) {
 /** The plugin list -- empty, and therefore inert, when the gate is closed. */
 export function ssoPlugins(env = process.env) {
   if (!ssoDiscoveryUrl(env)) return [];
-  return [genericOAuth({ config: [ssoConfig(env)] })];
+  return [
+    genericOAuth({ config: [ssoConfig(env)] }),
+    backchannelLogoutPlugin(),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Back-channel logout
+// ---------------------------------------------------------------------------
+
+/** OIDC Back-Channel Logout 1.0, section 2.4. */
+export const LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout";
+
+/**
+ * The configured provider, from Better Auth's own context.
+ *
+ * Mirrors `getAwaitableValue` in context/helpers.mjs: entries may be plain
+ * objects or thunks. Read rather than rebuilt so the receiver cannot drift from
+ * the sign-in path -- the issuer, audience, algorithms and JWKS below are the
+ * exact ones genericOAuth discovered at boot.
+ */
+async function findProvider(context, id) {
+  for (const entry of context?.socialProviders ?? []) {
+    const provider = typeof entry === "function" ? await entry() : entry;
+    if (provider?.id === id) return provider;
+  }
+  return null;
+}
+
+/**
+ * Verify a logout token and return its claims.
+ *
+ * Throws on anything short of a fully valid token. Signature, issuer, audience
+ * and expiry are `jose`'s job; the three checks after it are the ones that
+ * separate a logout token from an ID token, and skipping them turns an
+ * id_token captured from an ordinary sign-in into a remote sign-out button.
+ */
+export async function verifyLogoutToken(provider, token) {
+  const idToken = provider?.idToken;
+  if (!idToken) {
+    throw new Error(
+      "The SSO provider has no verified ID-token configuration, so a logout " +
+        "token cannot be checked. This should be unreachable: " +
+        "requireIdTokenVerification refuses to register the provider without one.",
+    );
+  }
+
+  const { payload } = await jwtVerify(token, idToken.jwks, {
+    issuer: idToken.issuer,
+    audience: idToken.audience,
+    algorithms: idToken.algorithms,
+  });
+
+  if (!payload.events || typeof payload.events !== "object") {
+    throw new Error("logout token has no events claim");
+  }
+  if (!(LOGOUT_EVENT in payload.events)) {
+    throw new Error("logout token does not carry the back-channel logout event");
+  }
+  // Section 2.4 again: a nonce is what makes a token an ID token. Its presence
+  // means this is a replayed id_token, not a logout notification.
+  if ("nonce" in payload) {
+    throw new Error("logout token must not carry a nonce");
+  }
+  if (typeof payload.sub !== "string" || !payload.sub) {
+    throw new Error("logout token has no sub, so it names nobody to sign out");
+  }
+
+  return payload;
+}
+
+/**
+ * The receiver Authentik posts to when a session ends there.
+ *
+ * Unauthenticated by necessity -- the caller is Authentik, not a browser with a
+ * cookie -- so the token IS the authentication, and nothing in it is trusted
+ * until verifyLogoutToken returns.
+ *
+ * Revokes BROWSER SESSIONS ONLY. Opaque API tokens and MCP connections are left
+ * alone on purpose: Authentik sends this on an ordinary session end, and
+ * killing long-lived credentials that sit in config files on other machines
+ * would break every MCP client with no way to tell them why. An account-disable
+ * path that also revokes tokens is a separate mechanism, if it is ever wanted.
+ *
+ * Configure the URL on the Authentik provider as:
+ *     <your public origin>/auth/backchannel-logout
+ */
+export function backchannelLogoutPlugin() {
+  return {
+    id: "mygist-sso-logout",
+
+    endpoints: {
+      backchannelLogout: createAuthEndpoint(
+        "/backchannel-logout",
+        { method: "POST" },
+        async (ctx) => {
+          // Authentik posts application/x-www-form-urlencoded; better-call
+          // parses that into ctx.body (better-call/dist/utils.mjs:33).
+          const token = ctx.body?.logout_token;
+          if (!token) {
+            throw new APIError("BAD_REQUEST", { message: "logout_token is required" });
+          }
+
+          const provider = await findProvider(ctx.context, PROVIDER_ID);
+          if (!provider) {
+            throw new APIError("NOT_FOUND", { message: "No SSO provider configured." });
+          }
+
+          let claims;
+          try {
+            claims = await verifyLogoutToken(provider, token);
+          } catch (error) {
+            // Logged, because a provider misconfiguration is silent otherwise:
+            // Authentik retries, gets 400, and neither side says why.
+            ctx.context.logger.warn(
+              `[sso] rejected a back-channel logout token: ${error?.message ?? error}`,
+            );
+            throw new APIError("BAD_REQUEST", { message: "Invalid logout token." });
+          }
+
+          // `iss` IS the stored account issuer: genericOAuth namespaces a
+          // federated account by the DISCOVERED issuer (index.mjs:143), and
+          // OIDC requires a logout token's iss to be that same value.
+          const owner = await ctx.context.internalAdapter.findAccountOwnerByKey({
+            issuer: claims.iss,
+            accountId: claims.sub,
+          });
+
+          // 200 for an unknown subject, deliberately. A different answer would
+          // tell whoever holds a valid token for another tenant which subjects
+          // have MyGist accounts, and there is nothing for the caller to do
+          // about it either way.
+          if (owner?.kind === "owned") {
+            await ctx.context.internalAdapter.deleteUserSessions(owner.user.id);
+          }
+
+          // Section 2.8: 200 with no body, and no caching.
+          ctx.setHeader("Cache-Control", "no-store");
+          return ctx.json({});
+        },
+      ),
+    },
+  };
 }
