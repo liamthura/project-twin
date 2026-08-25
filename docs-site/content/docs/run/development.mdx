@@ -146,16 +146,23 @@ enough, because nothing here touches pgvector.
 <Callout type="warn">
 Alembic owns the schema, including Better Auth's tables. The Better Auth
 CLI can emit and even apply its own DDL, and doing so puts the database into a
-state no migration describes.
+state no migration describes. Do not run `@better-auth/cli` against this
+project at all: it hard-pins its own `better-auth` dependency, so its diff
+engine resolves against a stale copy rather than the version this project
+runs, and it silently drops fields the stale copy does not know about (see
+`docs/superpowers/plans/notes/README.md`).
 
-```bash
-npm run schema:generate          # writes DDL, for reading
+To see what the current schema should look like, read it with the public
+`getAuthTables` API instead:
+
+```js
+import { getAuthTables } from "better-auth/db";
+const { auth } = await import("./src/auth.js");
+getAuthTables(auth.options);   // AUTH_MCP_RESOURCE must be set, or the OAuth plugins are absent
 ```
 
-That command exists to be read once while writing the matching Alembic
-migration, and its output is gitignored; it reappears on every run and is a
-record of nothing. `npm run schema:migrate` applies DDL directly; do not run it
-against anything you care about.
+That exists to be read once while writing the matching Alembic migration by
+hand; nothing here writes DDL, and nothing applies it for you.
 
 The committed record is `backend/migrations/versions/`, and
 `auth/src/__fixtures__/better-auth-schema.sql` is the copy the auth suite tests
