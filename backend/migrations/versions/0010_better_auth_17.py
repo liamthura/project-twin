@@ -23,11 +23,15 @@ default; `expiresAt`, where inventing one would backdate or extend a token,
 drops the constraint instead. Same reasoning for `oauthAccessToken."token"`,
 which 1.7 leaves empty for access tokens it issues as JWTs.
 
-`oauthResource`, `oauthClientResource` and `oauthClientAssertion` are created
-even though MyGist uses neither protected resources nor private_key_jwt client
-assertions. Better Auth's adapter queries every table it declares regardless of
-whether the feature is switched on, so a missing one surfaces as a runtime
-failure part-way through the MCP OAuth flow. Three empty tables cost nothing.
+`oauthResource` and `oauthClientResource` are created empty and then filled at
+runtime: 1.7's OAuth plugin seeds the resource row from its `resources` option,
+and auth/src/preflight.js links every client to it at boot so that 1.7's
+`enforcePerClientResources` default -- which refuses a client with no link row
+-- can stay on. `oauthClientAssertion` really is unused; MyGist has no
+private_key_jwt clients. It is created anyway because Better Auth's adapter
+queries every table it declares regardless of whether the feature is switched
+on, so a missing one surfaces as a runtime failure part-way through the MCP
+OAuth flow. An empty table costs nothing.
 
 Revision ID: 0010_better_auth_17
 Revises: 0009_history_and_reads
@@ -224,6 +228,21 @@ def upgrade() -> None:
     op.execute(
         'create index if not exists "oauthClientResource_resourceId_idx"'
         ' on better_auth."oauthClientResource" ("resourceId")'
+    )
+
+    # Load-bearing, not a tuning index. Better Auth's own schema declaration
+    # says so: "Composite uniqueness on (clientId, resourceId) is load-bearing
+    # -- the enforcePerClientResources linkage check assumes one row per pair."
+    # Without it the plugin's registration collision recovery, which is keyed on
+    # catching this exact constraint error, can never fire; and the boot-time
+    # backfill in auth/src/preflight.js has nothing to make its insert race-safe
+    # between two containers starting at once.
+    #
+    # `getAuthTables` expresses it as two separate `index: true` fields, which
+    # is why the generated field list above did not produce it.
+    op.execute(
+        'create unique index if not exists "oauthClientResource_clientId_resourceId_key"'
+        ' on better_auth."oauthClientResource" ("clientId", "resourceId")'
     )
 
 

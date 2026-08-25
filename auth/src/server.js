@@ -32,11 +32,17 @@ try {
   // log. It undermines itself if it can fail with a bare stack trace, so
   // anything unexpected in it still names what to look at.
   console.error(
-    "\n[preflight] Failed before it could check the database.\n" +
+    "\n[preflight] Failed before it could reach a verdict.\n" +
       `  ${error?.message ?? error}\n\n` +
       "  This is the check itself failing, not a verdict on your database.\n" +
-      "  Look first at DATABASE_URL: it is read at startup, and a value the\n" +
-      "  driver cannot parse fails here.\n",
+      "  Two things it does can throw:\n\n" +
+      "    - Reading DATABASE_URL, which happens at startup: a value the\n" +
+      "      driver cannot parse fails here.\n" +
+      "    - Awaiting the OAuth plugin's startup, which the client backfill\n" +
+      "      has to do before it can link anything. A plugin misconfiguration\n" +
+      "      -- AUTH_MCP_RESOURCE that is not an absolute URI, above all --\n" +
+      "      arrives here rather than at the first request, which is the\n" +
+      "      point of it arriving here at all.\n",
   );
   process.exit(1);
 }

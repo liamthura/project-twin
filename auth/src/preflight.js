@@ -12,14 +12,39 @@
  * actually identify the problem -- which database, which role, which
  * search_path -- and exits non-zero. The platform's deployment log is where
  * someone is already looking.
+ *
+ * It also WRITES, which a file called preflight would not normally do.
+ * `linkClientsToMcpResource` backfills `oauthClientResource` on every boot, so
+ * that Better Auth 1.7's `enforcePerClientResources` default can stay on
+ * without cutting off every client registered before the upgrade. It lives
+ * here rather than in a migration because the row it links against does not
+ * exist at migration time -- the OAuth plugin seeds it, asynchronously, and
+ * this is the first moment that seed can be awaited. Same boot phase, same
+ * pool, and the same purpose: an instance that cannot serve a connection says
+ * so in the deploy log rather than at somebody's browser callback.
  */
 
 import { activeCount, inviteOnly } from "./invite.js";
 import { mcpResource } from "./oauth.js";
 
-// Every table migration 0003 creates. Missing any means this service is
-// pointed at a database the API has not migrated.
-const REQUIRED_TABLES = ["user", "session", "account", "verification", "jwks"];
+// Migration 0003's five tables, plus the two of 0010's that this file goes on
+// to read and write. Missing any means this service is pointed at a database
+// the API has not migrated, and it is worth one query here to say that in
+// those words: without the 0010 pair listed, a database stuck on 0009 gets
+// past this check, has its missing `oauthResource` swallowed by the plugin's
+// own seed (which tolerates a missing table and defers), and then fails in
+// linkClientsToMcpResource with a bare relation-does-not-exist -- which
+// server.js catches and answers by suggesting DATABASE_URL, the wrong first
+// suspect by some distance.
+const REQUIRED_TABLES = [
+  "user",
+  "session",
+  "account",
+  "verification",
+  "jwks",
+  "oauthResource",
+  "oauthClientResource",
+];
 
 export async function preflight(pool, auth) {
   let context = null;
@@ -66,13 +91,16 @@ export async function preflight(pool, auth) {
         `  database:     ${context.db}\n` +
         `  role:         ${context.role}\n` +
         `  search_path:  ${context.search_path}\n\n` +
-        "  These tables are created by the API's Alembic migration 0003, not by\n" +
-        "  this service. Two things produce this:\n\n" +
+        "  These tables are created by the API's Alembic migrations 0003 and\n" +
+        "  0010, not by this service. Three things produce this:\n\n" +
         "    1. DATABASE_URL points at a DIFFERENT database from the API's, so\n" +
         "       the migration ran somewhere else. Compare both values -- host,\n" +
         "       role AND database name.\n" +
         "    2. The role above lacks USAGE on the better_auth schema, which the\n" +
-        "       migration created as whichever role ran it.\n\n" +
+        "       migration created as whichever role ran it.\n" +
+        "    3. Only the oauth* names are missing, in which case the database is\n" +
+        "       migrated but stopped short of 0010 -- the Better Auth 1.7\n" +
+        "       revision. Run `alembic upgrade head` against it.\n\n" +
         "  Check with:  psql -c \"select tablename from pg_tables " +
         "where schemaname='better_auth'\"\n",
     );
@@ -163,10 +191,15 @@ async function linkClientsToMcpResource(pool, auth) {
 /**
  * The backfill itself: one statement, no transaction, safe on every boot.
  *
- * Idempotency is the `not exists` rather than the `on conflict`, which can
- * only catch a primary-key collision -- there is no unique constraint on
- * (clientId, resourceId) in migration 0010 to conflict on. It is kept as the
- * cheap half of belt and braces.
+ * Idempotency is the ON CONFLICT, against the composite unique index migration
+ * 0010 puts on (clientId, resourceId) -- which Better Auth's own schema calls
+ * load-bearing, because its linkage check assumes one row per pair. A `not
+ * exists` subquery would read the same on a quiet boot and lose the race
+ * between two containers starting at once; the index cannot.
+ *
+ * Every client, including disabled ones. A disabled client is refused earlier
+ * and on other grounds, so withholding its link row would only mean the day it
+ * is re-enabled is the day it stops working.
  *
  * @returns how many link rows were created.
  */
@@ -175,11 +208,7 @@ export async function backfillClientResources(pool, resource) {
     `insert into better_auth."oauthClientResource" ("id", "clientId", "resourceId", "createdAt")
      select gen_random_uuid()::text, c."clientId", $1, now()
        from better_auth."oauthClient" c
-      where not exists (
-              select 1 from better_auth."oauthClientResource" r
-               where r."clientId" = c."clientId" and r."resourceId" = $1
-            )
-     on conflict do nothing`,
+     on conflict ("clientId", "resourceId") do nothing`,
     [resource],
   );
   return rowCount;

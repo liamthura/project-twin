@@ -235,6 +235,8 @@ CREATE INDEX "oauthAccessToken_sessionId_idx" ON better_auth."oauthAccessToken" 
 CREATE INDEX "oauthAccessToken_userId_idx" ON better_auth."oauthAccessToken" USING btree ("userId");
 CREATE INDEX "oauthClientResource_clientId_idx" ON better_auth."oauthClientResource" USING btree ("clientId");
 CREATE INDEX "oauthClientResource_resourceId_idx" ON better_auth."oauthClientResource" USING btree ("resourceId");
+
+CREATE UNIQUE INDEX "oauthClientResource_clientId_resourceId_key" ON better_auth."oauthClientResource" USING btree ("clientId", "resourceId");
 CREATE INDEX "oauthClient_userId_idx" ON better_auth."oauthClient" USING btree ("userId");
 CREATE INDEX "oauthConsent_clientId_idx" ON better_auth."oauthConsent" USING btree ("clientId");
 CREATE INDEX "oauthConsent_userId_idx" ON better_auth."oauthConsent" USING btree ("userId");
