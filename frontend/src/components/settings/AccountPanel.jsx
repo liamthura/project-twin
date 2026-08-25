@@ -50,6 +50,12 @@ export function AccountPanel({
   // question is two answers free to disagree.
   const [sso, setSso] = useState(false);
   const [accounts, setAccounts] = useState([]);
+  // True until the first fetch resolves. The password block below must default
+  // to hidden, not shown: "sso" and "accounts" start at their no-SSO values, so
+  // reading them before the fetch lands would offer a password change on an
+  // SSO-only account for the one render before the truth arrives -- exactly the
+  // control that cannot work.
+  const [loadingAccounts, setLoadingAccounts] = useState(true);
 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -58,13 +64,18 @@ export function AccountPanel({
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState(null);
 
-  const loadAccounts = useCallback(async () => {
+  const loadAccounts = useCallback(async (isCancelled = () => false) => {
     const [instance, list] = await Promise.all([
       getInstance().catch(() => null),
       listAccounts().catch(() => []),
     ]);
+    // Same guard as the getOnboarding chain below: a promise that resolves
+    // after the effect that started it was cleaned up must not write into a
+    // closure nobody is looking at any more.
+    if (isCancelled()) return;
     setSso(instance?.sso === true);
     setAccounts(list);
+    setLoadingAccounts(false);
   }, []);
 
   useEffect(() => {
@@ -79,7 +90,7 @@ export function AccountPanel({
         // already or genuinely unavailable, and a control that might do nothing
         // is worse than no control.
       });
-    loadAccounts();
+    loadAccounts(() => cancelled);
     return () => {
       cancelled = true;
     };
@@ -132,9 +143,11 @@ export function AccountPanel({
 
   // An account with a linked provider and no password has nothing to change,
   // and this form cannot set a first one. Offering it would be offering a
-  // control that cannot work.
+  // control that cannot work -- which is why this defaults to false while
+  // loadingAccounts is still true, rather than assuming "no SSO" until told
+  // otherwise.
   const hasPassword = accounts.some((a) => a.providerId === "credential");
-  const offerPasswordChange = !sso || hasPassword;
+  const offerPasswordChange = !loadingAccounts && (!sso || hasPassword);
 
   return (
     <div className="space-y-4">

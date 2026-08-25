@@ -167,13 +167,16 @@ describe("the getting-started restore", () => {
 });
 
 describe("changing the password", () => {
-  const openForm = () => {
+  const openForm = async () => {
     open();
-    fireEvent.click(screen.getByRole("button", { name: /change password/i }));
+    // The button is gated behind the account fetch now (it must not offer a
+    // password change before that fetch says a password is actually
+    // possible), so it is no longer present on the very first render.
+    fireEvent.click(await screen.findByRole("button", { name: /change password/i }));
   };
 
   it("refuses a mismatch without a round trip", async () => {
-    openForm();
+    await openForm();
     fireEvent.change(screen.getByLabelText(/^New password$/i), {
       target: { value: "longenough1" },
     });
@@ -187,7 +190,7 @@ describe("changing the password", () => {
   });
 
   it("refuses one shorter than eight characters", async () => {
-    openForm();
+    await openForm();
     fireEvent.change(screen.getByLabelText(/^New password$/i), {
       target: { value: "short" },
     });
@@ -201,7 +204,7 @@ describe("changing the password", () => {
   });
 
   it("sends the current password when one was given", async () => {
-    openForm();
+    await openForm();
     fireEvent.change(screen.getByLabelText(/Current password/i), {
       target: { value: "oldpassword" },
     });
@@ -221,7 +224,7 @@ describe("changing the password", () => {
   it("omits the current password when the field was left empty", async () => {
     // An account seeded before Better Auth has no password to confirm, and the
     // endpoint takes current_password as optional.
-    openForm();
+    await openForm();
     fireEvent.change(screen.getByLabelText(/^New password$/i), {
       target: { value: "longenough1" },
     });
@@ -237,7 +240,7 @@ describe("changing the password", () => {
 
   it("shows what the server said when it refuses", async () => {
     setPassword.mockRejectedValueOnce(new Error("Current password is wrong."));
-    openForm();
+    await openForm();
     fireEvent.change(screen.getByLabelText(/^New password$/i), {
       target: { value: "longenough1" },
     });
@@ -282,5 +285,27 @@ describe("AccountPanel with SSO", () => {
 
     render(<AccountPanel isOpen username="liam" />);
     expect(await screen.findByText(/change password/i)).toBeInTheDocument();
+  });
+
+  it("does not show the password change control before accounts have loaded", async () => {
+    // sso/accounts start at their no-SSO values (false/[]), so reading them
+    // before the fetch resolves would show "Change password" for a frame and
+    // then withdraw it once the truth -- SSO-only, no password -- arrives.
+    // That is the control this task exists to keep off screen; it must never
+    // flash on even for an instant.
+    let resolveInstance;
+    getInstance.mockReturnValue(
+      new Promise((resolve) => {
+        resolveInstance = resolve;
+      }),
+    );
+    listAccounts.mockResolvedValue([{ id: "a2", providerId: "authentik" }]);
+
+    render(<AccountPanel isOpen username="liam" />);
+    expect(screen.queryByText(/change password/i)).not.toBeInTheDocument();
+
+    resolveInstance({ sso: true });
+    await waitFor(() => expect(listAccounts).toHaveBeenCalled());
+    expect(screen.queryByText(/change password/i)).not.toBeInTheDocument();
   });
 });
