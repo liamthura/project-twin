@@ -9,14 +9,13 @@
 --
 --   docker exec mygist-db pg_dump -U mygist -d mygist_test --schema-only \
 --     --schema=better_auth --no-owner --no-privileges \
---     | grep -v '^\restrict'
+--     | grep -vE '^\\(un)?restrict'
 --
 -- The grep matters: newer pg_dump wraps its output in `\restrict` /
 -- `\unrestrict` psql meta-commands, which pool.query() cannot execute --
--- loading the fixture verbatim fails. Filter the `\restrict` line (its
--- matching `\unrestrict` is the last line, harmless if left in, but drop it
--- too if you want the output free of meta-commands entirely) before
--- overwriting this file.
+-- loading the fixture verbatim fails on either one, so both lines need
+-- dropping, not just the first -- confirmed by loading the filtered dump
+-- through pool.query() directly.
 --
 -- mygist_test, not mygist_local: the local database is only migrated when
 -- someone runs the app, so it lags, and dumping it produces a fixture for
