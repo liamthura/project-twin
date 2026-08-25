@@ -3,17 +3,9 @@ import { test } from "node:test";
 
 import { oauthProvider } from "@better-auth/oauth-provider";
 
-import { AUTH_BASE_PATH } from "./base-path.js";
 import { SCOPES, canonicalResource, mcpResource, oauthOptions, registrationScopes } from "./oauth.js";
 
 const ORIGIN = "https://mygist.example";
-
-// Derived the same way auth.js derives it -- origin + AUTH_BASE_PATH -- rather
-// than hand-written as an already-joined literal. A hand-written BASE here is
-// exactly what let Task 5's review slip through: it matched the bug in the
-// wiring (baseURL passed as the bare origin) by coincidence rather than by
-// construction, so a regression there would not have failed this test.
-const BASE = `${ORIGIN}${AUTH_BASE_PATH}`;
 
 // What AUTH_MCP_RESOURCE holds, on both containers.
 const RESOURCE = `${ORIGIN}/mcp`;
@@ -39,14 +31,21 @@ test("the OAuth surface is gated on AUTH_MCP_RESOURCE", () => {
   );
 });
 
-test("the MCP resource is a valid audience, or every token request 400s", () => {
-  const options = oauthOptions({ baseURL: BASE, mcpResource: RESOURCE });
-  assert.ok(options.validAudiences.includes("https://mygist.example/mcp"));
-  assert.ok(options.validAudiences.includes(BASE));
+test("the MCP resource is a configured resource, or every authorize 400s", () => {
+  // 1.7 replaced `validAudiences` with `resources`, which are seeded as rows
+  // rather than matched from a list. An unconfigured one comes back
+  // `invalid_target` at /oauth2/authorize -- in the browser, on the callback,
+  // long after anything could have caught it at boot.
+  const options = oauthOptions({ mcpResource: RESOURCE });
+  assert.deepEqual(options.resources, ["https://mygist.example/mcp"]);
+
+  // And off, because 1.7 defaults it on and every client registered before
+  // this upgrade has no oauthClientResource row. See oauth.js.
+  assert.equal(options.enforcePerClientResources, false);
 });
 
 test("all three persona scopes are offered", () => {
-  const options = oauthOptions({ baseURL: BASE, mcpResource: RESOURCE });
+  const options = oauthOptions({ mcpResource: RESOURCE });
   for (const scope of SCOPES) assert.ok(options.scopes.includes(scope));
 });
 
@@ -58,18 +57,18 @@ test("client_credentials is not enabled -- it cannot carry a user", () => {
   // grantTypes at all. That is exactly the false positive Task 5's review
   // caught: the grant stayed enabled server-wide despite this same assertion
   // passing, because it never looked at what the plugin actually ends up with.
-  const provider = oauthProvider(oauthOptions({ baseURL: BASE, mcpResource: RESOURCE }));
+  const provider = oauthProvider(oauthOptions({ mcpResource: RESOURCE }));
   assert.ok(!provider.options.grantTypes.includes("client_credentials"));
   assert.deepEqual(provider.options.grantTypes, ["authorization_code", "refresh_token"]);
 });
 
 test("registration is rate limited", () => {
-  const options = oauthOptions({ baseURL: BASE, mcpResource: RESOURCE });
+  const options = oauthOptions({ mcpResource: RESOURCE });
   assert.equal(options.rateLimit.register.max, 5);
 });
 
 test("access tokens are short lived so revocation bites quickly", () => {
-  const options = oauthOptions({ baseURL: BASE, mcpResource: RESOURCE });
+  const options = oauthOptions({ mcpResource: RESOURCE });
   // Seconds as numbers, not time-span strings: the plugin adds these onto a
   // unix timestamp, so a string silently produces an Invalid Date and a 500
   // from Postgres on the very last step of the handshake.

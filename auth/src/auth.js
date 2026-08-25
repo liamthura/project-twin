@@ -411,16 +411,10 @@ export const auth = betterAuth({
     // its session cookie for a JWT there on every page load.
     ...(MCP_RESOURCE
       ? [
-          oauthPlugin({
-            // baseURL here is Better Auth's own EFFECTIVE base, not the bare
-            // public origin -- see oauth.js's JSDoc on oauthOptions. Passing
-            // the origin alone (as an earlier version of this wiring did) left
-            // validAudiences silently missing the auth service's own base,
-            // because Better Auth's real base URL is origin + basePath,
-            // computed the same way here.
-            baseURL: `${baseURL}${AUTH_BASE_PATH}`,
-            mcpResource: MCP_RESOURCE,
-          }),
+          // One argument, since 1.7. This also took Better Auth's effective
+          // base until then, for `validAudiences` -- an option 1.7 removed, and
+          // the only thing that ever read it. See oauth.js.
+          oauthPlugin({ mcpResource: MCP_RESOURCE }),
 
           // Without this, a client that registers from our resource metadata is
           // stored without offline_access and then fails with `invalid_scope`

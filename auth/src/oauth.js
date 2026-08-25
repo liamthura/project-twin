@@ -50,18 +50,18 @@ export function mcpResource(env = process.env) {
 /**
  * The plugin's options, exported separately so they can be asserted on.
  *
- * @param {string} baseURL Better Auth's own EFFECTIVE base -- what
- *   `ctx.context.baseURL` resolves to, i.e. the public origin plus its
- *   `basePath` (".../auth"). NOT the bare origin: the auth service's own
- *   token endpoint lives at that effective base, and if this is passed the
- *   origin instead, `validAudiences` silently omits it. See auth.js, which
- *   derives this from the same `AUTH_BASE_PATH` its `basePath` option uses.
+ * Took Better Auth's effective base URL as a second argument until 1.7. That
+ * existed solely to put the auth service's own base into `validAudiences`,
+ * which 1.7 removed; nothing else here ever read it, and Better Auth computes
+ * its own base for itself. Gone rather than kept unused, because an argument a
+ * caller has to derive correctly and nothing consumes is a trap.
+ *
  * @param {string} mcpResource The canonical MCP resource URI, from
  *   AUTH_MCP_RESOURCE. Never derived from the origin here: the API container
  *   checks an access token's `aud` against its own copy of this value by exact
  *   string, and two independent derivations are two things to drift.
  */
-export function oauthOptions({ baseURL, mcpResource }) {
+export function oauthOptions({ mcpResource }) {
   return {
     // Real paths, not hash routes: Better Auth appends query parameters to
     // these, and anything after a `#` lands in the fragment rather than in
@@ -71,11 +71,44 @@ export function oauthOptions({ baseURL, mcpResource }) {
 
     scopes: [...SCOPES, "offline_access"],
 
-    // Load-bearing. This defaults to [baseURL], which is `.../auth` -- while
-    // every MCP client sends resource=`.../mcp`. Left at the default, Better
-    // Auth throws invalid_request and EVERY connection attempt fails at the
-    // token endpoint, with an error that names neither this option nor the fix.
-    validAudiences: [baseURL, mcpResource],
+    // Load-bearing, and the successor to 1.6's `validAudiences`, which 1.7
+    // removed entirely. A resource is now a persisted `oauthResource` row
+    // rather than a string in a list: the plugin seeds one per entry here on
+    // first use, and an authorize request naming a resource with no row is
+    // refused with
+    //
+    //     invalid_target: requested resource ... is not configured
+    //
+    // -- which lands in the browser as a failed callback, not as a startup
+    // error, so an instance that forgot this looks fine until someone connects.
+    //
+    // One entry, where `validAudiences` needed two. 1.6 defaulted that option
+    // to the auth service's own base and every MCP client sends
+    // resource=`.../mcp`, so that base had to be re-listed alongside it. 1.7
+    // has no implicit default to preserve, and the auth base is not a protected
+    // resource this server issues tokens for -- listing it would seed a row and
+    // let a client ask for a token audienced at the authorization server
+    // itself.
+    resources: [mcpResource],
+
+    // Off, which is 1.6's behaviour: a client may ask for any enabled
+    // resource. 1.7 defaults it ON, and then refuses an authorize request from
+    // a client with no `oauthClientResource` row --
+    //
+    //     invalid_target: client ... is not linked to resource(s) .../mcp
+    //
+    // Two reasons it stays off. Every client registered before this upgrade has
+    // no link row and never could have, so leaving the default on would break
+    // every connection that already exists, at the first authorize after
+    // deploying, with nothing an operator could do but tell people to
+    // reconnect. And there is exactly ONE resource here: a table saying which
+    // clients may reach which resource has nothing to say while the answer is
+    // always the same one.
+    //
+    // Turn it on if a second resource is ever added -- but backfill
+    // `oauthClientResource` for the existing clients in the same migration,
+    // because that is the step this note exists to remember.
+    enforcePerClientResources: false,
 
     // Explicit, because the plugin's own default is
     // ["authorization_code", "client_credentials", "refresh_token"] -- and an
@@ -120,8 +153,8 @@ export function oauthOptions({ baseURL, mcpResource }) {
   };
 }
 
-export function oauthPlugin({ baseURL, mcpResource }) {
-  return oauthProvider(oauthOptions({ baseURL, mcpResource }));
+export function oauthPlugin({ mcpResource }) {
+  return oauthProvider(oauthOptions({ mcpResource }));
 }
 
 /**
