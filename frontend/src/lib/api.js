@@ -272,8 +272,10 @@ async function getInstance() {
   // Both fallbacks name every key a caller reads. `mcp_oauth: false` is the
   // safe answer when we cannot ask: recommending that a client sign in, on an
   // instance that turns out to mount no discovery routes, sends someone through
-  // a flow that ends in a 404.
-  const unknown = { invite_only: false, mcp_oauth: false };
+  // a flow that ends in a 404. `sso: false` is safe for the mirror-image
+  // reason: showing only a redirect button, on an instance that federates
+  // nothing, leaves a person with no way in at all.
+  const unknown = { invite_only: false, mcp_oauth: false, sso: false };
   try {
     const response = await fetch(`${getApiBase()}/instance`);
     if (!response.ok) return unknown;

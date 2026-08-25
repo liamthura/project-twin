@@ -319,3 +319,93 @@ export async function resetPassword(newPassword, token) {
   cachedJwt = null;
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Single sign-on
+// ---------------------------------------------------------------------------
+
+/**
+ * The provider id, matching auth/src/sso.js and the Application slug on the
+ * identity provider. It is stored on every linked account row, so this is not
+ * a label -- changing it re-keys every link.
+ */
+export const SSO_PROVIDER_ID = "authentik";
+
+/** What the button says. Not configurable: see the spec's "Not building". */
+export const SSO_LABEL = "TDev Door";
+
+/**
+ * Ask the auth service for the provider's authorization URL, then go there.
+ *
+ * `/sign-in/social`, not `/sign-in/oauth2`. Better Auth 1.7's genericOAuth
+ * plugin registers no endpoints of its own -- it injects a provider into the
+ * core social-provider list, and the whole flow rides the core routes. The 1.6
+ * documentation still describes plugin routes that no longer exist.
+ *
+ * The three callbacks are how a redirect flow says what an onSuccess handler
+ * would have said: where to return to, where a BRAND-NEW account goes instead,
+ * and where a failure lands. Nothing after the assignment runs.
+ */
+async function startProviderFlow(path, { callbackURL, newUserCallbackURL, errorCallbackURL }) {
+  const res = await authFetch(path, {
+    method: "POST",
+    body: JSON.stringify({
+      provider: SSO_PROVIDER_ID,
+      callbackURL,
+      ...(newUserCallbackURL ? { newUserCallbackURL } : {}),
+      ...(errorCallbackURL ? { errorCallbackURL } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(await readError(res, `Could not reach ${SSO_LABEL}`));
+
+  const body = await res.json().catch(() => ({}));
+  if (!body?.url) {
+    // Never fail silently here. A button that does nothing is the hardest bug
+    // to report: nothing happened, and nothing said why.
+    throw new Error(`${SSO_LABEL} did not return a sign-in link.`);
+  }
+  window.location.href = body.url;
+}
+
+/** Begin a federated sign-in. Navigates away; nothing after this runs. */
+export async function startSsoSignIn(callbacks) {
+  return startProviderFlow("/sign-in/social", callbacks);
+}
+
+/**
+ * Bind the provider to the account that is already signed in here.
+ *
+ * The session cookie is what makes this a LINK rather than a sign-in: the
+ * service refuses without one, and refuses again if that subject already
+ * belongs to somebody else. Auto-linking on a matching email is switched off in
+ * the auth service on purpose -- see accountLinking in auth/src/auth.js.
+ */
+export async function startSsoLink(callbacks) {
+  return startProviderFlow("/link-social", callbacks);
+}
+
+/** Every credential on this account: the password, and any linked provider.
+ *
+ *  An empty list rather than a throw when there is no session. Detached mode
+ *  signs in with a bearer token and has no Better Auth session at all, which is
+ *  not an error -- there is simply nothing to show. */
+export async function listAccounts() {
+  const res = await authFetch("/list-accounts");
+  if (!res.ok) return [];
+  const body = await res.json().catch(() => null);
+  return Array.isArray(body) ? body : [];
+}
+
+/** Remove one credential.
+ *
+ *  Better Auth refuses to remove the last one, so nothing here re-checks it --
+ *  a second implementation of that rule is a second thing to drift. The
+ *  service's own message is passed through instead. */
+export async function unlinkAccount(accountId) {
+  const res = await authFetch("/unlink-account", {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  });
+  if (!res.ok) throw new Error(await readError(res, "Could not unlink that."));
+  return res.json();
+}
