@@ -35,7 +35,6 @@ import {
   mcpResource,
   oauthPlugin,
   oauthRegistrationNativePlugin,
-  oauthRegistrationScopePlugin,
   revokeConnection,
 } from "./oauth.js";
 
@@ -416,12 +415,7 @@ export const auth = betterAuth({
           // the only thing that ever read it. See oauth.js.
           oauthPlugin({ mcpResource: MCP_RESOURCE }),
 
-          // Without this, a client that registers from our resource metadata is
-          // stored without offline_access and then fails with `invalid_scope`
-          // the moment it asks for a refresh token. See oauth.js.
-          oauthRegistrationScopePlugin(createAuthMiddleware),
-
-          // And without this, a client asking to redirect to loopback -- which
+          // Without this, a client asking to redirect to loopback -- which
           // is every MCP client, and which this server documents as accepted --
           // is refused at registration by 1.7 for not having declared itself
           // native. See oauth.js.
