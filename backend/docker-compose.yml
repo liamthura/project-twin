@@ -80,6 +80,13 @@ services:
       #   openssl rand -base64 32
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-dev-only-secret-at-least-32-characters-xx}
       - PORT=3001
+      # The resource URI (e.g. https://your-instance/mcp) that gates the whole
+      # OAuth surface -- see auth/src/oauth.js. Empty by default: unset, the
+      # OAuth plugins never register at all, which is deliberate fail-closed
+      # behaviour, not a bug. It does mean a stack started without it cannot
+      # exercise MCP OAuth -- set it here (and in AUTH_MCP_RESOURCE for the
+      # backend container, see scripts/local-preview.sh) to test that surface.
+      - AUTH_MCP_RESOURCE=${AUTH_MCP_RESOURCE:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 30s

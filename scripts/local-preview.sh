@@ -115,6 +115,14 @@ docker run -d --name "$NAME" --network "$NETWORK" \
   `# the auth service has no host-published port.` \
   -e AUTH_JWKS_URL="${AUTH_JWKS_URL:-http://auth:3001/auth/jwks}" \
   -e AUTH_ISSUER="${AUTH_ISSUER:-${BETTER_AUTH_URL:-http://localhost:1120}/auth}" \
+  `# Gates whether this container mounts OAuth discovery routes -- see` \
+  `# backend/main.py and auth/src/oauth.js. Empty by default, same as the` \
+  `# auth service's own copy in backend/docker-compose.yml: unset, the OAuth` \
+  `# plugins never register there either, which is deliberate fail-closed` \
+  `# behaviour. It does mean a preview started without it has no OAuth` \
+  `# surface at all -- 404 on discovery -- so export it before running this` \
+  `# script to exercise MCP OAuth locally.` \
+  -e AUTH_MCP_RESOURCE="${AUTH_MCP_RESOURCE:-}" \
   "$IMAGE" >/dev/null
 
 # The entrypoint runs `alembic upgrade head` before uvicorn, so the port is
