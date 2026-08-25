@@ -31,20 +31,29 @@ Two things the 1.7 upgrade guide flags that **do not apply here** — confirmed 
 - **Modify** `auth/package.json` — dependency versions only.
 - **Create** `backend/migrations/versions/0010_better_auth_17.py` — the whole 1.7 schema delta in one revision.
 - **Create** `backend/tests/test_migration_0010.py` — backfill correctness and the unique index.
-- **Modify** `docs/superpowers/plans/notes/better_auth_1.7_delta.sql` — generated reference, committed so the next person can see what the revision was derived from.
+- **Modify** `docs/superpowers/plans/notes/better_auth_1.7_fields.txt` — generated reference, committed so the next person can see what the revision was derived from.
 
 ---
 
 ### Task 1: Capture the real 1.7 schema delta
 
+> **DONE — but not by the method below.** `@better-auth/cli` cannot generate a
+> correct 1.7 delta: it hard-pins its own `better-auth` dependency (latest is
+> 1.4.22 → `better-auth@1.4.22`) and imports the diff engine by bare specifier,
+> so plugin tables come out right and core tables come from the stale copy.
+> `account.issuer` was silently absent. The artifact was produced from the
+> public `getAuthTables` API instead — see
+> `docs/superpowers/plans/notes/README.md` for the exact snippet and the full
+> reasoning. Steps below are kept for the record; do not re-run them.
+
 Generating the schema beats reading a changelog: the revision is written from what the library actually declares for *this* plugin set, not from a summary table.
 
 **Files:**
-- Create: `docs/superpowers/plans/notes/better_auth_1.7_delta.sql`
+- Create: `docs/superpowers/plans/notes/better_auth_1.7_fields.txt`
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `docs/superpowers/plans/notes/better_auth_1.7_delta.sql`, the generated 1.7 schema. Task 2 reads it to write the migration.
+- Produces: `docs/superpowers/plans/notes/better_auth_1.7_fields.txt`, the generated 1.7 schema. Task 2 reads it to write the migration.
 
 - [ ] **Step 1: Bring up the local database and migrate it to 1.6.25 head**
 
@@ -100,8 +109,8 @@ Expected: non-empty file, and at least one line mentioning `issuer`. If `issuer`
 ```bash
 cd /Users/khantthura/Documents/ProjectL/project-twin
 mkdir -p docs/superpowers/plans/notes
-cp /tmp/ba17/ba17.sql docs/superpowers/plans/notes/better_auth_1.7_delta.sql
-git add docs/superpowers/plans/notes/better_auth_1.7_delta.sql
+cp /tmp/ba17/ba17.sql docs/superpowers/plans/notes/better_auth_1.7_fields.txt
+git add docs/superpowers/plans/notes/better_auth_1.7_fields.txt
 git commit -m "chore: capture the better-auth 1.7 schema delta this migration is written from"
 ```
 
@@ -112,7 +121,7 @@ git commit -m "chore: capture the better-auth 1.7 schema delta this migration is
 **Files:**
 - Create: `backend/migrations/versions/0010_better_auth_17.py`
 - Test: `backend/tests/test_migration_0010.py`
-- Read: `docs/superpowers/plans/notes/better_auth_1.7_delta.sql` (from Task 1)
+- Read: `docs/superpowers/plans/notes/better_auth_1.7_fields.txt` (from Task 1)
 
 **Interfaces:**
 - Consumes: the generated delta from Task 1.
@@ -221,14 +230,14 @@ Expected: FAIL — `psycopg.errors.UndefinedColumn: column "issuer" of relation 
 
 - [ ] **Step 3: Write the migration**
 
-Create `backend/migrations/versions/0010_better_auth_17.py`. Add any *additional* additive columns and indexes found in `docs/superpowers/plans/notes/better_auth_1.7_delta.sql` alongside the account block below, following the same `if not exists` style. Do **not** copy the CLI's output wholesale — it emits full `create table` statements for tables that already exist.
+Create `backend/migrations/versions/0010_better_auth_17.py`. Add any *additional* additive columns and indexes found in `docs/superpowers/plans/notes/better_auth_1.7_fields.txt` alongside the account block below, following the same `if not exists` style. Do **not** copy the CLI's output wholesale — it emits full `create table` statements for tables that already exist.
 
 ```python
 """Better Auth 1.7's schema changes.
 
 Derived from `@better-auth/cli generate` against better-auth 1.7.1 with this
 project's plugin set -- the generated output is committed at
-docs/superpowers/plans/notes/better_auth_1.7_delta.sql. Regenerate rather than
+docs/superpowers/plans/notes/better_auth_1.7_fields.txt. Regenerate rather than
 hand-edit if the plugin set changes.
 
 The account identity change is the only one with a data step. 1.7 keys an
