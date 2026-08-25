@@ -174,10 +174,15 @@ export const auth = betterAuth({
   // path through unchanged, so both sides must agree on this prefix.
   //
   // Pulled from base-path.js rather than written here as a literal, because
-  // the OAuth plugin below needs this exact value too: Better Auth's own
-  // effective base (ctx.context.baseURL) is baseURL + basePath, not the bare
-  // origin, and oauthOptions' validAudiences has to contain that effective
-  // base or every token request 400s.
+  // the jwt() plugin below pins its issuer and audience to `baseURL` plus this
+  // exact path. Better Auth's own effective base (ctx.context.baseURL) is
+  // origin + basePath, not the bare origin, and those two derivations have to
+  // agree or the API cannot verify both token types with one AUTH_ISSUER --
+  // see the jwt() comment for what that failure looked like.
+  //
+  // The OAuth plugin needed the same value until 1.7, for `validAudiences`.
+  // That option no longer exists, oauthOptions no longer takes a base at all,
+  // and Better Auth computes its own. See oauth.js.
   basePath: AUTH_BASE_PATH,
 
   // Minimum 32 characters, per the installation docs. BETTER_AUTH_SECRETS
