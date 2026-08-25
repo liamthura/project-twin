@@ -261,3 +261,43 @@ test("a logout token with no subject is refused", async () => {
     .sign(privateKey);
   await assert.rejects(() => verifyLogoutToken(provider, token), /sub/i);
 });
+
+test("a token issued a few seconds in the future is still accepted", async () => {
+  // clockTolerance absorbs skew between two independently-clocked hosts.
+  // Without it, Authentik running even a second or two ahead puts iat in the
+  // future and jose's maxTokenAge check rejects EVERY logout token -- a
+  // regression that would look like back-channel logout silently never
+  // working, blaming the token rather than the clocks.
+  //
+  // Built directly rather than via logoutToken(): that helper always calls
+  // .setIssuedAt() with no argument, which would stamp "now" over any iat
+  // this test tried to pass in.
+  const { privateKey, provider } = await localProvider();
+  const token = await new SignJWT({
+    events: { [LOGOUT_EVENT]: {} },
+    sub: "authentik-user-uuid",
+  })
+    .setProtectedHeader({ alg: "RS256", kid: "test-key" })
+    .setIssuer(ISSUER)
+    .setAudience(AUDIENCE)
+    .setIssuedAt(Math.floor(Date.now() / 1000) + 10)
+    .setJti("unique-token-id")
+    .sign(privateKey);
+  const claims = await verifyLogoutToken(provider, token);
+  assert.equal(claims.sub, "authentik-user-uuid");
+});
+
+test("a token well past maxTokenAge is refused", async () => {
+  const { privateKey, provider } = await localProvider();
+  const token = await new SignJWT({
+    events: { [LOGOUT_EVENT]: {} },
+    sub: "authentik-user-uuid",
+  })
+    .setProtectedHeader({ alg: "RS256", kid: "test-key" })
+    .setIssuer(ISSUER)
+    .setAudience(AUDIENCE)
+    .setIssuedAt(Math.floor(Date.now() / 1000) - 600)
+    .setJti("unique-token-id")
+    .sign(privateKey);
+  await assert.rejects(() => verifyLogoutToken(provider, token));
+});

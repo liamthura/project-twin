@@ -190,7 +190,17 @@ export async function verifyLogoutToken(provider, token) {
     // button. maxTokenAge is what actually bounds the token's life here; that
     // bound is what makes deliberately not keeping a jti cache defensible
     // rather than negligent.
+    //
+    // maxTokenAge bounds STALENESS only, on one side. clockTolerance is what
+    // absorbs skew between two independently-clocked hosts on the other:
+    // jose's iat check has no default tolerance (clockTolerance defaults to
+    // 0), so without this, Authentik's clock running even a second or two
+    // ahead of ours puts iat in the future and rejects EVERY logout token
+    // with "it should be in the past" -- a regression that would present as
+    // back-channel logout silently never working, blaming the token rather
+    // than the clocks.
     maxTokenAge: "5 minutes",
+    clockTolerance: "30 seconds",
     requiredClaims: ["iat", "jti"],
   });
 
