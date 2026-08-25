@@ -24,7 +24,7 @@ const host = process.env.HOST || "0.0.0.0";
 // means /health says ok while every real request 500s, and the reason lives
 // only in a container log -- the hardest place to reach mid-deploy.
 try {
-  if (!(await preflight(pool))) {
+  if (!(await preflight(pool, auth))) {
     process.exit(1);
   }
 } catch (error) {

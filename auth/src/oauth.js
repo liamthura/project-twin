@@ -110,24 +110,35 @@ export function oauthOptions({ mcpResource }) {
     // itself.
     resources: [mcpResource],
 
-    // Off, which is 1.6's behaviour: a client may ask for any enabled
-    // resource. 1.7 defaults it ON, and then refuses an authorize request from
-    // a client with no `oauthClientResource` row --
+    // What links a NEW client to that resource, and it has no default: 1.7
+    // links a dynamically registered client to nothing at all unless this says
+    // otherwise. Without it, every client would register successfully -- 201,
+    // a client_id, no complaint -- and then be refused at its first authorize
+    // by enforcePerClientResources below. The failure would land on the
+    // browser callback, one step after the step that looked fine.
+    //
+    // Also the allow-list for a client that names `resource` at registration:
+    // the plugin permits what is here plus clientRegistrationAllowedResources,
+    // and there is only ever this one to ask for.
+    clientRegistrationDefaultResources: [mcpResource],
+
+    // `enforcePerClientResources` is deliberately absent, which leaves 1.7's
+    // default of ON -- the RFC 8707 section 3 per-client check that the
+    // plugin's own source calls the secure default. Set to `false` for one
+    // commit during the 1.7 upgrade and turned back on here.
+    //
+    // On, an authorize request from a client with no `oauthClientResource` row
+    // is refused with
     //
     //     invalid_target: client ... is not linked to resource(s) .../mcp
     //
-    // Two reasons it stays off. Every client registered before this upgrade has
-    // no link row and never could have, so leaving the default on would break
-    // every connection that already exists, at the first authorize after
-    // deploying, with nothing an operator could do but tell people to
-    // reconnect. And there is exactly ONE resource here: a table saying which
-    // clients may reach which resource has nothing to say while the answer is
-    // always the same one.
-    //
-    // Turn it on if a second resource is ever added -- but backfill
-    // `oauthClientResource` for the existing clients in the same migration,
-    // because that is the step this note exists to remember.
-    enforcePerClientResources: false,
+    // and every client registered before the upgrade is exactly that: 1.6 had
+    // no link table, so no row exists and none ever could have. Those clients
+    // are linked at boot by `backfillClientResources` in preflight.js, which
+    // runs before server.listen, is idempotent, and says in the deploy log how
+    // many it linked. That backfill is what makes this default safe to keep
+    // rather than merely correct in principle -- if it is ever removed, this
+    // option has to go back to `false` in the same commit.
 
     // Explicit, because the plugin's own default is
     // ["authorization_code", "client_credentials", "refresh_token"] -- and an

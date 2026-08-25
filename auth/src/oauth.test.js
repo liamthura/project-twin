@@ -45,9 +45,16 @@ test("the MCP resource is a configured resource, or every authorize 400s", () =>
   const options = oauthOptions({ mcpResource: RESOURCE });
   assert.deepEqual(options.resources, ["https://mygist.example/mcp"]);
 
-  // And off, because 1.7 defaults it on and every client registered before
-  // this upgrade has no oauthClientResource row. See oauth.js.
-  assert.equal(options.enforcePerClientResources, false);
+  // And left unset, so 1.7's `true` stands -- the per-client check of RFC 8707
+  // section 3. Pre-upgrade clients are linked by backfillClientResources in
+  // preflight.js; asserted as `undefined` rather than as the effective `true`
+  // because it is this file NOT setting it that is the decision. See oauth.js.
+  assert.equal(options.enforcePerClientResources, undefined);
+
+  // New clients are linked at registration. Without this the plugin links a
+  // dynamic registration to nothing, and the check above then refuses it at
+  // its first authorize -- one step after the step that returned 201.
+  assert.deepEqual(options.clientRegistrationDefaultResources, [RESOURCE]);
 });
 
 test("all three persona scopes are offered", () => {
