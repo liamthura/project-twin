@@ -37,6 +37,7 @@ import {
   oauthRegistrationNativePlugin,
   revokeConnection,
 } from "./oauth.js";
+import { ssoDiscoveryUrl, ssoPlugins, usernameFor } from "./sso.js";
 
 const required = (name) => {
   const value = process.env[name];
@@ -62,6 +63,10 @@ const mailer = createMailer();
 // surface below. Same variable, same value as the API container's
 // AUTH_MCP_RESOURCE -- see oauth.js.
 const MCP_RESOURCE = mcpResource();
+
+// The OIDC provider this instance federates to, and the switch for the whole
+// SSO surface. Same fail-closed rule as MCP_RESOURCE above -- see sso.js.
+const OIDC_DISCOVERY = ssoDiscoveryUrl();
 
 // One pool, shared by Better Auth and the provisioning hook below. search_path
 // pins Better Auth's own queries to its schema; the hook reaches into `public`
@@ -214,6 +219,22 @@ export const auth = betterAuth({
     },
   },
 
+  account: {
+    accountLinking: {
+      // Explicit only. Better Auth's callback looks an existing user up by
+      // email and links to it, refusing today only because Authentik reports
+      // `email_verified: false` and MyGist's seeded accounts are unverified.
+      // Both are contingent; auto-linking on an email a provider cannot
+      // truthfully assert is a known takeover class, so the decision is
+      // configured rather than inferred from a default.
+      //
+      // /link-social is unaffected -- it passes `selectedUser`, which skips
+      // this guard entirely. That is the whole point: linking stays possible,
+      // and stays something a signed-in person chooses.
+      disableImplicitLinking: true,
+    },
+  },
+
   user: {
     changeEmail: {
       // "Add an email" IS a change-email for every existing account: seeding
@@ -266,7 +287,10 @@ export const auth = betterAuth({
             `insert into public.users (id, username, created_at)
              values ($1, $2, now())
              on conflict (id) do nothing`,
-            [user.id, user.username ?? user.name],
+            // No fallback to user.name. See usernameFor in sso.js: the old
+            // fallback wrote a display name into a column the legacy
+            // /api/auth/login treats as a credential.
+            [user.id, usernameFor(user)],
           );
 
           // Redeemed here, not in the gate, so that only an account which
@@ -434,6 +458,21 @@ export const auth = betterAuth({
           oauthRevokePlugin(),
         ]
       : []),
+
+    // Sign in with Authentik. Inert unless AUTH_OIDC_DISCOVERY_URL is set.
+    //
+    // Registers NO endpoints -- that changed in 1.7. The plugin injects a
+    // provider into context.socialProviders and the flow rides the core routes:
+    // /sign-in/social, /callback/authentik, /link-social. The redirect URI to
+    // configure on Authentik is therefore <origin>/auth/callback/authentik,
+    // with no `oauth2` segment in it.
+    //
+    // Its init FETCHES the discovery document, so this service will not boot
+    // while Authentik is unreachable. Deliberate: the alternatives are dropping
+    // ID-token verification, or booting with SSO quietly off. A security
+    // feature that disables itself is worse than one that fails in the deploy
+    // log, which is where someone is already looking.
+    ...ssoPlugins(),
 
     // Closed testing. Inert unless INVITE_ONLY is on, which no self-hosted
     // instance and no local dev environment turns on.

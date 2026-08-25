@@ -123,6 +123,12 @@ docker run -d --name "$NAME" --network "$NETWORK" \
   `# surface at all -- 404 on discovery -- so export it before running this` \
   `# script to exercise MCP OAuth locally.` \
   -e AUTH_MCP_RESOURCE="${AUTH_MCP_RESOURCE:-}" \
+  `# The API needs only the gate, never the credentials: all it does with it` \
+  `# is answer "sso": true on /api/instance, which is what makes the SPA show` \
+  `# the button. Set on both containers or on neither -- the same rule` \
+  `# AUTH_MCP_RESOURCE follows. Set here alone, the button appears and every` \
+  `# press 404s; set on the auth service alone, SSO works but is invisible.` \
+  -e AUTH_OIDC_DISCOVERY_URL="${AUTH_OIDC_DISCOVERY_URL:-}" \
   "$IMAGE" >/dev/null
 
 # The entrypoint runs `alembic upgrade head` before uvicorn, so the port is

@@ -42,7 +42,13 @@ try {
       "      has to do before it can link anything. A plugin misconfiguration\n" +
       "      -- AUTH_MCP_RESOURCE that is not an absolute URI, above all --\n" +
       "      arrives here rather than at the first request, which is the\n" +
-      "      point of it arriving here at all.\n",
+      "      point of it arriving here at all.\n" +
+      "    - Fetching AUTH_OIDC_DISCOVERY_URL, which the Authentik provider\n" +
+      "      does at startup. This service does NOT boot while the identity\n" +
+      "      provider is unreachable, by design. Check that the URL resolves\n" +
+      "      from inside this container and returns an `issuer` and a\n" +
+      "      `jwks_uri`; a document missing either is refused, because\n" +
+      "      accepting it would downgrade ID tokens to unverified decoding.\n",
   );
   process.exit(1);
 }
