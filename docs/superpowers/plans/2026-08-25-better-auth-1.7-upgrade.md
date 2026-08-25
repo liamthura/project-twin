@@ -393,6 +393,67 @@ git commit -m "chore(auth): better-auth and oauth-provider to 1.7.1"
 
 ---
 
+### Task 3b: Keep 1.7's per-client resource default, and backfill for it
+
+**Added after Task 3.** 1.7 defaults `enforcePerClientResources` to `true` — RFC 8707 §3
+per-client validation, which its own source calls the secure default. Task 3 set it to
+`false` because every `oauthClient` row registered before the upgrade has no
+`oauthClientResource` link row, so the default refuses each of them at its next
+authorize with `invalid_target`, on the browser callback, with no operator remedy
+but "reconnect".
+
+**The human owner chose to backfill and keep the default on**, overriding the
+reviewer's recommendation to leave it off. This task implements that.
+
+**Files:**
+- Modify: `auth/src/oauth.js` — remove `enforcePerClientResources: false`
+- Modify: `auth/src/preflight.js` — the backfill
+- Test: `auth/src/preflight.test.js` (new) or the existing oauth test file
+
+**Interfaces:**
+- Consumes: migration `0010_better_auth_17`, which creates `oauthResource` and
+  `oauthClientResource` empty.
+- Produces: an auth service that boots with the secure default on and every
+  pre-existing client still able to connect.
+
+**Why `preflight.js`:** it already runs at boot before `server.listen`
+(`server.js:27`), already holds the pool, and already exists to make a bad
+database state legible in a deployment log rather than as a 500 later. This is
+the same class of problem.
+
+**The trap, and it is the whole difficulty.** `oauthClientResource.resourceId` is
+a foreign key to `oauthResource.identifier`, and that resource row does not exist
+at migration time — the plugin seeds it from the `resources` option, at plugin
+init or lazily on first access, in `insertOnly` mode. So:
+
+- Do **not** hand-create the `oauthResource` row from a guessed identifier. Wrong
+  by a trailing slash and `insertOnly` will not correct it: you get two resource
+  rows, links pointing at the dead one, and the same `invalid_target` this task
+  exists to prevent — now with schema debt.
+- Establish first, empirically, **whether the plugin has seeded the row by the
+  time `preflight` runs.** If it has, link against it. If it has not, either
+  trigger the plugin's own seed through a public API, or fail preflight loudly
+  with a message naming `AUTH_MCP_RESOURCE`. Do not paper over a missing row.
+
+**Requirements:**
+- Idempotent. `on conflict do nothing`, safe on every boot, not just the first.
+- Gated on `AUTH_MCP_RESOURCE` being set, matching the fail-closed rule the rest
+  of the OAuth surface follows. Unset, the OAuth plugins do not register and
+  there is nothing to link.
+- Must not block boot when there are zero clients — a fresh instance is the
+  normal case, not an error.
+- Log what it linked, at boot, in the same voice as the existing preflight
+  output. A silent backfill is indistinguishable from one that did not run.
+- One test that fails if the logic breaks: a client with no link row gets one,
+  and a second run adds nothing.
+
+**Verification:** with `enforcePerClientResources` left at its 1.7 default, a
+client registered *before* this change must still complete authorize → token.
+That is the whole point of the task and unit tests do not prove it — it belongs
+in the Task 4 regression list as check 8.
+
+---
+
 ### Task 4: MCP OAuth regression against a running preview
 
 The exit criterion for the whole branch. None of it is covered by unit tests, and it is the surface most likely to have broken: the OAuth provider plugin moved a minor version and its tables are the ones the migration touched.
@@ -422,10 +483,13 @@ Each of these must pass:
 5. Revoke the connection from Account → Connected apps, and confirm the refresh grant now fails.
 6. **A client registered before the upgrade still works.** Register one on 1.6.25 first if the database has none — this is the only check that exercises the migration against pre-existing OAuth rows.
 7. Sign in to the web app and confirm the SPA still exchanges its session cookie for a JWT at `/auth/token`.
+8. **A client registered before Task 3b still completes authorize → token** with
+   `enforcePerClientResources` at its 1.7 default. This is the only proof the
+   backfill worked; a passing unit test does not establish it.
 
 - [ ] **Step 3: Record the result in the PR body**
 
-List all seven with their outcome. A regression pass that is not written down did not happen.
+List all eight with their outcome. A regression pass that is not written down did not happen.
 
 - [ ] **Step 4: Open the PR**
 
