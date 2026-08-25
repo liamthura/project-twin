@@ -885,23 +885,29 @@ FIELD_ALIASES = {
     "mental_tab_reference": ["ref_name", "name", "reference_name", "reference"],
 }
 
-def normalize_data(data: dict, entity: str) -> dict:
-    """Normalize field names in data to canonical form based on entity type."""
-    if not isinstance(data, dict):
-        return data
-    
-    normalized = dict(data)
-    
+def _identifier_aliases(entity: str) -> set:
+    """Every spelling this entity's identifier is accepted under.
+
+    Shared with normalize_data rather than restated beside it: the proposal
+    validator needs to know whether a missing identifier was really missing or
+    merely sent under another name, and two copies of this table would answer
+    that differently the first time one of them gained an alias.
+    """
+    if entity in ("link", "basic_info"):
+        return set()
+    return set(_name_aliases_for(entity))
+
+
+def _name_aliases_for(entity: str) -> list:
+    """The alias list normalize_data resolves an entity's identifier from."""
     if entity in ["hobby", "hobby_reference", "hobby_specific"]:
         name_aliases = FIELD_ALIASES.get("hobby", FIELD_ALIASES["name"])
     elif entity in ["project", "project_tag", "project_reference"]:
         name_aliases = FIELD_ALIASES.get("project", FIELD_ALIASES["name"])
     elif entity == "email":
         name_aliases = FIELD_ALIASES.get("email", ["address"])
-    elif entity == "link":
-        return normalized
-    elif entity == "basic_info":
-        return normalized
+    elif entity in ("link", "basic_info"):
+        return []
     elif entity == "language":
         name_aliases = FIELD_ALIASES.get("language", FIELD_ALIASES["name"])
     elif entity == "curiosity":
@@ -926,7 +932,20 @@ def normalize_data(data: dict, entity: str) -> dict:
         name_aliases = FIELD_ALIASES.get("connection", FIELD_ALIASES["name"])
     else:
         name_aliases = FIELD_ALIASES["name"]
-    
+
+    return name_aliases
+
+
+def normalize_data(data: dict, entity: str) -> dict:
+    """Normalize field names in data to canonical form based on entity type."""
+    if not isinstance(data, dict):
+        return data
+
+    normalized = dict(data)
+    name_aliases = _name_aliases_for(entity)
+    if not name_aliases:
+        return normalized
+
     if "name" not in normalized:
         for alias in name_aliases:
             if alias in normalized and alias != "name":
@@ -3762,16 +3781,50 @@ def _validate_proposal(p: dict) -> tuple[dict | None, dict | None]:
 
     spec = ENTITY_SCHEMA[section][entity]
     identifier_field = spec.get("identifier")
-    # normalize_data adds alias keys so the write path can find a field under
-    # any spelling an agent might use. Keeping them would make the review card
-    # show one value twice under two names, on the one surface whose whole job
-    # is being read by a person -- so store exactly the published input
-    # vocabulary, which is what get_schema tells clients to send.
-    declared = set(spec.get("required", [])) | set(spec.get("optional", []))
-    if identifier_field:
-        declared.add(identifier_field)
-    normalised = normalize_data(p.get("data") or {}, entity)
-    data = {k: v for k, v in normalised.items() if k in declared} or normalised
+    supplied = p.get("data") or {}
+    normalised = normalize_data(supplied, entity)
+
+    # A proposal with no identifier cannot be reviewed OR executed: the card has
+    # nothing to title itself with, and execute_modify has nothing to match on.
+    # It is the one incompleteness a human reviewer cannot repair, so it is
+    # refused here, where the agent can still retry.
+    #
+    # Deliberately ONLY the identifier. The other declared-required fields are
+    # left alone: an agent that hears "I'm now a Senior Engineer at Acme" knows
+    # the company and the role but not `period` or `type`, and demanding them
+    # would force it to invent them or say nothing. execute_modify enforces the
+    # full set at approval time, in front of the person who can actually supply
+    # the missing pieces -- which is what the review queue is for.
+    #
+    # Satisfied by ANY alias, because alias resolution happens inside
+    # execute_modify rather than in normalize_data: `top_of_mind` declares
+    # `item`, stores under `idea`, and executes perfectly from a bare `name`.
+    # Checking the declared spelling alone would reject a payload that
+    # demonstrably works.
+    if identifier_field and not str(normalised.get(identifier_field) or "").strip():
+        if not (_identifier_aliases(entity) & {
+            k for k, v in supplied.items() if str(v or "").strip()
+        }):
+            return None, {
+                "result": "invalid",
+                "reason": (
+                    f"'{entity}' needs {identifier_field} — a proposal with no "
+                    f"identifier cannot be reviewed or executed"
+                ),
+                "accepted_as": sorted(_identifier_aliases(entity)) or [identifier_field],
+            }
+
+    # Drop what normalize_data ADDED, not what the caller sent. It derives a
+    # canonical `name` from an alias without removing the alias, and keeping
+    # both would show the review card one value twice under two names, on the
+    # one surface whose whole job is being read by a person.
+    #
+    # Filtering on "is it declared" instead -- as this did until it dropped a
+    # goal's description on the floor -- is a different and worse rule: the
+    # executor accepts far more spellings than the schema publishes
+    # (`proficiency`, `state`, `is_active`), so undeclared cannot mean unwanted,
+    # and a field the agent deliberately wrote vanished with nothing said.
+    data = {k: v for k, v in normalised.items() if k in supplied}
     return dict(
         common, action=p["action"], entity=entity, data=data,
         identifier=str(data.get(identifier_field, "")),
