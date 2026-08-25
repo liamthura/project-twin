@@ -37,7 +37,7 @@ import {
   oauthRegistrationNativePlugin,
   revokeConnection,
 } from "./oauth.js";
-import { ssoDiscoveryUrl, ssoPlugins, usernameFor } from "./sso.js";
+import { ssoPlugins, usernameFor } from "./sso.js";
 
 const required = (name) => {
   const value = process.env[name];
@@ -63,10 +63,6 @@ const mailer = createMailer();
 // surface below. Same variable, same value as the API container's
 // AUTH_MCP_RESOURCE -- see oauth.js.
 const MCP_RESOURCE = mcpResource();
-
-// The OIDC provider this instance federates to, and the switch for the whole
-// SSO surface. Same fail-closed rule as MCP_RESOURCE above -- see sso.js.
-const OIDC_DISCOVERY = ssoDiscoveryUrl();
 
 // One pool, shared by Better Auth and the provisioning hook below. search_path
 // pins Better Auth's own queries to its schema; the hook reaches into `public`
@@ -466,6 +462,13 @@ export const auth = betterAuth({
     // /sign-in/social, /callback/authentik, /link-social. The redirect URI to
     // configure on Authentik is therefore <origin>/auth/callback/authentik,
     // with no `oauth2` segment in it.
+    //
+    // Spread unconditionally, unlike the OAuth block above: that block gates
+    // at this call site because oauthPlugin() needs MCP_RESOURCE handed to it
+    // as an argument either way. ssoPlugins() needs nothing from this file --
+    // it re-reads AUTH_OIDC_DISCOVERY_URL itself and returns [] when unset --
+    // so the gate lives in sso.js, the one place that already has to know the
+    // variable's name.
     //
     // Its init FETCHES the discovery document, so this service will not boot
     // while Authentik is unreachable. Deliberate: the alternatives are dropping
