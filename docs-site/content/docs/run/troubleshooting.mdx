@@ -347,7 +347,50 @@ Set on only one container it is a gate on one of two doors: the auth service
 owns Better Auth's sign-up, and the API owns the deprecated
 `/api/auth/register` that detached mode still uses.
 
+`INVITE_ONLY` does not gate single sign-on. A federated sign-in never reaches
+the sign-up form it guards, so on an instance with `AUTH_OIDC_DISCOVERY_URL` set
+the gate is the group bound to your provider's application, not this variable.
+
 `/api/instance` reports which mode the API believes it is in.
+
+</Accordion>
+
+<Accordion title="Signing in with the identity provider starts a second empty account">
+
+That is the designed behaviour, not a bug. Linking is explicit: an unknown
+subject always creates a new account and never adopts an existing one, because
+adopting on a matching email is an account-takeover class and no provider can
+truthfully assert that an address is verified.
+
+If the username was free you now have two accounts, and the persona data is on
+the first. If it was taken, the sign-in failed with
+"Could not sign you in" — which is the safe outcome, since resolving the clash to
+`liam-2` would have handed you an empty account that reads as "my data is gone".
+
+The fix in both cases is the same: sign in with your **password**, then
+**Settings → Account → Link**. Delete the stray account afterwards if one was
+created.
+
+</Accordion>
+
+<Accordion title="The auth container will not start, and the log names the discovery URL">
+
+It fetches `AUTH_OIDC_DISCOVERY_URL` at startup and refuses to serve if it
+cannot, by design — see the callout in [self-hosting](/run/self-hosting).
+
+Three causes, in order of likelihood:
+
+1. The provider is down, or not reachable **from inside the container**. A URL
+   that resolves on your laptop may not resolve on the container network.
+2. The document is missing `issuer` or `jwks_uri`. Both are required: without
+   them ID tokens could only be decoded, not verified, and MyGist refuses to
+   register a provider on those terms.
+3. `AUTH_OIDC_CLIENT_ID` or `AUTH_OIDC_CLIENT_SECRET` is unset. All three
+   variables travel together.
+
+To get back in while you fix it, unset `AUTH_OIDC_DISCOVERY_URL` on both
+containers and restart. Password sign-in returns immediately and nothing is
+lost — links stay in the database and come back with the variable.
 
 </Accordion>
 

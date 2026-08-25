@@ -132,7 +132,10 @@ only; the auth service has its own settings, documented in `auth/.env.example`.
 | `AUTH_ISSUER` | The auth service's issuer: its public origin **plus `/auth`**, e.g. `https://your-instance/auth`. Checked against the `iss` claim of every JWT the API is handed, of either kind. The suffix is not optional. See [The `/auth` suffix](#the-auth-suffix) below. |
 | `AUTH_AUDIENCE` | What a **session** JWT's `aud` claim must be, for `/api`. Falls back to `AUTH_ISSUER` when unset, which is what the auth service issues; leave it unset unless you have a reason not to. |
 | `AUTH_MCP_RESOURCE` | **Set this on both containers, or on neither.** The canonical URI of the **MCP** endpoint: `https://your-instance/mcp`, no trailing slash. An OAuth access token's `aud` claim must match this exactly to be accepted on `/mcp`, so the two containers have to agree on it character for character. Unset, OAuth is off on both sides: the API rejects OAuth access tokens outright and mounts none of the four `/.well-known` discovery routes, and the auth service registers no OAuth endpoints at all. |
-| `INVITE_ONLY` | **Both containers, or neither.** `true` closes sign-up: an account needs a code from the `invite_codes` table. Off by default. Only the literal string `true` turns it on, case-insensitively; `1`, `yes` and `on` are read as off, and set on only one container it is a gate on one of two doors. |
+| `INVITE_ONLY` | **Both containers, or neither.** `true` closes sign-up: an account needs a code from the `invite_codes` table. Off by default. Only the literal string `true` turns it on, case-insensitively; `1`, `yes` and `on` are read as off, and set on only one container it is a gate on one of two doors. It does **not** gate single sign-on: a federated sign-in never reaches the sign-up form it guards. On an instance with `AUTH_OIDC_DISCOVERY_URL` set, the group you bind to the provider's application is the gate — and a stricter one, since a code can be forwarded and an account on your provider cannot. |
+| `AUTH_OIDC_DISCOVERY_URL` | **Both containers, or neither.** The OpenID Connect discovery document of your identity provider, e.g. `https://door.example.com/application/o/mygist/.well-known/openid-configuration`. Unset — the default — nothing changes: no provider, no button, and password sign-in is the only way in. Set, the auth container federates sign-in and the API container reports `"sso": true` on `/api/instance`, which is what makes the button appear. Set on the API alone and the button appears and every press 404s; set on the auth service alone and sign-in works but nothing offers it. |
+| `AUTH_OIDC_CLIENT_ID` | **Auth container only.** The client id of the OAuth2/OIDC provider you created for MyGist. Required whenever `AUTH_OIDC_DISCOVERY_URL` is set; without it the auth service refuses to boot rather than showing a button that fails inside a browser redirect. |
+| `AUTH_OIDC_CLIENT_SECRET` | **Auth container only.** Its client secret. Never set this on the API container — it has no use for it, and a secret in a second place is a second place to leak it. |
 
 The first four make the browser sign-in flow work at all, and most self-hosted
 instances already have them set from the Better Auth setup. `AUTH_MCP_RESOURCE`
@@ -151,6 +154,58 @@ upgrading, so the whole OAuth surface is gated on this one value. Set it on
 both containers when you want OAuth; set it on neither when you don't. Setting
 it on only the API leaves clients discovering an authorization server that
 serves nothing.
+</Callout>
+
+### Federated sign-in (optional)
+
+MyGist can hand sign-in to an OpenID Connect provider — Authentik, Keycloak,
+Auth0, anything that publishes a discovery document. It stays optional: unset,
+every instance behaves exactly as it did before this existed.
+
+On the provider, create one OAuth2/OIDC application:
+
+- **Confidential** client, **authorization code** grant.
+- **Redirect URI:** `https://your-instance/auth/callback/authentik` — note there
+  is no `oauth2` segment. Better Auth serves federated callbacks on its core
+  `/callback/:providerId` route.
+- **Scopes:** `openid profile email`. The email scope is not optional — sign-in
+  fails outright without an address.
+- **Subject mode: the user's ID or UUID.** Set it the same way on every
+  application you ever add. It is what identifies an account here, so changing
+  it later re-keys every linked account in every app.
+- **Bind a group to the application.** That binding *is* the access control:
+  an application with no policy bound is open to every account on the provider.
+  MyGist deliberately does not check group claims itself — access policy belongs
+  at the gateway, in one place.
+- **Back-channel logout URL:** `https://your-instance/auth/backchannel-logout`.
+  Optional. Set it and ending a session at the provider ends the MyGist browser
+  session too. API tokens and MCP connections are left alone on purpose — they
+  live in config files on other machines, and killing them would break every
+  connected client with no way to tell it why.
+
+Then set `AUTH_OIDC_DISCOVERY_URL` on **both** containers, and
+`AUTH_OIDC_CLIENT_ID` / `AUTH_OIDC_CLIENT_SECRET` on the auth container only.
+
+<Callout type="warn">
+The auth container **fetches the discovery document at startup and will not boot
+while your provider is unreachable** — including for password sign-in.
+
+That is deliberate. The alternatives are accepting ID tokens without verifying
+them, or starting with single sign-on quietly switched off; a security feature
+that disables itself is worse than one that fails in a deployment log, which is
+where somebody is already looking.
+</Callout>
+
+<Callout>
+**Linking is explicit, and only ever from a signed-in session.** Signing in
+through the provider with an address that matches an existing MyGist account
+does **not** adopt that account — it starts a new, empty one, and fails if the
+username is taken.
+
+That is on purpose: linking on a matching email is a known account-takeover
+class, and no provider can truthfully assert that an address is verified.
+Existing accounts link from **Settings → Account → Link**, which requires the
+password first. Set `AUTH_OIDC_*` after you have linked, not before.
 </Callout>
 
 ### The `/auth` suffix
