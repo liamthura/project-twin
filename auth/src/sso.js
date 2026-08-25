@@ -245,10 +245,30 @@ export function backchannelLogoutPlugin() {
     endpoints: {
       backchannelLogout: createAuthEndpoint(
         "/backchannel-logout",
-        { method: "POST" },
+        {
+          method: "POST",
+          // Better Auth's router defaults EVERY endpoint to
+          // application/json only (api/index.mjs's `allowedMediaTypes`),
+          // and OIDC Back-Channel Logout 1.0 section 2.5 makes
+          // application/x-www-form-urlencoded the only thing a provider
+          // will ever send -- Authentik has no other mode. Without this
+          // override, better-call's body parser (utils.mjs) rejects every
+          // real logout call with 415 before the handler below runs at
+          // all, so the receiver silently never works: Authentik gets an
+          // error status back and there is no user watching to notice.
+          // json is accepted alongside it only because the OAuth provider
+          // plugin's own callback route does the same (callback.mjs,
+          // sign-in.mjs) and verification below is identical either way.
+          metadata: {
+            allowedMediaTypes: ["application/x-www-form-urlencoded", "application/json"],
+          },
+        },
         async (ctx) => {
-          // Authentik posts application/x-www-form-urlencoded; better-call
-          // parses that into ctx.body (better-call/dist/utils.mjs:33).
+          // Authentik posts application/x-www-form-urlencoded. better-call's
+          // body parser (utils.mjs) turns that into ctx.body -- but only
+          // once the metadata override above has let the request past the
+          // router's media-type gate; without it, the request never reaches
+          // this parser, let alone this line.
           const token = ctx.body?.logout_token;
           if (!token) {
             throw new APIError("BAD_REQUEST", { message: "logout_token is required" });
