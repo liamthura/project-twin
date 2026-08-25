@@ -34,6 +34,7 @@ import * as invite from "./invite.js";
 import {
   mcpResource,
   oauthPlugin,
+  oauthRegistrationNativePlugin,
   oauthRegistrationScopePlugin,
   revokeConnection,
 } from "./oauth.js";
@@ -425,6 +426,12 @@ export const auth = betterAuth({
           // stored without offline_access and then fails with `invalid_scope`
           // the moment it asks for a refresh token. See oauth.js.
           oauthRegistrationScopePlugin(createAuthMiddleware),
+
+          // And without this, a client asking to redirect to loopback -- which
+          // is every MCP client, and which this server documents as accepted --
+          // is refused at registration by 1.7 for not having declared itself
+          // native. See oauth.js.
+          oauthRegistrationNativePlugin(createAuthMiddleware),
 
           // Revocation the plugin has no endpoint for (see the JSDoc above),
           // and meaningless without it -- so it comes and goes with the rest

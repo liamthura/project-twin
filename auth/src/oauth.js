@@ -124,6 +124,82 @@ export function oauthPlugin({ baseURL, mcpResource }) {
   return oauthProvider(oauthOptions({ baseURL, mcpResource }));
 }
 
+/**
+ * The three hosts Better Auth 1.7 accepts an `http` redirect URI on, spelled
+ * exactly as RFC 8252 section 7.3 spells them.
+ */
+const NATIVE_HTTP_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+/**
+ * `"native"` if this registration is a native app that did not say so, else
+ * undefined to leave it alone.
+ *
+ * Better Auth 1.7 began validating redirect URIs against the client's
+ * `application_type`, and RFC 7591 says an omitted one means `"web"`. A web
+ * client may not redirect to loopback at all -- so a client that omits the
+ * field and asks for `http://127.0.0.1:9876/callback`, which is every MCP
+ * client we have, is now refused at registration with
+ *
+ *     web clients require https redirect URIs on non-loopback hosts
+ *
+ * That URI was accepted on 1.6, is documented as accepted in
+ * run/troubleshooting, and is what RFC 8252 tells a native app to use. The
+ * client is not wrong; it just never filled in a field it had no reason to.
+ *
+ * Deciding it from the redirect URIs is the same inference the standard makes:
+ * an app whose callback is an http loopback address IS a native app. This
+ * never widens what the server accepts -- Better Auth validates afterwards
+ * either way, and the worst a wrong guess here can do is leave a refusal that
+ * would have happened anyway. Compare `_is_loopback_host` in
+ * backend/auth_proxy.py, which restates the same rule under the same rule of
+ * never deciding anything.
+ */
+export function registrationApplicationType(body) {
+  if (body?.application_type !== undefined) return undefined;
+  const uris = body?.redirect_uris;
+  if (!Array.isArray(uris) || uris.length === 0) return undefined;
+
+  // EVERY URI, not some: a client mixing a loopback callback with an https one
+  // is a web client that also listens locally, and calling it native would
+  // refuse the https URI it actually uses.
+  const allLoopback = uris.every((uri) => {
+    let url;
+    try {
+      url = new URL(uri);
+    } catch {
+      return false;
+    }
+    return url.protocol === "http:" && NATIVE_HTTP_HOSTS.has(url.hostname);
+  });
+  return allLoopback ? "native" : undefined;
+}
+
+/**
+ * Let a native app register the loopback callback it is entitled to.
+ *
+ * See registrationApplicationType. Sits in front of `/oauth2/register` rather
+ * than in the plugin options because there is no option: the `"web"` default
+ * is a literal in the plugin's own register path, not a setting.
+ */
+export function oauthRegistrationNativePlugin(createAuthMiddleware) {
+  return {
+    id: "mygist-oauth-registration-native",
+
+    hooks: {
+      before: [
+        {
+          matcher: (context) => context.path === "/oauth2/register",
+          handler: createAuthMiddleware(async (ctx) => {
+            const applicationType = registrationApplicationType(ctx.body);
+            if (!applicationType) return;
+            return { context: { body: { ...ctx.body, application_type: applicationType } } };
+          }),
+        },
+      ],
+    },
+  };
+}
+
 /** The scope that decides whether a grant may hold a refresh token. */
 export const REFRESH_SCOPE = "offline_access";
 
