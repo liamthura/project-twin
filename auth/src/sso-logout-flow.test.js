@@ -148,9 +148,9 @@ before(async () => {
   // own table, not Better Auth's, and this suite has no Python migration
   // runner. Trimmed the same way, to the columns test 2 inserts and reads
   // back. Mirrors backend/migrations/versions/0001_baseline.py's `tokens`
-  // table; 0002_token_expiry.py's `expires_at` and
-  // 0006_oauth_and_token_scopes.py's `scopes` are both omitted because
-  // nothing here reads them.
+  // table; 0002_token_expiry.py's `expires_at`, 0006_oauth_and_token_scopes.py's
+  // `scopes`, and the baseline's own nullable `last_used_at` are all omitted
+  // because nothing here reads them.
   await pool.query(`
     create table if not exists public.tokens (
         id         uuid primary key default gen_random_uuid(),
@@ -377,6 +377,10 @@ test("an unknown subject answers 200 and deletes nothing", async () => {
 });
 
 test("a request with no logout_token field is refused", async () => {
+  // An empty body short-circuits getBody's media-type check entirely
+  // (better-call/dist/utils.mjs: `if (!request.body) return;` runs first),
+  // so this does NOT exercise the allowedMediaTypes fix -- it only proves
+  // the handler's own `logout_token is required` guard.
   const res = await postLogout(undefined);
   assert.ok(res.status >= 400, `a missing logout_token was not refused: ${res.status}`);
 });
