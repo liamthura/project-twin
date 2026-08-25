@@ -33,6 +33,18 @@ queries every table it declares regardless of whether the feature is switched
 on, so a missing one surfaces as a runtime failure part-way through the MCP
 OAuth flow. An empty table costs nothing.
 
+This revision was amended in place after it had been applied to local and test
+databases, to add the composite unique index on `oauthClientResource`. Alembic
+tracks revisions by id and not by content, so a database already stamped
+`0010_better_auth_17` will NOT pick that up from `alembic upgrade head` -- it
+reports itself up to date and does nothing. Re-apply it deliberately:
+
+    alembic stamp 0009_history_and_reads && alembic upgrade head
+
+Every statement here is written to be re-runnable, so that is safe on a
+database that has already had it. Production has never run this revision and
+needs no such step.
+
 Revision ID: 0010_better_auth_17
 Revises: 0009_history_and_reads
 """
@@ -228,6 +240,28 @@ def upgrade() -> None:
     op.execute(
         'create index if not exists "oauthClientResource_resourceId_idx"'
         ' on better_auth."oauthClientResource" ("resourceId")'
+    )
+
+    # Only reachable on a database that ran an INTERMEDIATE commit of this
+    # branch: the first version of auth/src/preflight.js backfilled with a
+    # `not exists` subquery, which two containers booting at once can both pass
+    # before either inserts. Production cannot have such a row -- it has never
+    # run 0010, so the table below is created empty by this same migration --
+    # but a dev or staging database that has been through the middle of this
+    # branch can, and the unique index would then abort the whole migration
+    # with a duplicate-key error partway through.
+    #
+    # Keeps the earliest physical row of each pair and drops the rest. The rows
+    # are interchangeable: nothing reads a link row's id or createdAt, only
+    # whether the pair exists. A no-op on every clean database.
+    op.execute(
+        """
+        delete from better_auth."oauthClientResource" a
+              using better_auth."oauthClientResource" b
+              where a."clientId" = b."clientId"
+                and a."resourceId" = b."resourceId"
+                and a.ctid > b.ctid
+        """
     )
 
     # Load-bearing, not a tuning index. Better Auth's own schema declaration
