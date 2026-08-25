@@ -50,18 +50,18 @@ export function mcpResource(env = process.env) {
 /**
  * The plugin's options, exported separately so they can be asserted on.
  *
- * @param {string} baseURL Better Auth's own EFFECTIVE base -- what
- *   `ctx.context.baseURL` resolves to, i.e. the public origin plus its
- *   `basePath` (".../auth"). NOT the bare origin: the auth service's own
- *   token endpoint lives at that effective base, and if this is passed the
- *   origin instead, `validAudiences` silently omits it. See auth.js, which
- *   derives this from the same `AUTH_BASE_PATH` its `basePath` option uses.
+ * Took Better Auth's effective base URL as a second argument until 1.7. That
+ * existed solely to put the auth service's own base into `validAudiences`,
+ * which 1.7 removed; nothing else here ever read it, and Better Auth computes
+ * its own base for itself. Gone rather than kept unused, because an argument a
+ * caller has to derive correctly and nothing consumes is a trap.
+ *
  * @param {string} mcpResource The canonical MCP resource URI, from
  *   AUTH_MCP_RESOURCE. Never derived from the origin here: the API container
  *   checks an access token's `aud` against its own copy of this value by exact
  *   string, and two independent derivations are two things to drift.
  */
-export function oauthOptions({ baseURL, mcpResource }) {
+export function oauthOptions({ mcpResource }) {
   return {
     // Real paths, not hash routes: Better Auth appends query parameters to
     // these, and anything after a `#` lands in the fragment rather than in
@@ -69,13 +69,76 @@ export function oauthOptions({ baseURL, mcpResource }) {
     loginPage: "/sign-in",
     consentPage: "/consent",
 
+    // Also, since 1.7, what EVERY dynamically registered client is stored
+    // with, whatever scope it asked for -- the plugin overwrites a dynamic
+    // registration's scope with this list rather than honouring the request.
+    //
+    // That fixed a bug this file used to carry a hook for. Our protected-
+    // resource metadata omits offline_access, because the MCP specification
+    // says a resource server SHOULD NOT advertise it; a client registering with
+    // the list it read there was stored without it on 1.6, and
+    // /oauth2/authorize validates against the REGISTERED client's scopes -- so
+    // asking for the refresh token it was entitled to came back
+    // `invalid_scope`. Found by Claude Code on the first real connection, and
+    // fixed here by adding offline_access at registration. 1.7 makes that hook
+    // do nothing, so it is gone; the test that watches the outcome it protected
+    // -- "a client registered from our resource metadata can still refresh" --
+    // stays, and is now the only thing holding the property.
+    //
+    // The ceiling this raises for a narrow client is not a grant: what a client
+    // actually receives is the scope on its authorize request, and the consent
+    // screen offers exactly that and nothing wider (see Consent.jsx).
     scopes: [...SCOPES, "offline_access"],
 
-    // Load-bearing. This defaults to [baseURL], which is `.../auth` -- while
-    // every MCP client sends resource=`.../mcp`. Left at the default, Better
-    // Auth throws invalid_request and EVERY connection attempt fails at the
-    // token endpoint, with an error that names neither this option nor the fix.
-    validAudiences: [baseURL, mcpResource],
+    // Load-bearing, and the successor to 1.6's `validAudiences`, which 1.7
+    // removed entirely. A resource is now a persisted `oauthResource` row
+    // rather than a string in a list: the plugin seeds one per entry here on
+    // first use, and an authorize request naming a resource with no row is
+    // refused with
+    //
+    //     invalid_target: requested resource ... is not configured
+    //
+    // -- which lands in the browser as a failed callback, not as a startup
+    // error, so an instance that forgot this looks fine until someone connects.
+    //
+    // One entry, where `validAudiences` needed two. 1.6 defaulted that option
+    // to the auth service's own base and every MCP client sends
+    // resource=`.../mcp`, so that base had to be re-listed alongside it. 1.7
+    // has no implicit default to preserve, and the auth base is not a protected
+    // resource this server issues tokens for -- listing it would seed a row and
+    // let a client ask for a token audienced at the authorization server
+    // itself.
+    resources: [mcpResource],
+
+    // What links a NEW client to that resource, and it has no default: 1.7
+    // links a dynamically registered client to nothing at all unless this says
+    // otherwise. Without it, every client would register successfully -- 201,
+    // a client_id, no complaint -- and then be refused at its first authorize
+    // by enforcePerClientResources below. The failure would land on the
+    // browser callback, one step after the step that looked fine.
+    //
+    // Also the allow-list for a client that names `resource` at registration:
+    // the plugin permits what is here plus clientRegistrationAllowedResources,
+    // and there is only ever this one to ask for.
+    clientRegistrationDefaultResources: [mcpResource],
+
+    // `enforcePerClientResources` is deliberately absent, which leaves 1.7's
+    // default of ON -- the RFC 8707 section 3 per-client check that the
+    // plugin's own source calls the secure default. Set to `false` for one
+    // commit during the 1.7 upgrade and turned back on here.
+    //
+    // On, an authorize request from a client with no `oauthClientResource` row
+    // is refused with
+    //
+    //     invalid_target: client ... is not linked to resource(s) .../mcp
+    //
+    // and every client registered before the upgrade is exactly that: 1.6 had
+    // no link table, so no row exists and none ever could have. Those clients
+    // are linked at boot by `backfillClientResources` in preflight.js, which
+    // runs before server.listen, is idempotent, and says in the deploy log how
+    // many it linked. That backfill is what makes this default safe to keep
+    // rather than merely correct in principle -- if it is ever removed, this
+    // option has to go back to `false` in the same commit.
 
     // Explicit, because the plugin's own default is
     // ["authorization_code", "client_credentials", "refresh_token"] -- and an
@@ -120,63 +183,81 @@ export function oauthOptions({ baseURL, mcpResource }) {
   };
 }
 
-export function oauthPlugin({ baseURL, mcpResource }) {
-  return oauthProvider(oauthOptions({ baseURL, mcpResource }));
-}
-
-/** The scope that decides whether a grant may hold a refresh token. */
-export const REFRESH_SCOPE = "offline_access";
-
-/**
- * The scope string a registration should be stored with, or undefined to leave
- * it alone.
- *
- * An empty request is left alone deliberately: the plugin already defaults a
- * scope-less registration to the full `scopes` option, which contains
- * offline_access, so there is nothing to correct.
- */
-export function registrationScopes(scope) {
-  const requested = (scope || "").split(" ").filter(Boolean);
-  if (!requested.length) return undefined;
-  if (requested.includes(REFRESH_SCOPE)) return undefined;
-  return [...requested, REFRESH_SCOPE].join(" ");
+export function oauthPlugin({ mcpResource }) {
+  return oauthProvider(oauthOptions({ mcpResource }));
 }
 
 /**
- * Make a dynamically registered client capable of holding a refresh token.
- *
- * Two decisions collide here, each correct on its own. Our protected-resource
- * metadata omits offline_access, because the MCP specification says a resource
- * server SHOULD NOT advertise it -- refresh tokens are the client's concern,
- * not the resource's. And `/oauth2/authorize` validates a request against the
- * REGISTERED client's scopes rather than the server's:
- *
- *     const validScopes = new Set(client.scopes ?? opts.scopes);
- *
- * A client that registers using the scope list it read from our resource
- * metadata is therefore stored without offline_access -- and then fails with
- * `invalid_scope` the moment it asks for the refresh token it is entitled to.
- * Observed against Claude Code on the first real connection; the metadata is
- * right, the plugin is right, and the client is right.
- *
- * Adding it at registration keeps the metadata spec-compliant and fixes the
- * thing that is actually broken: a client that could never refresh. It grants
- * nothing on its own -- the consent screen still decides what is handed over,
- * and offline_access only ever means "may hold a refresh token", never "may
- * read or write a persona".
+ * The three hosts Better Auth 1.7 accepts an `http` redirect URI on, spelled
+ * exactly as RFC 8252 section 7.3 spells them.
  */
-export function oauthRegistrationScopePlugin(createAuthMiddleware) {
+// `[::1]` keeps its brackets: that is what URL.hostname returns for an IPv6
+// literal, and what Better Auth's own check compares against.
+const NATIVE_HTTP_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * `"native"` if this registration is a native app that did not say so, else
+ * undefined to leave it alone.
+ *
+ * Better Auth 1.7 began validating redirect URIs against the client's
+ * `application_type`, and RFC 7591 says an omitted one means `"web"`. A web
+ * client may not redirect to loopback at all -- so a client that omits the
+ * field and asks for `http://127.0.0.1:9876/callback`, which is every MCP
+ * client we have, is now refused at registration with
+ *
+ *     web clients require https redirect URIs on non-loopback hosts
+ *
+ * That URI was accepted on 1.6, is documented as accepted in
+ * run/troubleshooting, and is what RFC 8252 tells a native app to use. The
+ * client is not wrong; it just never filled in a field it had no reason to.
+ *
+ * Deciding it from the redirect URIs is the same inference the standard makes:
+ * an app whose callback is an http loopback address IS a native app. This
+ * never widens what the server accepts -- Better Auth validates afterwards
+ * either way, and the worst a wrong guess here can do is leave a refusal that
+ * would have happened anyway. Compare `_is_loopback_host` in
+ * backend/auth_proxy.py, which restates the same rule under the same rule of
+ * never deciding anything.
+ */
+export function registrationApplicationType(body) {
+  if (body?.application_type !== undefined) return undefined;
+  const uris = body?.redirect_uris;
+  if (!Array.isArray(uris) || uris.length === 0) return undefined;
+
+  // EVERY URI, not some: a client mixing a loopback callback with an https one
+  // is a web client that also listens locally, and calling it native would
+  // refuse the https URI it actually uses.
+  const allLoopback = uris.every((uri) => {
+    let url;
+    try {
+      url = new URL(uri);
+    } catch {
+      return false;
+    }
+    return url.protocol === "http:" && NATIVE_HTTP_HOSTS.has(url.hostname);
+  });
+  return allLoopback ? "native" : undefined;
+}
+
+/**
+ * Let a native app register the loopback callback it is entitled to.
+ *
+ * See registrationApplicationType. Sits in front of `/oauth2/register` rather
+ * than in the plugin options because there is no option: the `"web"` default
+ * is a literal in the plugin's own register path, not a setting.
+ */
+export function oauthRegistrationNativePlugin(createAuthMiddleware) {
   return {
-    id: "mygist-oauth-registration-scope",
+    id: "mygist-oauth-registration-native",
 
     hooks: {
       before: [
         {
           matcher: (context) => context.path === "/oauth2/register",
           handler: createAuthMiddleware(async (ctx) => {
-            const scope = registrationScopes(ctx.body?.scope);
-            if (!scope) return;
-            return { context: { body: { ...ctx.body, scope } } };
+            const applicationType = registrationApplicationType(ctx.body);
+            if (!applicationType) return;
+            return { context: { body: { ...ctx.body, application_type: applicationType } } };
           }),
         },
       ],

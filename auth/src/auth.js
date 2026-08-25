@@ -34,7 +34,7 @@ import * as invite from "./invite.js";
 import {
   mcpResource,
   oauthPlugin,
-  oauthRegistrationScopePlugin,
+  oauthRegistrationNativePlugin,
   revokeConnection,
 } from "./oauth.js";
 
@@ -174,10 +174,15 @@ export const auth = betterAuth({
   // path through unchanged, so both sides must agree on this prefix.
   //
   // Pulled from base-path.js rather than written here as a literal, because
-  // the OAuth plugin below needs this exact value too: Better Auth's own
-  // effective base (ctx.context.baseURL) is baseURL + basePath, not the bare
-  // origin, and oauthOptions' validAudiences has to contain that effective
-  // base or every token request 400s.
+  // the jwt() plugin below pins its issuer and audience to `baseURL` plus this
+  // exact path. Better Auth's own effective base (ctx.context.baseURL) is
+  // origin + basePath, not the bare origin, and those two derivations have to
+  // agree or the API cannot verify both token types with one AUTH_ISSUER --
+  // see the jwt() comment for what that failure looked like.
+  //
+  // The OAuth plugin needed the same value until 1.7, for `validAudiences`.
+  // That option no longer exists, oauthOptions no longer takes a base at all,
+  // and Better Auth computes its own. See oauth.js.
   basePath: AUTH_BASE_PATH,
 
   // Minimum 32 characters, per the installation docs. BETTER_AUTH_SECRETS
@@ -404,27 +409,24 @@ export const auth = betterAuth({
     // variable.
     //
     // NOT accompanied by `disabledPaths: ["/token"]`, which both the OAuth and
-    // JWT plugin docs recommend. Verified against the published package: this
-    // plugin registers /oauth2/token and never a bare /token, so there is no
-    // collision -- and disabling /token would break the SPA, which exchanges
-    // its session cookie for a JWT there on every page load.
+    // JWT plugin docs recommend. Re-verified against the published package at
+    // 1.7.1, by enumerating what each plugin actually registers: this one
+    // registers /oauth2/token and never a bare /token. The bare one belongs to
+    // the JWT plugin, so there is no collision -- and disabling it would break
+    // the SPA, which exchanges its session cookie for a JWT there on every page
+    // load.
     ...(MCP_RESOURCE
       ? [
-          oauthPlugin({
-            // baseURL here is Better Auth's own EFFECTIVE base, not the bare
-            // public origin -- see oauth.js's JSDoc on oauthOptions. Passing
-            // the origin alone (as an earlier version of this wiring did) left
-            // validAudiences silently missing the auth service's own base,
-            // because Better Auth's real base URL is origin + basePath,
-            // computed the same way here.
-            baseURL: `${baseURL}${AUTH_BASE_PATH}`,
-            mcpResource: MCP_RESOURCE,
-          }),
+          // One argument, since 1.7. This also took Better Auth's effective
+          // base until then, for `validAudiences` -- an option 1.7 removed, and
+          // the only thing that ever read it. See oauth.js.
+          oauthPlugin({ mcpResource: MCP_RESOURCE }),
 
-          // Without this, a client that registers from our resource metadata is
-          // stored without offline_access and then fails with `invalid_scope`
-          // the moment it asks for a refresh token. See oauth.js.
-          oauthRegistrationScopePlugin(createAuthMiddleware),
+          // Without this, a client asking to redirect to loopback -- which
+          // is every MCP client, and which this server documents as accepted --
+          // is refused at registration by 1.7 for not having declared itself
+          // native. See oauth.js.
+          oauthRegistrationNativePlugin(createAuthMiddleware),
 
           // Revocation the plugin has no endpoint for (see the JSDoc above),
           // and meaningless without it -- so it comes and goes with the rest

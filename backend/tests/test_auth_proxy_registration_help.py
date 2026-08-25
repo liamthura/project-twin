@@ -4,6 +4,13 @@ Better Auth's refusal is correct and its message is not usable: it states the
 rule, names neither the offending URI nor a fix, and arrives at the one moment
 someone is stuck. These tests pin the two properties that matter -- it explains
 the case it should, and it touches nothing else.
+
+Every case below hand-writes the 1.6-shaped `message` payload the code path
+expects, which better-auth 1.7 no longer sends -- see the FIXME on
+`explain_registration_refusal` in auth_proxy.py. So this suite currently pins
+behaviour on a path live traffic cannot reach; the failure mode is bounded
+(the bare upstream 400 still carries the correct RFC error code), and fixing
+the dead code is a deliberate separate follow-up.
 """
 import json
 

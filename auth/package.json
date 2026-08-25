@@ -7,14 +7,12 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test \"src/**/*.test.js\"",
-    "schema:generate": "npx --yes @better-auth/cli@latest generate --config src/auth.js --output ../backend/migrations/sql/better_auth.sql",
-    "schema:migrate": "npx --yes @better-auth/cli@latest migrate --config src/auth.js"
+    "test": "node --test \"src/**/*.test.js\""
   },
   "dependencies": {
-    "@better-auth/oauth-provider": "1.6.25",
+    "@better-auth/oauth-provider": "1.7.1",
     "bcryptjs": "3.0.2",
-    "better-auth": "1.6.25",
+    "better-auth": "1.7.1",
     "pg": "8.16.3"
   }
 }

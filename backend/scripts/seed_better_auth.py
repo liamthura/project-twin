@@ -47,6 +47,9 @@ PLACEHOLDER_DOMAIN = "mygist.invalid"
 # rather than a column on the user. Seeding an account therefore writes two
 # rows, and the bcrypt hash belongs on the second.
 CREDENTIAL_PROVIDER = "credential"
+# Better Auth 1.7 keys an account on (issuer, accountId). Migration 0010
+# backfills existing credential rows with this value; new ones must match it.
+CREDENTIAL_ISSUER = "local:credential"
 
 
 def placeholder_email(username: str) -> str:
@@ -168,8 +171,8 @@ def seed(dry_run: bool = False) -> dict:
                     """
                     insert into better_auth."account"
                         ("id", "accountId", "providerId", "userId",
-                         "password", "createdAt", "updatedAt")
-                    values (%s, %s, %s, %s, %s, %s, %s)
+                         "password", "createdAt", "updatedAt", "issuer")
+                    values (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         str(uuid.uuid4()),
@@ -179,6 +182,7 @@ def seed(dry_run: bool = False) -> dict:
                         row["password_hash"],
                         now,
                         now,
+                        CREDENTIAL_ISSUER,
                     ),
                 )
             stats["credentials"] += 1

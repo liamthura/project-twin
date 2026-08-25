@@ -96,6 +96,7 @@ delete process.env.INVITE_ONLY;
 const { auth, pool } = await import("./auth.js");
 const { toNodeHandler } = await import("better-auth/node");
 const { READ, PROPOSE, WRITE, revokeConnection } = await import("./oauth.js");
+const { backfillClientResources } = await import("./preflight.js");
 
 const PERSONA_SCOPES = [READ, PROPOSE, WRITE];
 
@@ -172,7 +173,11 @@ async function registerClient() {
     scope: PERSONA_SCOPES.join(" "),
   });
   const body = await res.json().catch(() => null);
-  assert.equal(res.status, 200, `registration failed: ${JSON.stringify(body)}`);
+  // 201, not 200: Better Auth 1.7 made this endpoint answer with the status
+  // RFC 7591 section 3.2.1 requires for a created registration. Asserted
+  // exactly rather than as `res.ok`, because the status IS the contract a
+  // client reads and a silent slide back to 200 is worth failing on.
+  assert.equal(res.status, 201, `registration failed: ${JSON.stringify(body)}`);
   return body;
 }
 
@@ -441,5 +446,76 @@ test("session JWTs and access tokens agree on the issuer", async () => {
     access.iss,
     session.iss,
     "the two token types disagree on the issuer, so no single AUTH_ISSUER can verify both",
+  );
+});
+
+test("the backfill links a client that has no link row, and only once", async () => {
+  // The pre-upgrade state, reproduced rather than imagined: a client that
+  // exists with no `oauthClientResource` row. 1.6 had no such table, so every
+  // client registered before the upgrade looks exactly like this, and 1.7's
+  // `enforcePerClientResources` default refuses each of them. Registering for
+  // real and then deleting the link row is the closest reachable thing to a
+  // 1.6 client -- and it means the resource row this links against is the one
+  // the PLUGIN seeded, not one this test invented, which is the whole trap the
+  // backfill has to avoid.
+  const client = await registerClient();
+  await pool.query(
+    'delete from better_auth."oauthClientResource" where "clientId" = $1',
+    [client.client_id],
+  );
+
+  // Signed in, because the per-client check runs after authentication -- an
+  // anonymous authorize redirects to /sign-in and never reaches it. This is
+  // what the backfill is for, so it is asserted as a refusal first: without
+  // it, the test below would pass whether the backfill worked or not.
+  const { cookie } = await signUp();
+  const refused = await api(
+    authorizeURL(client.client_id, pkce().challenge),
+    { headers: { cookie } },
+  );
+  const refusedWhere =
+    refused.headers.get("location") ??
+    JSON.stringify(await refused.json().catch(() => ({})));
+  assert.match(
+    refusedWhere,
+    /invalid_target/,
+    `an unlinked client was NOT refused, so this test proves nothing: ${refused.status} ${refusedWhere}`,
+  );
+
+  const first = await backfillClientResources(pool, MCP_RESOURCE);
+  assert.ok(first >= 1, "the backfill linked nothing");
+
+  const { rows } = await pool.query(
+    `select "resourceId" from better_auth."oauthClientResource"
+      where "clientId" = $1`,
+    [client.client_id],
+  );
+  assert.deepEqual(
+    rows.map((r) => r.resourceId),
+    [MCP_RESOURCE],
+    "the client did not end up linked to exactly the MCP resource",
+  );
+
+  // And now the same request gets through, which is the outcome the whole
+  // task exists for: a client registered before the upgrade still connects.
+  const allowed = await api(
+    authorizeURL(client.client_id, pkce().challenge),
+    { headers: { cookie } },
+  );
+  const allowedWhere =
+    allowed.headers.get("location") ??
+    (await allowed.json().catch(() => ({})))?.url ??
+    "";
+  assert.ok(
+    allowedWhere.includes("/consent"),
+    `the backfilled client still could not authorize: ${allowedWhere}`,
+  );
+
+  // Every boot after the first. A backfill that is only correct once is a
+  // backfill that quietly doubles the table on restart.
+  assert.equal(
+    await backfillClientResources(pool, MCP_RESOURCE),
+    0,
+    "a second run inserted rows, so the backfill is not idempotent",
   );
 });

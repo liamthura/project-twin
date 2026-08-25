@@ -166,8 +166,15 @@ _REGISTER_SUFFIX = "/oauth2/register"
 def _is_loopback_host(host: str) -> bool:
     """RFC 8252 loopback, plus the RFC 6761 `.localhost` names Better Auth allows.
 
-    Mirrors @better-auth/core's isLoopbackHost. Used only to point at which URI
-    in a rejected list was the offending one.
+    Wider than the rule actually enforced at /oauth2/register. The oauth-provider
+    plugin's own validateClientRedirectUri decides there, and for `native` it
+    checks only the three literal hosts in NATIVE_HTTP_HOSTS
+    (auth/src/oauth.js): `localhost`, `127.0.0.1`, `[::1]` -- not the wider
+    RFC 6761 `.localhost` suffix or loopback IP range this function accepts.
+    That is bounded: this function never decides anything (see the module
+    docstring above), so a disagreement can only make the rejected-URI list
+    below narrower than what actually got refused, i.e. help text that omits a
+    URI -- never a wrong accept/refuse decision.
     """
     import ipaddress
 
@@ -205,9 +212,12 @@ def _rejected_redirect_uris(body: bytes) -> list[str]:
 def _redirect_uri_help(rejected: list[str]) -> str:
     named = f" Yours: {', '.join(rejected)}." if rejected else ""
     return (
-        "This server accepts a redirect URI that is https:// on any host, "
-        "http:// on a loopback host only (127.0.0.1, [::1], localhost), or a "
-        f"private-use scheme such as myapp://callback.{named} "
+        "This server accepts a redirect URI that is https:// on any host, or "
+        "http:// on a loopback host only (127.0.0.1, [::1], localhost)."
+        f"{named} "
+        "A private-use scheme is refused unless the client also registers an "
+        "application_type of native, because RFC 7591 makes a registration that "
+        "omits that field a web client, and a web client may only use https. "
         "A client whose dashboard you reach at a non-loopback address -- over a "
         "tunnel, a VPN, or a reverse proxy -- derives its callback from that "
         "origin, so give that origin HTTPS and the callback follows. On a "
@@ -233,6 +243,11 @@ def explain_registration_refusal(body: bytes, upstream: httpx.Response) -> Optio
         return None
     if not isinstance(payload, dict):
         return None
+    # FIXME: dead since better-auth 1.7. It answers a redirect-URI refusal with
+    # `error` / `error_description` and no `message` key at all, so this reads ""
+    # and returns None, and the bare upstream refusal passes through un-enriched.
+    # Deliberately not fixed on the 1.7 upgrade branch -- it is its own task, and
+    # the tests below still pass because they feed a hand-written 1.6 payload.
     message = str(payload.get("message", ""))
     if "redirect" not in message.lower() or "https" not in message.lower():
         return None
