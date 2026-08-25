@@ -17,6 +17,12 @@ Add nullable, backfill, then constrain. Adding the column NOT NULL in one step
 would fail against any database that already has rows -- which is every
 database this will ever run against.
 
+Six oauth columns 0006 made `not null` are declared optional by 1.7. Where the
+value has a right answer they keep NOT NULL and gain 0003's `current_timestamp`
+default; `expiresAt`, where inventing one would backdate or extend a token,
+drops the constraint instead. Same reasoning for `oauthAccessToken."token"`,
+which 1.7 leaves empty for access tokens it issues as JWTs.
+
 `oauthResource`, `oauthClientResource` and `oauthClientAssertion` are created
 even though MyGist uses neither protected resources nor private_key_jwt client
 assertions. Better Auth's adapter queries every table it declares regardless of
@@ -75,6 +81,27 @@ NEW_COLUMNS = {
     ],
 }
 
+# Six columns 1.7 declares optional that 0006 made `not null` with no default.
+# Same req -> opt signal acted on for `oauthAccessToken."token"` below, and a
+# NOT NULL violation raised inside better-auth's adapter is a 500 part-way
+# through the token or consent endpoint, against real clients.
+#
+# They are split because only one group has a right answer. A row created now
+# was created now, so `createdAt`/`updatedAt` keep NOT NULL and gain the default
+# 0003 already gives the core tables. There is no correct expiry to invent, so
+# `expiresAt` drops the constraint rather than take a default that would
+# silently backdate or extend a token's life.
+TIMESTAMP_DEFAULTS = [
+    ("oauthRefreshToken", '"createdAt"'),
+    ("oauthAccessToken", '"createdAt"'),
+    ("oauthConsent", '"createdAt"'),
+    ("oauthConsent", '"updatedAt"'),
+]
+RELAXED_EXPIRIES = [
+    ("oauthRefreshToken", '"expiresAt"'),
+    ("oauthAccessToken", '"expiresAt"'),
+]
+
 
 def upgrade() -> None:
     op.execute(
@@ -127,6 +154,16 @@ def upgrade() -> None:
         'alter table better_auth."oauthAccessToken"'
         ' alter column "token" drop not null'
     )
+
+    for table, column in TIMESTAMP_DEFAULTS:
+        op.execute(
+            f'alter table better_auth."{table}"'
+            f" alter column {column} set default current_timestamp"
+        )
+    for table, column in RELAXED_EXPIRIES:
+        op.execute(
+            f'alter table better_auth."{table}" alter column {column} drop not null'
+        )
 
     op.execute(
         'create index if not exists "oauthRefreshToken_authorizationCodeId_idx"'
@@ -207,8 +244,15 @@ def downgrade() -> None:
                 f'alter table better_auth."{table}" drop column if exists {name}'
             )
 
-    # Left as-is on the way down: re-adding the NOT NULL would fail against any
-    # 1.7 row that has no opaque token, and a nullable column breaks nothing
-    # for 1.6.
+    for table, column in TIMESTAMP_DEFAULTS:
+        op.execute(
+            f'alter table better_auth."{table}" alter column {column} drop default'
+        )
+
+    # The two NOT NULLs this revision dropped stay dropped. Re-adding either
+    # would fail against any 1.7 row written without the value -- an access
+    # token issued as a JWT, or a token 1.7 gave no expiry -- and a nullable
+    # column breaks nothing for 1.6.
+
     op.execute('drop index if exists better_auth."account_issuer_accountId_uidx"')
     op.execute('alter table better_auth."account" drop column if exists "issuer"')
