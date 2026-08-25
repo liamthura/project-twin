@@ -166,8 +166,15 @@ _REGISTER_SUFFIX = "/oauth2/register"
 def _is_loopback_host(host: str) -> bool:
     """RFC 8252 loopback, plus the RFC 6761 `.localhost` names Better Auth allows.
 
-    Mirrors @better-auth/core's isLoopbackHost. Used only to point at which URI
-    in a rejected list was the offending one.
+    Wider than the rule actually enforced at /oauth2/register. The oauth-provider
+    plugin's own validateClientRedirectUri decides there, and for `native` it
+    checks only the three literal hosts in NATIVE_HTTP_HOSTS
+    (auth/src/oauth.js): `localhost`, `127.0.0.1`, `[::1]` -- not the wider
+    RFC 6761 `.localhost` suffix or loopback IP range this function accepts.
+    That is bounded: this function never decides anything (see the module
+    docstring above), so a disagreement can only make the rejected-URI list
+    below narrower than what actually got refused, i.e. help text that omits a
+    URI -- never a wrong accept/refuse decision.
     """
     import ipaddress
 
