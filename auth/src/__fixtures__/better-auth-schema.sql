@@ -7,8 +7,12 @@
 --
 -- Regenerate after any migration that touches better_auth:
 --
---   docker exec mygist-db pg_dump -U mygist -d mygist_local --schema-only \
+--   docker exec mygist-db pg_dump -U mygist -d mygist_test --schema-only \
 --     --schema=better_auth --no-owner --no-privileges
+--
+-- mygist_test, not mygist_local: the local database is only migrated when
+-- someone runs the app, so it lags, and dumping it produces a fixture for
+-- whatever revision that person last happened to be on.
 --
 -- The seam is pinned from the other side by
 -- backend/tests/test_better_auth_schema_fixture.py, which asserts the migrated
