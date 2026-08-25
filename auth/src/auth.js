@@ -404,10 +404,12 @@ export const auth = betterAuth({
     // variable.
     //
     // NOT accompanied by `disabledPaths: ["/token"]`, which both the OAuth and
-    // JWT plugin docs recommend. Verified against the published package: this
-    // plugin registers /oauth2/token and never a bare /token, so there is no
-    // collision -- and disabling /token would break the SPA, which exchanges
-    // its session cookie for a JWT there on every page load.
+    // JWT plugin docs recommend. Re-verified against the published package at
+    // 1.7.1, by enumerating what each plugin actually registers: this one
+    // registers /oauth2/token and never a bare /token. The bare one belongs to
+    // the JWT plugin, so there is no collision -- and disabling it would break
+    // the SPA, which exchanges its session cookie for a JWT there on every page
+    // load.
     ...(MCP_RESOURCE
       ? [
           // One argument, since 1.7. This also took Better Auth's effective
