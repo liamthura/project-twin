@@ -519,6 +519,20 @@ def invite_only() -> bool:
     return os.getenv("INVITE_ONLY", "").lower() == "true"
 
 
+def sso_configured() -> bool:
+    """Whether this instance federates sign-in to an identity provider.
+
+    Read from the same AUTH_OIDC_DISCOVERY_URL the auth service gates its whole
+    SSO surface on -- the "set it on both containers" rule AUTH_MCP_RESOURCE
+    already teaches. This container never sees the client secret: all it does
+    with the value is answer this question.
+
+    Blank counts as unset. A variable declared in compose and left empty is the
+    default state, not an opt-in.
+    """
+    return bool(os.getenv("AUTH_OIDC_DISCOVERY_URL", "").strip())
+
+
 def build_commit() -> str:
     """The commit this image was built from, or "dev" when nothing stamped it.
 
@@ -546,12 +560,18 @@ async def instance():
     recommending the one that cannot work here would be worse than recommending
     neither.
 
+    `sso` says whether sign-in is federated to an identity provider. The SPA
+    reads it to decide whether to lead with a redirect button or with the
+    password form, and it is the one field on this endpoint that changes what a
+    stranger is asked for rather than merely what they are told.
+
     `commit` is the build stamp, so "is this deploy live" costs one GET rather
     than a token and a handshake.
     """
     return {
         "invite_only": invite_only(),
         "mcp_oauth": jwt_auth.mcp_resource_configured(),
+        "sso": sso_configured(),
         "commit": build_commit(),
     }
 
@@ -589,6 +609,15 @@ async def register(body: RegisterRequest):
     mode authenticates here. Removing it would break that, and would also lock
     out any client that scripted registration against this endpoint.
     """
+    # Closed outright when this instance federates sign-in. This mints a MyGist
+    # password; on an SSO instance the identity provider owns credentials, and a
+    # second place to create one is a second place to attack.
+    if sso_configured():
+        raise HTTPException(
+            status_code=403,
+            detail="this instance uses single sign-on; sign in through its web app",
+        )
+
     # The other door. Better Auth's sign-up is gated by an invite code; this is
     # the one detached mode uses, and a gate on one door is not a gate.
     #
@@ -623,6 +652,20 @@ async def login(body: LoginRequest):
     stored token over a session, so an account signed in this way keeps working
     until its token expires.
     """
+    # Before the rate limiter and before the password check, so the refusal
+    # costs no attempt slot and reveals nothing about whether the account
+    # exists. This is a second password path -- it verifies a bcrypt hash in
+    # Python and mints an opaque token, reachable by curl whatever the SPA
+    # renders -- so hiding the form would not have closed it.
+    #
+    # Detached and CLI users sign in through the provider in a browser and mint
+    # a token from Account -> API tokens, which already exists.
+    if sso_configured():
+        raise HTTPException(
+            status_code=403,
+            detail="this instance uses single sign-on; sign in through its web app",
+        )
+
     # Rate limit before checking credentials. The counter is keyed on the
     # submitted username whether or not it exists, so a 429 says nothing about
     # whether the account is real -- see db.login_retry_after.
