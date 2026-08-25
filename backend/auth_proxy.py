@@ -205,9 +205,12 @@ def _rejected_redirect_uris(body: bytes) -> list[str]:
 def _redirect_uri_help(rejected: list[str]) -> str:
     named = f" Yours: {', '.join(rejected)}." if rejected else ""
     return (
-        "This server accepts a redirect URI that is https:// on any host, "
-        "http:// on a loopback host only (127.0.0.1, [::1], localhost), or a "
-        f"private-use scheme such as myapp://callback.{named} "
+        "This server accepts a redirect URI that is https:// on any host, or "
+        "http:// on a loopback host only (127.0.0.1, [::1], localhost)."
+        f"{named} "
+        "A private-use scheme is refused unless the client also registers an "
+        "application_type of native, because RFC 7591 makes a registration that "
+        "omits that field a web client, and a web client may only use https. "
         "A client whose dashboard you reach at a non-loopback address -- over a "
         "tunnel, a VPN, or a reverse proxy -- derives its callback from that "
         "origin, so give that origin HTTPS and the callback follows. On a "
@@ -233,6 +236,11 @@ def explain_registration_refusal(body: bytes, upstream: httpx.Response) -> Optio
         return None
     if not isinstance(payload, dict):
         return None
+    # FIXME: dead since better-auth 1.7. It answers a redirect-URI refusal with
+    # `error` / `error_description` and no `message` key at all, so this reads ""
+    # and returns None, and the bare upstream refusal passes through un-enriched.
+    # Deliberately not fixed on the 1.7 upgrade branch -- it is its own task, and
+    # the tests below still pass because they feed a hand-written 1.6 payload.
     message = str(payload.get("message", ""))
     if "redirect" not in message.lower() or "https" not in message.lower():
         return None
