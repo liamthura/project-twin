@@ -124,6 +124,7 @@ ignore them.
 These connect the API container to the auth container, the second one in
 [What you need](#what-you-need) above. All but the last two live on the API side
 only; the auth service has its own settings, documented in `auth/.env.example`.
+The last three are read by the auth container alone.
 
 | Variable | Notes |
 |---|---|
@@ -136,6 +137,7 @@ only; the auth service has its own settings, documented in `auth/.env.example`.
 | `AUTH_OIDC_DISCOVERY_URL` | **Both containers, or neither.** The OpenID Connect discovery document of your identity provider, e.g. `https://door.example.com/application/o/mygist/.well-known/openid-configuration`. Unset — the default — nothing changes: no provider, no button, and password sign-in is the only way in. Set, the auth container federates sign-in and the API container reports `"sso": true` on `/api/instance`, which is what makes the button appear. Set on the API alone and the button appears and every press 404s; set on the auth service alone and sign-in works but nothing offers it. |
 | `AUTH_OIDC_CLIENT_ID` | **Auth container only.** The client id of the OAuth2/OIDC provider you created for MyGist. Required whenever `AUTH_OIDC_DISCOVERY_URL` is set; without it the auth service refuses to boot rather than showing a button that fails inside a browser redirect. |
 | `AUTH_OIDC_CLIENT_SECRET` | **Auth container only.** Its client secret. Never set this on the API container — it has no use for it, and a secret in a second place is a second place to leak it. |
+| `AUTH_TRUSTED_PROXIES` | **Auth container only.** Which addresses in an `X-Forwarded-For` chain are proxies rather than the client, comma-separated, IPs or CIDRs. Empty by default, and empty passes no option at all. Rate limiting keys on the client IP and `/sign-in*` allows only **3 requests per 10 seconds**, so where the IP cannot be resolved every caller shares one bucket and any one of them can hold sign-in — federated sign-in included — shut for the whole instance. A header carrying more than one entry resolves to nothing until this names which entries to skip. Set it to the address of whatever *appends* to that header in front of MyGist: your edge proxy or load balancer, **not** the API container, which forwards the header untouched and never adds itself. `docker network inspect <network>` will give you the address. Invalid entries are warned about in the auth container's boot log and ignored rather than refused, so a typo degrades quietly — read the log after changing this. |
 
 The first four make the browser sign-in flow work at all, and most self-hosted
 instances already have them set from the Better Auth setup. `AUTH_MCP_RESOURCE`

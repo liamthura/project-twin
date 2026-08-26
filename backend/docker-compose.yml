@@ -97,6 +97,24 @@ services:
       - AUTH_OIDC_DISCOVERY_URL=${AUTH_OIDC_DISCOVERY_URL:-}
       - AUTH_OIDC_CLIENT_ID=${AUTH_OIDC_CLIENT_ID:-}
       - AUTH_OIDC_CLIENT_SECRET=${AUTH_OIDC_CLIENT_SECRET:-}
+      # Which addresses in an X-Forwarded-For chain are proxies rather than the
+      # client, comma-separated, IPs or CIDRs.
+      #
+      # Rate limiting keys on the client IP, and /sign-in* allows only 3
+      # requests per 10 seconds. Where the IP cannot be resolved every caller
+      # shares one bucket, so any one of them can hold sign-in shut for
+      # everybody. A header carrying more than one entry resolves to nothing
+      # until this names which of them to skip.
+      #
+      # The correct value is the address of whatever APPENDS to that header in
+      # front of MyGist -- your edge proxy or load balancer, not the API
+      # container, which forwards the header untouched (backend/auth_proxy.py).
+      # `docker network inspect <network>` will tell you the addresses.
+      #
+      # Empty by default, and empty passes no option at all. Invalid entries are
+      # warned about and ignored rather than refused, so a typo degrades quietly
+      # -- check the boot log after changing this.
+      - AUTH_TRUSTED_PROXIES=${AUTH_TRUSTED_PROXIES:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 30s

@@ -15,8 +15,11 @@ process.env.BETTER_AUTH_URL = "http://localhost:3999";
 process.env.BETTER_AUTH_SECRET = "config-test-secret-at-least-32-characters";
 process.env.DATABASE_URL = "postgres://mygist:mygist@localhost:5433/mygist_test";
 delete process.env.AUTH_OIDC_DISCOVERY_URL;
+// Asserted below to produce no `advanced.ipAddress` at all, so it must not be
+// inherited from whatever shell runs this.
+delete process.env.AUTH_TRUSTED_PROXIES;
 
-const { auth, pool } = await import("./auth.js");
+const { auth, pool, trustedProxies } = await import("./auth.js");
 
 after(async () => {
   await pool.end();
@@ -57,4 +60,20 @@ test("no discovery URL means no provider and no receiver", () => {
   const ids = auth.options.plugins.map((p) => p.id);
   assert.ok(!ids.includes("generic-oauth"));
   assert.ok(!ids.includes("mygist-sso-logout"));
+});
+
+test("trusted proxies are parsed, and absent when unset", () => {
+  // The list is what lets rate limiting resolve a client IP out of a
+  // multi-entry X-Forwarded-For chain. Unresolved, every caller shares one
+  // bucket and `/sign-in*` allows 3 requests per 10 seconds across all of them.
+  assert.deepEqual(
+    trustedProxies({ AUTH_TRUSTED_PROXIES: " 172.18.0.0/16 , ,10.0.0.5 " }),
+    ["172.18.0.0/16", "10.0.0.5"],
+  );
+  assert.deepEqual(trustedProxies({}), []);
+  assert.deepEqual(trustedProxies({ AUTH_TRUSTED_PROXIES: " , " }), []);
+
+  // And the fail-safe: AUTH_TRUSTED_PROXIES is unset for this whole file, so
+  // the assembled config must carry no `ipAddress` key at all.
+  assert.equal(auth.options.advanced.ipAddress, undefined);
 });

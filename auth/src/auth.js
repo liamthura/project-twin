@@ -64,6 +64,37 @@ const mailer = createMailer();
 // AUTH_MCP_RESOURCE -- see oauth.js.
 const MCP_RESOURCE = mcpResource();
 
+/**
+ * Which addresses in an `X-Forwarded-For` chain are proxies rather than the
+ * client, comma-separated, IPs or CIDRs.
+ *
+ * Rate limiting keys on the client IP, and `/sign-in*` carries a special rule
+ * of 3 requests per 10 seconds (api/rate-limiter/index.mjs:302-309). When the
+ * IP cannot be resolved every caller shares one `no-trusted-ip|<path>` bucket,
+ * so any one of them can hold federated sign-in shut for the whole instance.
+ *
+ * This is what lets it be resolved when there is a chain to walk.
+ * `@better-auth/core/utils/ip` (getIPFromHeader) walks the header from the
+ * right, skips entries matching this list, and takes the first that does not
+ * match. Without it a header carrying more than one entry resolves to nothing,
+ * because it will not guess which of them the client is.
+ *
+ * Not hardcodable, which is why it is a variable: the addresses depend on
+ * whatever appends to the header in front of this instance, and this project's
+ * local Docker bridges a different range from a Linux host's default.
+ *
+ * Empty is the default and passes the option not at all, so an instance that
+ * sets nothing behaves exactly as it did before.
+ */
+export function trustedProxies(env = process.env) {
+  return (env.AUTH_TRUSTED_PROXIES || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+const TRUSTED_PROXIES = trustedProxies();
+
 // One pool, shared by Better Auth and the provisioning hook below. search_path
 // pins Better Auth's own queries to its schema; the hook reaches into `public`
 // by qualifying the table explicitly, which works regardless of search_path.
@@ -213,6 +244,16 @@ export const auth = betterAuth({
       // the one-id-space property that seeding gave the existing ones.
       generateId: () => randomUUID(),
     },
+
+    // Spread rather than set, so an unconfigured instance carries no
+    // `ipAddress` key at all. Behaviourally an empty list is already the same
+    // as none -- getIPFromHeader does `?? []` then checks `length > 0` -- but
+    // create-context.mjs:90-93 validates whatever is here, and the same
+    // fail-safe shape as every other variable on this branch is worth more than
+    // one saved line.
+    ...(TRUSTED_PROXIES.length > 0
+      ? { ipAddress: { trustedProxies: TRUSTED_PROXIES } }
+      : {}),
   },
 
   account: {
