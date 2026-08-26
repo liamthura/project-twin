@@ -9,14 +9,12 @@ import {
   unlinkAccount,
 } from "./session.js";
 
-let assign;
-
 beforeEach(() => {
   // window.location.href is not writable in jsdom, and the module assigns to
-  // it. Replacing the object is the supported way to observe that.
-  assign = vi.fn();
+  // it. Replacing the object is the supported way to observe that -- the tests
+  // below read `window.location.href` back.
   delete window.location;
-  window.location = { origin: "https://mygist.test", assign, href: "" };
+  window.location = { origin: "https://mygist.test", href: "" };
   global.fetch = vi.fn();
 });
 

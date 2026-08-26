@@ -21,7 +21,10 @@ const AUTHENTIK = {
   issuer: "https://door.thuradev.qzz.io/application/o/mygist/",
 };
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  window.history.replaceState(null, "", "/");
+});
 
 it("shows nothing on an instance that does not federate sign-in", () => {
   const { container } = render(
@@ -32,15 +35,22 @@ it("shows nothing on an instance that does not federate sign-in", () => {
 
 it("offers to link when the account has no provider yet", async () => {
   const user = userEvent.setup();
+  // A real route, so "does the hash survive" is a question this can answer.
+  window.history.replaceState(null, "", "/#/preferences");
   render(<LinkedAccounts accounts={[CREDENTIAL]} sso />);
 
   await user.click(screen.getByRole("button", { name: /link tdev door/i }));
 
-  // Comes back here afterwards, not to the app root: the person was in
-  // Settings and expects to still be in Settings.
-  expect(startSsoLink).toHaveBeenCalledWith(
-    expect.objectContaining({ callbackURL: expect.stringContaining("/") }),
-  );
+  // Comes back to the section it started from, not to the app root. MyGist is
+  // hash-routed, so the hash is the route and leaving it out loses it.
+  const [args] = startSsoLink.mock.calls[0];
+  expect(args.callbackURL).toBe("/#/preferences");
+
+  // But the FAILURE url carries no hash, deliberately. Better Auth appends
+  // `?error=<code>` to the end of this string, so a hash would bury the code in
+  // the fragment where nothing reads it and leave readRoute() returning
+  // "preferences?error=...", which matches no section.
+  expect(args.errorCallbackURL).toBe("/");
 });
 
 it("says it is linked, and offers to undo it", async () => {
