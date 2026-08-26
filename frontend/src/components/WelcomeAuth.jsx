@@ -578,6 +578,7 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
           <div className="space-y-3">
             <Button
               type="button"
+              variant="sso"
               className="w-full"
               onClick={handleSso}
               disabled={ssoPending}

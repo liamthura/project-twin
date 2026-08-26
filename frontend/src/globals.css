@@ -30,6 +30,19 @@
     --accent-foreground: 228 69% 55%;
     --destructive: 0 65% 48%;
     --destructive-foreground: 0 0% 98%;
+    /* The identity provider's brand colour, for the federated sign-in button.
+       Its own token rather than --primary, because it identifies a THIRD PARTY
+       -- the button is a promise about where you are being sent, and reusing
+       MyGist's own primary would make it look like a MyGist action.
+
+       The logo's exact colour is #f85a40 (hsl 8 93% 61%). This is that hue,
+       darkened until white text on it clears WCAG AA for normal text: the
+       brand value measures 3.22:1 against white and this measures 4.60:1,
+       where 4.5 is the floor for 14px text. Same value in both themes -- the
+       contrast that matters is text against the button, not against the page,
+       so brightening it for dark mode would only push it back under. */
+    --sso: 9 59% 50%;
+    --sso-foreground: 0 0% 100%;
     --success: 142 71% 35%;
     --warning: 43 96% 40%;
     --border: 20 6% 90%;
@@ -97,6 +110,9 @@
     --accent-foreground: 228 94% 67%;
     --destructive: 0 74% 54%;
     --destructive-foreground: 0 0% 98%;
+    /* Deliberately identical to the light theme -- see the comment there. */
+    --sso: 9 59% 50%;
+    --sso-foreground: 0 0% 100%;
     --success: 142 60% 50%;
     --warning: 43 90% 55%;
     --border: 60 2% 16%;
