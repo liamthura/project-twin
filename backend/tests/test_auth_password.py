@@ -355,3 +355,171 @@ def test_migration_is_idempotent(rerun_migrations):
             (db.hash_token(plaintext),),
         ).fetchone()["n"]
     assert count == 1
+
+
+# ---------------------------------------------------------------------------
+# set_password also writes better_auth."account" -- the row Better Auth's web
+# sign-in actually checks. Without this, set-password 200s and changes
+# nothing a web sign-in reads (see fix-wave-b.md).
+# ---------------------------------------------------------------------------
+
+
+def _credential_row(user_id):
+    with db.get_pool().connection() as conn:
+        return conn.execute(
+            """
+            select "password", "providerId", "issuer"
+              from better_auth."account"
+             where "userId" = %s and "providerId" = 'credential'
+            """,
+            (user_id,),
+        ).fetchone()
+
+
+def _seed_better_auth_user(user_id, username):
+    """Insert the better_auth."user" row a real Better Auth sign-up, an
+    Authentik-federated sign-in, or scripts/seed_better_auth.py would already
+    have created. better_auth."account".userId is a NOT NULL FK onto this
+    table, so set_password's credential write has nothing to attach to
+    without it -- exercising that write means giving the test one."""
+    with db.get_pool().connection() as conn:
+        conn.execute(
+            """
+            insert into better_auth."user"
+                ("id", "name", "email", "emailVerified", "username", "displayUsername")
+            values (%s, %s, %s, false, %s, %s)
+            """,
+            (user_id, username, f"{username}@mygist.invalid", username, username),
+        )
+
+
+def test_set_password_writes_both_stores(client):
+    reg = client.post(
+        "/api/auth/register", json={"username": "alice", "password": "correcthorse"}
+    ).json()
+    user_id = reg["user_id"]
+    _seed_better_auth_user(user_id, "alice")
+
+    resp = client.post(
+        "/api/auth/set-password",
+        json={"password": "newpassword1", "current_password": "correcthorse"},
+        headers=auth_headers(reg["token"]),
+    )
+    assert resp.status_code == 200
+
+    with db.get_pool().connection() as conn:
+        users_hash = conn.execute(
+            "select password_hash from users where id = %s", (user_id,)
+        ).fetchone()["password_hash"]
+    credential = _credential_row(user_id)
+
+    assert db.check_password("newpassword1", users_hash)
+    assert credential is not None
+    assert db.check_password("newpassword1", credential["password"])
+
+
+def test_set_password_creates_credential_row_when_none_exists(client):
+    # A federated-only account: a better_auth."user" row (as Authentik SSO
+    # would create) but no credential account -- it has never had a password.
+    reg = client.post("/api/auth/register", json={"username": "bob"}).json()
+    user_id = reg["user_id"]
+    _seed_better_auth_user(user_id, "bob")
+
+    assert _credential_row(user_id) is None
+
+    resp = client.post(
+        "/api/auth/set-password",
+        json={"password": "firstpassword1"},
+        headers=auth_headers(reg["token"]),
+    )
+    assert resp.status_code == 200
+
+    credential = _credential_row(user_id)
+    assert credential is not None
+    assert credential["providerId"] == "credential"
+    assert credential["issuer"] == "local:credential"
+    assert db.check_password("firstpassword1", credential["password"])
+
+
+def test_set_password_old_password_fails_in_both_stores(client):
+    reg = client.post(
+        "/api/auth/register", json={"username": "alice", "password": "correcthorse"}
+    ).json()
+    user_id = reg["user_id"]
+    _seed_better_auth_user(user_id, "alice")
+
+    resp = client.post(
+        "/api/auth/set-password",
+        json={"password": "newpassword1", "current_password": "correcthorse"},
+        headers=auth_headers(reg["token"]),
+    )
+    assert resp.status_code == 200
+
+    with db.get_pool().connection() as conn:
+        users_hash = conn.execute(
+            "select password_hash from users where id = %s", (user_id,)
+        ).fetchone()["password_hash"]
+    credential = _credential_row(user_id)
+
+    assert not db.check_password("correcthorse", users_hash)
+    assert not db.check_password("correcthorse", credential["password"])
+
+
+def test_set_password_wrong_current_password_touches_neither_store(client):
+    reg = client.post(
+        "/api/auth/register", json={"username": "alice", "password": "correcthorse"}
+    ).json()
+    user_id = reg["user_id"]
+    _seed_better_auth_user(user_id, "alice")
+
+    # Establish a real credential row first, so "untouched" is a meaningful
+    # claim rather than "still absent".
+    setup = client.post(
+        "/api/auth/set-password",
+        json={"password": "correcthorse2", "current_password": "correcthorse"},
+        headers=auth_headers(reg["token"]),
+    )
+    assert setup.status_code == 200
+    credential_before = _credential_row(user_id)
+    assert credential_before is not None
+
+    resp = client.post(
+        "/api/auth/set-password",
+        json={"password": "newpassword1", "current_password": "notright"},
+        headers=auth_headers(reg["token"]),
+    )
+    assert resp.status_code == 403
+
+    with db.get_pool().connection() as conn:
+        users_hash = conn.execute(
+            "select password_hash from users where id = %s", (user_id,)
+        ).fetchone()["password_hash"]
+    credential_after = _credential_row(user_id)
+
+    assert db.check_password("correcthorse2", users_hash)
+    assert credential_after == credential_before
+    assert db.check_password("correcthorse2", credential_after["password"])
+
+
+def test_set_password_skips_better_auth_write_for_detached_only_account(client):
+    """A detached-mode account with no better_auth."user" row at all (never
+    seeded, never touched Better Auth) must still get a 200 -- the write to
+    users.password_hash is what detached mode actually reads."""
+    reg = client.post(
+        "/api/auth/register", json={"username": "carol", "password": "correcthorse"}
+    ).json()
+    user_id = reg["user_id"]
+
+    resp = client.post(
+        "/api/auth/set-password",
+        json={"password": "newpassword1", "current_password": "correcthorse"},
+        headers=auth_headers(reg["token"]),
+    )
+    assert resp.status_code == 200
+    assert _credential_row(user_id) is None
+
+    with db.get_pool().connection() as conn:
+        users_hash = conn.execute(
+            "select password_hash from users where id = %s", (user_id,)
+        ).fetchone()["password_hash"]
+    assert db.check_password("newpassword1", users_hash)

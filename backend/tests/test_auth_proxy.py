@@ -8,7 +8,7 @@ import gzip
 
 import httpx
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 import auth_proxy
@@ -99,6 +99,105 @@ def test_stale_content_headers_are_dropped():
     # The length of what we are actually sending, not the compressed length.
     assert response.headers["content-length"] == str(len(plain))
     assert len(plain) != len(compressed)
+
+
+# --- X-Forwarded-For, which this proxy asserts rather than forwards ----------
+#
+# Driven through the real route with a stubbed upstream, not by calling
+# _request_headers with a hand-built scope: what is being pinned is what the
+# auth service RECEIVES, and that is the only thing the security argument rests
+# on. TestClient reports the peer as "testclient", so that string appearing
+# upstream is proof the value came from our side of the hop.
+
+
+def _captured_upstream(monkeypatch):
+    """Register the proxy and capture the headers it sends upstream."""
+    sent = {}
+
+    async def _capture(self, method, url, **kwargs):
+        sent["headers"] = kwargs["headers"]
+        return upstream_response([("content-type", "application/json")])
+
+    monkeypatch.setattr(auth_proxy, "SERVICE_URL", "http://auth.internal:3001")
+    monkeypatch.setattr(httpx.AsyncClient, "request", _capture)
+    app = FastAPI()
+    auth_proxy.register(app)
+    return TestClient(app), sent
+
+
+def test_a_forged_forwarded_for_never_reaches_the_auth_service(monkeypatch):
+    """The fix. The auth service trusts a single-entry X-Forwarded-For outright
+    and keys its sign-in rate limit on the result, so a caller who can write
+    that header picks their own bucket and their own session.ipAddress. It must
+    arrive as OUR view of the peer, not theirs."""
+    client, sent = _captured_upstream(monkeypatch)
+
+    client.get("/auth/session", headers={"X-Forwarded-For": "9.9.9.9"})
+
+    assert sent["headers"]["x-forwarded-for"] == "testclient"
+    assert "9.9.9.9" not in str(sent["headers"])
+
+
+def test_only_one_forwarded_for_is_sent_whatever_arrived(monkeypatch):
+    """Header names are case-insensitive and may repeat. Two entries upstream
+    would be a chain again -- the exact ambiguity this closes -- and a surviving
+    odd-cased copy would be read by the upstream in preference to nothing."""
+    client, sent = _captured_upstream(monkeypatch)
+
+    client.get(
+        "/auth/session",
+        headers=[
+            ("X-Forwarded-For", "9.9.9.9"),
+            ("x-forwarded-for", "8.8.8.8"),
+            ("X-FORWARDED-FOR", "1.1.1.1"),
+        ],
+    )
+
+    matching = [k for k in sent["headers"] if k.lower() == "x-forwarded-for"]
+    assert matching == ["x-forwarded-for"]
+    assert sent["headers"]["x-forwarded-for"] == "testclient"
+
+
+def test_no_forwarded_for_at_all_when_there_is_no_peer(monkeypatch):
+    """ASGI does not guarantee a peer, so request.client can be None. Omit the
+    header: absent resolves to null upstream, which is honest, where an empty or
+    placeholder value is indistinguishable from an attack."""
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/auth/session",
+        "headers": [(b"x-forwarded-for", b"9.9.9.9"), (b"cookie", b"a=b")],
+        # No "client" key at all -- Request.client is then None.
+    }
+    headers = auth_proxy._request_headers(Request(scope))
+
+    assert not [k for k in headers if k.lower() == "x-forwarded-for"]
+    assert headers["cookie"] == "a=b"
+
+
+def test_every_other_header_still_passes_through(monkeypatch):
+    """One header became an assertion; nothing else did. Cookie in particular:
+    the caller's session is what the auth service authenticates them by."""
+    client, sent = _captured_upstream(monkeypatch)
+
+    client.get(
+        "/auth/session",
+        headers={
+            "cookie": "better-auth.session_token=mine",
+            "authorization": "Bearer token",
+            "origin": "https://example.com",
+            "x-forwarded-proto": "https",
+            "x-forwarded-host": "example.com",
+            "user-agent": "curl/8",
+        },
+    )
+
+    assert sent["headers"]["cookie"] == "better-auth.session_token=mine"
+    assert sent["headers"]["authorization"] == "Bearer token"
+    assert sent["headers"]["origin"] == "https://example.com"
+    assert sent["headers"]["x-forwarded-proto"] == "https"
+    assert sent["headers"]["x-forwarded-host"] == "example.com"
+    assert sent["headers"]["user-agent"] == "curl/8"
 
 
 @pytest.mark.parametrize(

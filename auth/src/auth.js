@@ -37,6 +37,7 @@ import {
   oauthRegistrationNativePlugin,
   revokeConnection,
 } from "./oauth.js";
+import { PROVIDER_ID, ssoPlugins, usernameFor } from "./sso.js";
 
 const required = (name) => {
   const value = process.env[name];
@@ -62,6 +63,51 @@ const mailer = createMailer();
 // surface below. Same variable, same value as the API container's
 // AUTH_MCP_RESOURCE -- see oauth.js.
 const MCP_RESOURCE = mcpResource();
+
+/**
+ * Which addresses in an `X-Forwarded-For` chain are proxies rather than the
+ * client, comma-separated, IPs or CIDRs. Empty by default, and empty passes the
+ * option not at all.
+ *
+ * Normally nothing needs to set this, because the client address does not
+ * arrive here as a chain to walk. backend/auth_proxy.py OVERWRITES
+ * X-Forwarded-For with the peer that connected to IT and drops whatever the
+ * caller sent, so this service receives exactly one entry and that entry is
+ * ours. Measured against the resolver this option feeds (`getIPFromHeader` in
+ * `@better-auth/core/utils/ip`), a single entry needs no trustedProxies at all:
+ *
+ *   9.9.9.9                 -> 9.9.9.9   single entry, no configuration
+ *   203.0.113.99, 1.1.1.1   -> null      a chain, no configuration
+ *
+ * The second line is why the default is empty rather than the private ranges it
+ * briefly was on this branch. Trusting ranges makes the walk run from the right
+ * and return the rightmost entry it does NOT trust -- so a two-entry header of
+ * two PUBLIC addresses returns the caller's own value. Rotated per request that
+ * hands a caller a fresh rate-limit bucket rather than merely a shared one
+ * (`/sign-in*` allows 3 requests per 10 seconds, keyed `ip|path`), and the same
+ * value is persisted to `session.ipAddress`. Trusting a range is only safe where
+ * something is KNOWN to append an entry to the right of it; the fix was to make
+ * that true at the proxy instead, where the connection actually terminates.
+ *
+ * Set it for the case it genuinely serves: a deployment where something other
+ * than backend/auth_proxy.py fronts this service and appends to the header.
+ * Setting it now replaces nothing, because the default is empty. If what you
+ * have is an edge proxy in front of the API CONTAINER, that container's
+ * FORWARDED_ALLOW_IPS is the variable you want instead -- see
+ * docs/run/self-hosting -- because it teaches the hop that makes the assertion.
+ *
+ * Invalid entries are warned about at boot and ignored rather than refused
+ * (better-auth/dist/context/create-context.mjs:90-94), so a typo degrades
+ * quietly -- read the log after changing this.
+ */
+export function trustedProxies(env = process.env) {
+  return (env.AUTH_TRUSTED_PROXIES || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+const TRUSTED_PROXIES = trustedProxies();
 
 // One pool, shared by Better Auth and the provisioning hook below. search_path
 // pins Better Auth's own queries to its schema; the hook reaches into `public`
@@ -212,6 +258,53 @@ export const auth = betterAuth({
       // the one-id-space property that seeding gave the existing ones.
       generateId: () => randomUUID(),
     },
+
+    // Spread rather than set, so an unconfigured instance carries no
+    // `ipAddress` key at all. Behaviourally an empty list is already the same
+    // as none -- getIPFromHeader does `?? []` then checks `length > 0` -- but
+    // create-context.mjs:90-94 validates whatever is here, and the same
+    // fail-safe shape as every other variable on this branch is worth more than
+    // one saved line.
+    ...(TRUSTED_PROXIES.length > 0
+      ? { ipAddress: { trustedProxies: TRUSTED_PROXIES } }
+      : {}),
+  },
+
+  account: {
+    accountLinking: {
+      // Explicit only. Better Auth's sign-in path looks an existing user up by
+      // email and would link the account to it, refusing today only because
+      // Authentik reports `email_verified: false` and MyGist's seeded accounts
+      // are unverified. Both are contingent; auto-linking on an email a
+      // provider cannot truthfully assert is a known takeover class, so the
+      // decision is configured rather than inferred from a default.
+      //
+      // This is the option that still forbids adoption-by-email on sign-in.
+      // oauth2/link-account.mjs:83 refuses as soon as this is true, as one
+      // disjunct of an OR that no other setting below can satisfy away.
+      disableImplicitLinking: true,
+
+      // The two below apply ONLY to the explicit link callback -- the path
+      // /link-social starts and api/routes/callback.mjs:150 finishes. Nothing
+      // on the sign-in path reads either: `allowDifferentEmails` is read at
+      // exactly two places, callback.mjs:175 and account.mjs:213, and both are
+      // explicit-link guards.
+
+      // Required, not optional, and the whole migration depends on it.
+      // callback.mjs:175 compares the provider's address against the address
+      // on the signed-in account. Seeding gave every account that predates SSO
+      // a `<username>@mygist.invalid` placeholder, which can never equal a real
+      // address, so without this the callback returns EMAIL_DOES_NOT_MATCH for
+      // every existing account and there is no way to link at all.
+      allowDifferentEmails: true,
+
+      // callback.mjs:171 also refuses an untrusted provider whenever the
+      // provider does not assert `email_verified`, which Authentik does not by
+      // default. Trusting our own configured provider clears that; it cannot
+      // reopen implicit linking, because disableImplicitLinking above rejects
+      // first regardless of whether the provider is trusted.
+      trustedProviders: [PROVIDER_ID],
+    },
   },
 
   user: {
@@ -266,7 +359,10 @@ export const auth = betterAuth({
             `insert into public.users (id, username, created_at)
              values ($1, $2, now())
              on conflict (id) do nothing`,
-            [user.id, user.username ?? user.name],
+            // No fallback to user.name. See usernameFor in sso.js: the old
+            // fallback wrote a display name into a column the legacy
+            // /api/auth/login treats as a credential.
+            [user.id, usernameFor(user)],
           );
 
           // Redeemed here, not in the gate, so that only an account which
@@ -434,6 +530,28 @@ export const auth = betterAuth({
           oauthRevokePlugin(),
         ]
       : []),
+
+    // Sign in with Authentik. Inert unless AUTH_OIDC_DISCOVERY_URL is set.
+    //
+    // Registers NO endpoints -- that changed in 1.7. The plugin injects a
+    // provider into context.socialProviders and the flow rides the core routes:
+    // /sign-in/social, /callback/authentik, /link-social. The redirect URI to
+    // configure on Authentik is therefore <origin>/auth/callback/authentik,
+    // with no `oauth2` segment in it.
+    //
+    // Spread unconditionally, unlike the OAuth block above: that block gates
+    // at this call site because oauthPlugin() needs MCP_RESOURCE handed to it
+    // as an argument either way. ssoPlugins() needs nothing from this file --
+    // it re-reads AUTH_OIDC_DISCOVERY_URL itself and returns [] when unset --
+    // so the gate lives in sso.js, the one place that already has to know the
+    // variable's name.
+    //
+    // Its init FETCHES the discovery document, so this service will not boot
+    // while Authentik is unreachable. Deliberate: the alternatives are dropping
+    // ID-token verification, or booting with SSO quietly off. A security
+    // feature that disables itself is worse than one that fails in the deploy
+    // log, which is where someone is already looking.
+    ...ssoPlugins(),
 
     // Closed testing. Inert unless INVITE_ONLY is on, which no self-hosted
     // instance and no local dev environment turns on.

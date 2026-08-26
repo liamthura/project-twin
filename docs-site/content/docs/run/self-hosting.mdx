@@ -122,8 +122,12 @@ ignore them.
 ### Auth service
 
 These connect the API container to the auth container, the second one in
-[What you need](#what-you-need) above. All but the last two live on the API side
-only; the auth service has its own settings, documented in `auth/.env.example`.
+[What you need](#what-you-need) above. Most live on the API side only; the auth
+service has its own settings, documented in `auth/.env.example`.
+`AUTH_OIDC_CLIENT_ID`, `AUTH_OIDC_CLIENT_SECRET` and `AUTH_TRUSTED_PROXIES` are
+read by the auth container alone, and `FORWARDED_ALLOW_IPS` by the API container
+alone. Named rather than counted, because a row added to the table below should
+not quietly make this sentence wrong.
 
 | Variable | Notes |
 |---|---|
@@ -132,7 +136,12 @@ only; the auth service has its own settings, documented in `auth/.env.example`.
 | `AUTH_ISSUER` | The auth service's issuer: its public origin **plus `/auth`**, e.g. `https://your-instance/auth`. Checked against the `iss` claim of every JWT the API is handed, of either kind. The suffix is not optional. See [The `/auth` suffix](#the-auth-suffix) below. |
 | `AUTH_AUDIENCE` | What a **session** JWT's `aud` claim must be, for `/api`. Falls back to `AUTH_ISSUER` when unset, which is what the auth service issues; leave it unset unless you have a reason not to. |
 | `AUTH_MCP_RESOURCE` | **Set this on both containers, or on neither.** The canonical URI of the **MCP** endpoint: `https://your-instance/mcp`, no trailing slash. An OAuth access token's `aud` claim must match this exactly to be accepted on `/mcp`, so the two containers have to agree on it character for character. Unset, OAuth is off on both sides: the API rejects OAuth access tokens outright and mounts none of the four `/.well-known` discovery routes, and the auth service registers no OAuth endpoints at all. |
-| `INVITE_ONLY` | **Both containers, or neither.** `true` closes sign-up: an account needs a code from the `invite_codes` table. Off by default. Only the literal string `true` turns it on, case-insensitively; `1`, `yes` and `on` are read as off, and set on only one container it is a gate on one of two doors. |
+| `INVITE_ONLY` | **Both containers, or neither.** `true` closes sign-up: an account needs a code from the `invite_codes` table. Off by default. Only the literal string `true` turns it on, case-insensitively; `1`, `yes` and `on` are read as off, and set on only one container it is a gate on one of two doors. It does **not** gate single sign-on: a federated sign-in never reaches the sign-up form it guards. The two gates are separate, and both still apply — the group you bind to the provider's application decides who can sign in *through the provider*, and `INVITE_ONLY` decides who can create an account *with a password*, on any instance. So an instance with `AUTH_OIDC_DISCOVERY_URL` set and `INVITE_ONLY` off still has an open password sign-up form: adding a provider does not close it. |
+| `AUTH_OIDC_DISCOVERY_URL` | **Both containers, or neither.** The OpenID Connect discovery document of your identity provider, e.g. `https://door.example.com/application/o/mygist/.well-known/openid-configuration`. Unset — the default — nothing changes: no provider, no button, and password sign-in is the only way in. Set, the auth container federates sign-in and the API container reports `"sso": true` on `/api/instance`, which is what makes the button appear. Set on the API alone and the button appears and every press 404s; set on the auth service alone and sign-in works but nothing offers it. |
+| `AUTH_OIDC_CLIENT_ID` | **Auth container only.** The client id of the OAuth2/OIDC provider you created for MyGist. Required whenever `AUTH_OIDC_DISCOVERY_URL` is set; without it the auth service refuses to boot rather than showing a button that fails inside a browser redirect. |
+| `AUTH_OIDC_CLIENT_SECRET` | **Auth container only.** Its client secret. Never set this on the API container — it has no use for it, and a secret in a second place is a second place to leak it. |
+| `AUTH_TRUSTED_PROXIES` | **Auth container only, and normally leave it unset.** Which addresses in an `X-Forwarded-For` chain are proxies rather than the client, comma-separated, IPs or CIDRs. Empty by default, and empty passes no option at all. Nothing normally needs it, because the client address does not reach the auth service as a chain: the API container **overwrites** `X-Forwarded-For` with the address it saw connect to it and discards whatever the caller sent, so the auth service receives exactly one entry — and a single entry resolves with no trusted proxies configured. Set it only if something *other* than the API container fronts your auth service and appends to that header. If what you have instead is an edge proxy in front of the **API** container, `FORWARDED_ALLOW_IPS` is the variable you want. Invalid entries are warned about in the auth container's boot log and ignored rather than refused, so a typo degrades quietly — read the log after changing this. |
+| `FORWARDED_ALLOW_IPS` | **API container only.** The address the API container sees its **edge proxy** connecting from — a reverse proxy, load balancer or CDN in front of MyGist — comma-separated, IPs or CIDRs. Read by uvicorn, not by MyGist's own code, and it defaults to `127.0.0.1`, so an instance that sets nothing behaves exactly as it always has. It decides one thing: whether uvicorn believes an incoming `X-Forwarded-For` and reports the real visitor as the client, or ignores it and reports the connecting peer. Behind a reverse proxy and unset, every visitor looks like that proxy, which puts them all in one rate-limit bucket — and `/sign-in*` allows only **3 requests per 10 seconds** per bucket, so one visitor can hold sign-in shut for everybody. On a bare `docker run` with nothing in front, leave it unset. Do not set it to `*`: that trusts the leftmost entry in the header, which any caller can write. |
 
 The first four make the browser sign-in flow work at all, and most self-hosted
 instances already have them set from the Better Auth setup. `AUTH_MCP_RESOURCE`
@@ -151,6 +160,75 @@ upgrading, so the whole OAuth surface is gated on this one value. Set it on
 both containers when you want OAuth; set it on neither when you don't. Setting
 it on only the API leaves clients discovering an authorization server that
 serves nothing.
+</Callout>
+
+### Federated sign-in (optional)
+
+MyGist can hand sign-in to an OpenID Connect provider — Authentik, Keycloak,
+Auth0, anything that publishes a discovery document. It stays optional: unset,
+every instance behaves exactly as it did before this existed.
+
+On the provider, create one OAuth2/OIDC application:
+
+- **Confidential** client, **authorization code** grant.
+- **Redirect URI:** `https://your-instance/auth/callback/authentik` — note there
+  is no `oauth2` segment. Better Auth serves federated callbacks on its core
+  `/callback/:providerId` route.
+- **Scopes:** `openid profile email`. The email scope is not optional — sign-in
+  fails outright without an address.
+- **Subject mode: the user's ID or UUID.** Set it the same way on every
+  application you ever add. It is what identifies an account here, so changing
+  it later re-keys every linked account in every app.
+- **Bind a group to the application.** That binding *is* the access control:
+  an application with no policy bound is open to every account on the provider.
+  MyGist deliberately does not check group claims itself — access policy belongs
+  at the gateway, in one place.
+- **Back-channel logout URL:** `https://your-instance/auth/backchannel-logout`.
+  Optional. Set it and ending a session at the provider ends the MyGist browser
+  session too. API tokens and MCP connections are left alone on purpose — they
+  live in config files on other machines, and killing them would break every
+  connected client with no way to tell it why.
+
+Then set `AUTH_OIDC_DISCOVERY_URL` on **both** containers, and
+`AUTH_OIDC_CLIENT_ID` / `AUTH_OIDC_CLIENT_SECRET` on the auth container only.
+
+<Callout type="warn">
+The auth container **fetches the discovery document at startup and will not boot
+while your provider is unreachable** — including for password sign-in.
+
+That is deliberate. The alternatives are accepting ID tokens without verifying
+them, or starting with single sign-on quietly switched off; a security feature
+that disables itself is worse than one that fails in a deployment log, which is
+where somebody is already looking.
+</Callout>
+
+<Callout>
+**Linking is explicit, and only ever from a signed-in session.** MyGist never
+adopts an existing account because a provider claims the same address. That is
+on purpose: linking on a matching email is a known account-takeover class, and
+no provider can truthfully assert that an address is verified.
+
+So there is an order to migrating an account you already have, and it is:
+
+1. **Set the variables** — `AUTH_OIDC_*`, on both containers as above. Until
+   they are set, `/api/instance` reports no provider and there is no Link
+   control anywhere in the app to use.
+2. **Sign in with your password.** The sign-in screen leads with the provider
+   button once the variables are set; **Sign in with a password instead** is
+   underneath it. That link is what makes the migration possible — it is the
+   only way to reach your existing account before it has a provider linked.
+3. **Link from Settings → Account.**
+4. **Then use the button.** From here on, the provider signs you in to the
+   account you already had.
+
+Pressing the provider button *before* you have linked does not sign you into
+your existing account. Accounts that predate single sign-on hold a
+`<username>@mygist.invalid` placeholder address, which matches nothing your
+provider will ever send, so you get a second, empty account — and it fails
+outright if your provider's username is already taken here. If you have added a
+real email to your account and your provider sends that same address, sign-in
+fails instead, with `account_not_linked`: nothing is adopted and nothing is
+created. Either way the fix is the same, and it is step 2.
 </Callout>
 
 ### The `/auth` suffix

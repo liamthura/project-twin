@@ -347,7 +347,71 @@ Set on only one container it is a gate on one of two doors: the auth service
 owns Better Auth's sign-up, and the API owns the deprecated
 `/api/auth/register` that detached mode still uses.
 
+`INVITE_ONLY` does not gate single sign-on. A federated sign-in never reaches
+the sign-up form it guards, so the group bound to your provider's application is
+what decides who can sign in through the provider. That is a second gate, not a
+replacement: with `INVITE_ONLY` off, the password sign-up form stays open on an
+SSO instance too.
+
 `/api/instance` reports which mode the API believes it is in.
+
+</Accordion>
+
+<Accordion title="Signing in with the identity provider did not get me into my account">
+
+That is the designed behaviour, not a bug. Linking is explicit: MyGist never
+adopts an existing account because a provider claims the same address, because
+adopting on a matching email is an account-takeover class and no provider can
+truthfully assert that an address is verified.
+
+Which way it fails depends on the address your provider sent:
+
+- **It matches no MyGist account.** A new, empty one is created — and every
+  account that predates single sign-on holds a `<username>@mygist.invalid`
+  placeholder, so this is the usual outcome. You now have two accounts and the
+  persona data is on the first.
+- **It matches an account that has no provider linked.** Nothing is created and
+  nothing is adopted: the sign-in fails with `account_not_linked` and you cannot
+  get in that way at all.
+- **The username your provider sent is already taken here.** The sign-in fails
+  too — the safe outcome, since resolving the clash to `liam-2` would have
+  handed you an empty account that reads as "my data is gone".
+
+The fix in every case is the same: sign in with your **password**, using **Sign
+in with a password instead** on the sign-in screen, then **Settings → Account →
+Link**. Delete the stray account afterwards if one was created.
+
+</Accordion>
+
+<Accordion title="The auth container will not start, and the log names the discovery URL">
+
+It fetches `AUTH_OIDC_DISCOVERY_URL` at startup and refuses to serve if it
+cannot, by design — see the callout in [self-hosting](/run/self-hosting).
+
+Three causes, in order of likelihood:
+
+1. The provider is down, or not reachable **from inside the container**. A URL
+   that resolves on your laptop may not resolve on the container network.
+2. The document is missing `issuer` or `jwks_uri`. Both are required: without
+   them ID tokens could only be decoded, not verified, and MyGist refuses to
+   register a provider on those terms.
+3. `AUTH_OIDC_CLIENT_ID` or `AUTH_OIDC_CLIENT_SECRET` is unset. All three
+   variables travel together.
+
+To get back in while you fix it, unset `AUTH_OIDC_DISCOVERY_URL` on both
+containers and restart. Password sign-in returns immediately, and links stay in
+the database and come back with the variable.
+
+With one exception, and it matters: an account created **through** the provider
+never had a password, so unsetting the variable locks it out — there is no
+credential left for it to sign in with. Nothing is deleted, but nothing reaches
+it either until the provider is back.
+
+So a rollback is a safe move only for accounts that had a password before they
+linked. If the account you need is one the provider created, fix the provider
+instead. The alternative is a password reset to the address on that account,
+which the provider supplied and is real — but that needs a working mailer, which
+is a second thing to be sure of at the moment you are already down.
 
 </Accordion>
 

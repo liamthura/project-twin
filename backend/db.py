@@ -423,6 +423,14 @@ def revoke_token(user_id: str, token_id: str) -> bool:
     return row is not None
 
 
+# Better Auth 1.7 keys an account on (issuer, accountId); migration 0010
+# backfilled every credential row with this issuer and made it NOT NULL, so a
+# row set_password inserts must match. Mirrors scripts/seed_better_auth.py,
+# which is the existing precedent for writing this table from Python.
+_CREDENTIAL_PROVIDER = "credential"
+_CREDENTIAL_ISSUER = "local:credential"
+
+
 def set_password(
     user_id: str, password: str, current_password: Optional[str] = None
 ) -> None:
@@ -431,6 +439,41 @@ def set_password(
     Accounts that already have a password must supply the correct
     current_password (InvalidCredentialsError otherwise); legacy/no-password
     accounts may set one without it.
+
+    Writes the new hash to two places in one transaction: `users.password_hash`
+    (read by /api/auth/login, still live for detached/non-SSO use) and
+    better_auth."account".password for the user's "credential" row (read by
+    Better Auth's web sign-in). Before this, only the first was written -- a
+    password change returned 200 and updated nothing a web sign-in checks, so
+    the account went on accepting the OLD password there indefinitely.
+
+    Pointing this at Better Auth's own change-password endpoint instead would
+    be architecturally cleaner (Better Auth owns human credentials), but it
+    creates the mirror bug: users.password_hash goes stale and
+    /api/auth/login, live on every non-SSO instance, keeps accepting the
+    superseded password. One write updating both readers is smaller and
+    leaves no path anywhere that still accepts a password that has been
+    changed.
+
+    This does reach into the better_auth schema from Python, which is
+    normally exactly the drift db.resolve_user_by_id exists to keep visible.
+    It is safe here for the same reason scripts/seed_better_auth.py is safe:
+    the two hashes are interchangeable by construction -- both are bcrypt at
+    cost 12 (auth/src/auth.js's verifier; this module's hash_password via
+    bcrypt.gensalt()'s default) -- and that interchangeability is the entire
+    premise the seed script already relies on. Do not "clean this up" into a
+    single write; that reintroduces the bug this fixes.
+
+    Skipped entirely when better_auth."user" has no row for this id: a
+    detached-mode account created straight through /api/auth/register (the
+    only door when there is no same-origin Better Auth to sign up through)
+    has never touched Better Auth at all, so there is no web sign-in reading
+    a stale value to fix. It is also not optional -- account."userId" has a
+    NOT NULL foreign key onto better_auth."user", so inserting a credential
+    row for an id with no user row would fail outright, taking this
+    endpoint's 200 down with it. Once such an account IS seeded or signs in
+    through Better Auth, the next password change picks up the credential
+    row like any other.
     """
     with get_pool().connection() as conn:
         row = conn.execute(
@@ -440,10 +483,54 @@ def set_password(
         if existing is not None:
             if not current_password or not check_password(current_password, existing):
                 raise InvalidCredentialsError()
+
+        new_hash = hash_password(password)
+
         conn.execute(
             "update users set password_hash = %s where id = %s",
-            (hash_password(password), user_id),
+            (new_hash, user_id),
         )
+
+        has_better_auth_user = conn.execute(
+            'select 1 from better_auth."user" where "id" = %s', (user_id,)
+        ).fetchone()
+        if not has_better_auth_user:
+            return
+
+        credential = conn.execute(
+            """
+            select "id" from better_auth."account"
+             where "userId" = %s and "providerId" = %s
+            """,
+            (user_id, _CREDENTIAL_PROVIDER),
+        ).fetchone()
+
+        if credential:
+            conn.execute(
+                """
+                update better_auth."account"
+                   set "password" = %s, "updatedAt" = now()
+                 where "id" = %s
+                """,
+                (new_hash, credential["id"]),
+            )
+        else:
+            conn.execute(
+                """
+                insert into better_auth."account"
+                    ("id", "accountId", "providerId", "userId",
+                     "password", "createdAt", "updatedAt", "issuer")
+                values (%s, %s, %s, %s, %s, now(), now(), %s)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    user_id,
+                    _CREDENTIAL_PROVIDER,
+                    user_id,
+                    new_hash,
+                    _CREDENTIAL_ISSUER,
+                ),
+            )
 
 
 def verify_password(username: str, password: str) -> Optional[dict]:

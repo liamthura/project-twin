@@ -18,6 +18,14 @@ vi.mock("@/lib/session.js", () => ({
   signOut: vi.fn(async () => {}),
   getSession: vi.fn(async () => null),
   isPlaceholderEmail: vi.fn(() => false),
+  // AccountPanel (rendered inside this dialog) now fetches accounts, and
+  // LinkedAccounts underneath it needs these too -- this mock is a full
+  // replacement rather than a partial one built on importOriginal.
+  listAccounts: vi.fn(async () => []),
+  SSO_PROVIDER_ID: "authentik",
+  SSO_LABEL: "TDev Door",
+  startSsoLink: vi.fn(async () => {}),
+  unlinkAccount: vi.fn(async () => ({})),
 }));
 
 vi.mock("@/lib/onboarding.js", () => ({

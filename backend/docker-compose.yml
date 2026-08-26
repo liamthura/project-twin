@@ -87,6 +87,28 @@ services:
       # exercise MCP OAuth -- set it here (and in AUTH_MCP_RESOURCE for the
       # backend container, see scripts/local-preview.sh) to test that surface.
       - AUTH_MCP_RESOURCE=${AUTH_MCP_RESOURCE:-}
+      # Federated sign-in. All three or none: a discovery URL without
+      # credentials refuses to boot rather than showing a button that fails
+      # inside a browser redirect. Empty by default, so a self-hosted instance
+      # keeps password sign-in and gains no new surface.
+      #
+      # This container FETCHES the discovery URL at startup and will not boot
+      # while it is unreachable, which is deliberate -- see auth/src/sso.js.
+      - AUTH_OIDC_DISCOVERY_URL=${AUTH_OIDC_DISCOVERY_URL:-}
+      - AUTH_OIDC_CLIENT_ID=${AUTH_OIDC_CLIENT_ID:-}
+      - AUTH_OIDC_CLIENT_SECRET=${AUTH_OIDC_CLIENT_SECRET:-}
+      # Which addresses in an X-Forwarded-For chain are proxies rather than the
+      # client, comma-separated, IPs or CIDRs. Empty by default, and empty
+      # passes no option at all.
+      #
+      # Leave it unset. The client address does not reach this service as a
+      # chain: the API container overwrites X-Forwarded-For with the peer it saw
+      # (backend/auth_proxy.py), so exactly one entry arrives and a single entry
+      # resolves with nothing configured. Set it only if something other than
+      # that container fronts this service and appends to the header -- and NOT
+      # to the private ranges, which is worse than empty. auth/src/auth.js and
+      # auth/.env.example have the measured cases.
+      - AUTH_TRUSTED_PROXIES=${AUTH_TRUSTED_PROXIES:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 30s

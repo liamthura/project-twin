@@ -14,6 +14,7 @@ vi.mock("@/lib/session.js", async (importOriginal) => {
     signUp: vi.fn(async () => ({})),
     requestPasswordReset: vi.fn(async () => ({ status: true })),
     checkInvite: vi.fn(async () => true),
+    startSsoSignIn: vi.fn(async () => {}),
   };
 });
 
@@ -33,7 +34,13 @@ vi.mock("@/lib/api.js", async (importOriginal) => {
 });
 
 import { registerAccount, loginAccount, saveConfig, getInstance, CLOUD_API_URL } from "@/lib/api.js";
-import { signIn, signUp, requestPasswordReset, checkInvite } from "@/lib/session.js";
+import {
+  signIn,
+  signUp,
+  requestPasswordReset,
+  checkInvite,
+  startSsoSignIn,
+} from "@/lib/session.js";
 import { WelcomeAuth } from "@/components/WelcomeAuth";
 
 // jsdom serves the page from http://localhost:3000 by default, which stands
@@ -619,5 +626,96 @@ describe("validation arrives per field, on blur", () => {
     await waitFor(() =>
       expect(screen.getByText("Invalid username or password")).toBeInTheDocument(),
     );
+  });
+});
+
+describe("WelcomeAuth with SSO configured", () => {
+  beforeEach(() => {
+    getInstance.mockResolvedValue({ invite_only: false, sso: true });
+  });
+
+  it("leads with the provider and hides the password form", async () => {
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    expect(
+      await screen.findByRole("button", { name: /continue with tdev door/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^password$/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps a way in for anyone who has not linked yet", async () => {
+    // Not only for the migration window, when Liam must sign in with a
+    // password to reach the link button at all. It permanently covers every
+    // account that exists and has not linked.
+    const user = userEvent.setup();
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /sign in with a password instead/i }),
+    );
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
+  });
+
+  it("sends the app's own sign-in home, and a new account to onboarding", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /continue with tdev door/i }),
+    );
+
+    expect(startSsoSignIn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        callbackURL: "/",
+        newUserCallbackURL: "/#/onboarding/welcome",
+      }),
+    );
+  });
+
+  it("resumes an in-flight OAuth authorize request", async () => {
+    // The fiddliest path in the whole feature: MyGist is an OAuth server and an
+    // OAuth client in one request. The authorize query has to survive the round
+    // trip to the provider, or the MCP client that started this is dropped
+    // without an answer.
+    window.history.replaceState(null, "", "/sign-in?client_id=abc&state=xyz");
+    const user = userEvent.setup();
+    render(<WelcomeAuth intent="connect" onSuccess={() => {}} />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /continue with tdev door/i }),
+    );
+
+    const [args] = startSsoSignIn.mock.calls[0];
+    expect(args.callbackURL).toBe("/auth/oauth2/authorize?client_id=abc&state=xyz");
+    // And no new-user URL. callback.mjs:254 prefers it over callbackURL for a
+    // sign-in that registered an account, so setting it here would send an MCP
+    // client's first-ever user to onboarding and drop the authorize request.
+    expect(args.newUserCallbackURL).toBeUndefined();
+  });
+
+  it("explains a failed sign-in, and points at the fix", async () => {
+    // The most likely cause by far is a username collision: someone signed in
+    // through the provider without linking first. Resolving that to `liam-2`
+    // would hand them a second, empty account, so it fails -- and the copy has
+    // to name the actual remedy, because the person reading it is the operator
+    // at 11pm.
+    window.history.replaceState(null, "", "/sign-in?error=unable_to_create_user");
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    expect(await screen.findByText(/could not sign you in with tdev door/i))
+      .toBeInTheDocument();
+    expect(screen.getByText(/link tdev door from settings/i)).toBeInTheDocument();
+    // The raw code, for the person who has to look it up.
+    expect(screen.getByText(/unable_to_create_user/)).toBeInTheDocument();
+  });
+
+  it("shows nothing about SSO on an instance that does not use it", async () => {
+    getInstance.mockResolvedValue({ invite_only: false, sso: false });
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    expect(await screen.findByLabelText(/^password$/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /continue with tdev door/i }),
+    ).not.toBeInTheDocument();
   });
 });
