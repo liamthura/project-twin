@@ -11,8 +11,38 @@ lost time to a container port and a DNS record that lived only in dashboards.
 
 Cost is one loopback hop, on auth calls only. /api and /mcp never touch this.
 
-The service's own baseURL is set to the public origin, so it never infers
-anything from forwarded headers and this stays a dumb passthrough.
+The service's own baseURL is set to the public origin, so it never infers its
+own address from forwarded headers.
+
+Everything the caller sends crosses this hop untouched -- Cookie, Origin,
+Authorization, the body -- with ONE exception: X-Forwarded-For is overwritten
+with this server's own view of the peer, and whatever the caller put there is
+discarded. That header is not data from the caller, it is an assertion ABOUT the
+caller, and only the hop that terminates their connection is in a position to
+make it. So this is a passthrough for everything except the one header that
+cannot be one. `_request_headers` is where it happens.
+
+Why it has to happen here. The auth service resolves a client IP out of that
+header (`getIPFromHeader`, @better-auth/core/utils/ip), keys rate limiting on
+the result -- `/sign-in*` allows 3 requests per 10 seconds per `ip|path` -- and
+persists it to `session.ipAddress`. Measured against that resolver with no
+`trustedProxies` configured, which is the default:
+
+  "9.9.9.9"                 -> 9.9.9.9   a single entry is trusted outright
+  "203.0.113.99, 1.1.1.1"   -> null      a chain resolves to nothing
+
+Both lines are a caller's to write if this hop forwards the header, and neither
+outcome is acceptable: the first hands them any address they like, the second is
+the shared-bucket case the auth service's own comment describes. Configuring
+`trustedProxies` cannot fix it either -- trusting a range makes the walk from the
+right stop at the rightmost entry it does not trust, so two public entries return
+the caller's own value and let them pick a fresh rate-limit bucket per request.
+
+And nothing between a browser and here validated the header against the real TCP
+peer: uvicorn only rewrites `request.client` from it when the connecting peer is
+itself in FORWARDED_ALLOW_IPS (default `127.0.0.1`), and run/self-hosting
+documents a bare `docker run -p 1120:1120` with no reverse proxy at all as a
+supported deployment.
 """
 
 import json
@@ -54,9 +84,14 @@ _HOP_BY_HOP = {
 # either on produces a response the client cannot parse.
 _DROP_FROM_RESPONSE = _HOP_BY_HOP | {"content-encoding", "content-length"}
 
+# The header this proxy asserts rather than forwards. See the module docstring.
+_CLIENT_IP = "x-forwarded-for"
+
 # Dropped from the REQUEST. Host is left to httpx so it matches the upstream
-# address rather than the public one.
-_DROP_FROM_REQUEST = _HOP_BY_HOP | {"host"}
+# address rather than the public one. The inbound client-IP header is dropped
+# here -- by lowered name, so every casing and every repeat of it goes -- and
+# `_request_headers` then sets our own.
+_DROP_FROM_REQUEST = _HOP_BY_HOP | {"host", _CLIENT_IP}
 
 
 class _NoCookieJar(CookieJar):
@@ -109,11 +144,27 @@ def _http() -> httpx.AsyncClient:
 
 
 def _request_headers(request: Request) -> dict:
-    return {
+    """The caller's headers, with X-Forwarded-For replaced by our own peer.
+
+    Overwrite, never append. A chain is what makes the upstream resolver
+    ambiguous in the first place; one authoritative entry is what makes it
+    unforgeable, and it resolves with no `trustedProxies` configured at all.
+
+    `request.client` is None when the ASGI server reports no peer, which the
+    spec permits. The header is then omitted entirely rather than sent empty or
+    filled with a placeholder: absent, the upstream finds no x-forwarded-for and
+    resolves null, which is the honest answer. A malformed value would be
+    indistinguishable from an attack, and a placeholder would be a lie about
+    where the request came from.
+    """
+    headers = {
         k: v
         for k, v in request.headers.items()
         if k.lower() not in _DROP_FROM_REQUEST
     }
+    if request.client is not None:
+        headers[_CLIENT_IP] = request.client.host
+    return headers
 
 
 def build_response(upstream: httpx.Response) -> Response:

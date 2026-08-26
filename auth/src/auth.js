@@ -66,73 +66,45 @@ const MCP_RESOURCE = mcpResource();
 
 /**
  * Which addresses in an `X-Forwarded-For` chain are proxies rather than the
- * client, comma-separated, IPs or CIDRs.
+ * client, comma-separated, IPs or CIDRs. Empty by default, and empty passes the
+ * option not at all.
  *
- * Rate limiting keys on the client IP, and `/sign-in*` carries a special rule
- * of 3 requests per 10 seconds (api/rate-limiter/index.mjs:302-309). When the
- * IP cannot be resolved every caller shares one `no-trusted-ip|<path>` bucket,
- * so any one of them can hold federated sign-in shut for the whole instance.
+ * Normally nothing needs to set this, because the client address does not
+ * arrive here as a chain to walk. backend/auth_proxy.py OVERWRITES
+ * X-Forwarded-For with the peer that connected to IT and drops whatever the
+ * caller sent, so this service receives exactly one entry and that entry is
+ * ours. Measured against the resolver this option feeds (`getIPFromHeader` in
+ * `@better-auth/core/utils/ip`), a single entry needs no trustedProxies at all:
  *
- * This is what lets it be resolved when there is a chain to walk.
- * `@better-auth/core/utils/ip` (getIPFromHeader) walks the header from the
- * right, skips entries matching this list, and takes the first that does not
- * match. Without it a header carrying more than one entry resolves to nothing,
- * because it will not guess which of them the client is.
+ *   9.9.9.9                 -> 9.9.9.9   single entry, no configuration
+ *   203.0.113.99, 1.1.1.1   -> null      a chain, no configuration
  *
- * Defaults to every private range, because that is what is actually in front of
- * this service: it is never published, and reaches the outside only through the
- * API container on a container network (backend/docker-compose.yml). So every
- * hop between a browser and here holds a private address by construction, and
- * trusting private hops while trusting no public one is the standard shape --
- * it needs no per-environment value, which matters because the ranges differ
- * between a Linux host's Docker defaults and this project's local bridge.
+ * The second line is why the default is empty rather than the private ranges it
+ * briefly was on this branch. Trusting ranges makes the walk run from the right
+ * and return the rightmost entry it does NOT trust -- so a two-entry header of
+ * two PUBLIC addresses returns the caller's own value. Rotated per request that
+ * hands a caller a fresh rate-limit bucket rather than merely a shared one
+ * (`/sign-in*` allows 3 requests per 10 seconds, keyed `ip|path`), and the same
+ * value is persisted to `session.ipAddress`. Trusting a range is only safe where
+ * something is KNOWN to append an entry to the right of it; the fix was to make
+ * that true at the proxy instead, where the connection actually terminates.
  *
- * Measured against the real resolver rather than reasoned about, because the
- * behaviour is not obvious. `X` is the header, `->` the resolved client:
+ * Set it for the case it genuinely serves: a deployment where something other
+ * than backend/auth_proxy.py fronts this service and appends to the header.
+ * Setting it now replaces nothing, because the default is empty. If what you
+ * have is an edge proxy in front of the API CONTAINER, that container's
+ * FORWARDED_ALLOW_IPS is the variable you want instead -- see
+ * docs/run/self-hosting -- because it teaches the hop that makes the assertion.
  *
- *   203.0.113.7                           -> 203.0.113.7   (unchanged)
- *   203.0.113.7, 192.168.107.4            -> 203.0.113.7   (was: nothing)
- *   203.0.113.7, 172.18.0.5, 192.168.1.4  -> 203.0.113.7   (was: nothing)
- *   1.2.3.4, 203.0.113.7                  -> 203.0.113.7   (was: nothing)
- *
- * The third case is the one this exists for, and the fourth is why the default
- * is safe: a client that writes its own X-Forwarded-For is walked PAST, because
- * the search runs from the right and stops at the first address we do not
- * trust. A spoofed leftmost entry can never be reached.
- *
- * Two cases it does not solve, both needing an explicit value:
- *
- *   - A PUBLIC proxy in front -- Cloudflare, or any CDN. Its address is not
- *     private, so the walk stops there and reports the CDN as the client. Set
- *     this variable to the private ranges PLUS that provider's, or every
- *     visitor shares one bucket per path again.
- *   - A header carrying only private addresses resolves to nothing, where
- *     before it resolved to the last of them. In production that means nothing
- *     upstream recorded a real client, so there is no client IP to find and
- *     nothing is lost; in development getIP falls back to 127.0.0.1 anyway,
- *     and rate limiting is off there.
- *
- * Setting the variable REPLACES this list rather than adding to it, so an
- * explicit value must include the private ranges it still wants trusted.
+ * Invalid entries are warned about at boot and ignored rather than refused
+ * (better-auth/dist/context/create-context.mjs:90-94), so a typo degrades
+ * quietly -- read the log after changing this.
  */
-export const PRIVATE_PROXY_RANGES = [
-  "10.0.0.0/8",
-  "172.16.0.0/12",
-  "192.168.0.0/16",
-  "127.0.0.0/8",
-  // Carrier-grade NAT, which is also Tailscale's range -- reaching an instance
-  // over a tailnet is a documented path in run/infrastructure.
-  "100.64.0.0/10",
-  "::1/128",
-  "fd00::/8",
-];
-
 export function trustedProxies(env = process.env) {
-  const configured = (env.AUTH_TRUSTED_PROXIES || "")
+  return (env.AUTH_TRUSTED_PROXIES || "")
     .split(",")
     .map((entry) => entry.trim())
     .filter(Boolean);
-  return configured.length > 0 ? configured : PRIVATE_PROXY_RANGES;
 }
 
 const TRUSTED_PROXIES = trustedProxies();
@@ -287,12 +259,12 @@ export const auth = betterAuth({
       generateId: () => randomUUID(),
     },
 
-    // Always set now that the default is non-empty -- see trustedProxies above
-    // for what it is and the measured behaviour it produces. Still spread, so
-    // that a deliberately empty AUTH_TRUSTED_PROXIES cannot be expressed here
-    // by accident: the list is never empty, and if it ever became so this
-    // carries no `ipAddress` key rather than an empty one that
-    // create-context.mjs:90-93 would validate.
+    // Spread rather than set, so an unconfigured instance carries no
+    // `ipAddress` key at all. Behaviourally an empty list is already the same
+    // as none -- getIPFromHeader does `?? []` then checks `length > 0` -- but
+    // create-context.mjs:90-94 validates whatever is here, and the same
+    // fail-safe shape as every other variable on this branch is worth more than
+    // one saved line.
     ...(TRUSTED_PROXIES.length > 0
       ? { ipAddress: { trustedProxies: TRUSTED_PROXIES } }
       : {}),

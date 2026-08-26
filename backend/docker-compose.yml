@@ -98,21 +98,16 @@ services:
       - AUTH_OIDC_CLIENT_ID=${AUTH_OIDC_CLIENT_ID:-}
       - AUTH_OIDC_CLIENT_SECRET=${AUTH_OIDC_CLIENT_SECRET:-}
       # Which addresses in an X-Forwarded-For chain are proxies rather than the
-      # client, comma-separated, IPs or CIDRs.
+      # client, comma-separated, IPs or CIDRs. Empty by default, and empty
+      # passes no option at all.
       #
-      # Rate limiting keys on the client IP, and /sign-in* allows only 3
-      # requests per 10 seconds. Where the IP cannot be resolved every caller
-      # shares one bucket, so any one of them can hold sign-in shut for
-      # everybody. A header carrying more than one entry resolves to nothing
-      # until this names which of them to skip.
-      #
-      # Leave unset unless a PUBLIC proxy sits in front. The default is every
-      # private range, which is correct here: this service is not published and
-      # is reached only through the API container on this network, so every hop
-      # in front of it is private. Set it only for a public CDN -- Cloudflare
-      # and the like -- whose addresses the default cannot skip, and remember
-      # that setting it REPLACES the private ranges rather than adding to them.
-      # See auth/.env.example, and auth/src/auth.js for the measured behaviour.
+      # Leave it unset. The client address does not reach this service as a
+      # chain: the API container overwrites X-Forwarded-For with the peer it saw
+      # (backend/auth_proxy.py), so exactly one entry arrives and a single entry
+      # resolves with nothing configured. Set it only if something other than
+      # that container fronts this service and appends to the header -- and NOT
+      # to the private ranges, which is worse than empty. auth/src/auth.js and
+      # auth/.env.example have the measured cases.
       - AUTH_TRUSTED_PROXIES=${AUTH_TRUSTED_PROXIES:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
