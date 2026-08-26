@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { clearConfig, getInstance, setPassword } from "@/lib/api.js";
-import { listAccounts, signOut } from "@/lib/session.js";
+import { listAccounts, signOut, SSO_LABEL } from "@/lib/session.js";
 import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
 import { EmailSettings } from "@/components/EmailSettings";
 import { LinkedAccounts } from "@/components/LinkedAccounts";
@@ -29,6 +29,34 @@ import { LinkedAccounts } from "@/components/LinkedAccounts";
 // Checked here so the failure arrives before a round trip, not instead of the
 // server's check.
 const MIN_PASSWORD_LENGTH = 8;
+
+/**
+ * A failed link, read off the URL and then removed from it.
+ *
+ * A link attempt leaves Settings entirely -- it is a full redirect to the
+ * provider -- and Better Auth sends the failure back to `errorCallbackURL` with
+ * `?error=<code>` appended. Nothing in the signed-in app read that: WelcomeAuth
+ * reads the same parameter, but only ever renders when signed out.
+ *
+ * Removed once read, for two reasons: the code would otherwise reappear every
+ * time this panel is opened, and it would surface as a failed *sign-in* on the
+ * WelcomeAuth banner if the person signed out with it still in the URL.
+ */
+function takeLinkError() {
+  if (typeof window === "undefined") return "";
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("error");
+  if (!code) return "";
+  params.delete("error");
+  params.delete("error_description");
+  const query = params.toString();
+  window.history.replaceState(
+    null,
+    "",
+    `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+  );
+  return code;
+}
 
 export function AccountPanel({
   isOpen,
@@ -95,6 +123,19 @@ export function AccountPanel({
       cancelled = true;
     };
   }, [isOpen, loadAccounts]);
+
+  // Once, on mount. A link failure has already happened by the time this
+  // panel exists again -- there is nothing to poll and nothing that can arrive
+  // later.
+  useEffect(() => {
+    const code = takeLinkError();
+    if (!code) return;
+    toast({
+      variant: "destructive",
+      title: `Could not link ${SSO_LABEL}`,
+      description: `Nothing was changed. The most likely reason is that this ${SSO_LABEL} account is already linked to a different MyGist account — check which one you signed in as, then try again. (${code})`,
+    });
+  }, []);
 
   const handleSignOut = async () => {
     // The session cookie is HttpOnly, so only the service can revoke it.

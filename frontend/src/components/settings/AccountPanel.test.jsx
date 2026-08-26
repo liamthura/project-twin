@@ -33,8 +33,11 @@ vi.mock("@/lib/onboarding.js", () => ({
   saveOnboarding: vi.fn(async () => {}),
 }));
 
+// Hoisted so tests can assert on it. A fresh vi.fn() per useToast() call
+// would be unreachable from here.
+const { toastSpy } = vi.hoisted(() => ({ toastSpy: vi.fn() }));
 vi.mock("@/components/ui/use-toast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
+  useToast: () => ({ toast: toastSpy }),
 }));
 
 import { getInstance, setPassword } from "@/lib/api.js";
@@ -63,6 +66,9 @@ beforeEach(() => {
   // clearAllMocks leaves in place.
   getInstance.mockResolvedValue({ sso: false });
   listAccounts.mockResolvedValue([]);
+  // The panel reads `?error=` off the URL on mount, so a test that puts one
+  // there must not leak it into the next one.
+  window.history.replaceState(null, "", "/");
 });
 
 describe("who you are", () => {
@@ -305,7 +311,42 @@ describe("AccountPanel with SSO", () => {
     expect(screen.queryByText(/change password/i)).not.toBeInTheDocument();
 
     resolveInstance({ sso: true });
-    await waitFor(() => expect(listAccounts).toHaveBeenCalled());
+    // The linked row is what proves the fetch actually landed and the panel
+    // re-rendered on it. Waiting on `listAccounts` having been called does not:
+    // it was already true at mount, so that assertion passes before the resolve
+    // is anywhere near the DOM and only re-checks the line above.
+    await screen.findByText(/TDev Door is linked/i);
     expect(screen.queryByText(/change password/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("a link attempt that came back with an error", () => {
+  // A link is a full redirect away from Settings, so the dialog is gone by the
+  // time Better Auth sends the failure back with `?error=<code>`. Only
+  // WelcomeAuth read that parameter, and only when signed out, so a signed-in
+  // person got nothing at all.
+  it("says what went wrong, and takes the code off the URL", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/?error=account_already_linked_to_different_user",
+    );
+    open();
+
+    await waitFor(() => expect(toastSpy).toHaveBeenCalled());
+    const [arg] = toastSpy.mock.calls[0];
+    expect(arg.variant).toBe("destructive");
+    expect(arg.title).toMatch(/could not link/i);
+    expect(arg.description).toMatch(/account_already_linked_to_different_user/);
+
+    // Left in place it would fire again on every visit to this panel, and would
+    // read as a failed SIGN-IN on the welcome screen after signing out.
+    expect(window.location.search).toBe("");
+  });
+
+  it("says nothing when the URL carries no error", async () => {
+    open();
+    await waitFor(() => expect(listAccounts).toHaveBeenCalled());
+    expect(toastSpy).not.toHaveBeenCalled();
   });
 });

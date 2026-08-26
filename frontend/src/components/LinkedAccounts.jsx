@@ -46,10 +46,24 @@ export function LinkedAccounts({ accounts = [], sso = false, onChanged = () => {
     setError(null);
     setPending(true);
     try {
-      // Back to where they are standing. Somebody in Settings expects to still
-      // be in Settings when the provider is done with them.
-      const here = `${window.location.pathname}${window.location.search}`;
-      await startSsoLink({ callbackURL: here, errorCallbackURL: here });
+      // Back to where they are standing. MyGist is hash-routed, so the hash is
+      // the route -- without it every successful link lands on the default
+      // section rather than the one this started from. Settings is a dialog
+      // with no route of its own, so it closes either way.
+      const base = `${window.location.pathname}${window.location.search}`;
+      const here = `${base}${window.location.hash}`;
+      await startSsoLink({
+        callbackURL: here,
+        // The failure URL deliberately carries NO hash. Better Auth builds its
+        // error redirect by string concatenation -- callback.mjs:82 appends
+        // `?error=<code>` to the end of whatever it was given -- so a hash here
+        // would produce `/#/profile?error=...`, which puts the code inside the
+        // fragment where nothing reads it and leaves `readRoute()` returning
+        // "profile?error=...", a route that matches no section. Landing on the
+        // default section with a readable reason beats landing in the right
+        // place with none. AccountPanel picks the code up from the query.
+        errorCallbackURL: base,
+      });
     } catch (err) {
       setError(err.message);
       setPending(false);
