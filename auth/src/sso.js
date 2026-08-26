@@ -72,10 +72,17 @@ export function mapProfileToUser(profile) {
 export function usernameFor(user) {
   const username = typeof user?.username === "string" ? user.username.trim() : "";
   if (!username) {
+    // Every user create comes through here, not only federated ones: Better
+    // Auth treats `username` as optional on /sign-up/email, so a scripted
+    // sign-up that omits it lands here too. The message has to make sense to
+    // whoever hit it, which on most instances is someone with no provider at
+    // all -- so it names the field first and the provider's mapping only as
+    // the case where that field goes missing on its own.
     throw new Error(
-      "Cannot provision an account with no username. An SSO sign-in must " +
-        "supply preferred_username -- check the Authentik provider's scope " +
-        "mappings include `profile`.",
+      "Cannot create an account with no username. A sign-up must supply " +
+        "`username`; a federated sign-in takes it from `preferred_username`, " +
+        "so if this was an SSO sign-in, check the provider's scope mappings " +
+        "include `profile`.",
     );
   }
   return username;

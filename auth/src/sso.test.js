@@ -113,8 +113,13 @@ test("provisioning refuses to invent a username", () => {
 
   // The old fallback was `user.username ?? user.name`, which quietly wrote a
   // display name into a credential column. Loud is the fix.
-  assert.throws(() => usernameFor({ name: "Khant Thura" }), /preferred_username/);
-  assert.throws(() => usernameFor({ username: "   " }), /preferred_username/);
+  assert.throws(() => usernameFor({ name: "Khant Thura" }), /no username/);
+  assert.throws(() => usernameFor({ username: "   " }), /no username/);
+
+  // And the message has to make sense on an instance with no provider, because
+  // this runs on every user create -- `username` is optional on
+  // /sign-up/email, so a scripted sign-up that omits it arrives here too.
+  assert.throws(() => usernameFor({}), /must supply `username`/);
 });
 
 // ---------------------------------------------------------------------------

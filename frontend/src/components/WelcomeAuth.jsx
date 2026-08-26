@@ -144,11 +144,18 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
   const [resetEmail, setResetEmail] = useState("");
   const [resetSent, setResetSent] = useState(false);
 
-  // Whether this instance requires an invite code. Null until asked, so the
-  // sign-up form is not rendered and then replaced by a gate a moment later.
+  // Whether this instance requires an invite code, and whether it federates
+  // sign-in. Both null until asked, and while they are null both forms DO
+  // show and then get replaced: `needsInvite` requires `inviteOnly === true`
+  // and `ssoAvailable` requires `sso === true`.
+  //
+  // That flash is the deliberate direction to fail. An instance with neither an
+  // invite gate nor a provider is the default and the common case, so a null
+  // that reads as "no" is usually right -- and where it is wrong it costs a
+  // form that comes straight back, behind the invite gate or behind "Sign in
+  // with a password instead". Biasing the other way would hide the only way in
+  // on every instance that has no provider.
   const [inviteOnly, setInviteOnly] = useState(null);
-  // Whether this instance federates sign-in. Null until asked, so the password
-  // form is not rendered and then withdrawn a moment later.
   const [sso, setSso] = useState(null);
   // The escape hatch. Shown permanently, not only during the migration window:
   // it covers everyone who has an account and has not linked yet -- which
