@@ -667,7 +667,7 @@ describe("WelcomeAuth with SSO configured", () => {
     expect(startSsoSignIn).toHaveBeenCalledWith(
       expect.objectContaining({
         callbackURL: "/",
-        newUserCallbackURL: "/#/onboarding/welcome",
+        newUserCallbackURL: "/?onboarding=1",
       }),
     );
   });
@@ -717,5 +717,52 @@ describe("WelcomeAuth with SSO configured", () => {
     expect(
       screen.queryByRole("button", { name: /continue with tdev door/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("callback URLs Better Auth will actually accept", () => {
+  // The whole reason these are query parameters and not hash routes. Better
+  // Auth validates every callback against trusted-origins.mjs's relative-path
+  // rule -- character class [\w\-.+/@] plus an optional `?query` -- so a `#`
+  // is refused outright with "Invalid newUserCallbackURL" before any redirect
+  // is built. MyGist is hash-routed, so this catches the whole class rather
+  // than one URL: it is the constraint, not an example of it.
+  const acceptsRelativePath = (url) =>
+    /^\/(?!\/|\\|%2f|%5c)[\w\-.\+/@]*(?:\?[\w\-.\+/=&%@]*)?$/.test(url);
+
+  it("rejects a hash route, which is why none is ever sent", () => {
+    expect(acceptsRelativePath("/#/onboarding/welcome")).toBe(false);
+    expect(acceptsRelativePath("/#/profile")).toBe(false);
+  });
+
+  it("accepts every URL this screen actually sends", async () => {
+    getInstance.mockResolvedValue({ invite_only: false, sso: true });
+    const user = userEvent.setup();
+    render(<WelcomeAuth onSuccess={() => {}} />);
+    await user.click(
+      await screen.findByRole("button", { name: /continue with tdev door/i }),
+    );
+
+    const sent = startSsoSignIn.mock.calls[0][0];
+    for (const key of ["callbackURL", "newUserCallbackURL", "errorCallbackURL"]) {
+      const url = sent[key];
+      if (url === undefined) continue;
+      expect(
+        acceptsRelativePath(url),
+        `${key} ${JSON.stringify(url)} would be refused by Better Auth`,
+      ).toBe(true);
+    }
+  });
+
+  it("still routes a brand-new account to onboarding, via the query", async () => {
+    getInstance.mockResolvedValue({ invite_only: false, sso: true });
+    const user = userEvent.setup();
+    render(<WelcomeAuth onSuccess={() => {}} />);
+    await user.click(
+      await screen.findByRole("button", { name: /continue with tdev door/i }),
+    );
+    expect(startSsoSignIn).toHaveBeenCalledWith(
+      expect.objectContaining({ newUserCallbackURL: "/?onboarding=1" }),
+    );
   });
 });

@@ -259,6 +259,21 @@ export default function App() {
     pendingBandRef.current = band ?? null;
   }, []);
 
+  // Landed here from a federated sign-up. The provider redirect has no
+  // onSuccess to carry `isNew` in, so WelcomeAuth asks to come back with this
+  // marker instead -- and it is a QUERY parameter rather than the
+  // `#/onboarding/welcome` route it stands for because Better Auth refuses any
+  // callback URL containing a `#`. Same shape as `?verified=1` above: read it,
+  // act, strip it, so a reload does not send someone back through onboarding.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("onboarding") !== "1") return;
+
+    navigate("onboarding", DEFAULT_ONBOARDING_STEP);
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [navigate]);
+
   // Nothing re-picks a valid destination for us, so this does. Turn off the
   // section you are looking at and `activeSection` would name a page that no
   // longer exists, which renders as empty with no way back. An unknown BAND is
