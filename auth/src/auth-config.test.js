@@ -19,7 +19,9 @@ delete process.env.AUTH_OIDC_DISCOVERY_URL;
 // inherited from whatever shell runs this.
 delete process.env.AUTH_TRUSTED_PROXIES;
 
-const { auth, pool, trustedProxies } = await import("./auth.js");
+const { auth, pool, trustedProxies, PRIVATE_PROXY_RANGES } = await import(
+  "./auth.js"
+);
 
 after(async () => {
   await pool.end();
@@ -62,7 +64,7 @@ test("no discovery URL means no provider and no receiver", () => {
   assert.ok(!ids.includes("mygist-sso-logout"));
 });
 
-test("trusted proxies are parsed, and absent when unset", () => {
+test("trusted proxies are parsed, and reach the assembled config", () => {
   // The list is what lets rate limiting resolve a client IP out of a
   // multi-entry X-Forwarded-For chain. Unresolved, every caller shares one
   // bucket and `/sign-in*` allows 3 requests per 10 seconds across all of them.
@@ -70,10 +72,74 @@ test("trusted proxies are parsed, and absent when unset", () => {
     trustedProxies({ AUTH_TRUSTED_PROXIES: " 172.18.0.0/16 , ,10.0.0.5 " }),
     ["172.18.0.0/16", "10.0.0.5"],
   );
-  assert.deepEqual(trustedProxies({}), []);
-  assert.deepEqual(trustedProxies({ AUTH_TRUSTED_PROXIES: " , " }), []);
 
-  // And the fail-safe: AUTH_TRUSTED_PROXIES is unset for this whole file, so
-  // the assembled config must carry no `ipAddress` key at all.
-  assert.equal(auth.options.advanced.ipAddress, undefined);
+  // AUTH_TRUSTED_PROXIES is unset for this whole file, so this is the default
+  // path -- and it must reach the config rather than being computed and
+  // dropped. Asserting the value, not merely that the key exists: an empty
+  // list here would validate fine and silently share the bucket again.
+  assert.deepEqual(
+    auth.options.advanced.ipAddress.trustedProxies,
+    PRIVATE_PROXY_RANGES,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Trusted proxies
+// ---------------------------------------------------------------------------
+
+test("trusted proxies default to the private ranges, and a value replaces them", () => {
+  // The default is what makes rate limiting work at all on a normal deploy:
+  // this service is never published, so every hop in front of it is private.
+  assert.deepEqual(trustedProxies({}), PRIVATE_PROXY_RANGES);
+  assert.deepEqual(trustedProxies({ AUTH_TRUSTED_PROXIES: "  " }), PRIVATE_PROXY_RANGES);
+
+  // REPLACES rather than extends -- an explicit value must re-list any private
+  // range it still wants trusted. Asserted because the opposite is the
+  // intuitive guess and getting it wrong silently stops trusting the network.
+  assert.deepEqual(trustedProxies({ AUTH_TRUSTED_PROXIES: "104.24.0.0/14" }), [
+    "104.24.0.0/14",
+  ]);
+  assert.deepEqual(
+    trustedProxies({ AUTH_TRUSTED_PROXIES: " 10.0.0.0/8 , 104.24.0.0/14 " }),
+    ["10.0.0.0/8", "104.24.0.0/14"],
+  );
+});
+
+test("every default range is one Better Auth will actually accept", async () => {
+  // create-context.mjs WARNS and moves on for an unparseable entry rather than
+  // failing, so a typo here would be silently dropped and the bucket would
+  // quietly go back to being shared. This is the only thing that would catch it.
+  const { findInvalidTrustedProxies } = await import(
+    "@better-auth/core/utils/ip"
+  );
+  assert.deepEqual(findInvalidTrustedProxies(PRIVATE_PROXY_RANGES), []);
+});
+
+test("the default resolves a client through private hops, and past a spoof", async () => {
+  // Measured against the real resolver, not reasoned about. Each case below is
+  // a line in trustedProxies' doc comment; this is what keeps that comment
+  // honest, which matters on this branch more than most -- a confidently wrong
+  // comment about library behaviour is what hid the linking bug.
+  const { getIPFromHeader } = await import("@better-auth/core/utils/ip");
+  const opts = { trustedProxies: PRIVATE_PROXY_RANGES };
+
+  // Unchanged from no configuration at all.
+  assert.equal(getIPFromHeader("203.0.113.7", opts), "203.0.113.7");
+
+  // The case this exists for: unresolvable before, correct now.
+  assert.equal(getIPFromHeader("203.0.113.7, 192.168.107.4", opts), "203.0.113.7");
+  assert.equal(
+    getIPFromHeader("203.0.113.7, 172.18.0.5, 192.168.1.4", opts),
+    "203.0.113.7",
+  );
+
+  // Why the default is safe: the walk runs from the RIGHT and stops at the
+  // first untrusted address, so a client that writes its own header is walked
+  // past rather than believed.
+  assert.equal(getIPFromHeader("1.2.3.4, 203.0.113.7", opts), "203.0.113.7");
+
+  // A public CDN in front is NOT solved by the default -- it reports the CDN.
+  // Asserted so the limitation is a fact in the suite rather than a caveat in
+  // prose that nobody re-checks.
+  assert.equal(getIPFromHeader("203.0.113.7, 104.24.1.1", opts), "104.24.1.1");
 });

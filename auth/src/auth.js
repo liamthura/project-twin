@@ -79,18 +79,60 @@ const MCP_RESOURCE = mcpResource();
  * match. Without it a header carrying more than one entry resolves to nothing,
  * because it will not guess which of them the client is.
  *
- * Not hardcodable, which is why it is a variable: the addresses depend on
- * whatever appends to the header in front of this instance, and this project's
- * local Docker bridges a different range from a Linux host's default.
+ * Defaults to every private range, because that is what is actually in front of
+ * this service: it is never published, and reaches the outside only through the
+ * API container on a container network (backend/docker-compose.yml). So every
+ * hop between a browser and here holds a private address by construction, and
+ * trusting private hops while trusting no public one is the standard shape --
+ * it needs no per-environment value, which matters because the ranges differ
+ * between a Linux host's Docker defaults and this project's local bridge.
  *
- * Empty is the default and passes the option not at all, so an instance that
- * sets nothing behaves exactly as it did before.
+ * Measured against the real resolver rather than reasoned about, because the
+ * behaviour is not obvious. `X` is the header, `->` the resolved client:
+ *
+ *   203.0.113.7                           -> 203.0.113.7   (unchanged)
+ *   203.0.113.7, 192.168.107.4            -> 203.0.113.7   (was: nothing)
+ *   203.0.113.7, 172.18.0.5, 192.168.1.4  -> 203.0.113.7   (was: nothing)
+ *   1.2.3.4, 203.0.113.7                  -> 203.0.113.7   (was: nothing)
+ *
+ * The third case is the one this exists for, and the fourth is why the default
+ * is safe: a client that writes its own X-Forwarded-For is walked PAST, because
+ * the search runs from the right and stops at the first address we do not
+ * trust. A spoofed leftmost entry can never be reached.
+ *
+ * Two cases it does not solve, both needing an explicit value:
+ *
+ *   - A PUBLIC proxy in front -- Cloudflare, or any CDN. Its address is not
+ *     private, so the walk stops there and reports the CDN as the client. Set
+ *     this variable to the private ranges PLUS that provider's, or every
+ *     visitor shares one bucket per path again.
+ *   - A header carrying only private addresses resolves to nothing, where
+ *     before it resolved to the last of them. In production that means nothing
+ *     upstream recorded a real client, so there is no client IP to find and
+ *     nothing is lost; in development getIP falls back to 127.0.0.1 anyway,
+ *     and rate limiting is off there.
+ *
+ * Setting the variable REPLACES this list rather than adding to it, so an
+ * explicit value must include the private ranges it still wants trusted.
  */
+export const PRIVATE_PROXY_RANGES = [
+  "10.0.0.0/8",
+  "172.16.0.0/12",
+  "192.168.0.0/16",
+  "127.0.0.0/8",
+  // Carrier-grade NAT, which is also Tailscale's range -- reaching an instance
+  // over a tailnet is a documented path in run/infrastructure.
+  "100.64.0.0/10",
+  "::1/128",
+  "fd00::/8",
+];
+
 export function trustedProxies(env = process.env) {
-  return (env.AUTH_TRUSTED_PROXIES || "")
+  const configured = (env.AUTH_TRUSTED_PROXIES || "")
     .split(",")
     .map((entry) => entry.trim())
     .filter(Boolean);
+  return configured.length > 0 ? configured : PRIVATE_PROXY_RANGES;
 }
 
 const TRUSTED_PROXIES = trustedProxies();
@@ -245,12 +287,12 @@ export const auth = betterAuth({
       generateId: () => randomUUID(),
     },
 
-    // Spread rather than set, so an unconfigured instance carries no
-    // `ipAddress` key at all. Behaviourally an empty list is already the same
-    // as none -- getIPFromHeader does `?? []` then checks `length > 0` -- but
-    // create-context.mjs:90-93 validates whatever is here, and the same
-    // fail-safe shape as every other variable on this branch is worth more than
-    // one saved line.
+    // Always set now that the default is non-empty -- see trustedProxies above
+    // for what it is and the measured behaviour it produces. Still spread, so
+    // that a deliberately empty AUTH_TRUSTED_PROXIES cannot be expressed here
+    // by accident: the list is never empty, and if it ever became so this
+    // carries no `ipAddress` key rather than an empty one that
+    // create-context.mjs:90-93 would validate.
     ...(TRUSTED_PROXIES.length > 0
       ? { ipAddress: { trustedProxies: TRUSTED_PROXIES } }
       : {}),

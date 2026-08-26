@@ -106,14 +106,13 @@ services:
       # everybody. A header carrying more than one entry resolves to nothing
       # until this names which of them to skip.
       #
-      # The correct value is the address of whatever APPENDS to that header in
-      # front of MyGist -- your edge proxy or load balancer, not the API
-      # container, which forwards the header untouched (backend/auth_proxy.py).
-      # `docker network inspect <network>` will tell you the addresses.
-      #
-      # Empty by default, and empty passes no option at all. Invalid entries are
-      # warned about and ignored rather than refused, so a typo degrades quietly
-      # -- check the boot log after changing this.
+      # Leave unset unless a PUBLIC proxy sits in front. The default is every
+      # private range, which is correct here: this service is not published and
+      # is reached only through the API container on this network, so every hop
+      # in front of it is private. Set it only for a public CDN -- Cloudflare
+      # and the like -- whose addresses the default cannot skip, and remember
+      # that setting it REPLACES the private ranges rather than adding to them.
+      # See auth/.env.example, and auth/src/auth.js for the measured behaviour.
       - AUTH_TRUSTED_PROXIES=${AUTH_TRUSTED_PROXIES:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
