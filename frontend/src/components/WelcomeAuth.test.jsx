@@ -685,11 +685,12 @@ describe("WelcomeAuth with SSO configured", () => {
       await screen.findByRole("button", { name: /continue with tdev door/i }),
     );
 
-    expect(startSsoSignIn).toHaveBeenCalledWith(
-      expect.objectContaining({
-        callbackURL: "/auth/oauth2/authorize?client_id=abc&state=xyz",
-      }),
-    );
+    const [args] = startSsoSignIn.mock.calls[0];
+    expect(args.callbackURL).toBe("/auth/oauth2/authorize?client_id=abc&state=xyz");
+    // And no new-user URL. callback.mjs:254 prefers it over callbackURL for a
+    // sign-in that registered an account, so setting it here would send an MCP
+    // client's first-ever user to onboarding and drop the authorize request.
+    expect(args.newUserCallbackURL).toBeUndefined();
   });
 
   it("explains a failed sign-in, and points at the fix", async () => {

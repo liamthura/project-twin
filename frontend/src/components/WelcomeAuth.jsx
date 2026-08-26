@@ -293,7 +293,15 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
         // A brand-new account lands on Welcome rather than an empty Profile.
         // A redirect flow has no onSuccess to decide that in, so the provider
         // is told up front.
-        newUserCallbackURL: "/#/onboarding/welcome",
+        //
+        // But not during an OAuth flow. callback.mjs:254 prefers the new-user
+        // URL over callbackURL whenever the sign-in registered an account, so
+        // set unconditionally it would send an MCP client's first-ever user to
+        // onboarding and drop the authorize request with no answer at all. The
+        // request has a client waiting on it; onboarding is still one click
+        // away afterwards. This is what the password path already does -- App's
+        // onSuccess resumes the flow without asking whether the user is new.
+        newUserCallbackURL: isOAuthRequest ? undefined : "/#/onboarding/welcome",
         // Back where you started, so the banner appears in the framing the
         // person was already in.
         errorCallbackURL: `${window.location.pathname}${query}`,
