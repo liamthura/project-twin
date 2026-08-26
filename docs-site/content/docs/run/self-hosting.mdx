@@ -197,15 +197,32 @@ where somebody is already looking.
 </Callout>
 
 <Callout>
-**Linking is explicit, and only ever from a signed-in session.** Signing in
-through the provider with an address that matches an existing MyGist account
-does **not** adopt that account — it starts a new, empty one, and fails if the
-username is taken.
+**Linking is explicit, and only ever from a signed-in session.** MyGist never
+adopts an existing account because a provider claims the same address. That is
+on purpose: linking on a matching email is a known account-takeover class, and
+no provider can truthfully assert that an address is verified.
 
-That is on purpose: linking on a matching email is a known account-takeover
-class, and no provider can truthfully assert that an address is verified.
-Existing accounts link from **Settings → Account → Link**, which requires the
-password first. Set `AUTH_OIDC_*` after you have linked, not before.
+So there is an order to migrating an account you already have, and it is:
+
+1. **Set the variables** — `AUTH_OIDC_*`, on both containers as above. Until
+   they are set, `/api/instance` reports no provider and there is no Link
+   control anywhere in the app to use.
+2. **Sign in with your password.** The sign-in screen leads with the provider
+   button once the variables are set; **Sign in with a password instead** is
+   underneath it. That link is what makes the migration possible — it is the
+   only way to reach your existing account before it has a provider linked.
+3. **Link from Settings → Account.**
+4. **Then use the button.** From here on, the provider signs you in to the
+   account you already had.
+
+Pressing the provider button *before* you have linked does not sign you into
+your existing account. Accounts that predate single sign-on hold a
+`<username>@mygist.invalid` placeholder address, which matches nothing your
+provider will ever send, so you get a second, empty account — and it fails
+outright if your provider's username is already taken here. If you have added a
+real email to your account and your provider sends that same address, sign-in
+fails instead, with `account_not_linked`: nothing is adopted and nothing is
+created. Either way the fix is the same, and it is step 2.
 </Callout>
 
 ### The `/auth` suffix
