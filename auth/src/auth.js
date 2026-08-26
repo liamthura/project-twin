@@ -37,7 +37,7 @@ import {
   oauthRegistrationNativePlugin,
   revokeConnection,
 } from "./oauth.js";
-import { ssoPlugins, usernameFor } from "./sso.js";
+import { PROVIDER_ID, ssoPlugins, usernameFor } from "./sso.js";
 
 const required = (name) => {
   const value = process.env[name];
@@ -217,17 +217,38 @@ export const auth = betterAuth({
 
   account: {
     accountLinking: {
-      // Explicit only. Better Auth's callback looks an existing user up by
-      // email and links to it, refusing today only because Authentik reports
-      // `email_verified: false` and MyGist's seeded accounts are unverified.
-      // Both are contingent; auto-linking on an email a provider cannot
-      // truthfully assert is a known takeover class, so the decision is
-      // configured rather than inferred from a default.
+      // Explicit only. Better Auth's sign-in path looks an existing user up by
+      // email and would link the account to it, refusing today only because
+      // Authentik reports `email_verified: false` and MyGist's seeded accounts
+      // are unverified. Both are contingent; auto-linking on an email a
+      // provider cannot truthfully assert is a known takeover class, so the
+      // decision is configured rather than inferred from a default.
       //
-      // /link-social is unaffected -- it passes `selectedUser`, which skips
-      // this guard entirely. That is the whole point: linking stays possible,
-      // and stays something a signed-in person chooses.
+      // This is the option that still forbids adoption-by-email on sign-in.
+      // oauth2/link-account.mjs:83 refuses as soon as this is true, as one
+      // disjunct of an OR that no other setting below can satisfy away.
       disableImplicitLinking: true,
+
+      // The two below apply ONLY to the explicit link callback -- the path
+      // /link-social starts and api/routes/callback.mjs:150 finishes. Nothing
+      // on the sign-in path reads either: `allowDifferentEmails` is read at
+      // exactly two places, callback.mjs:175 and account.mjs:213, and both are
+      // explicit-link guards.
+
+      // Required, not optional, and the whole migration depends on it.
+      // callback.mjs:175 compares the provider's address against the address
+      // on the signed-in account. Seeding gave every account that predates SSO
+      // a `<username>@mygist.invalid` placeholder, which can never equal a real
+      // address, so without this the callback returns EMAIL_DOES_NOT_MATCH for
+      // every existing account and there is no way to link at all.
+      allowDifferentEmails: true,
+
+      // callback.mjs:171 also refuses an untrusted provider whenever the
+      // provider does not assert `email_verified`, which Authentik does not by
+      // default. Trusting our own configured provider clears that; it cannot
+      // reopen implicit linking, because disableImplicitLinking above rejects
+      // first regardless of whether the provider is trusted.
+      trustedProviders: [PROVIDER_ID],
     },
   },
 

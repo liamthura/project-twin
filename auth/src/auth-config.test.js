@@ -23,20 +23,31 @@ after(async () => {
 });
 
 test("implicit linking is switched off explicitly, not left to luck", async () => {
-  // The 1.7 callback DOES look up an existing user by email
+  // The 1.7 sign-in path DOES look up an existing user by email
   // (oauth2/link-account.mjs:63) and would link the account to it. Today it
   // refuses only because Authentik reports email_verified:false AND MyGist's
   // seeded accounts are unverified -- two contingent facts, either of which
   // could change without anyone connecting the change to a takeover.
   //
   // Auto-linking on an unverifiable email claim is a known takeover class, so
-  // "explicit only" is configured rather than inferred. It does not touch
-  // /link-social: that path sets `selectedUser`, which skips the guard.
+  // "explicit only" is configured rather than inferred.
   const { auth } = await import("./auth.js");
   assert.equal(
     auth.options.account.accountLinking.disableImplicitLinking,
     true,
   );
+});
+
+test("the explicit link callback can reach an account with a placeholder email", async () => {
+  // Both of these are what callback.mjs:171 and :175 read, and both are needed
+  // for a pre-SSO account to link at all: its email is a `@mygist.invalid`
+  // placeholder that can never equal the provider's real address, and Authentik
+  // does not assert email_verified. sso-link-flow.test.js drives the real
+  // callback and is the test with teeth; this one pins the config it depends on.
+  const { auth } = await import("./auth.js");
+  const linking = auth.options.account.accountLinking;
+  assert.equal(linking.allowDifferentEmails, true);
+  assert.deepEqual(linking.trustedProviders, ["authentik"]);
 });
 
 test("no discovery URL means no provider and no receiver", () => {
