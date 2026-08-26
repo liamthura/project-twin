@@ -41,16 +41,21 @@ it("offers to link when the account has no provider yet", async () => {
 
   await user.click(screen.getByRole("button", { name: /link tdev door/i }));
 
-  // Comes back to the section it started from, not to the app root. MyGist is
-  // hash-routed, so the hash is the route and leaving it out loses it.
+  // NEITHER url carries the hash, and it is not an oversight. Better Auth
+  // validates a relative callback against character class [\w\-.+/@] plus an
+  // optional `?query` -- no `#` -- so "/#/preferences" is refused outright
+  // with "Invalid callbackURL" and the link never starts. Returning someone to
+  // the exact section is not expressible; landing on the default one is.
   const [args] = startSsoLink.mock.calls[0];
-  expect(args.callbackURL).toBe("/#/preferences");
-
-  // But the FAILURE url carries no hash, deliberately. Better Auth appends
-  // `?error=<code>` to the end of this string, so a hash would bury the code in
-  // the fragment where nothing reads it and leave readRoute() returning
-  // "preferences?error=...", which matches no section.
+  expect(args.callbackURL).toBe("/");
   expect(args.errorCallbackURL).toBe("/");
+
+  // The constraint itself, so this fails for a legible reason if anyone puts
+  // the hash back.
+  const accepts = (u) =>
+    /^\/(?!\/|\\|%2f|%5c)[\w\-.\+/@]*(?:\?[\w\-.\+/=&%@]*)?$/.test(u);
+  expect(accepts("/#/preferences")).toBe(false);
+  expect(accepts(args.callbackURL)).toBe(true);
 });
 
 it("says it is linked, and offers to undo it", async () => {

@@ -46,22 +46,22 @@ export function LinkedAccounts({ accounts = [], sso = false, onChanged = () => {
     setError(null);
     setPending(true);
     try {
-      // Back to where they are standing. MyGist is hash-routed, so the hash is
-      // the route -- without it every successful link lands on the default
-      // section rather than the one this started from. Settings is a dialog
-      // with no route of its own, so it closes either way.
+      // NO hash, on either URL. Better Auth validates every callback against
+      // trusted-origins.mjs's relative-path rule, whose character class is
+      // [\w\-.+/@] plus an optional `?query` -- a `#` is not in it, so any
+      // hash-bearing path is refused outright with "Invalid callbackURL"
+      // before the redirect is ever built. MyGist is hash-routed, so returning
+      // someone to the exact section they started from is simply not
+      // expressible here; landing on the default section is the cost.
+      // Settings is a dialog with no route of its own and closes either way.
       const base = `${window.location.pathname}${window.location.search}`;
-      const here = `${base}${window.location.hash}`;
       await startSsoLink({
-        callbackURL: here,
-        // The failure URL deliberately carries NO hash. Better Auth builds its
-        // error redirect by string concatenation -- callback.mjs:82 appends
-        // `?error=<code>` to the end of whatever it was given -- so a hash here
-        // would produce `/#/profile?error=...`, which puts the code inside the
-        // fragment where nothing reads it and leaves `readRoute()` returning
-        // "profile?error=...", a route that matches no section. Landing on the
-        // default section with a readable reason beats landing in the right
-        // place with none. AccountPanel picks the code up from the query.
+        callbackURL: base,
+        // Same value, and doubly so for failures: Better Auth builds its error
+        // redirect by string concatenation (callback.mjs:82 appends
+        // `?error=<code>`), so even if a hash were accepted it would produce
+        // `/#/profile?error=...` and bury the code in the fragment.
+        // AccountPanel picks the code up from the query.
         errorCallbackURL: base,
       });
     } catch (err) {
