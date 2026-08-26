@@ -52,6 +52,12 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // The identity provider's brand colour. Separate from primary because
+        // it names a third party rather than a MyGist action -- see globals.css.
+        sso: {
+          DEFAULT: "hsl(var(--sso))",
+          foreground: "hsl(var(--sso-foreground))",
+        },
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
         // Brand layer. ground-inverse and on-inverse are marketing-only and

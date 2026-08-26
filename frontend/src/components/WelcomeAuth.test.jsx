@@ -766,3 +766,30 @@ describe("callback URLs Better Auth will actually accept", () => {
     );
   });
 });
+
+describe("the provider button carries the provider's colour", () => {
+  // It names a THIRD PARTY, so it must not wear MyGist's own primary -- the
+  // button is a promise about where pressing it sends you.
+  it("uses the sso variant, not the default one", async () => {
+    getInstance.mockResolvedValue({ invite_only: false, sso: true });
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    const button = await screen.findByRole("button", {
+      name: /continue with tdev door/i,
+    });
+    expect(button.className).toContain("bg-sso");
+    expect(button.className).not.toContain("bg-primary");
+  });
+
+  it("keeps the password escape hatch legible beside it", async () => {
+    // The brand button is visually dominant by design, but this link is the
+    // ONLY route an existing account has to reach Settings and link. If it
+    // ever stops being rendered, the migration path closes.
+    getInstance.mockResolvedValue({ invite_only: false, sso: true });
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    expect(
+      await screen.findByRole("button", { name: /sign in with a password instead/i }),
+    ).toBeInTheDocument();
+  });
+});
