@@ -37,6 +37,7 @@ TOOL_SCOPES: dict[str, str] = {
     "search_context": READ,
     "get_entity": READ,
     "get_schema": READ,
+    "whoami": READ,
     "propose_update": PROPOSE,
     "persona_modify": WRITE,
     "persona_batch": WRITE,

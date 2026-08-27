@@ -34,6 +34,7 @@ def test_a_read_only_grant_sees_only_read_tools():
         "search_context",
         "get_entity",
         "get_schema",
+        "whoami",
     }
 
 

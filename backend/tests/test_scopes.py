@@ -45,6 +45,7 @@ def test_every_mcp_tool_has_a_scope():
         "search_context": scopes.READ,
         "get_entity": scopes.READ,
         "get_schema": scopes.READ,
+        "whoami": scopes.READ,
         "propose_update": scopes.PROPOSE,
         "persona_modify": scopes.WRITE,
         "persona_batch": scopes.WRITE,

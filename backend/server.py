@@ -32,6 +32,7 @@ from typing import Optional, Literal, Union, List
 import uuid
 
 from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_http_request
 # from starlette.middleware.base import BaseHTTPMiddleware
 # from starlette.requests import Request
 # from starlette.responses import JSONResponse, Response
@@ -44,6 +45,8 @@ import proposals_store
 import search_index
 import mcp_activity
 import mcp_prompts
+import mcp_scopes
+import scopes
 import sections
 import settings_store
 import skill_resources
@@ -3339,6 +3342,44 @@ def get_schema(
     """
     result = get_entity_schema(entity=entity, file=file)
     return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def whoami() -> str:
+    """Which MyGist account this connection is authenticated as, and what it
+    may do.
+
+    Call it when the user asks who they are signed in as, when they suspect
+    they are connected to the wrong account, or when a tool refused a write --
+    the cause is usually a narrower grant rather than a broken connection, and
+    `tools` below says which is which.
+
+    RETURNS:
+        username    the account this connection reads and writes
+        credential  "oauth" (a connected app), "token" (a personal access
+                    token), or "unknown" outside HTTP
+        scopes      the granted scopes, hierarchy already expanded
+        tools       the tools those scopes allow -- anything missing here needs
+                    a wider grant, made by reconnecting from MyGist's settings
+    """
+    user = db.resolve_user_by_id(db.current_user_id.get())
+    try:
+        granted = scopes.current_scopes.get()
+    except LookupError:
+        # Same fail-closed answer as mcp_scopes: no grant on the request means
+        # nothing is authorised, not that everything is.
+        granted = frozenset()
+    try:
+        credential = get_http_request().state.credential_kind
+    except Exception:
+        # stdio, or a request that never passed main.py's middleware.
+        credential = "unknown"
+    return json.dumps({
+        "username": user["username"] if user else None,
+        "credential": credential,
+        "scopes": sorted(granted),
+        "tools": sorted(mcp_scopes.tools_for_scopes(granted)),
+    }, ensure_ascii=False)
 
 
 # =============================================================================
