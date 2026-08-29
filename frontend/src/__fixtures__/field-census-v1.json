@@ -203,5 +203,18 @@
     ],
     "entries > Key Decisions": [],
     "entries > Follow-up Items": []
+  },
+  "inventory": {
+    "items": [
+      "name",
+      "notes",
+      "category",
+      "status",
+      "specs"
+    ],
+    "items > Details": [
+      "name",
+      "value"
+    ]
   }
 }

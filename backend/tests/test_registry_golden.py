@@ -6,7 +6,9 @@ refactor changed behavior — fix the refactor, never the fixture.
 
 The one thing that legitimately moves this fixture is a DELIBERATE change to
 the tool contract, which is not a refactor and must be argued for on its own.
-That has happened twice.
+That has happened twice. A new section pack also moves it, by adding a pack to
+`section_order`, `section_registry` and `entity_schema` and touching nothing
+already here -- confirm that before regenerating, entity by entity.
 
 Wave 6 corrected `profile`'s vocabulary, which declared seven field names
 nothing stored (`language.proficiency`, `email.label`,

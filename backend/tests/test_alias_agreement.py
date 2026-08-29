@@ -98,18 +98,19 @@ def test_the_skip_list_is_exactly_the_expected_size():
     new unlisted entity is named in the diff rather than merely changing a
     number nobody reads closely."""
     # Computed by walking every shipped manifest (see `SKIPPED` above) and
-    # subtracting FIELD_ALIASES' 20 keys. 25 entities, none of which
+    # subtracting FIELD_ALIASES' 20 keys. 27 entities, none of which
     # FIELD_ALIASES' table has ever heard of:
     expected = {
         "aesthetic", "basic_info", "club", "communication_default",
         "coursework", "education", "education_highlight", "energy_peak",
         "example_item", "goal", "hobby_specific", "interest",
+        "inventory_item", "inventory_spec",
         "learning_entry", "like", "media_item", "mood_override",
         "personality_trait", "project_highlight", "project_tag",
         "response_format", "sleep", "stress_trigger", "work_experience",
         "work_highlight", "work_skill",
     }
-    assert len(expected) == 25
+    assert len(expected) == 27
     assert SKIPPED == expected
 
 

@@ -1,0 +1,115 @@
+{
+  "$schema": "../meta_schema.json",
+  "key": "inventory",
+  "title": "Inventory",
+  "description": "Hardware and services you own: what it is, what state it's in, and its details",
+  "core": false,
+  "default_enabled": false,
+  "position": 57,
+  "defaults": {
+    "items": []
+  },
+  "id_lists": [
+    [
+      "items",
+      "inventory"
+    ]
+  ],
+  "scope_contributions": {
+    "professional": [
+      "items"
+    ],
+    "personal": [
+      "items"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "list",
+      "path": [
+        "items"
+      ],
+      "search": true,
+      "facets": [
+        "category",
+        "status"
+      ],
+      "element": {
+        "entity": "inventory_item",
+        "identifier": "name",
+        "fields": [
+          {
+            "name": "name",
+            "required": true,
+            "role": "title",
+            "placeholder": "MacBook Pro 14"
+          },
+          {
+            "name": "notes",
+            "type": "longtext",
+            "placeholder": "What you use it for, quirks, anything worth knowing..."
+          },
+          {
+            "name": "specs",
+            "type": "list",
+            "label": "Details",
+            "show": [
+              "count"
+            ],
+            "element": {
+              "entity": "inventory_spec",
+              "identifier": "name",
+              "parent": "inventory_item_name",
+              "fields": [
+                {
+                  "name": "name",
+                  "required": true,
+                  "role": "title",
+                  "placeholder": "provider"
+                },
+                {
+                  "name": "value",
+                  "required": true,
+                  "placeholder": "Hetzner"
+                }
+              ]
+            },
+            "$comment": "The custom-field list. A laptop and a VPS share almost no metadata, so the per-item detail is name/value rows rather than fixed fields -- promoting one to a real field costs context tokens for every user on every read. Same nested-list shape as the `references` blocks in knowledge, projects, lifestyle and aesthetics, with `value` where those have `url`/`notes`. No alias on `name`: an alias only resolves if server.py's FIELD_ALIASES accepts it, which a declarative pack cannot add, and the parent parameter is `inventory_item_name`, so a bare `name` collides with nothing."
+          },
+          {
+            "name": "category",
+            "type": "enum",
+            "values": [
+              "computer",
+              "phone",
+              "server",
+              "network",
+              "peripheral",
+              "audio",
+              "camera",
+              "storage",
+              "other"
+            ],
+            "allow_custom": true,
+            "show": [
+              "badge"
+            ]
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "values": [
+              "in_use",
+              "spare",
+              "retired"
+            ],
+            "show": [
+              "badge"
+            ]
+          }
+        ]
+      },
+      "$comment": "One flat list. Grouping devices, services and homelab into separate nodes was considered and dropped: the categories blur (a homelab box is a computer and a server) and the long tail lands nowhere. `category` as a facet does the same job with one field. No purchase price, serial, warranty or acquired date -- this section is what the user has, for an agent that needs to know their kit, not an asset register; any of those goes in `specs` if a user wants it."
+    }
+  ]
+}

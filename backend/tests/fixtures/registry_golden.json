@@ -327,7 +327,7 @@
           ]
         },
         "identifier": "title",
-        "description": "Saved topics and bookmarks to revisit later — a shelf, not an inbox"
+        "description": "Saved topics and bookmarks to revisit later \u2014 a shelf, not an inbox"
       },
       "mental_tab_reference": {
         "actions": [
@@ -533,7 +533,7 @@
           "note"
         ],
         "identifier": "item",
-        "description": "Inbox for fleeting ideas and current thoughts — expect entries to be pruned"
+        "description": "Inbox for fleeting ideas and current thoughts \u2014 expect entries to be pruned"
       }
     },
     "lifestyle": {
@@ -817,6 +817,59 @@
         ],
         "identifier": "topic"
       }
+    },
+    "inventory": {
+      "inventory_item": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "required": [
+          "name"
+        ],
+        "optional": [
+          "notes",
+          "specs",
+          "category",
+          "status",
+          "custom_category"
+        ],
+        "identifier": "name",
+        "valid_values": {
+          "category": [
+            "computer",
+            "phone",
+            "server",
+            "network",
+            "peripheral",
+            "audio",
+            "camera",
+            "storage",
+            "other"
+          ],
+          "status": [
+            "in_use",
+            "spare",
+            "retired"
+          ]
+        }
+      },
+      "inventory_spec": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "required": [
+          "inventory_item_name",
+          "name",
+          "value"
+        ],
+        "optional": [],
+        "identifier": "name",
+        "parent": "inventory_item_name"
+      }
     }
   },
   "section_order": [
@@ -828,6 +881,7 @@
     "lifestyle",
     "media",
     "aesthetics",
+    "inventory",
     "circle",
     "learning_log"
   ],
@@ -1123,6 +1177,26 @@
       "context_fields": {
         "learning": [
           "entries"
+        ]
+      }
+    },
+    "inventory": {
+      "key": "inventory",
+      "default": {
+        "items": []
+      },
+      "id_lists": [
+        [
+          "items",
+          "inventory"
+        ]
+      ],
+      "context_fields": {
+        "professional": [
+          "items"
+        ],
+        "personal": [
+          "items"
         ]
       }
     }

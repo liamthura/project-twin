@@ -497,6 +497,15 @@ a one-line input, silently and correctly.
 
 ## Nested arrays
 
+<Callout type="warn">
+A nested element is the one shape a pack cannot fully add on its own. The
+generic write branch skips any entity carrying a `parent`, so MCP `add`,
+`update` and `remove` on individual child rows need a hand-written branch in
+`server.py` and a contributed pack cannot ship one. The array still renders,
+still reads, and can be written whole through the parent row's `update`. Only
+per-row writes need the code.
+</Callout>
+
 A nested array is a field with `type: "list"` and an `element` of its own. There
 is no separate child-node concept: a `list` field's `element` and a `list` node's
 `element` mean the same thing, and as a field inside a row's `fields` the only

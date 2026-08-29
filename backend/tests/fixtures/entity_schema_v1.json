@@ -811,5 +811,58 @@
         "item"
       ]
     }
+  },
+  "inventory": {
+    "inventory_item": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "name"
+      ],
+      "optional": [
+        "notes",
+        "specs",
+        "category",
+        "status",
+        "custom_category"
+      ],
+      "identifier": "name",
+      "valid_values": {
+        "category": [
+          "computer",
+          "phone",
+          "server",
+          "network",
+          "peripheral",
+          "audio",
+          "camera",
+          "storage",
+          "other"
+        ],
+        "status": [
+          "in_use",
+          "spare",
+          "retired"
+        ]
+      }
+    },
+    "inventory_spec": {
+      "actions": [
+        "add",
+        "update",
+        "remove"
+      ],
+      "required": [
+        "inventory_item_name",
+        "name",
+        "value"
+      ],
+      "optional": [],
+      "identifier": "name",
+      "parent": "inventory_item_name"
+    }
   }
 }
