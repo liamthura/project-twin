@@ -348,6 +348,32 @@ it; a new pack normally declares nothing, and its form and its contract agree.
 
 ### Nested arrays, and `parent`
 
+**A nested element is the one thing a pack cannot add on its own.**
+`server._generic_entity_spec` (server.py:996) returns `None` for any entity
+carrying a `parent`, so the generic write branch never claims one and
+`execute_modify` falls through to `❌ Unknown entity type`. Every nested entity
+in the shipped packs has a hand-written `elif` branch, and a new one needs the
+same. `tests/test_stored_key_audit.py` catches its absence, and its parent
+identifier also needs an `ALLOWED_UNSTORED` entry there, since a parent selector
+locates a row rather than being stored on it.
+
+The declarative guarantee therefore covers **top-level list entities**. A
+contributed pack that wants per-row writes on a nested array is asking for a
+renderer-kit change, not a pack change. Without one the array still renders and
+still reads, and a client can write it whole through the parent row's `update`,
+which is enough for most of them.
+
+Two more traps a nested element walks into, both from tables in `server.py` that
+predate the format:
+
+- An **`alias` only resolves if `FIELD_ALIASES` accepts it**, and a pack cannot
+  add a key there. Declaring one the table does not carry promises input
+  handling the server never performs; `tests/test_alias_agreement.py` fails on it.
+- **`FIELD_ALIASES["name"]` lists `value` and `item` as identifier spellings**,
+  so an element with a real `value` field gets its value copied into its name
+  unless `_name_aliases_for` routes it away from that default. `inventory_spec`
+  is the first element to need that, and it is why it has a branch there.
+
 A nested list is a field with `type: "list"` and an `element` of its own. There
 is no separate child-node concept: a `list` field's `element` and a `list`
 node's `element` mean the same thing, and as a field inside a row's `fields` the

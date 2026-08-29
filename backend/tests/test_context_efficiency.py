@@ -26,9 +26,10 @@ def _expected_filetypes(scope: str) -> set[str]:
     """Bare file-type names a scope should load. Hardcoded (NOT derived from the
     code under test) so this characterization test can catch scope->file drift."""
     if scope == "full":
-        # media/aesthetics are default-off (opt-in); a fresh as_user has no
-        # opt-ins, so "full" excludes them same as any other disabled pack.
-        return set(store.VALID_FILES) - {"media", "aesthetics"}
+        # media/aesthetics/inventory are default-off (opt-in); a fresh as_user
+        # has no opt-ins, so "full" excludes them same as any other disabled
+        # pack.
+        return set(store.VALID_FILES) - {"media", "aesthetics", "inventory"}
     return _EXPECTED_FILES_BY_SCOPE[scope]
 
 
@@ -83,12 +84,14 @@ def test_resolve_scope_fields_preserves_legacy_key_order():
         # the ONE entry marked `primary` -- see the aesthetics hook in
         # get_scoped_context -- so minimal stays small.
         "minimal": ["preferences", "profile", "goals", "projects", "aesthetics"],
-        "professional": ["preferences", "profile", "goals", "knowledge", "projects"],
-        # media/aesthetics contribute to "personal" too but post-date the
-        # legacy _CONTEXT_FILE_ORDER tuple, so they land after it (in
-        # registry position order) rather than interleaved with it.
+        "professional": ["preferences", "profile", "goals", "knowledge", "projects",
+                         "inventory"],
+        # media/aesthetics/inventory contribute to "personal" too but
+        # post-date the legacy _CONTEXT_FILE_ORDER tuple, so they land after
+        # it (in registry position order) rather than interleaved with it.
+        # inventory is the only one of the three on "professional".
         "personal": ["preferences", "profile", "goals", "lifestyle", "knowledge", "circle",
-                     "media", "aesthetics"],
+                     "media", "aesthetics", "inventory"],
         "learning": ["preferences", "profile", "goals", "knowledge", "projects", "learning_log"],
     }
     for scope, keys in expected.items():

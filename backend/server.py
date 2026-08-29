@@ -933,6 +933,15 @@ def _name_aliases_for(entity: str) -> list:
         name_aliases = FIELD_ALIASES.get("top_of_mind", ["topic"])
     elif entity == "connection":
         name_aliases = FIELD_ALIASES.get("connection", FIELD_ALIASES["name"])
+    elif entity == "inventory_spec":
+        # `value` is a DECLARED field on a spec, not a synonym for its
+        # identifier. The FIELD_ALIASES["name"] default lists both "value" and
+        # "item", so falling through would copy a spec's value into its name --
+        # {"name": "provider", "value": "Hetzner"} sent without a name stored
+        # itself as "Hetzner". Not in FIELD_ALIASES: nothing else looks this up,
+        # and a key there would pull the entity into test_alias_agreement's
+        # CHECKED set, which is about manifest-declared aliases.
+        name_aliases = ["name", "spec_name", "key", "field"]
     else:
         name_aliases = FIELD_ALIASES["name"]
 
@@ -2068,6 +2077,53 @@ def execute_modify(action: str, entity: str, data: dict) -> str:
                 save_json("lifestyle.json", lifestyle)
                 return f"✅ Removed specific from {hobby_name}"
             return f"❌ Specific not found"
+    
+    elif entity == "inventory_spec":
+        # Nested entities never reach the generic branch -- _generic_entity_spec
+        # returns None for anything carrying a `parent` -- so an inventory item's
+        # custom fields need this one to be writable per row rather than only as
+        # a whole array through `inventory_item.update`.
+        inventory = load_json("inventory.json")
+        items = inventory.get("items", [])
+        item_name = get_field(data, "inventory_item_name", "inventory_item", "item", "parent")
+        idx, item = find_in_array(items, item_name or "", "name")
+        if idx == -1:
+            return f"❌ Inventory item '{item_name}' not found"
+
+        specs = item.setdefault("specs", [])
+        spec_name = get_field(data, "name", "spec_name", "key", "field")
+
+        if action == "add":
+            if not spec_name:
+                return "❌ Spec requires 'name'"
+            value = get_field(data, "value")
+            if value is None or value == "":
+                return "❌ Spec requires 'value'"
+            spec_idx, _ = find_in_array(specs, spec_name, "name")
+            if spec_idx != -1:
+                return f"ℹ️ Spec '{spec_name}' already on {item_name}"
+            specs.append({"name": spec_name, "value": value})
+            save_json("inventory.json", inventory)
+            return f"✅ Added spec '{spec_name}' to {item_name}"
+        elif action == "update":
+            spec_idx, spec = find_in_array(specs, spec_name or "", "name")
+            if spec_idx == -1:
+                return f"❌ Spec '{spec_name}' not found on {item_name}"
+            value = get_field(data, "value")
+            if value is not None:
+                spec["value"] = value
+            new_name = get_field(data, "new_name", "new_spec_name")
+            if new_name:
+                spec["name"] = new_name
+            save_json("inventory.json", inventory)
+            return f"✅ Updated spec '{spec_name}' on {item_name}"
+        elif action == "remove":
+            spec_idx, _ = find_in_array(specs, spec_name or "", "name")
+            if spec_idx == -1:
+                return f"❌ Spec '{spec_name}' not found on {item_name}"
+            specs.pop(spec_idx)
+            save_json("inventory.json", inventory)
+            return f"✅ Removed spec '{spec_name}' from {item_name}"
     
     # === GENERAL PREFERENCE (key-value category system) ===
     elif entity == "preference":

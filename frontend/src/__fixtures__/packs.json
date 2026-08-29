@@ -2485,11 +2485,11 @@
         ],
         "required": [
           "inventory_item_name",
-          "spec_name",
+          "name",
           "value"
         ],
         "optional": [],
-        "identifier": "spec_name",
+        "identifier": "name",
         "parent": "inventory_item_name"
       }
     },
@@ -2535,10 +2535,7 @@
                     "name": "name",
                     "required": true,
                     "role": "title",
-                    "placeholder": "provider",
-                    "alias": [
-                      "spec_name"
-                    ]
+                    "placeholder": "provider"
                   },
                   {
                     "name": "value",
@@ -2547,7 +2544,7 @@
                   }
                 ]
               },
-              "$comment": "The custom-field list. A laptop and a VPS share almost no metadata, so the per-item detail is name/value rows rather than fixed fields -- promoting one to a real field costs context tokens for every user on every read. Same nested-list shape as the `references` blocks in knowledge, projects, lifestyle and aesthetics, with `value` where those have `url`/`notes`, and `name` aliased so a client says `spec_name` rather than colliding with the item's own `name`."
+              "$comment": "The custom-field list. A laptop and a VPS share almost no metadata, so the per-item detail is name/value rows rather than fixed fields -- promoting one to a real field costs context tokens for every user on every read. Same nested-list shape as the `references` blocks in knowledge, projects, lifestyle and aesthetics, with `value` where those have `url`/`notes`. No alias on `name`: an alias only resolves if server.py's FIELD_ALIASES accepts it, which a declarative pack cannot add, and the parent parameter is `inventory_item_name`, so a bare `name` collides with nothing."
             },
             {
               "name": "category",

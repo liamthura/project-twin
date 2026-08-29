@@ -176,5 +176,17 @@
    "source": "text",
    "tags": "array"
   }
+ },
+ "inventory": {
+  "items": {
+   "name": "text",
+   "notes": "longtext",
+   "category": "enum+custom",
+   "status": "enum"
+  },
+  "items > Details": {
+   "name": "text",
+   "value": "text"
+  }
  }
 }

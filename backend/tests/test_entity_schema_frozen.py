@@ -6,11 +6,15 @@ shipped packs already disagree with themselves on order -- communication_default
 lists tone/locale/detail_level in the ui block and tone/detail_level/locale in
 the entity -- so no order is authoritative), everything else compares exactly.
 
-The frozen file holds 42 entities across 10 packs, which is every pack
+The frozen file holds 44 entities across 11 packs, which is every pack
 `load_packs` ships. `_template` is not among them: it declares one entity
 (`example_item`), but pack_loader.py:93 skips any directory whose name starts
-with `_`, so it never reaches a client. Counting the directory listing gives 43
-across 11 -- that number describes the filesystem, not the contract.
+with `_`, so it never reaches a client. Counting the directory listing gives 45
+across 12 -- that number describes the filesystem, not the contract.
+
+A new pack legitimately adds to this file, and only ever adds: `inventory`
+brought the last two entities. Regenerating it that way is not the weakening
+the paragraph below rules out -- that is an edit to an entity already here.
 
 Weakening this test is never the right fix. It is the whole safety argument for
 deriving a schema that used to be copied.

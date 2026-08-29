@@ -100,6 +100,7 @@ ALLOWED_UNSTORED = {
     ("projects", "project_highlight", "project_name"): "parent selector",
     ("lifestyle", "hobby_reference", "hobby_name"): "parent selector",
     ("lifestyle", "hobby_specific", "hobby_name"): "parent selector",
+    ("inventory", "inventory_spec", "inventory_item_name"): "parent selector",
     # Chooses which sub-object of the section is written, not a stored key.
     ("knowledge", "knowledge", "category"): "selects the target list",
     ("preferences", "preference", "category"): "selects the target sub-object",
@@ -131,6 +132,7 @@ _PARENT_SEEDS = {
     "title": ("mental_tab", {"title": "ParentTab"}, "ParentTab"),
     "project_name": ("project", {"name": "ParentProject", "description": "D"}, "ParentProject"),
     "hobby_name": ("hobby", {"name": "ParentHobby"}, "ParentHobby"),
+    "inventory_item_name": ("inventory_item", {"name": "ParentItem"}, "ParentItem"),
 }
 
 # Keys that move on their own and would register as a diff every run.
