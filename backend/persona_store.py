@@ -41,6 +41,60 @@ def _assign_ids(file_type: str, data: dict) -> dict:
     return data
 
 
+def _name_keys() -> frozenset:
+    """Stored keys that NAME a row, collected from every shipped manifest.
+
+    Derived rather than listed: `role: "title"` is already the manifest's answer
+    to "which field names this row", and a hardcoded set would go stale the next
+    time a pack lands. Not taken from the derived contract's `identifier`, which
+    reports an input spelling where a field has one -- `domain_reference`
+    identifies as `ref_name` and stores `name`.
+    """
+    keys = set()
+
+    def walk(nodes):
+        for node in nodes:
+            for f in (node.get("element") or {}).get("fields") or []:
+                if f.get("role") == "title":
+                    keys.add(f["name"])
+                # A `list`/`strings` FIELD carries an `element` of the same
+                # shape as a node's, so a nested row's title comes out of the
+                # same branch rather than a second one.
+                if f.get("element"):
+                    walk([f])
+            walk(node.get("sections") or [])
+
+    for meta in sections.PACK_META.values():
+        walk(meta["sections"])
+    return frozenset(keys)
+
+
+NAME_KEYS = _name_keys()
+
+
+def _trim_names(value) -> None:
+    """Strip whitespace around every row name in the blob, in place, at any depth.
+
+    A name is an identifier: server.find_in_array matches on it, so a stored
+    "iPhone " is a row no client can address by the name its user sees. Done
+    here because save() is the only write both the editor and the MCP branches
+    reach -- trimming in either one alone would leave the other able to store an
+    unaddressable row.
+
+    Only names. Whitespace inside a notes field can be deliberate, and nothing
+    looks a row up by its notes.
+    """
+    if isinstance(value, dict):
+        for key, inner in value.items():
+            if key in NAME_KEYS and isinstance(inner, str):
+                value[key] = inner.strip()
+            else:
+                _trim_names(inner)
+    elif isinstance(value, list):
+        for inner in value:
+            _trim_names(inner)
+
+
 def _normalize(file_type: str, data: dict) -> dict:
     """Legacy-format migration, ported verbatim from main.py's read_json_file.
 
@@ -538,6 +592,7 @@ def save(file_type: str, data: dict) -> bool:
     row: this is the only point in the system holding what the persona said and
     what it is about to say at the same time.
     """
+    _trim_names(data)
     _assign_ids(file_type, data)
     user_id = db.current_user_id.get()
     with db.get_pool().connection() as conn:
