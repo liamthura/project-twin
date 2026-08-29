@@ -600,3 +600,43 @@ def test_response_format_entity_adds_and_removes(as_user):
         "remove", "response_format", {"item": "CODE BLOCKS OVER THREE LINES"}
     ).startswith("✅")
     assert store.load("preferences")["response_format"] == []
+
+
+def test_a_row_name_is_trimmed_on_the_way_in(as_user):
+    """A name is an identifier -- server.find_in_array matches on it -- so a
+    stored "iPhone " is a row nothing can address by the name its user sees."""
+    store.save("inventory", {"items": [{"name": "  iPhone  ", "category": "phone"}]})
+    assert store.load("inventory")["items"][0]["name"] == "iPhone"
+
+
+def test_trimming_reaches_a_nested_row(as_user):
+    """The walk is depth-first over the whole blob rather than over id_lists,
+    which are top-level only. A spec is addressed by name like any other row."""
+    store.save("inventory", {"items": [
+        {"name": "VPS", "specs": [{"name": " provider ", "value": " Hetzner "}]}]})
+    spec = store.load("inventory")["items"][0]["specs"][0]
+    assert spec["name"] == "provider"
+    # Only names. A value is not looked up by, and its whitespace is the
+    # user's business.
+    assert spec["value"] == " Hetzner "
+
+
+def test_notes_keep_their_whitespace(as_user):
+    """The narrow rule stated as a test: trimming every string would quietly
+    rewrite prose, and nothing finds a row by its notes."""
+    store.save("inventory", {"items": [{"name": "VPS", "notes": "  runs Coolify\n"}]})
+    assert store.load("inventory")["items"][0]["notes"] == "  runs Coolify\n"
+
+
+def test_an_untrimmed_row_can_still_be_addressed(as_user):
+    """Rows written before the trim existed. Matching strips both sides, so the
+    row is reachable -- and the write that reaches it trims it for good."""
+    import server
+    import settings_store
+    settings_store.set_enabled_optins(["inventory"])   # ships default-off
+    store.save("inventory", {"items": [{"name": "iPhone ", "category": "phone"}]})
+    assert server.execute_modify(
+        "update", "inventory_item", {"name": "iPhone", "status": "spare"}
+    ).startswith("✅")
+    item = store.load("inventory")["items"][0]
+    assert item["name"] == "iPhone" and item["status"] == "spare"

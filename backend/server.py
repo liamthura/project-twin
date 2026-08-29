@@ -260,7 +260,12 @@ def find_in_array(array: list, identifier: str, id_field: str = "name") -> tuple
     not-found error. That is the honest answer: no row has a list for a name.
     """
     def _key(value):
-        return value.lower() if isinstance(value, str) else None
+        # Stripped as well as lowered: persona_store trims a row's name on the
+        # way in, but a row stored before that did is still out there, and a
+        # client is free to send a name with a space on either end. Matching is
+        # the half that has to tolerate it -- an unaddressable row cannot even
+        # be renamed.
+        return value.strip().lower() if isinstance(value, str) else None
 
     target = _key(identifier)
     if target is None:
