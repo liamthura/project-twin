@@ -2434,6 +2434,159 @@
     ]
   },
   {
+    "key": "inventory",
+    "title": "Inventory",
+    "description": "Hardware and services you own: what it is, what state it's in, and its details",
+    "core": false,
+    "default_enabled": false,
+    "enabled": true,
+    "entities": {
+      "inventory_item": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "required": [
+          "name"
+        ],
+        "optional": [
+          "notes",
+          "specs",
+          "category",
+          "status",
+          "custom_category"
+        ],
+        "identifier": "name",
+        "valid_values": {
+          "category": [
+            "computer",
+            "phone",
+            "server",
+            "network",
+            "peripheral",
+            "audio",
+            "camera",
+            "storage",
+            "other"
+          ],
+          "status": [
+            "in_use",
+            "spare",
+            "retired"
+          ]
+        }
+      },
+      "inventory_spec": {
+        "actions": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "required": [
+          "inventory_item_name",
+          "spec_name",
+          "value"
+        ],
+        "optional": [],
+        "identifier": "spec_name",
+        "parent": "inventory_item_name"
+      }
+    },
+    "sections": [
+      {
+        "kind": "list",
+        "path": [
+          "items"
+        ],
+        "search": true,
+        "facets": [
+          "category",
+          "status"
+        ],
+        "element": {
+          "entity": "inventory_item",
+          "identifier": "name",
+          "fields": [
+            {
+              "name": "name",
+              "required": true,
+              "role": "title",
+              "placeholder": "MacBook Pro 14"
+            },
+            {
+              "name": "notes",
+              "type": "longtext",
+              "placeholder": "What you use it for, quirks, anything worth knowing..."
+            },
+            {
+              "name": "specs",
+              "type": "list",
+              "label": "Details",
+              "show": [
+                "count"
+              ],
+              "element": {
+                "entity": "inventory_spec",
+                "identifier": "name",
+                "parent": "inventory_item_name",
+                "fields": [
+                  {
+                    "name": "name",
+                    "required": true,
+                    "role": "title",
+                    "placeholder": "provider",
+                    "alias": [
+                      "spec_name"
+                    ]
+                  },
+                  {
+                    "name": "value",
+                    "required": true,
+                    "placeholder": "Hetzner"
+                  }
+                ]
+              },
+              "$comment": "The custom-field list. A laptop and a VPS share almost no metadata, so the per-item detail is name/value rows rather than fixed fields -- promoting one to a real field costs context tokens for every user on every read. Same nested-list shape as the `references` blocks in knowledge, projects, lifestyle and aesthetics, with `value` where those have `url`/`notes`, and `name` aliased so a client says `spec_name` rather than colliding with the item's own `name`."
+            },
+            {
+              "name": "category",
+              "type": "enum",
+              "values": [
+                "computer",
+                "phone",
+                "server",
+                "network",
+                "peripheral",
+                "audio",
+                "camera",
+                "storage",
+                "other"
+              ],
+              "allow_custom": true,
+              "show": [
+                "badge"
+              ]
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "values": [
+                "in_use",
+                "spare",
+                "retired"
+              ],
+              "show": [
+                "badge"
+              ]
+            }
+          ]
+        },
+        "$comment": "One flat list. Grouping devices, services and homelab into separate nodes was considered and dropped: the categories blur (a homelab box is a computer and a server) and the long tail lands nowhere. `category` as a facet does the same job with one field. No purchase price, serial, warranty or acquired date -- this section is what the user has, for an agent that needs to know their kit, not an asset register; any of those goes in `specs` if a user wants it."
+      }
+    ]
+  },
+  {
     "key": "circle",
     "title": "Circle",
     "description": "People and relationships",
