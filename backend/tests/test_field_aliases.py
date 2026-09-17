@@ -47,19 +47,12 @@ LEGACY_SECTIONS = {
     "current_learning": "goals",
 }
 
-# Aliases that do NOT work today, and why, so the list is a statement rather
-# than a silence. All four *_reference entities normalise their identifier
-# through their PARENT's alias list (server._name_aliases_for), which sets
-# `name` from the parent selector before the branch reads it -- so a reference
-# sent as `{"domain_name": "Rust", "title": "The Book"}` is stored with the
-# name "Rust". strict=True: when the write path stops doing this, these fail
-# and the list shrinks.
-SHADOWED_BY_THE_PARENT_SELECTOR = {
-    ("domain_reference", "title"), ("domain_reference", "reference_name"),
-    ("hobby_reference", "title"), ("hobby_reference", "reference_name"),
-    ("project_reference", "title"), ("project_reference", "reference_name"),
-    ("mental_tab_reference", "reference"), ("mental_tab_reference", "reference_name"),
-}
+# Nothing here is expected to fail. There was a list: the four *_reference
+# entities used to normalise their identifier through their PARENT's alias
+# list, so `{"domain_name": "Rust", "title": "The Book"}` stored a reference
+# called "Rust". `_name_aliases_for` reads each entity's own entry now and bars
+# the parent's spellings, and the eight cases that documented the bug are
+# ordinary passing cases. See test_section_bindings for the rule itself.
 
 
 def _section_of(entity):
@@ -94,10 +87,7 @@ def _write(entity, desc, payload, section, action):
 
 
 @pytest.mark.parametrize("entity,field,alias", CASES, ids=lambda v: v)
-def test_an_alias_writes_what_the_field_name_writes(entity, field, alias, clean_database,
-                                                    request):
-    if (entity, alias) in SHADOWED_BY_THE_PARENT_SELECTOR:
-        request.node.add_marker(pytest.mark.xfail(strict=True, reason="shadowed"))
+def test_an_alias_writes_what_the_field_name_writes(entity, field, alias, clean_database):
     section = _section_of(entity)
     assert section, f"{entity} is not in the vocabulary"
     desc = DESCRIPTORS.get(entity)

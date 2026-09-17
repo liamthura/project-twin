@@ -714,26 +714,18 @@ FIELD_ALIASES = {
     # The four *_reference entities. Every one of them accepts four spellings
     # for its identifier and persists exactly one -- `name` -- so `ref_name`,
     # the spelling all four manifests declare as `identifier`, is an INPUT
-    # ALIAS and nothing else. Recorded here transcribed from each branch's own
-    # get_field call, in that call's order:
-    #   hobby_reference       server.py:2097 -> writes {"name": ...} at :2102
-    #   project_reference     server.py:2328 -> writes {"name": ...} at :2333
-    #   domain_reference      server.py:2441 -> writes {"name": ...} at :2446
-    #   mental_tab_reference  server.py:2481 -> writes {"name": ...} at :2486
-    # (mental_tab_reference's fourth spelling is "reference", not "title" --
-    # transcribed, not assumed symmetric.)
+    # ALIAS and nothing else. (mental_tab_reference's fourth spelling is
+    # "reference", not "title" -- transcribed from its old branch, not assumed
+    # symmetric.)
     #
-    # These four entries are INERT for normalize_data, which is the table's
-    # only runtime consumer. Every branch below looks the table up by a
-    # HARDCODED literal key, never by the entity being normalised, and all
-    # four reference entities are routed to their PARENT's alias list --
-    # hobby_reference to "hobby" (:1149), project_reference to "project"
-    # (:1151), mental_tab_reference to "mental_tab" (:1169), domain_reference
-    # to "domain" (:1173). So no lookup anywhere can reach a key added here.
-    # Asserted executably, by deleting each entry and diffing normalize_data's
-    # output, in tests/test_section_bindings.py.
+    # These four were INERT until the write path was made declarative, and the
+    # reason they were is the bug that fixing them fixed: `normalize_data`
+    # routed each reference entity to its PARENT's alias list, so a reference
+    # sent as {"domain_name": "Rust", "title": "The Book"} was stored with the
+    # name "Rust". `_name_aliases_for` reads these entries now, minus whichever
+    # spelling selects the parent.
     #
-    # They exist so that tests/test_section_bindings.py's alias guard -- which is
+    # They also exist so that tests/test_section_bindings.py's alias guard --
     # inert for any entity this table does not name -- can see them. Without
     # them a `ui` child node binding `ref_name` fails NOTHING on the backend:
     # `ref_name` sits in each entity's `required`, so the spelling check waves
@@ -811,10 +803,31 @@ def _identifier_aliases(entity: str) -> set:
 
 
 def _name_aliases_for(entity: str) -> list:
-    """The alias list normalize_data resolves an entity's identifier from."""
-    if entity in ["hobby", "hobby_reference", "hobby_specific"]:
+    """The alias list normalize_data resolves an entity's identifier from.
+
+    A CHILD is never resolved from its parent's list. It used to be: all four
+    `*_reference` entities read their parent's, so `{"domain_name": "Rust",
+    "title": "The Book"}` set `name` from `domain_name` and stored a reference
+    called "Rust" -- the parent's name, silently, on a spelling the manifest
+    advertises. Each of the four has had its own entry in FIELD_ALIASES all
+    along; they are what is read now.
+
+    `_without_parent_spellings` then holds the rule generally, for the two
+    bare-string children (hobby_specific, project_tag) and for any nested
+    element a future pack declares: whatever list an entity resolves its own
+    name from, the parameter that selects its parent is not in it.
+    """
+    if entity == "hobby_reference":
+        name_aliases = FIELD_ALIASES["hobby_reference"]
+    elif entity == "project_reference":
+        name_aliases = FIELD_ALIASES["project_reference"]
+    elif entity == "mental_tab_reference":
+        name_aliases = FIELD_ALIASES["mental_tab_reference"]
+    elif entity == "domain_reference":
+        name_aliases = FIELD_ALIASES["domain_reference"]
+    elif entity in ["hobby", "hobby_specific"]:
         name_aliases = FIELD_ALIASES.get("hobby", FIELD_ALIASES["name"])
-    elif entity in ["project", "project_tag", "project_reference"]:
+    elif entity in ["project", "project_tag"]:
         name_aliases = FIELD_ALIASES.get("project", FIELD_ALIASES["name"])
     elif entity == "email":
         name_aliases = FIELD_ALIASES.get("email", ["address"])
@@ -830,11 +843,9 @@ def _name_aliases_for(entity: str) -> list:
         name_aliases = FIELD_ALIASES.get("trait", ["trait"])
     elif entity == "passion":
         name_aliases = FIELD_ALIASES.get("passion", FIELD_ALIASES["name"])
-    elif entity in ["mental_tab", "mental_tab_reference"]:
+    elif entity == "mental_tab":
         name_aliases = FIELD_ALIASES.get("mental_tab", FIELD_ALIASES["name"])
     elif entity == "domain" or entity == "knowledge":
-        name_aliases = FIELD_ALIASES.get("domain", FIELD_ALIASES["name"])
-    elif entity == "domain_reference":
         name_aliases = FIELD_ALIASES.get("domain", FIELD_ALIASES["name"])
     elif entity == "current_learning":
         name_aliases = FIELD_ALIASES.get("learning_item", ["topic"])
@@ -854,7 +865,25 @@ def _name_aliases_for(entity: str) -> list:
     else:
         name_aliases = FIELD_ALIASES["name"]
 
-    return name_aliases
+    return _without_parent_spellings(entity, name_aliases)
+
+
+def _without_parent_spellings(entity: str, aliases: list) -> list:
+    """`aliases` minus anything that names the row this entity sits under.
+
+    A parent selector locates a row; it is never the child's own name. Reading
+    one as a name is not a harmless mix-up -- it stores the parent's name on
+    the child, which is a plausible-looking row nobody can tell is wrong.
+
+    Derived from the pack rather than listed here, so a nested element a future
+    manifest declares is covered the day it ships.
+    """
+    resolved = _target_for(entity)
+    if resolved is None or not resolved[1]["parent"]:
+        return aliases
+    parent = resolved[1]["parent"]
+    barred = {parent["param"], parent["identifier"]}
+    return [a for a in aliases if a not in barred]
 
 
 def normalize_data(data: dict, entity: str) -> dict:
@@ -1490,10 +1519,11 @@ _STAMPS = {
 # adding one here would be a change dressed up as a move. mental_tab's
 # `created_at` is not missing from this table -- its pack declares
 # `default: "@now"`, which _seed resolves, so the format already says it.
-# Not here, deliberately: inventory's `added_date`. It is declared `ui_only`
-# like the five above, but no MCP write has ever set it -- inventory arrived
-# after the declarative path and the editor is its only writer. Stamping it
-# here would be a fix, not a move, so it stays a separate decision.
+#
+# Inventory has no entry because inventory has no date: its manifest says so in
+# as many words ("No purchase price, serial, warranty or acquired date -- this
+# section is what the user has ... not an asset register"). A stamp here would
+# invent a field nothing declares, renders or reads.
 
 
 def _target_for(entity: str):

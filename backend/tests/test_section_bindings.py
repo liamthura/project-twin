@@ -326,7 +326,7 @@ def test_every_shipped_element_is_reachable_by_the_guard(key):
     assert len(visited) == expected, f"{key}: visited {visited}"
 
 
-# --- FIELD_ALIASES' four inert entries ------------------------------------
+# --- FIELD_ALIASES' four reference entries, which are read ----------------
 
 REFERENCE_ENTITIES = [
     "hobby_reference", "project_reference", "domain_reference",
@@ -335,48 +335,41 @@ REFERENCE_ENTITIES = [
 
 
 @pytest.mark.parametrize("entity", REFERENCE_ENTITIES)
-def test_reference_entities_are_inert_in_field_aliases(entity):
-    """`FIELD_ALIASES` is not only a guard input -- `normalize_data` consumes it
-    on the live MCP write path -- so adding an entity to it must be proved to
-    change nothing there, not assumed to.
+def test_a_reference_resolves_its_name_from_its_own_entry(entity):
+    """These four entries were inert for a long time, and the bug was the
+    reason: `normalize_data` routed every reference entity to its PARENT's
+    alias list, so `{"domain_name": "Rust", "title": "The Book"}` set `name`
+    from `domain_name` and stored a reference called "Rust". The parent's
+    name, on the child, silently, under a spelling the manifest advertises.
 
-    It is inert because every branch of `normalize_data` looks the table up by
-    a HARDCODED literal key rather than by the entity being normalised, and all
-    four reference entities are routed to their PARENT's list (server.py:1149,
-    :1151, :1169, :1173). Proved by deletion rather than by reading: with the
-    entry removed, `normalize_data` must produce byte-identical output for
-    every payload shape below -- including one carrying each of the four
-    spellings the entity's own get_field accepts, which is exactly what a
-    lookup-by-entity-name would react to.
+    Each entity reads its own entry now, and the parent selector is barred
+    from the list `_name_aliases_for` returns -- both spellings of it, because
+    `_parent_row` accepts the parent's MCP parameter and its stored identifier
+    alike, and neither can also mean "this child's name".
+
+    Proved by deletion, the way the inertness claim it replaces was: pull the
+    entry and the lookup fails, so the table is read rather than decorative.
     """
     import server
 
-    payloads = [
-        {},
-        {"name": "N"},
-        {"ref_name": "R"},
-        {"reference_name": "R"},
-        {"title": "T"},
-        {"reference": "R"},
-        {"ref_name": "R", "name": "N"},
-        {"url": "u", "notes": "n"},
-        # The parent selectors, which normalize_data DOES react to today (it
-        # routes these entities to the parent's alias list, so e.g. a bare
-        # `domain_name` becomes `name`). Included so the comparison would
-        # catch a change to that existing behaviour too, not just the absence
-        # of a new one.
-        {"hobby_name": "H"},
-        {"project_name": "P"},
-        {"domain_name": "D"},
-        {"topic": "T"},
-    ]
-    assert entity in server.FIELD_ALIASES, "this guard is about the entry being present"
+    parent = server._target_for(entity)[1]["parent"]
+    selector = parent["param"]
 
-    with_entry = [server.normalize_data(dict(p), entity) for p in payloads]
+    for spelling in server.FIELD_ALIASES[entity]:
+        if spelling == "name":
+            continue  # the target key, not a source for it
+        got = server.normalize_data({selector: "Parent Row", spelling: "Mine"}, entity)
+        assert got["name"] == "Mine", f"{spelling} did not reach `name`"
+
+    only_parent = server.normalize_data({selector: "Parent Row"}, entity)
+    assert "name" not in only_parent, (
+        f"{selector} selects the parent and was read as the child's name"
+    )
+
     with patch.dict(server.FIELD_ALIASES):
         del server.FIELD_ALIASES[entity]
-        without_entry = [server.normalize_data(dict(p), entity) for p in payloads]
-    assert with_entry == without_entry
+        with pytest.raises(KeyError):
+            server.normalize_data({"ref_name": "Mine"}, entity)
 
 
 @pytest.mark.parametrize("entity", REFERENCE_ENTITIES)

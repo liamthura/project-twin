@@ -1253,20 +1253,14 @@
     "notes": "notes one",
     "url": "url one"
    },
-   "message": "✅ Added domain reference 'Parent Row' to Parent Row",
+   "message": "❌ Domain reference requires 'ref_name'",
    "step": "add without required fields",
    "stored": {
     "domains": [
      {
       "id": "<volatile>",
       "name": "Parent Row",
-      "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       }
-      ]
+      "references": []
      }
     ],
     "mental_tabs": []
@@ -1288,11 +1282,6 @@
       "id": "<volatile>",
       "name": "Parent Row",
       "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       },
        {
         "name": "domain_reference one",
         "notes": "notes one",
@@ -1321,11 +1310,6 @@
       "name": "Parent Row",
       "references": [
        {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       },
-       {
         "name": "domain_reference one",
         "notes": "notes one",
         "url": "url one"
@@ -1353,11 +1337,6 @@
       "name": "Parent Row",
       "references": [
        {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       },
-       {
         "name": "domain_reference one",
         "notes": "notes two",
         "url": "url two"
@@ -1383,13 +1362,7 @@
      {
       "id": "<volatile>",
       "name": "Parent Row",
-      "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       }
-      ]
+      "references": []
      }
     ],
     "mental_tabs": []
@@ -1410,13 +1383,7 @@
      {
       "id": "<volatile>",
       "name": "Parent Row",
-      "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       }
-      ]
+      "references": []
      }
     ],
     "mental_tabs": []
@@ -2538,21 +2505,13 @@
     "notes": "notes one",
     "url": "url one"
    },
-   "message": "✅ Added hobby reference 'Parent Row' to Parent Row",
+   "message": "❌ Hobby reference requires 'ref_name'",
    "step": "add without required fields",
    "stored": {
     "hobbies": [
      {
       "id": "<volatile>",
-      "last_updated": "<volatile>",
-      "name": "Parent Row",
-      "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       }
-      ]
+      "name": "Parent Row"
      }
     ],
     "interests": [],
@@ -2591,11 +2550,6 @@
       "last_updated": "<volatile>",
       "name": "Parent Row",
       "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       },
        {
         "name": "hobby_reference one",
         "notes": "notes one",
@@ -2641,11 +2595,6 @@
       "name": "Parent Row",
       "references": [
        {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       },
-       {
         "name": "hobby_reference one",
         "notes": "notes one",
         "url": "url one"
@@ -2690,11 +2639,6 @@
       "name": "Parent Row",
       "references": [
        {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       },
-       {
         "name": "hobby_reference one",
         "notes": "notes two",
         "url": "url two"
@@ -2737,13 +2681,7 @@
       "id": "<volatile>",
       "last_updated": "<volatile>",
       "name": "Parent Row",
-      "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       }
-      ]
+      "references": []
      }
     ],
     "interests": [],
@@ -2781,13 +2719,7 @@
       "id": "<volatile>",
       "last_updated": "<volatile>",
       "name": "Parent Row",
-      "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       }
-      ]
+      "references": []
      }
     ],
     "interests": [],
@@ -4725,20 +4657,14 @@
     "title": "Parent Row",
     "url": "url one"
    },
-   "message": "✅ Added mental tab reference 'Parent Row' to Parent Row",
+   "message": "❌ Mental tab reference requires 'ref_name'",
    "step": "add without required fields",
    "stored": {
     "domains": [],
     "mental_tabs": [
      {
       "id": "<volatile>",
-      "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       }
-      ],
+      "references": [],
       "title": "Parent Row"
      }
     ]
@@ -4760,11 +4686,6 @@
      {
       "id": "<volatile>",
       "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       },
        {
         "name": "mental_tab_reference one",
         "notes": "notes one",
@@ -4793,11 +4714,6 @@
       "id": "<volatile>",
       "references": [
        {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       },
-       {
         "name": "mental_tab_reference one",
         "notes": "notes one",
         "url": "url one"
@@ -4825,11 +4741,6 @@
       "id": "<volatile>",
       "references": [
        {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       },
-       {
         "name": "mental_tab_reference one",
         "notes": "notes two",
         "url": "url two"
@@ -4855,13 +4766,7 @@
     "mental_tabs": [
      {
       "id": "<volatile>",
-      "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       }
-      ],
+      "references": [],
       "title": "Parent Row"
      }
     ]
@@ -4882,13 +4787,7 @@
     "mental_tabs": [
      {
       "id": "<volatile>",
-      "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       }
-      ],
+      "references": [],
       "title": "Parent Row"
      }
     ]
@@ -5752,23 +5651,16 @@
     "project_name": "Parent Row",
     "url": "url one"
    },
-   "message": "✅ Added project reference 'Parent Row' to Parent Row",
+   "message": "❌ Project reference requires 'ref_name'",
    "step": "add without required fields",
    "stored": {
     "projects": [
      {
       "highlights": [],
       "id": "<volatile>",
-      "last_updated": "<volatile>",
       "name": "Parent Row",
       "notes": "",
-      "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       }
-      ],
+      "references": [],
       "tags": []
      }
     ],
@@ -5794,11 +5686,6 @@
       "name": "Parent Row",
       "notes": "",
       "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       },
        {
         "name": "project_reference one",
         "notes": "notes one",
@@ -5831,11 +5718,6 @@
       "notes": "",
       "references": [
        {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       },
-       {
         "name": "project_reference one",
         "notes": "notes one",
         "url": "url one"
@@ -5867,11 +5749,6 @@
       "notes": "",
       "references": [
        {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       },
-       {
         "name": "project_reference one",
         "notes": "notes two",
         "url": "url two"
@@ -5901,13 +5778,7 @@
       "last_updated": "<volatile>",
       "name": "Parent Row",
       "notes": "",
-      "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       }
-      ],
+      "references": [],
       "tags": []
      }
     ],
@@ -5932,13 +5803,7 @@
       "last_updated": "<volatile>",
       "name": "Parent Row",
       "notes": "",
-      "references": [
-       {
-        "name": "Parent Row",
-        "notes": "notes one",
-        "url": "url one"
-       }
-      ],
+      "references": [],
       "tags": []
      }
     ],
