@@ -1084,7 +1084,7 @@ def _written_entity_id() -> Optional[str]:
 
     Read from db.last_write, which persona_store.save() fills by diffing the
     section before and after -- so this works for every entity in every section
-    without execute_modify's thirty branches having to return anything new.
+    without the write path having to return anything new.
 
     Only ever one id: an approve or a promote performs a single add. Anything
     else means the diff saw something this cannot attribute, and None is the

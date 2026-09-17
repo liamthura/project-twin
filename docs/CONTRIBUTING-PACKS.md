@@ -348,20 +348,21 @@ it; a new pack normally declares nothing, and its form and its contract agree.
 
 ### Nested arrays, and `parent`
 
-**A nested element is the one thing a pack cannot add on its own.**
-`server._generic_entity_spec` (server.py:996) returns `None` for any entity
-carrying a `parent`, so the generic write branch never claims one and
-`execute_modify` falls through to `❌ Unknown entity type`. Every nested entity
-in the shipped packs has a hand-written `elif` branch, and a new one needs the
-same. `tests/test_stored_key_audit.py` catches its absence, and its parent
-identifier also needs an `ALLOWED_UNSTORED` entry there, since a parent selector
-locates a row rather than being stored on it.
+**A nested element needs no code.** `pack_loader.derive_write_targets` records
+where its rows live -- the parent's list, the parent's identifier, the key on
+the parent row holding the array -- and `server.write_entity` reads that, so
+`add`, `update` and `remove` work on a child row the moment the manifest
+declares one. This was not true before: the write path refused any entity
+carrying a `parent`, and every nested entity in the shipped packs had a
+hand-written branch instead.
 
-The declarative guarantee therefore covers **top-level list entities**. A
-contributed pack that wants per-row writes on a nested array is asking for a
-renderer-kit change, not a pack change. Without one the array still renders and
-still reads, and a client can write it whole through the parent row's `update`,
-which is enough for most of them.
+Its parent identifier still needs an `ALLOWED_UNSTORED` entry in
+`tests/test_stored_key_audit.py`, since a parent selector locates a row rather
+than being stored on it.
+
+The declarative guarantee therefore covers **top-level and nested list
+entities**, and arrays of bare strings in both positions (`bulk` lets a client
+send the array's own name to add several at once).
 
 Two more traps a nested element walks into, both from tables in `server.py` that
 predate the format:
