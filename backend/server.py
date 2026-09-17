@@ -2,41 +2,26 @@
 """
 MyGist MCP Server - FastMCP Edition
 
-Your portable personal context for AI.
-Migrated to FastMCP for HTTP transport with Bearer token authentication.
+Your portable personal context for AI. Defines the tools; main.py mounts them
+at /mcp behind its own auth middleware, which is what serves them in
+production. `python server.py` runs the same tools over stdio for local
+debugging.
 
-Usage:
-    # Development (stdio)
-    python server.py
-    
-    # Production (HTTP with SSE)
-    uvicorn server:app --host 0.0.0.0 --port 1120
-
-Environment Variables:
-    MYGIST_API_TOKEN: Bearer token for authentication (required in production)
-    PERSONA_DATA_DIR: Path to persona data directory (default: ../mygist_data)
+Persona data lives in Postgres, scoped to the current request's user by
+persona_store -- there is no data directory and no server-owned token. The
+credential is the one main.py's middleware already resolved.
 """
 
 import json
 import os
 import sys
-import re
-import secrets
 import logging
-# import zipfile
-# import io
-# import shutil
-from pathlib import Path
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional, Literal, Union, List
 import uuid
 
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_request
-# from starlette.middleware.base import BaseHTTPMiddleware
-# from starlette.requests import Request
-# from starlette.responses import JSONResponse, Response
-# from starlette.routing import Route
 from dotenv import load_dotenv
 
 import db
@@ -69,67 +54,6 @@ logger = logging.getLogger(__name__)
 # load_json / save_json below are thin delegators onto it.
 
 
-
-# =============================================================================
-# BEARER TOKEN AUTHENTICATION MIDDLEWARE
-# =============================================================================
-# TODO: commented out here
-# class BearerAuthMiddleware(BaseHTTPMiddleware):
-#     """
-#     Middleware that validates Bearer token on all requests.
-#     Skips authentication for health check endpoints.
-#     """
-    
-#     SKIP_AUTH_PATHS = frozenset({"/", "/health", "/healthz"})
-    
-#     def __init__(self, app, token: str | None = None):
-#         super().__init__(app)
-#         self.token = token
-#         self._auth_enabled = bool(token)
-        
-#         if not self._auth_enabled:
-#             logger.warning(
-#                 "⚠️  MYGIST_API_TOKEN not set - authentication disabled! "
-#                 "Set this env var in production."
-#             )
-    
-#     async def dispatch(self, request: Request, call_next) -> Response:
-#         # Skip auth for health endpoints
-#         if request.url.path in self.SKIP_AUTH_PATHS:
-#             return await call_next(request)
-        
-#         # Skip auth if no token configured (dev mode)
-#         if not self._auth_enabled:
-#             return await call_next(request)
-        
-#         # Extract and validate Authorization header
-#         auth_header = request.headers.get("Authorization", "")
-        
-#         if not auth_header:
-#             logger.warning(f"Missing Authorization header from {request.client.host}")
-#             return JSONResponse(
-#                 status_code=401,
-#                 content={"error": "Unauthorized", "message": "Missing Authorization header"}
-#             )
-        
-#         parts = auth_header.split(" ", 1)
-#         if len(parts) != 2 or parts[0].lower() != "bearer":
-#             return JSONResponse(
-#                 status_code=401,
-#                 content={"error": "Unauthorized", "message": "Invalid Authorization header format. Use: Bearer <token>"}
-#             )
-        
-#         # Timing-safe comparison
-#         if not secrets.compare_digest(parts[1], self.token):
-#             logger.warning(f"Invalid token from {request.client.host}")
-#             return JSONResponse(
-#                 status_code=401,
-#                 content={"error": "Unauthorized", "message": "Invalid bearer token"}
-#             )
-        
-#         return await call_next(request)
-
-
 # =============================================================================
 # CORE DATA FUNCTIONS
 # =============================================================================
@@ -144,53 +68,6 @@ def load_json(filename: str) -> dict:
 def save_json(filename: str, data: dict) -> bool:
     file_type = filename[:-5] if filename.endswith(".json") else filename
     return persona_store.save(file_type, data)
-
-def get_nested_value(data: dict, path: str):
-    """Get a value from nested dict using dot notation path"""
-    keys = path.split(".")
-    current = data
-    for key in keys:
-        if isinstance(current, dict):
-            current = current.get(key)
-        elif isinstance(current, list):
-            found = next((item for item in current if isinstance(item, dict) and item.get("name", "").lower() == key.lower()), None)
-            if found:
-                current = found
-            else:
-                try:
-                    current = current[int(key)]
-                except (ValueError, IndexError):
-                    return None
-        else:
-            return None
-        if current is None:
-            return None
-    return current
-
-def set_nested_value(data: dict, path: str, value, create_missing: bool = True):
-    """Set a value in nested dict using dot notation path"""
-    keys = path.split(".")
-    current = data
-    
-    for i, key in enumerate(keys[:-1]):
-        if isinstance(current, dict):
-            if key not in current and create_missing:
-                current[key] = {}
-            current = current.get(key)
-        elif isinstance(current, list):
-            found = next((item for item in current if isinstance(item, dict) and item.get("name", "").lower() == key.lower()), None)
-            if found:
-                current = found
-            else:
-                return False
-        if current is None:
-            return False
-    
-    final_key = keys[-1]
-    if isinstance(current, dict):
-        current[final_key] = value
-        return True
-    return False
 
 def _as_list(value) -> list:
     """Coerce an MCP-supplied value to a list without raising.
@@ -4040,165 +3917,9 @@ def propose_update(proposals: list, client: str) -> str:
     return json.dumps({"results": results}, ensure_ascii=False)
 
 
-# # =============================================================================
-# # HEALTH CHECK ENDPOINTS & APP SETUP
-# # =============================================================================
-
-# async def health_check(request):
-#     """Health check endpoint for container orchestration."""
-#     return JSONResponse({
-#         "status": "ok",
-#         "service": "mygist",
-#         "data_dir": str(DATA_DIR),
-#         "data_dir_exists": DATA_DIR.exists()
-#     })
-
-# async def root_handler(request):
-#     """Root endpoint with service info."""
-#     return JSONResponse({
-#         "service": "MyGist MCP Server",
-#         "version": "2.0.0",
-#         "description": "Your portable personal context for AI",
-#         "transport": "FastMCP with SSE/Streamable HTTP",
-#         "endpoints": {
-#             "health": "/health",
-#             "mcp": "/mcp"
-#         }
-#     })
-
-
-# async def export_data(request):
-#     """Export all MyGist data as a downloadable zip file."""
-#     if not DATA_DIR.exists():
-#         return JSONResponse({"error": "Data directory not found"}, status_code=404)
-    
-#     # Create zip in memory
-#     zip_buffer = io.BytesIO()
-    
-#     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-#         # Add all JSON files from DATA_DIR
-#         for json_file in DATA_DIR.glob("*.json"):
-#             zf.write(json_file, json_file.name)
-        
-#         # Add metadata
-#         metadata = {
-#             "exported_at": datetime.now().isoformat(),
-#             "version": "2.0.0",
-#             "files": [f.name for f in DATA_DIR.glob("*.json")]
-#         }
-#         zf.writestr("_metadata.json", json.dumps(metadata, indent=2))
-    
-#     zip_buffer.seek(0)
-#     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-#     filename = f"mygist_backup_{timestamp}.zip"
-    
-#     return Response(
-#         content=zip_buffer.getvalue(),
-#         media_type="application/zip",
-#         headers={"Content-Disposition": f"attachment; filename={filename}"}
-#     )
-
-
-# async def import_data(request):
-#     """Import MyGist data from an uploaded zip file."""
-#     content_type = request.headers.get("content-type", "")
-    
-#     if "multipart/form-data" in content_type:
-#         # Handle form upload
-#         form = await request.form()
-#         upload = form.get("file")
-#         if not upload:
-#             return JSONResponse({"error": "No file uploaded"}, status_code=400)
-#         zip_data = await upload.read()
-#     else:
-#         # Handle raw body upload
-#         zip_data = await request.body()
-    
-#     if not zip_data:
-#         return JSONResponse({"error": "No data received"}, status_code=400)
-    
-#     # Validate it's a zip file
-#     try:
-#         zip_buffer = io.BytesIO(zip_data)
-#         with zipfile.ZipFile(zip_buffer, 'r') as zf:
-#             # Security check: only allow .json files
-#             for name in zf.namelist():
-#                 if not name.endswith('.json'):
-#                     continue
-#                 # Prevent path traversal
-#                 if '..' in name or name.startswith('/'):
-#                     return JSONResponse({"error": f"Invalid filename: {name}"}, status_code=400)
-            
-#             # Create backup of current data
-#             backup_dir = DATA_DIR.parent / f"mygist_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-#             if DATA_DIR.exists():
-#                 shutil.copytree(DATA_DIR, backup_dir)
-#                 logger.info(f"Created backup at: {backup_dir}")
-            
-#             # Ensure data dir exists
-#             DATA_DIR.mkdir(parents=True, exist_ok=True)
-            
-#             # Extract only JSON files
-#             imported_files = []
-#             for name in zf.namelist():
-#                 if name.endswith('.json') and not name.startswith('_'):
-#                     zf.extract(name, DATA_DIR)
-#                     imported_files.append(name)
-#                     logger.info(f"Imported: {name}")
-            
-#             return JSONResponse({
-#                 "status": "success",
-#                 "imported_files": imported_files,
-#                 "backup_created": str(backup_dir) if backup_dir.exists() else None
-#             })
-            
-#     except zipfile.BadZipFile:
-#         return JSONResponse({"error": "Invalid zip file"}, status_code=400)
-#     except Exception as e:
-#         logger.error(f"Import failed: {e}")
-#         return JSONResponse({"error": f"Import failed: {str(e)}"}, status_code=500)
-
-
-# def create_app():
-#     """Create the production app with auth middleware."""
-#     # Get the underlying Starlette app from FastMCP
-#     starlette_app = mcp.http_app()
-    
-#     # Add custom routes for health checks and data management
-#     starlette_app.routes.insert(0, Route("/", endpoint=root_handler, methods=["GET"]))
-#     starlette_app.routes.insert(1, Route("/health", endpoint=health_check, methods=["GET"]))
-#     starlette_app.routes.insert(2, Route("/healthz", endpoint=health_check, methods=["GET"]))
-#     starlette_app.routes.insert(3, Route("/export", endpoint=export_data, methods=["GET"]))
-#     starlette_app.routes.insert(4, Route("/import", endpoint=import_data, methods=["POST"]))
-    
-#     # Add Bearer auth middleware
-#     api_token = os.getenv("MYGIST_API_TOKEN")
-#     starlette_app.add_middleware(BearerAuthMiddleware, token=api_token)
-    
-#     logger.info(f"MyGist MCP Server initialized")
-#     logger.info(f"Data directory: {DATA_DIR}")
-#     logger.info(f"Auth enabled: {bool(api_token)}")
-    
-#     return starlette_app
-
-
-# # Create app for uvicorn
-# app = create_app()
-
-
 # =============================================================================
 # MAIN ENTRY POINTS
 # =============================================================================
 
 if __name__ == "__main__":
-    import sys
-    
-    # # Check if running in HTTP mode
-    # if "--http" in sys.argv or os.getenv("MCP_TRANSPORT") == "http":
-    #     import uvicorn
-    #     port = int(os.getenv("PORT", "1120"))
-    #     host = os.getenv("HOST", "0.0.0.0")
-    #     uvicorn.run(app, host=host, port=port)
-    # else:
-    #     # Default: stdio transport for local MCP clients
     mcp.run()
