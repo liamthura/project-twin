@@ -770,6 +770,59 @@ FIELD_ALIASES = {
     "mental_tab_reference": ["ref_name", "name", "reference_name", "reference"],
 }
 
+
+# Every OTHER field's input spellings, per entity -- FIELD_ALIASES above covers
+# identifiers only. Harvested verbatim from the per-entity branches that used
+# to hold them as `get_field(data, "trait", "characteristic", ...)` calls, so
+# an agent that has been sending `employer` for a work highlight or
+# `proficiency` for a domain's level keeps working.
+#
+# `new_<field>` needs no entry: a rename accepts `new_` in front of the stored
+# name, the MCP spelling, or any alias here (see _field_value).
+#
+# tests/test_field_aliases.py asserts every one of these writes exactly what
+# the field's own name writes.
+ENTITY_FIELD_ALIASES = {
+    "career_aspiration": {"aspiration": ['goal', 'title', 'career_goal', 'objective', 'aim']},
+    "club": {"name": ['club', 'society', 'activity']},
+    "connection": {"name": ['person', 'contact', 'connection_name']},
+    "coursework": {"course": ['coursework', 'class', 'topic', 'subject']},
+    "coursework_topic": {"course": ['coursework', 'class', 'topic', 'subject']},
+    "curiosity": {"name": ['passion', 'topic', 'curiosity', 'interest']},
+    "current_learning": {"context": ['why'], "topic": ['name', 'title']},
+    "dislike": {"item": ['name', 'dislike', 'like']},
+    "domain": {"level": ['proficiency', 'skill_level'], "name": ['domain', 'domain_name', 'area', 'topic'], "notes": ['description', 'details']},
+    "domain_reference": {"domain_name": ['domain', 'for_domain', 'parent'], "notes": ['description'], "ref_name": ['name', 'reference_name', 'title'], "url": ['link', 'href']},
+    "email": {"address": ['email', 'email_address'], "purpose": ['type', 'category']},
+    "energy_peak": {"peak": ['energy_peak', 'time', 'when', 'name']},
+    "goal": {"custom_type": ['type_label'], "title": ['name', 'goal'], "type": ['category']},
+    "hobby": {"name": ['hobby', 'hobby_name', 'title', 'activity'], "notes": ['description', 'details'], "skill_level": ['level', 'proficiency'], "status": ['state', 'is_active']},
+    "hobby_reference": {"hobby_name": ['hobby', 'parent', 'for_hobby'], "notes": ['description'], "ref_name": ['name', 'reference_name', 'title'], "url": ['link', 'href']},
+    "hobby_specific": {"hobby_name": ['hobby', 'parent', 'for_hobby'], "specific": ['value', 'item', 'detail']},
+    "inventory_spec": {"inventory_item_name": ['inventory_item', 'item', 'parent'], "name": ['spec_name', 'key', 'field']},
+    "knowledge": {"category": ['type'], "level": ['proficiency', 'skill_level'], "name": ['topic', 'domain', 'subject', 'area'], "notes": ['description', 'details']},
+    "language": {"fluency": ['level', 'proficiency'], "name": ['language', 'language_name', 'lang']},
+    "like": {"item": ['name', 'dislike', 'like']},
+    "link": {"label": ['name', 'title', 'platform'], "url": ['link', 'href', 'website']},
+    "mental_tab": {"context": ['notes', 'description', 'details'], "status": ['state'], "title": ['topic', 'name', 'mental_tab', 'subject']},
+    "mental_tab_reference": {"notes": ['description'], "ref_name": ['name', 'reference_name', 'reference'], "title": ['topic', 'mental_tab', 'for_tab', 'parent'], "url": ['link', 'href']},
+    "mood_override": {"mood": ['feeling', 'state', 'when']},
+    "passion": {"name": ['passion', 'topic', 'curiosity', 'interest']},
+    "personality_trait": {"trait": ['personality_trait', 'characteristic', 'quality', 'name']},
+    "preference": {"category": ['type'], "key": ['setting', 'option', 'preference'], "value": ['setting_value']},
+    "project": {"description": ['desc', 'summary'], "name": ['project', 'project_name', 'title'], "notes": ['details'], "status": ['state', 'progress']},
+    "project_highlight": {"highlight": ['item', 'achievement'], "project_name": ['project', 'for_project', 'parent']},
+    "project_reference": {"notes": ['description'], "project_name": ['project', 'for_project'], "ref_name": ['name', 'reference_name', 'title'], "url": ['link', 'href']},
+    "project_tag": {"project_name": ['project', 'for_project'], "tag": ['label', 'value']},
+    "response_format": {"item": ['format', 'preference', 'value']},
+    "sleep": {"bedtime": ['bed_time', 'sleep_time', 'sleep'], "day_type": ['type', 'day', 'when'], "wakeup": ['wake_up', 'wake_time', 'wake', 'rise']},
+    "stress_trigger": {"trigger": ['stress_trigger', 'item', 'name']},
+    "top_of_mind": {"item": ['topic', 'thought', 'subject', 'name', 'idea']},
+    "value": {"value": ['core_value', 'belief', 'principle', 'name']},
+    "work_highlight": {"company": ['work', 'employer', 'organization'], "highlight": ['item', 'achievement']},
+    "work_skill": {"company": ['work', 'employer', 'organization'], "skill": ['item', 'technology']},
+}
+
 def _identifier_aliases(entity: str) -> set:
     """Every spelling this entity's identifier is accepted under.
 
