@@ -1,151 +1,65 @@
-import * as React from "react"
+// One toast at a time, held in module scope so `toast()` can be called from
+// anywhere -- an event handler, a promise callback, a module with no hook
+// context -- and read back by the single <Toaster />.
+//
+// Module scope is the part that matters and the part that surprises: a toast
+// raised in one test is still standing in the next, because it never belonged
+// to a component and RTL's cleanup cannot reach it. App.test.jsx asserts
+// against that deliberately.
+//
+// Radix owns the timing. Each toast's `duration` prop closes it and calls
+// `onOpenChange(false)`; REMOVE_DELAY is only the grace period that lets the
+// exit animation finish before the element unmounts.
+import { useSyncExternalStore } from "react";
 
-const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 3000
+const REMOVE_DELAY = 3000;
 
-const actionTypes = {
-  ADD_TOAST: "ADD_TOAST",
-  UPDATE_TOAST: "UPDATE_TOAST",
-  DISMISS_TOAST: "DISMISS_TOAST",
-  REMOVE_TOAST: "REMOVE_TOAST",
+let toasts = [];
+let seq = 0;
+const listeners = new Set();
+
+function publish(next) {
+  toasts = next;
+  listeners.forEach((listener) => listener());
 }
 
-let count = 0
-
-function genId() {
-  count = (count + 1) % Number.MAX_SAFE_INTEGER
-  return count.toString()
+function subscribe(listener) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
-const toastTimeouts = new Map()
-
-const addToRemoveQueue = (toastId) => {
-  if (toastTimeouts.has(toastId)) {
-    return
-  }
-
-  const timeout = setTimeout(() => {
-    toastTimeouts.delete(toastId)
-    dispatch({
-      type: actionTypes.REMOVE_TOAST,
-      toastId: toastId,
-    })
-  }, TOAST_REMOVE_DELAY)
-
-  toastTimeouts.set(toastId, timeout)
+// Identity is the subscription: useSyncExternalStore re-renders when this
+// returns a new reference, so it returns the stored array itself.
+function getToasts() {
+  return toasts;
 }
 
-export const reducer = (state, action) => {
-  switch (action.type) {
-    case actionTypes.ADD_TOAST:
-      return {
-        ...state,
-        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
-      }
-
-    case actionTypes.UPDATE_TOAST:
-      return {
-        ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === action.toast.id ? { ...t, ...action.toast } : t
-        ),
-      }
-
-    case actionTypes.DISMISS_TOAST: {
-      const { toastId } = action
-
-      if (toastId) {
-        addToRemoveQueue(toastId)
-      } else {
-        state.toasts.forEach((toast) => {
-          addToRemoveQueue(toast.id)
-        })
-      }
-
-      return {
-        ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === toastId || toastId === undefined
-            ? {
-                ...t,
-                open: false,
-              }
-            : t
-        ),
-      }
-    }
-    case actionTypes.REMOVE_TOAST:
-      if (action.toastId === undefined) {
-        return {
-          ...state,
-          toasts: [],
-        }
-      }
-      return {
-        ...state,
-        toasts: state.toasts.filter((t) => t.id !== action.toastId),
-      }
-  }
+function dismiss(id) {
+  publish(toasts.map((t) => (t.id === id ? { ...t, open: false } : t)));
+  // Filtering by id makes a stale timer harmless: it can only ever match the
+  // toast it was scheduled for, never the one that replaced it.
+  setTimeout(() => publish(toasts.filter((t) => t.id !== id)), REMOVE_DELAY);
 }
 
-const listeners = []
-
-let memoryState = { toasts: [] }
-
-function dispatch(action) {
-  memoryState = reducer(memoryState, action)
-  listeners.forEach((listener) => {
-    listener(memoryState)
-  })
-}
-
-function toast({ ...props }) {
-  const id = genId()
-
-  const update = (props) =>
-    dispatch({
-      type: actionTypes.UPDATE_TOAST,
-      toast: { ...props, id },
-    })
-  const dismiss = () => dispatch({ type: actionTypes.DISMISS_TOAST, toastId: id })
-
-  dispatch({
-    type: actionTypes.ADD_TOAST,
-    toast: {
+// A new toast replaces the standing one rather than queueing behind it: this
+// app raises them for the result of an action the user just took, and the
+// latest result is the one worth reading.
+function toast(props) {
+  const id = String(++seq);
+  publish([
+    {
       ...props,
       id,
       open: true,
       onOpenChange: (open) => {
-        if (!open) dismiss()
+        if (!open) dismiss(id);
       },
     },
-  })
-
-  return {
-    id: id,
-    dismiss,
-    update,
-  }
+  ]);
 }
 
 function useToast() {
-  const [state, setState] = React.useState(memoryState)
-
-  React.useEffect(() => {
-    listeners.push(setState)
-    return () => {
-      const index = listeners.indexOf(setState)
-      if (index > -1) {
-        listeners.splice(index, 1)
-      }
-    }
-  }, [state])
-
-  return {
-    ...state,
-    toast,
-    dismiss: (toastId) => dispatch({ type: actionTypes.DISMISS_TOAST, toastId }),
-  }
+  return { toasts: useSyncExternalStore(subscribe, getToasts, getToasts), toast };
 }
 
-export { useToast, toast }
+export { useToast, toast };
