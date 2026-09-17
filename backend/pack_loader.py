@@ -534,9 +534,9 @@ def derive_entities(manifest: dict) -> dict:
     This is the function that replaces the authored `entities` block. It is the
     whole point of format v2 -- a field's name, type, vocabulary, default and
     requiredness are declared once, and the contract MCP clients see is computed
-    from that rather than maintained beside it. `tests/test_converter.py` asserts
-    per pack that what it computes equals the schema authored today, entity for
-    entity and key for key.
+    from that rather than maintained beside it. `tests/test_entity_schema_frozen.py`
+    asserts per pack that what it computes equals the schema authored before the
+    format changed, entity for entity and key for key.
 
     It stays a pure function of the manifest so that assertion is meaningful: no
     file reads, no imports of sections.py or server.py, nothing cached.
