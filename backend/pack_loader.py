@@ -534,9 +534,9 @@ def derive_entities(manifest: dict) -> dict:
     This is the function that replaces the authored `entities` block. It is the
     whole point of format v2 -- a field's name, type, vocabulary, default and
     requiredness are declared once, and the contract MCP clients see is computed
-    from that rather than maintained beside it. `tests/test_converter.py` asserts
-    per pack that what it computes equals the schema authored today, entity for
-    entity and key for key.
+    from that rather than maintained beside it. `tests/test_entity_schema_frozen.py`
+    asserts per pack that what it computes equals the schema authored before the
+    format changed, entity for entity and key for key.
 
     It stays a pure function of the manifest so that assertion is meaningful: no
     file reads, no imports of sections.py or server.py, nothing cached.
@@ -686,4 +686,143 @@ def derive_entities(manifest: dict) -> dict:
     visit(manifest["sections"], "")
     for name, spec in manifest.get("mcp_entities", {}).items():
         out[name] = {k: v for k, v in spec.items() if k != "$comment"}
+    return out
+
+
+def build_write_targets(packs: dict[str, dict]) -> dict[str, dict]:
+    """{section_key: {entity_name: target}} -- server.WRITE_TARGETS' shape."""
+    return {key: derive_write_targets(m) for key, m in packs.items()}
+
+
+def derive_write_targets(manifest: dict) -> dict:
+    """{entity: target}: where each entity's rows LIVE, and what shape they are.
+
+    `derive_entities` above answers the client's question -- what may I say
+    about this entity. This answers the server's -- which array in the section
+    blob, which key identifies a row, what type each field is, and for a nested
+    element, which row it hangs under. Together they are everything the write
+    path needs, so it needs nothing per entity of its own.
+
+    The same walk, deliberately a separate function: the entity schema is the
+    published MCP contract, frozen by tests/test_entity_schema_frozen.py, and
+    storage coordinates have no business in it.
+
+    A target is:
+
+        kind        "rows" (an array of objects), "strings" (an array of bare
+                    strings) or "singleton" (one object, updated in place)
+        path        keys from the section blob root to that array or object
+        identifier  the STORED key that names a row, or None for a singleton
+                    that has none (basic_info, communication_default)
+        param       what a client calls the identifier, which is not always
+                    the stored key: a domain_reference stores `name` and is
+                    addressed as `ref_name`
+        fields      every writable field with its declared type, vocabulary
+                    and default -- `ui_only` fields excluded, because no
+                    client may set them
+        parent      None, or where the enclosing row is: its path, its stored
+                    identifier, the parameter a client selects it by, and the
+                    key on it holding this entity's array
+        bulk        for a `strings` element that declares it, the array's own
+                    name -- the plural a client may send instead of one value
+
+    Entities declared in `mcp_entities` get no target: they have no element,
+    so there is nothing to derive, and the write path keeps code for them.
+    """
+    out: dict[str, dict] = {}
+
+    def field_spec(field: dict) -> dict:
+        alias = field.get("alias")
+        spec = {
+            "name": field["name"],
+            "param": alias[0] if alias else field["name"],
+            "type": field.get("type", "text"),
+            "required": bool(field.get("required")),
+        }
+        if field.get("ui_only"):
+            spec["ui_only"] = True
+        off = field.get("off_contract", ())
+        if field.get("type") == "enum" and "values" not in off:
+            spec["values"] = list(field["values"])
+            if field.get("allow_custom"):
+                spec["allow_custom"] = True
+        if "default" in field:
+            # `off_contract` is about what the CONTRACT advertises, and a
+            # default hidden from it is still a default the server applies --
+            # lifestyle's status has been landing "active" on every hobby an
+            # agent added without one, while telling no client it would.
+            spec["default"] = field["default"]
+        if field.get("exclusive"):
+            spec["exclusive"] = True
+        return spec
+
+    def emit(entity: str, target: dict, variants=()) -> None:
+        out[entity] = target
+        for variant in variants:
+            out[variant["entity"]] = target
+
+    def element(path: list, el: dict, parent: dict | None, kind: str) -> None:
+        # `ui_only` fields are KEPT here, flagged, where derive_entities drops
+        # them: no client may set one, but a pack can still declare what the
+        # server writes into it (knowledge's `created_at` is `@now`), and the
+        # write path has to see that to honour it.
+        fields = list(el["fields"])
+        by_name = {f["name"]: f for f in el["fields"]}
+        identifier = el.get("identifier")
+        param = identifier
+        if identifier in by_name:
+            alias = by_name[identifier].get("alias")
+            param = alias[0] if alias else identifier
+        emit(el["entity"], {
+            "kind": kind,
+            "path": path,
+            "identifier": identifier,
+            "param": param,
+            "fields": [field_spec(f) for f in fields],
+            "parent": parent,
+            "bulk": None,
+        }, el.get("variants", []))
+
+        # A nested array hangs off THIS row, and its parent selector is this
+        # element's identifier under whichever spelling the child declares.
+        for field in fields:
+            child = field.get("element")
+            if child is None:
+                continue
+            handle = {
+                "path": path,
+                "entity": el["entity"],
+                "identifier": el["identifier"],
+                "param": child.get("parent", el["identifier"]),
+                "child": field["name"],
+            }
+            if field.get("type") == "strings":
+                strings(child, field["name"], handle, path)
+            else:
+                element(path, child, handle, "rows")
+
+    def strings(el: dict, array_name: str, parent: dict | None, path: list) -> None:
+        emit(el["entity"], {
+            "kind": "strings",
+            "path": path,
+            "identifier": el["identifier"],
+            "param": el["identifier"],
+            "fields": [],
+            "parent": parent,
+            "bulk": array_name if el.get("bulk") else None,
+        }, el.get("variants", []))
+
+    def visit(nodes: list) -> None:
+        for node in nodes:
+            if node["kind"] == "group":
+                visit(node["sections"])
+            elif node["kind"] == "strings":
+                if "element" in node:
+                    strings(node["element"], node["path"][-1], None, node["path"])
+            elif node["kind"] == "fields":
+                element(node["path"], node["element"], None, "singleton")
+            else:
+                element(node["path"], node["element"], None, "rows")
+
+    visit(manifest["sections"])
     return out

@@ -127,7 +127,7 @@
                 }
               ]
             },
-            "$comment": "Stores `name`. The entity declares `ref_name` as its identifier, which is an MCP input alias only -- server.py:2133 writes {\"name\": ref_name or \"\"}."
+            "$comment": "Stores `name`. The entity declares `ref_name` as its identifier, which is an MCP input alias only -- server.write_entity writes {\"name\": ref_name or \"\"}."
           },
           {
             "name": "skill_level",
@@ -161,7 +161,7 @@
           }
         ]
       },
-      "$comment": "`status` declares the full three-value enum itself; the contract's `valid_values` is derived from that, not the other way round. Until 2026-07-29 execute_modify collapsed \"paused\" to \"inactive\" on write, so a user's \"paused\" survived only until the next AI edit; see docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md 1.1.1. `references` is a child list whose rows store `name`, NOT the `ref_name` the entity declares as its identifier -- server.py:2133."
+      "$comment": "`status` declares the full three-value enum itself; the contract's `valid_values` is derived from that, not the other way round. Until 2026-07-29 execute_modify collapsed \"paused\" to \"inactive\" on write, so a user's \"paused\" survived only until the next AI edit; see docs/superpowers/plans/2026-07-29-wave-5-storage-keys-reference.md 1.1.1. `references` is a child list whose rows store `name`, NOT the `ref_name` the entity declares as its identifier -- server.write_entity."
     },
     {
       "kind": "list",
@@ -231,7 +231,7 @@
         "entity": "personality_trait",
         "identifier": "trait"
       },
-      "$comment": "Bare strings: lifestyle[\"personality_traits\"] is a list of strings, not objects -- server.py:1772 appends `item` directly. The entity's `trait` is an input field name, never a stored key (CANONICAL_STORED_KEY[\"trait\"] is None), so this node binds no entity and names no fields."
+      "$comment": "Bare strings: lifestyle[\"personality_traits\"] is a list of strings, not objects -- server.write_entity appends `item` directly. The entity's `trait` is an input field name, never a stored key (CANONICAL_STORED_KEY[\"trait\"] is None), so this node binds no entity and names no fields."
     },
     {
       "kind": "strings",
@@ -252,7 +252,7 @@
         "entity": "value",
         "identifier": "value"
       },
-      "$comment": "Bare strings, same shape as personality_traits -- server.py:1793. CANONICAL_STORED_KEY[\"value\"] is None."
+      "$comment": "Bare strings, same shape as personality_traits -- server.write_entity. CANONICAL_STORED_KEY[\"value\"] is None."
     },
     {
       "kind": "group",
@@ -300,7 +300,7 @@
               }
             ]
           },
-          "$comment": "The entity's `day_type` is a ROUTER selecting which sub-object to write (server.py:2295), never itself stored, so it is deliberately not bound. The two day keys are fixed; server.py:2292 rejects any other."
+          "$comment": "The entity's `day_type` is a ROUTER selecting which sub-object to write, never itself stored, so it is deliberately not bound. The two day keys are fixed and execute_modify's sleep branch rejects any other -- which is also why sleep is one of the few entities still written by a branch of its own rather than by server.write_entity: its rows are two sibling objects chosen by a parameter, not one array."
         },
         {
           "kind": "fields",
@@ -349,7 +349,7 @@
             "entity": "energy_peak",
             "identifier": "peak"
           },
-          "$comment": "Bare strings -- server.py:2314 appends `item` directly."
+          "$comment": "Bare strings -- server.write_entity appends `item` directly."
         },
         {
           "kind": "strings",

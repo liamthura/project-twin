@@ -249,12 +249,6 @@ async function whoami(serverUrl, token) {
   return api("/auth/whoami");
 }
 
-// Check if connected
-function isConfigured() {
-  const config = getConfig();
-  return !!(config?.serverUrl || import.meta.env.DEV);
-}
-
 /**
  * What this instance is, before anyone has a credential.
  *
@@ -566,7 +560,6 @@ export {
   registerAccount,
   loginAccount,
   whoami,
-  isConfigured,
   getInstance,
   exportData,
   importData,

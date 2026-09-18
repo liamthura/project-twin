@@ -233,11 +233,16 @@ def test_the_coercion_is_idempotent(clean_database, as_user):
 
 
 def test_a_write_still_finds_an_un_normalised_legacy_string(clean_database, as_user):
-    """_find_course stays shape-tolerant so a write reaching a blob that has
-    not been through _normalize finds its entry rather than duplicating it."""
-    assert server._find_course(["Compilers"], "compilers") == "Compilers"
-    assert server._find_course([{"name": "Compilers"}], "COMPILERS") == {"name": "Compilers"}
-    assert server._find_course([{"name": "Other"}], "Compilers") is None
+    """A write reaching a blob that has not been through _normalize finds its
+    entry rather than duplicating it.
+
+    The tolerance used to live in `_find_course`, a coursework/clubs-specific
+    helper; it is `find_in_array` now, which every row write goes through, so
+    the property covers more than the two lists it was written for.
+    """
+    assert server.find_in_array(["Compilers"], "compilers") == (0, "Compilers")
+    assert server.find_in_array([{"name": "Compilers"}], "COMPILERS") == (0, {"name": "Compilers"})
+    assert server.find_in_array([{"name": "Other"}], "Compilers") == (-1, None)
 
 
 # ---------------------------------------------------------------------------

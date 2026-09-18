@@ -54,7 +54,7 @@
           ],
           "title": "Preferred Languages",
           "placeholder": "e.g. Python, TypeScript...",
-          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
         },
         {
           "kind": "strings",
@@ -64,7 +64,7 @@
           ],
           "title": "Frameworks",
           "placeholder": "e.g. FastAPI, Next.js...",
-          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
         },
         {
           "kind": "strings",
@@ -74,7 +74,7 @@
           ],
           "title": "Tools",
           "placeholder": "e.g. VS Code, Docker...",
-          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
         }
       ]
     },
@@ -118,7 +118,7 @@
               }
             ]
           },
-          "$comment": "An update-only singleton (identifier: null). All three keys are written literally, not through get_field -- server.py:2211-2219."
+          "$comment": "An update-only singleton (identifier: null). All three keys are written literally, not through get_field -- server.write_entity."
         },
         {
           "kind": "list",
@@ -153,7 +153,7 @@
               }
             ]
           },
-          "$comment": "Stores `mood`. The retired editor wrote this name under `when_feeling`, which no execute_modify branch has ever read -- every MCP lookup resolves on o.get(\"mood\") -- so UI-written overrides were unreachable over MCP and AI-written ones rendered as \"Untitled mood\". persona_store._normalize backfills when_feeling -> mood with a collision guard. `locale`, which the old editor also wrote here, is NOT stored for an override (server.py:2245-2249) and is deliberately not bound."
+          "$comment": "Stores `mood`. The retired editor wrote this name under `when_feeling`, which no execute_modify branch has ever read -- every MCP lookup resolves on o.get(\"mood\") -- so UI-written overrides were unreachable over MCP and AI-written ones rendered as \"Untitled mood\". persona_store._normalize backfills when_feeling -> mood with a collision guard. `locale`, which the old editor also wrote here, is NOT stored for an override (server.write_entity) and is deliberately not bound."
         },
         {
           "kind": "strings",
@@ -193,7 +193,7 @@
           ],
           "title": "Preferred Methods",
           "placeholder": "e.g. hands-on examples...",
-          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
         },
         {
           "kind": "strings",
@@ -203,7 +203,7 @@
           ],
           "title": "Things to Avoid",
           "placeholder": "e.g. walls of text...",
-          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.py:2199), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
         }
       ]
     },
