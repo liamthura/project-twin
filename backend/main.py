@@ -1233,24 +1233,35 @@ def register_static_routes(app: FastAPI, static_dir: Path) -> bool:
 
         app.mount("/docs", StaticFiles(directory=docs_dir, html=True), name="docs")
 
+    # One shell, two pages: the landing page at "/" and the app under "/app".
+    # main.jsx picks which to render from the path, so every one of these
+    # serves the same index.html. Named routes, deliberately not a catch-all:
+    # the MCP app is mounted at "/" and matches everything, so a fallback would
+    # need a hand-maintained exclusion list for /mcp, /api, /auth, /docs and
+    # /.well-known. The app itself stays on the hash router under /app.
+    #
+    # /app/sign-in and /app/consent are OAuth surface: Better Auth's loginPage
+    # and consentPage (auth/src/oauth.js), real paths because it appends query
+    # parameters to them.
     @app.get("/", include_in_schema=False)
+    @app.get("/app", include_in_schema=False)
+    @app.get("/app/", include_in_schema=False)
+    @app.get("/app/sign-in", include_in_schema=False)
+    @app.get("/app/consent", include_in_schema=False)
     async def spa_index() -> Response:
         # The shell must not be cached: it names the hashed asset files.
         return FileResponse(
             static_dir / "index.html", headers={"Cache-Control": "no-cache"}
         )
 
-    # OAuth redirect targets. Two named routes, deliberately not a catch-all:
-    # the MCP app is mounted at "/" and matches everything, so a fallback would
-    # need a hand-maintained exclusion list for /mcp, /api, /auth, /docs and
-    # /.well-known. These are OAuth surface, not app navigation -- the app
-    # itself stays on the hash router.
+    # Where the OAuth screens lived before the app moved under /app. An
+    # authorize flow already in flight, or a client that cached the old URL,
+    # still lands -- 308 with the query intact, because the query IS the flow.
     @app.get("/sign-in", include_in_schema=False)
     @app.get("/consent", include_in_schema=False)
-    async def spa_oauth_screens() -> Response:
-        return FileResponse(
-            static_dir / "index.html", headers={"Cache-Control": "no-cache"}
-        )
+    async def spa_oauth_moved(request: Request) -> Response:
+        query = f"?{request.url.query}" if request.url.query else ""
+        return RedirectResponse(f"/app{request.url.path}{query}", status_code=308)
 
     # Marketing-page artwork: the gradient edge strip and hero field.
     #

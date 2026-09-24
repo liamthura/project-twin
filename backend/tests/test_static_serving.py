@@ -153,6 +153,26 @@ def test_index_is_served_at_root(static_app):
     assert "MyGist" in resp.text
 
 
+@pytest.mark.parametrize("path", ["/app", "/app/", "/app/sign-in", "/app/consent"])
+def test_the_app_and_its_oauth_screens_share_the_shell(static_app, path):
+    """main.jsx picks landing or app from the path; the server only has to
+    hand every one of them the same index.html."""
+    resp = TestClient(static_app).get(path)
+    assert resp.status_code == 200
+    assert "MyGist" in resp.text
+    assert resp.headers["cache-control"] == "no-cache"
+
+
+@pytest.mark.parametrize("path", ["/sign-in", "/consent"])
+def test_old_oauth_paths_move_under_app_with_the_query(static_app, path):
+    """An authorize flow already in flight when the app moved still lands:
+    the query is the flow, so it has to survive the redirect."""
+    resp = TestClient(static_app).get(
+        f"{path}?client_id=abc&state=xyz", follow_redirects=False)
+    assert resp.status_code == 308
+    assert resp.headers["location"] == f"/app{path}?client_id=abc&state=xyz"
+
+
 def test_index_is_not_cached(static_app):
     """The shell names the content-hashed asset files, so caching it would
     pin clients to a stale build."""

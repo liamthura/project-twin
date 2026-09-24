@@ -20,7 +20,7 @@ import { Footer } from "./Footer";
  * the design spec, and it is a positioning decision rather than a taste one. A
  * page selling durable, boring infrastructure should not fidget.
  */
-export default function Landing({ onSignIn }) {
+export default function Landing({ onSignIn, onOpenApp, signedIn = false }) {
   // Lifted here because the hero and the closing CTA are the same action in
   // two places. Not persisted: a reload asking again is the honest answer,
   // since the page has no way to know who is reading it.
@@ -35,10 +35,10 @@ export default function Landing({ onSignIn }) {
         className="h-3 w-full bg-[url('/landing/edge-strip-light.webp')] bg-cover bg-center dark:bg-[url('/landing/edge-strip-dark.webp')]"
       />
 
-      <Nav onSignIn={onSignIn} onJoin={scrollToWaitlist} joined={joined} />
+      <Nav onSignIn={onSignIn} onOpenApp={onOpenApp} signedIn={signedIn} onJoin={scrollToWaitlist} joined={joined} />
 
       <main>
-        <Hero onSignIn={onSignIn} onJoined={() => setJoined(true)} />
+        <Hero onSignIn={onSignIn} onOpenApp={onOpenApp} signedIn={signedIn} onJoined={() => setJoined(true)} />
         <HowItWorks />
         <Bento />
         <Faq />

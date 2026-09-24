@@ -34,7 +34,7 @@ import { BlurFade } from "@/components/ui/blur-fade";
  * paper, and the shipped page was not using paper. The field lives on
  * `ProductShot` now, which is the only place it can be checked once.
  */
-export function Hero({ onSignIn, onJoined }) {
+export function Hero({ onSignIn, onOpenApp, signedIn = false, onJoined }) {
   return (
     <section id="top" className="relative overflow-hidden bg-background pt-20 md:pt-28">
       <Column className="relative z-10">
@@ -60,13 +60,13 @@ export function Hero({ onSignIn, onJoined }) {
 
           <p className="mt-3 text-sm text-muted-foreground">{HERO.note}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {HERO.signIn.prefix}{" "}
+            {(signedIn ? HERO.openApp : HERO.signIn).prefix}{" "}
             <button
               type="button"
-              onClick={onSignIn}
+              onClick={signedIn ? onOpenApp : onSignIn}
               className="rounded text-link underline-offset-4 hover:underline"
             >
-              {HERO.signIn.label}
+              {(signedIn ? HERO.openApp : HERO.signIn).label}
             </button>
           </p>
         </div>

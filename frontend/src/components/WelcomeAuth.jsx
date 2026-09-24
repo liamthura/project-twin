@@ -37,6 +37,7 @@ import {
   isAuthRoute,
   readRoute,
 } from "@/lib/routes.js";
+import { APP_PATH } from "@/lib/paths.js";
 
 /** An invite link: ?invite=7F2K-QX91. Read once at mount -- it cannot change
  *  while the page is open, and reading it in render would re-check it on every
@@ -296,7 +297,7 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
       const query = window.location.search;
       const isOAuthRequest = new URLSearchParams(query).has("client_id");
       await startSsoSignIn({
-        callbackURL: isOAuthRequest ? `/auth/oauth2/authorize${query}` : "/",
+        callbackURL: isOAuthRequest ? `/auth/oauth2/authorize${query}` : `${APP_PATH}/`,
         // A brand-new account lands on Welcome rather than an empty Profile.
         // A redirect flow has no onSuccess to decide that in, so the provider
         // is told up front.
@@ -316,7 +317,7 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
         // request has a client waiting on it; onboarding is still one click
         // away afterwards. This is what the password path already does -- App's
         // onSuccess resumes the flow without asking whether the user is new.
-        newUserCallbackURL: isOAuthRequest ? undefined : "/?onboarding=1",
+        newUserCallbackURL: isOAuthRequest ? undefined : `${APP_PATH}/?onboarding=1`,
         // Back where you started, so the banner appears in the framing the
         // person was already in.
         errorCallbackURL: `${window.location.pathname}${query}`,

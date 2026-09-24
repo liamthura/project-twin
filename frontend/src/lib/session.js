@@ -1,3 +1,5 @@
+import { APP_PATH } from "@/lib/paths.js";
+
 /**
  * Browser session, backed by Better Auth.
  *
@@ -274,7 +276,7 @@ export async function sendVerificationEmail(email) {
 
 /** Where the verification link lands once the address is confirmed. */
 function verifiedCallbackUrl() {
-  return `${window.location.origin}/?verified=1`;
+  return `${window.location.origin}${APP_PATH}/?verified=1`;
 }
 
 /** Where the reset link lands. `reset=1` is ours; Better Auth appends `token`.
@@ -283,7 +285,7 @@ function verifiedCallbackUrl() {
  *  `?token=` in the URL from being mistaken for a reset -- that name is far too
  *  generic to claim. */
 export function resetCallbackUrl() {
-  return `${window.location.origin}/?reset=1`;
+  return `${window.location.origin}${APP_PATH}/?reset=1`;
 }
 
 /** Ask for a reset email.

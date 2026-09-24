@@ -65,9 +65,10 @@ export function oauthOptions({ mcpResource }) {
   return {
     // Real paths, not hash routes: Better Auth appends query parameters to
     // these, and anything after a `#` lands in the fragment rather than in
-    // location.search. FastAPI serves the SPA shell at both.
-    loginPage: "/sign-in",
-    consentPage: "/consent",
+    // location.search. FastAPI serves the SPA shell at both, and 308s the
+    // pre-/app paths here.
+    loginPage: "/app/sign-in",
+    consentPage: "/app/consent",
 
     // Also, since 1.7, what EVERY dynamically registered client is stored
     // with, whatever scope it asked for -- the plugin overwrites a dynamic

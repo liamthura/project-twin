@@ -117,7 +117,7 @@ def invite_link(base: str, code: str) -> str:
     """`?invite=CODE`, which WelcomeAuth reads once at mount and uses to skip
     the code-entry screen. A query parameter rather than a hash, because the
     hash never reaches the server and this has to survive the auth redirects."""
-    return f"{base}/?invite={code}"
+    return f"{base}/app/?invite={code}"
 
 
 def invite_email(code: str, link: str, uses: int, expires_at: datetime | None) -> tuple[str, str]:
