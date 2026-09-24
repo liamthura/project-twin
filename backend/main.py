@@ -723,12 +723,22 @@ async def usage():
 
 
 @app.post("/api/auth/set-password")
-async def set_password(body: SetPasswordRequest):
+async def set_password(body: SetPasswordRequest, request: Request):
     validate_new_password(body.password)
     try:
-        db.set_password(db.current_user_id.get(), body.password, body.current_password)
+        db.set_password(
+            db.current_user_id.get(),
+            body.password,
+            body.current_password,
+            via_session=getattr(request.state, "credential_kind", None) == "session",
+        )
     except db.InvalidCredentialsError:
         raise HTTPException(status_code=403, detail="current password is incorrect")
+    except db.PasswordNeedsSessionError:
+        raise HTTPException(
+            status_code=403,
+            detail="sign in to MyGist in a browser to set a first password",
+        )
     return {"status": "ok"}
 
 
