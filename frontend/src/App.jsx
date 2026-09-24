@@ -122,6 +122,11 @@ export default function App() {
   // failed write leaves the chip honest and Save now still on offer.
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showConnectionSettings, setShowConnectionSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState(null);
+  const openSettings = (tab = null) => {
+    setSettingsTab(tab);
+    setShowConnectionSettings(true);
+  };
 
   // Theme: "light" | "dark" | "system" (system follows the OS live)
   const [theme, setTheme] = useState(
@@ -584,7 +589,7 @@ export default function App() {
       <div className="min-h-dvh flex items-center justify-center">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground">Connecting to backend...</p>
+          <p className="text-muted-foreground">Loading your persona…</p>
         </div>
       </div>
     );
@@ -635,17 +640,17 @@ export default function App() {
         <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle className="text-destructive">
-              Connection Failed
+              Couldn&apos;t reach MyGist
             </CardTitle>
             <CardDescription>{error}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Button onClick={loadAllData} className="w-full">
               <RefreshCw className="h-4 w-4 mr-2" />
-              Retry Connection
+              Try again
             </Button>
             <Button
-              onClick={() => setShowConnectionSettings(true)}
+              onClick={() => openSettings("server")}
               variant="outline"
               className="w-full"
             >
@@ -722,7 +727,7 @@ export default function App() {
         theme={theme}
         onCycleTheme={cycleTheme}
         accountName={packData.profile?.preferred_name || packData.profile?.name}
-        onOpenSettings={() => setShowConnectionSettings(true)}
+        onOpenSettings={() => openSettings()}
         onSaveNow={saveAll}
       />
 
@@ -730,7 +735,7 @@ export default function App() {
         {/* Above the navigation rather than in a corner: an account that cannot
             be recovered is worth one line of the page until it can be. */}
         <div className="mb-4 empty:mb-0">
-          <AddEmailBanner onAddEmail={() => setShowConnectionSettings(true)} />
+          <AddEmailBanner onAddEmail={() => openSettings("account")} />
         </div>
 
         <SectionSheet {...shellProps} />
@@ -749,7 +754,8 @@ export default function App() {
               <GettingStartedCard
                 disabledSections={disabledSections}
                 onStart={() => navigate("onboarding", DEFAULT_ONBOARDING_STEP)}
-                onOpenSettings={() => setShowConnectionSettings(true)}
+                onOpenSettings={openSettings}
+                onConnect={() => navigate("onboarding", "connect")}
               />
             )}
 
@@ -775,7 +781,8 @@ export default function App() {
                 // same number again. The polling exception below still stands:
                 // it is what stops the two of us polling at once.
                 onCounts={setPendingCount}
-                onOpenSettings={() => setShowConnectionSettings(true)}
+                onOpenSettings={openSettings}
+                onConnect={() => navigate("onboarding", "connect")}
                 sectionTitles={sectionTitles}
                 packs={packs}
               />
@@ -843,6 +850,7 @@ export default function App() {
       {/* Connection Settings Dialog */}
       <SettingsDialog
         isOpen={showConnectionSettings}
+        initialTab={settingsTab}
         disabledSections={disabledSections}
         onClose={() => setShowConnectionSettings(false)}
         onConnectionChange={() => {

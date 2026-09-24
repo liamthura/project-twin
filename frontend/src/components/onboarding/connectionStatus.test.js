@@ -24,6 +24,7 @@ describe("connectionStatus", () => {
     expect(connectionStatus([], [])).toEqual({
       state: "none",
       name: null,
+      kind: null,
       canPropose: false,
     });
   });
@@ -32,6 +33,7 @@ describe("connectionStatus", () => {
     expect(connectionStatus([token()], [])).toEqual({
       state: "waiting",
       name: "Claude Desktop",
+      kind: "token",
       canPropose: true,
     });
   });
@@ -43,6 +45,7 @@ describe("connectionStatus", () => {
     expect(connectionStatus([used], [])).toEqual({
       state: "connected",
       name: "Claude Desktop",
+      kind: "token",
       canPropose: true,
     });
   });
@@ -54,6 +57,7 @@ describe("connectionStatus", () => {
     expect(connectionStatus([], [grant()])).toEqual({
       state: "connected",
       name: "Claude",
+      kind: "grant",
       canPropose: false,
     });
   });
@@ -75,6 +79,7 @@ describe("connectionStatus", () => {
     expect(connectionStatus([unused, used], [])).toEqual({
       state: "connected",
       name: "New",
+      kind: "token",
       canPropose: true,
     });
   });
@@ -83,6 +88,7 @@ describe("connectionStatus", () => {
     expect(connectionStatus(null, null)).toEqual({
       state: "none",
       name: null,
+      kind: null,
       canPropose: false,
     });
   });
