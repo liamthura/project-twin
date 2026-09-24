@@ -28,7 +28,9 @@ function StepMark({ done, n }) {
   );
 }
 
-export function GettingStartedCard({ disabledSections = [], onStart, onOpenSettings }) {
+export function GettingStartedCard({
+  disabledSections = [], onStart, onOpenSettings, onConnect,
+}) {
   const [state, setState] = useState(null);
   const [connection, setConnection] = useState({
     state: "none",
@@ -125,7 +127,7 @@ export function GettingStartedCard({ disabledSections = [], onStart, onOpenSetti
                 variant="outline"
                 size="sm"
                 className="shrink-0"
-                onClick={onOpenSettings}
+                onClick={onConnect}
               >
                 Connect
               </Button>
@@ -163,7 +165,7 @@ export function GettingStartedCard({ disabledSections = [], onStart, onOpenSetti
                 <button
                   type="button"
                   className="underline underline-offset-2 hover:text-foreground"
-                  onClick={onOpenSettings}
+                  onClick={() => onOpenSettings?.(connection.kind === "grant" ? "apps" : "tokens")}
                 >
                   Reconnect with permission to suggest
                 </button>{" "}

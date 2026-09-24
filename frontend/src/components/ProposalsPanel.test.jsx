@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ProposalsPanel from "./ProposalsPanel";
 import { promotionTargets } from "./PromoteDialog";
@@ -25,6 +25,7 @@ const PACKS = [
 vi.mock("@/lib/api", () => ({
   listProposals: vi.fn(),
   listConnectedApps: vi.fn(() => Promise.resolve([])),
+  listTokens: vi.fn(() => Promise.resolve([])),
   proposalCount: vi.fn(() => Promise.resolve({ entity: 1, note: 1, total: 2 })),
   approveProposal: vi.fn(() => Promise.resolve({ status: "approved", section: "knowledge" })),
   rejectProposal: vi.fn(() => Promise.resolve({ status: "rejected", section: null })),
@@ -399,7 +400,7 @@ describe("ProposalsPanel", () => {
       ]);
       render(<ProposalsPanel />);
       expect(await screen.findByText(
-        /None of your connected apps can suggest changes/i)).toBeInTheDocument();
+        /None of your connections can suggest changes/i)).toBeInTheDocument();
     });
 
     it("says nothing extra when something can propose", async () => {
@@ -412,6 +413,50 @@ describe("ProposalsPanel", () => {
       await waitFor(() => expect(api.listConnectedApps).toHaveBeenCalled());
       expect(screen.queryByText(/not suggest changes/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/nothing is connected/i)).not.toBeInTheDocument();
+    });
+
+    it("counts a used token as connected, not just OAuth grants", async () => {
+      // The P0 from the 2026-09-24 critique: a token-only user was told
+      // "Nothing is connected yet" by the one screen that waits on a client.
+      api.listConnectedApps.mockResolvedValue([]);
+      api.listTokens.mockResolvedValue([
+        { id: "t1", label: "Claude Code", last_used_at: "2026-09-22T10:00:00Z",
+          scopes: ["persona:read", "persona:propose"] },
+      ]);
+      render(<ProposalsPanel />);
+      await waitFor(() => expect(api.listTokens).toHaveBeenCalled());
+      expect(await screen.findByText(/nothing waiting/i)).toBeInTheDocument();
+      expect(screen.queryByText(/nothing is connected/i)).not.toBeInTheDocument();
+    });
+
+    it("says a token is waiting for its first call", async () => {
+      api.listConnectedApps.mockResolvedValue([]);
+      api.listTokens.mockResolvedValue([
+        { id: "t1", label: "Cursor", last_used_at: null, scopes: ["persona:read"] },
+      ]);
+      render(<ProposalsPanel />);
+      expect(await screen.findByText(/Cursor is set up but hasn.t been used yet/i))
+        .toBeInTheDocument();
+    });
+
+    it("sends Connect an app to the connect flow", async () => {
+      api.listConnectedApps.mockResolvedValue([]);
+      api.listTokens.mockResolvedValue([]);
+      const onConnect = vi.fn();
+      render(<ProposalsPanel onConnect={onConnect} />);
+      fireEvent.click(await screen.findByRole("button", { name: /connect an app/i }));
+      expect(onConnect).toHaveBeenCalled();
+    });
+
+    it("opens the tab that manages the read-only connection", async () => {
+      api.listTokens.mockResolvedValue([]);
+      api.listConnectedApps.mockResolvedValue([
+        { id: "g1", clientId: "c1", clientName: "Claude Desktop", scopes: ["persona:read"] },
+      ]);
+      const onOpenSettings = vi.fn();
+      render(<ProposalsPanel onOpenSettings={onOpenSettings} />);
+      fireEvent.click(await screen.findByRole("button", { name: /review access/i }));
+      expect(onOpenSettings).toHaveBeenCalledWith("apps");
     });
 
     it("does not ask about connections while there is something to review", async () => {

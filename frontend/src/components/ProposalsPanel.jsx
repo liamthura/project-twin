@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   listProposals, proposalCount, approveProposal, rejectProposal, promoteProposal,
-  listConnectedApps,
+  listConnectedApps, listTokens,
 } from "@/lib/api";
-import { PROPOSE } from "@/lib/scopes.js";
+import { connectionStatus } from "./onboarding/connectionStatus";
 import InboxRow from "./InboxRow";
 import ObservationCard from "./ObservationCard";
 import PromoteDialog, { promotionTargets } from "./PromoteDialog";
@@ -33,7 +33,7 @@ const KINDS = [
 const QUEUE_POLL_MS = 15000;
 
 export default function ProposalsPanel({
-  onViewSection, onSectionChanged, onCounts, onOpenSettings,
+  onViewSection, onSectionChanged, onCounts, onOpenSettings, onConnect,
   sectionTitles = {}, packs = [],
 }) {
   const [kind, setKind] = useState("entity");
@@ -42,7 +42,7 @@ export default function ProposalsPanel({
   const [error, setError] = useState(null);
   const [promoting, setPromoting] = useState(null);
   const [counts, setCounts] = useState({ entity: 0, note: 0, total: 0 });
-  const [grants, setGrants] = useState(null);
+  const [connection, setConnection] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const { toast } = useToast();
 
@@ -97,19 +97,34 @@ export default function ProposalsPanel({
   // An empty queue has two very different causes, and they have different
   // fixes. Asked once, and only when there is nothing to review: a reader with
   // proposals waiting never sees this line, and this is the one surface in the
-  // app that already polls. A failure is treated as "no grants", which renders
-  // no extra line -- which is what happens today.
+  // app that already polls.
+  //
+  // Tokens and grants both count. Checking grants alone told everyone who
+  // connected with a token that nothing was connected -- the same shared rule
+  // as onboarding and the Getting-started card, so the three cannot disagree.
+  // listTokens throws for a read-scoped credential; that is a permission, not
+  // a failure, so it degrades to "no tokens I can see".
   useEffect(() => {
     // `loaded` matters: rows is [] on the first render too, before the queue
     // has been fetched at all. Without it this fires on every mount, which is
     // the opposite of asking only when there is nothing to review.
-    if (!loaded || rows.length > 0 || grants !== null) return;
+    if (!loaded || rows.length > 0 || connection !== null) return;
     let cancelled = false;
-    listConnectedApps()
-      .then((list) => { if (!cancelled) setGrants(list); })
-      .catch(() => { if (!cancelled) setGrants([]); });
+    Promise.all([
+      listTokens().catch(() => []),
+      listConnectedApps().catch(() => []),
+    ]).then(([tokens, grants]) => {
+      // `total` because naming one connection when several can only read
+      // would imply the others can suggest.
+      if (!cancelled) {
+        setConnection({
+          ...connectionStatus(tokens, grants),
+          total: tokens.length + grants.length,
+        });
+      }
+    });
     return () => { cancelled = true; };
-  }, [loaded, rows.length, grants]);
+  }, [loaded, rows.length, connection]);
 
   /**
    * Run one resolution, then say what happened.
@@ -236,21 +251,30 @@ export default function ProposalsPanel({
       {rows.length === 0 ? (
         <EmptyState className="space-y-2">
           <p>Nothing waiting. Agents propose changes here as they notice them.</p>
-          {grants?.length === 0 && (
+          {connection?.state === "none" && (
             <p>
               Nothing is connected yet.{" "}
-              <Button variant="link" className="h-auto p-0" onClick={onOpenSettings}>
+              <Button variant="link" className="h-auto p-0" onClick={onConnect}>
                 Connect an app
               </Button>
             </p>
           )}
-          {grants?.length > 0
-            && !grants.some((g) => (g.scopes || []).includes(PROPOSE)) && (
+          {connection?.state === "waiting" && (
             <p>
-              {grants.length === 1
-                ? `${grants[0].clientName} can read your persona but not suggest changes to it.`
-                : "None of your connected apps can suggest changes to your persona."}{" "}
-              <Button variant="link" className="h-auto p-0" onClick={onOpenSettings}>
+              {connection.name || "Your token"} is set up but hasn&apos;t been used yet.
+              Suggestions arrive once your client makes its first call.
+            </p>
+          )}
+          {connection?.state === "connected" && !connection.canPropose && (
+            <p>
+              {connection.total === 1
+                ? `${connection.name || "Your connection"} can read your persona but not suggest changes to it.`
+                : "None of your connections can suggest changes to your persona."}{" "}
+              <Button
+                variant="link"
+                className="h-auto p-0"
+                onClick={() => onOpenSettings?.(connection.kind === "grant" ? "apps" : "tokens")}
+              >
                 Review access
               </Button>
             </p>

@@ -66,9 +66,8 @@ export function AppsPanel({ isOpen }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Applications you&apos;ve connected through &quot;Allow&quot; on a consent
-        screen -- Claude Desktop, an MCP client, or anything else that signed in
-        with your account.
+        Apps you&apos;ve allowed on a consent screen, such as Claude Desktop or any
+        other client that signed in with your account.
       </p>
       {loading ? (
         <div className="flex items-center justify-center py-6 text-muted-foreground">

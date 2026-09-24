@@ -27,6 +27,8 @@ function carriesPropose(scopes) {
   return (scopes || []).some((s) => PROPOSE_SCOPES.includes(s));
 }
 
+// `kind` says which Settings tab manages the connection being named, so a
+// "change its access" link can open the right one.
 export function connectionStatus(tokens, grants) {
   const tokenRows = tokens || [];
   const grantRows = grants || [];
@@ -38,16 +40,16 @@ export function connectionStatus(tokens, grants) {
   // A used token first: it is the only evidence here that a client actually
   // called, and the card's best moment is naming the thing that did.
   const used = tokenRows.find((t) => t?.last_used_at);
-  if (used) return { state: "connected", name: used.label || null, canPropose };
+  if (used) return { state: "connected", name: used.label || null, kind: "token", canPropose };
 
   if (grantRows.length > 0) {
     const first = grantRows[0];
-    return { state: "connected", name: first.clientName || null, canPropose };
+    return { state: "connected", name: first.clientName || null, kind: "grant", canPropose };
   }
 
   if (tokenRows.length > 0) {
-    return { state: "waiting", name: tokenRows[0].label || null, canPropose };
+    return { state: "waiting", name: tokenRows[0].label || null, kind: "token", canPropose };
   }
 
-  return { state: "none", name: null, canPropose: false };
+  return { state: "none", name: null, kind: null, canPropose: false };
 }

@@ -43,11 +43,13 @@ export function TokenPanel({ isOpen }) {
   const [copied, setCopied] = useState(false);
   const [confirmRevokeId, setConfirmRevokeId] = useState(null);
   const [revokingId, setRevokingId] = useState(null);
-  // The scope choice for the next minted token. Both start selected, and the
-  // handlers below keep write > propose > read true rather than letting a click
-  // build a choice that means nothing.
+  // The scope choice for the next minted token. Propose starts on and write
+  // off: "nothing lands without the user" is the product's default, so direct
+  // writes are something you opt into, not something you have to notice and
+  // turn off. The handlers below keep write > propose > read true rather than
+  // letting a click build a choice that means nothing.
   const [propose, setPropose] = useState(true);
-  const [write, setWrite] = useState(true);
+  const [write, setWrite] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -113,7 +115,7 @@ export function TokenPanel({ isOpen }) {
     setRevealed(null);
     setNewLabel("mcp");
     setPropose(true);
-    setWrite(true);
+    setWrite(false);
     load();
   };
 
@@ -180,7 +182,8 @@ export function TokenPanel({ isOpen }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Tokens let AI clients (Claude, MCP) access your MyGist.
+        A token lets an AI client reach your persona without signing in through a
+        browser. Give each client its own, so you can revoke one and keep the rest.
       </p>
 
       {loading ? (
@@ -262,7 +265,7 @@ export function TokenPanel({ isOpen }) {
           <TokenScopeRow
             id="token-scope-read"
             label="Read your persona"
-            help="Always granted -- a token needs this to do anything."
+            help="Always granted. A token needs this to do anything."
             checked
             disabled
           />
@@ -271,7 +274,7 @@ export function TokenPanel({ isOpen }) {
             label="Suggest changes for your approval"
             help={
               write
-                ? "Included -- direct changes below need this too."
+                ? "Included, because direct changes need it too."
                 : "Changes wait for you to approve them before they apply."
             }
             checked={propose}
@@ -280,7 +283,11 @@ export function TokenPanel({ isOpen }) {
           <TokenScopeRow
             id="token-scope-write"
             label="Change your persona directly"
-            help="Applied immediately, without asking first."
+            help={
+              write
+                ? "Changes apply straight away and skip your review queue."
+                : "Off by default. Changes would apply straight away, without asking you."
+            }
             checked={write}
             onCheckedChange={onWriteChange}
           />

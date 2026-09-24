@@ -63,6 +63,17 @@ describe("signed in", () => {
     expect(await screen.findByText(/Liam/)).toBeInTheDocument();
   });
 
+  it("lands on the tab a caller asked for", async () => {
+    // "Review access" in the review queue opens Connected apps, not Account.
+    render(
+      <SettingsDialog isOpen onClose={vi.fn()} initialTab="apps" disabledSections={[]} />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Connected apps" }))
+        .toHaveAttribute("aria-selected", "true"));
+    expect(listConnectedApps).toHaveBeenCalled();
+  });
+
   it("offers all five tabs, enabled", async () => {
     open();
     await waitFor(() => expect(whoami).toHaveBeenCalled());

@@ -46,6 +46,9 @@ export function SettingsDialog({
   // Also App's. Needed only to write onboarding state back without clearing it:
   // SettingsUpdate requires disabled_sections and writes what it is sent.
   disabledSections = [],
+  // Where to land once signed in. A caller that opened Settings to fix one
+  // thing ("Review access") should not leave the reader hunting for it.
+  initialTab = null,
 }) {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [username, setUsername] = useState(null);
@@ -62,7 +65,9 @@ export function SettingsDialog({
         if (cancelled) return;
         setIsSignedIn(true);
         setUsername(me.username || "your account");
-        setActiveTab(defaultTab(true));
+        setActiveTab(
+          initialTab && isTabAvailable(initialTab, true) ? initialTab : defaultTab(true),
+        );
       })
       .catch(() => {
         // Signed out is a state, not an error. Server is the tab that still
@@ -71,7 +76,7 @@ export function SettingsDialog({
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
+  }, [isOpen, initialTab]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
