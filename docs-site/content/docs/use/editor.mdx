@@ -61,37 +61,48 @@ The editor works on a small screen. A few things move:
 
 ## Sections
 
-Open the **Sections** manager to turn sections on and off.
+Optional sections that are switched off are listed under **More sections** at
+the bottom of the menu. **Add** turns one on and takes you to it. To switch a
+section off, use **Hide** in its header.
 
-- **Media** and **aesthetics** start off. Turn them on if you want them.
-- **Profile**, **preferences** and the **learning log** are always on and cannot
-  be disabled.
-- Everything else is on by default and can be switched off.
+- **Media**, **aesthetics** and **inventory** start off. Add them if you want
+  them.
+- **Profile**, **preferences** and the **learning log** are always on and have
+  no Hide button.
+- Everything else is on by default and can be hidden.
 
-Disabling a section keeps its data exactly as it is. The section stops being
+Hiding a section keeps its data exactly as it is. The section stops being
 offered to AI clients and stops appearing in the editor, and comes back
-unchanged when you re-enable it.
+unchanged when you add it again. The message that confirms it has an **Undo**.
 
-<Screenshot
-  src="/screenshots/sections-manager.png"
-  caption="The Sections manager"
-/>
+## History
+
+Every section header has a **History** button. It lists the last versions of
+that section, kept automatically whenever anything changes it, with the date
+and which client made the change. **Restore this** puts a version back, and a
+restore can itself be undone the same way.
 
 ## Account
 
-The settings dialog has five tabs: **Account**, **Server**, **Tokens**,
-**Connected apps** and **Data**. Three of them matter for day-to-day use.
+Open **Settings** from the menu under your name, top right. The same menu
+switches the theme and signs you out. Settings has three tabs: **Account**,
+**Connections** and **Data**.
 
-### Account and server
+### Account
 
-Your password, under Account: set one if you registered without, or change the
-one you have. Minimum eight characters. **Server** is which instance the UI is
-pointed at, for a browser that is not being served by the instance itself.
+Your password: set one if you registered without, or change the one you have.
+Minimum eight characters. Your email, linked sign-in accounts, and whether
+changes save as you type are here too.
 
-### Tokens
+### Connections
 
-Issue named tokens for AI clients, see when each was last used, and revoke any
-of them.
+Everything that can reach your persona, in two groups: apps connected over
+OAuth, and tokens you issued yourself. Issue named tokens for AI clients, see
+when each was last used, and revoke any of them.
+
+A new token can read your persona and suggest changes for your approval.
+Changing it directly is off unless you switch it on, because those changes skip
+your review queue.
 
 <Callout type="warn">
 A new token's value is shown **once**, when you create it. Copy it immediately.
@@ -103,7 +114,7 @@ does not disconnect everything else.
 
 <Screenshot
   src="/screenshots/settings-tokens.png"
-  caption="The Tokens tab"
+  caption="Tokens, under Connections"
 />
 
 ### Data
@@ -111,15 +122,19 @@ does not disconnect everything else.
 **Export** downloads your whole persona as a zip of JSON files, one per section:
 the same structured data the tools read.
 
-**Import** takes one back. Two modes:
+**Import** takes one back. Choose the mode first, then the file:
 
 | Mode | Does |
 |---|---|
-| **Replace** | Overwrites your existing data with the backup's contents |
-| **Merge** | Combines the backup with what is already there |
+| **Merge** | Adds the backup to what is already there. The default |
+| **Replace** | Overwrites your existing data with the backup's contents, after asking once more |
 
 Export then import is also how you move between servers. It needs no database
 access at either end.
+
+**Advanced: server**, at the bottom of Data, is which instance this web app
+talks to. You only need it when the page is not being served by the instance
+itself.
 
 <Screenshot
   src="/screenshots/settings-data.png"
