@@ -10,7 +10,6 @@ import { useRef, useState } from "react";
 import { Download, Loader2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { segmentClass } from "@/components/ui/segmented-control";
 import { useToast } from "@/components/ui/use-toast";
 import { exportData, importData } from "@/lib/api.js";
@@ -20,7 +19,11 @@ export function DataPanel() {
 
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [importMode, setImportMode] = useState("replace");
+  // Merge by default: it is the one that cannot lose anything. Replace is the
+  // most destructive action in the app, so it asks once more after the file is
+  // chosen, naming the file, rather than firing the moment the picker closes.
+  const [importMode, setImportMode] = useState("merge");
+  const [pendingFile, setPendingFile] = useState(null);
   // A ref rather than getElementById: two dialogs on one page would both have
   // answered to that id.
   const fileInput = useRef(null);
@@ -45,10 +48,7 @@ export function DataPanel() {
     }
   };
 
-  const handleImport = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const runImport = async (file) => {
     setImporting(true);
     try {
       const result = await importData(file, importMode);
@@ -67,9 +67,17 @@ export function DataPanel() {
       });
     } finally {
       setImporting(false);
-      // Choosing the same file twice in a row fires no change event otherwise.
-      e.target.value = "";
+      setPendingFile(null);
     }
+  };
+
+  const handleFileChosen = (e) => {
+    const file = e.target.files?.[0];
+    // Choosing the same file twice in a row fires no change event otherwise.
+    e.target.value = "";
+    if (!file) return;
+    if (importMode === "replace") setPendingFile(file);
+    else runImport(file);
   };
 
   return (
@@ -99,63 +107,99 @@ export function DataPanel() {
             )}
           </Button>
         </div>
-        <div className="flex items-center justify-between gap-3 p-3">
+        <div className="space-y-3 p-3">
           <div className="space-y-0.5">
             <p className="text-sm font-medium">Import backup</p>
             <p className="text-xs text-muted-foreground">
               Restore from a backup zip. A safety backup is made first.
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fileInput.current?.click()}
-            disabled={exporting || importing}
-            className="shrink-0"
+
+          <div
+            role="group"
+            aria-labelledby="import-mode-label"
+            className="space-y-2"
           >
-            {importing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <>
-                <Upload className="mr-2 h-4 w-4" />
-                Choose file
-              </>
-            )}
-          </Button>
+            <p id="import-mode-label" className="text-xs font-medium">
+              How to import
+            </p>
+            <div className="flex rounded-lg bg-muted p-0.5">
+              {[
+                ["merge", "Merge"],
+                ["replace", "Replace"],
+              ].map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={importMode === mode}
+                  onClick={() => {
+                    setImportMode(mode);
+                    setPendingFile(null);
+                  }}
+                  className={segmentClass(importMode === mode, false)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {importMode === "merge"
+                ? "Merge adds the backup to what you already have."
+                : "Replace overwrites your current persona with the backup."}
+            </p>
+          </div>
+
+          {pendingFile ? (
+            <div className="space-y-2 rounded-lg border border-destructive/40 p-3">
+              <p className="text-sm">
+                Replace your persona with <strong>{pendingFile.name}</strong>? Your
+                current data is backed up first.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => runImport(pendingFile)}
+                  disabled={importing}
+                >
+                  {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Replace"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPendingFile(null)}
+                  disabled={importing}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInput.current?.click()}
+              disabled={exporting || importing}
+            >
+              {importing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Choose file
+                </>
+              )}
+            </Button>
+          )}
           <input
             ref={fileInput}
             data-testid="import-file"
             type="file"
             accept=".zip"
-            onChange={handleImport}
+            onChange={handleFileChosen}
             className="hidden"
           />
         </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Import mode</Label>
-        <div className="flex rounded-lg bg-muted p-0.5">
-          <button
-            type="button"
-            onClick={() => setImportMode("replace")}
-            className={segmentClass(importMode === "replace", false)}
-          >
-            Replace
-          </button>
-          <button
-            type="button"
-            onClick={() => setImportMode("merge")}
-            className={segmentClass(importMode === "merge", false)}
-          >
-            Merge
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {importMode === "replace"
-            ? "Replace overwrites your existing data with the backup's contents."
-            : "Merge combines the backup with your existing data."}
-        </p>
       </div>
     </div>
   );
