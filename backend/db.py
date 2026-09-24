@@ -74,6 +74,13 @@ class InvalidCredentialsError(Exception):
     """current_password missing or wrong when changing an existing password."""
 
 
+class PasswordNeedsSessionError(Exception):
+    """A first password for a Better Auth account, asked for by something other
+    than a signed-in browser. A bearer token setting one would open a password
+    route into an account that has only ever signed in through the identity
+    provider."""
+
+
 def get_pool() -> ConnectionPool:
     global _pool
     if _pool is None:
@@ -431,14 +438,45 @@ _CREDENTIAL_PROVIDER = "credential"
 _CREDENTIAL_ISSUER = "local:credential"
 
 
+def _current_password_hash(conn, user_id: str) -> Optional[str]:
+    """The account's password as sign-in checks it.
+
+    Better Auth's credential row when there is one: a Better Auth sign-up
+    never sets users.password_hash, and a Better Auth reset or change updates
+    only the credential row. The legacy column is the answer only for an
+    account Better Auth has never held a password for. Reading the legacy
+    column alone is what let a token replace a password without knowing it,
+    and a superseded password keep working on /api/auth/login.
+    """
+    row = conn.execute(
+        """
+        select coalesce(
+            (select "password" from better_auth."account"
+              where "userId" = %s and "providerId" = %s),
+            (select password_hash from users where id = %s)
+        ) as hash
+        """,
+        # better_auth ids are text and users.id is a uuid; a caller holding a
+        # UUID object would otherwise hit "operator does not exist: text = uuid".
+        (str(user_id), _CREDENTIAL_PROVIDER, str(user_id)),
+    ).fetchone()
+    return row["hash"] if row else None
+
+
 def set_password(
-    user_id: str, password: str, current_password: Optional[str] = None
+    user_id: str,
+    password: str,
+    current_password: Optional[str] = None,
+    *,
+    via_session: bool = False,
 ) -> None:
     """Set (or change) the user's password.
 
     Accounts that already have a password must supply the correct
-    current_password (InvalidCredentialsError otherwise); legacy/no-password
-    accounts may set one without it.
+    current_password (InvalidCredentialsError otherwise), checked against
+    _current_password_hash. An account with no password anywhere may set one
+    without it -- but a Better Auth account only from a signed-in browser
+    (`via_session`), never from a bearer token (PasswordNeedsSessionError).
 
     Writes the new hash to two places in one transaction: `users.password_hash`
     (read by /api/auth/login, still live for detached/non-SSO use) and
@@ -476,13 +514,16 @@ def set_password(
     row like any other.
     """
     with get_pool().connection() as conn:
-        row = conn.execute(
-            "select password_hash from users where id = %s", (user_id,)
+        has_better_auth_user = conn.execute(
+            'select 1 from better_auth."user" where "id" = %s', (user_id,)
         ).fetchone()
-        existing = row["password_hash"] if row else None
+
+        existing = _current_password_hash(conn, user_id)
         if existing is not None:
             if not current_password or not check_password(current_password, existing):
                 raise InvalidCredentialsError()
+        elif has_better_auth_user and not via_session:
+            raise PasswordNeedsSessionError()
 
         new_hash = hash_password(password)
 
@@ -491,9 +532,6 @@ def set_password(
             (new_hash, user_id),
         )
 
-        has_better_auth_user = conn.execute(
-            'select 1 from better_auth."user" where "id" = %s', (user_id,)
-        ).fetchone()
         if not has_better_auth_user:
             return
 
@@ -540,9 +578,10 @@ def verify_password(username: str, password: str) -> Optional[dict]:
     password_bytes = password.encode("utf-8")
     with get_pool().connection() as conn:
         row = conn.execute(
-            "select id, username, password_hash from users where username = %s",
-            (username,),
+            "select id, username from users where username = %s", (username,)
         ).fetchone()
+        if row is not None:
+            row = {**row, "password_hash": _current_password_hash(conn, row["id"])}
     # Every failure branch performs exactly one bcrypt op so response timing
     # doesn't reveal whether the username exists or has a password.
     if row is None:

@@ -427,12 +427,9 @@ def test_set_password_creates_credential_row_when_none_exists(client):
 
     assert _credential_row(user_id) is None
 
-    resp = client.post(
-        "/api/auth/set-password",
-        json={"password": "firstpassword1"},
-        headers=auth_headers(reg["token"]),
-    )
-    assert resp.status_code == 200
+    # From a signed-in browser. A token may not do this -- see
+    # test_a_token_cannot_give_a_federated_account_its_first_password.
+    db.set_password(user_id, "firstpassword1", via_session=True)
 
     credential = _credential_row(user_id)
     assert credential is not None
@@ -523,3 +520,84 @@ def test_set_password_skips_better_auth_write_for_detached_only_account(client):
             "select password_hash from users where id = %s", (user_id,)
         ).fetchone()["password_hash"]
     assert db.check_password("newpassword1", users_hash)
+
+
+# ---------------------------------------------------------------------------
+# The account's current password is whatever Better Auth's credential row
+# holds, when there is one. Reading only users.password_hash -- which a Better
+# Auth sign-up never sets -- let any write-scoped token set a new password with
+# no current password (account takeover from a leaked .mcp.json token), and let
+# a password superseded by a Better Auth reset keep working on the legacy login.
+# ---------------------------------------------------------------------------
+
+
+def _better_auth_account_with_password(client, username, password):
+    """A Better Auth sign-up: users row with no password_hash, a Better Auth
+    user, and the credential row holding the real password. Returns
+    (user_id, opaque write token)."""
+    reg = client.post("/api/auth/register", json={"username": username}).json()
+    _seed_better_auth_user(reg["user_id"], username)
+    db.set_password(reg["user_id"], password, via_session=True)
+    with db.get_pool().connection() as conn:
+        conn.execute("update users set password_hash = null where id = %s", (reg["user_id"],))
+    return reg["user_id"], reg["token"]
+
+
+def test_a_token_cannot_replace_a_better_auth_password_without_the_current_one(client):
+    user_id, token = _better_auth_account_with_password(client, "carol", "originalpass1")
+
+    resp = client.post(
+        "/api/auth/set-password",
+        json={"password": "attackerpass1"},
+        headers=auth_headers(token),
+    )
+
+    assert resp.status_code == 403
+    assert db.check_password("originalpass1", _credential_row(user_id)["password"])
+
+
+def test_a_better_auth_password_can_still_be_changed_with_the_current_one(client):
+    user_id, token = _better_auth_account_with_password(client, "dave", "originalpass1")
+
+    resp = client.post(
+        "/api/auth/set-password",
+        json={"password": "newpassword1", "current_password": "originalpass1"},
+        headers=auth_headers(token),
+    )
+
+    assert resp.status_code == 200
+    assert db.check_password("newpassword1", _credential_row(user_id)["password"])
+
+
+def test_a_token_cannot_give_a_federated_account_its_first_password(client):
+    # SSO-only: a Better Auth user and no password anywhere. A token setting
+    # one would open a password route around the identity provider.
+    reg = client.post("/api/auth/register", json={"username": "erin"}).json()
+    _seed_better_auth_user(reg["user_id"], "erin")
+
+    resp = client.post(
+        "/api/auth/set-password",
+        json={"password": "firstpassword1"},
+        headers=auth_headers(reg["token"]),
+    )
+
+    assert resp.status_code == 403
+    assert _credential_row(reg["user_id"]) is None
+
+
+def test_legacy_login_checks_the_better_auth_password_not_a_stale_copy(client):
+    # A Better Auth reset updates only the credential row, leaving the old
+    # hash in users.password_hash. The legacy login must not accept it.
+    user_id, _ = _better_auth_account_with_password(client, "frank", "newpassword1")
+    with db.get_pool().connection() as conn:
+        conn.execute(
+            "update users set password_hash = %s where id = %s",
+            (db.hash_password("oldpassword1"), user_id),
+        )
+
+    assert client.post(
+        "/api/auth/login", json={"username": "frank", "password": "oldpassword1"}
+    ).status_code == 401
+    assert client.post(
+        "/api/auth/login", json={"username": "frank", "password": "newpassword1"}
+    ).status_code == 200
