@@ -30,6 +30,10 @@ describe("legacyForward", () => {
     expect(legacyForward(at("/", "?invite=7F2K", "#/signup"))).toBe("/app/?invite=7F2K#/signup");
   });
 
+  it("adds the slash to a bare /app, keeping the route and query", () => {
+    expect(legacyForward(at("/app", "?x=1", "#/review"))).toBe("/app/?x=1#/review");
+  });
+
   it("never forwards from anywhere but the root", () => {
     expect(legacyForward(at("/app/", "?reset=1", "#/profile"))).toBeNull();
   });

@@ -67,7 +67,7 @@ until the user approves. Rejected proposals are never raised again.
   conversation paying for it.
 - Ten persona sections: Profile, Goals, Knowledge, Preferences, Projects,
   Lifestyle, Circle, Learning log, plus optional Media and Aesthetics.
-- One Docker image serves the landing page at `/`, the web UI at `/app`, REST at
+- One Docker image serves the landing page at `/`, the web UI at `/app/`, REST at
   `/api`, MCP at `/mcp`, docs at `/docs`. Sign-in runs in a second container.
 - Four Markdown skills in `backend/skills/` teach agents how to read, write, and
   propose; a running server serves them over MCP at `skill://mygist/<name>/`.

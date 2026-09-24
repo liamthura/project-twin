@@ -17,13 +17,16 @@ export function isAppPath(pathname) {
 const APP_PARAMS = ["invite", "reset", "verified", "onboarding"];
 
 /**
- * Where a pre-/app link should go now, or null to stay put.
- *
- * Only the root is forwarded. The server cannot see a #fragment, so an old
+ * Where a link should go now, or null to stay put: a bare /app gets its
+ * slash, and old links at the root move under /app/. The server cannot see a
+ * #fragment, so an old
  * `/#/profile` bookmark reaches the landing page and has to be sent on from
  * the browser.
  */
 export function legacyForward({ pathname, search, hash }) {
+  // /app/ is canonical, so routes read /app/#/profile. The server redirects a
+  // bare /app too; this covers the dev server and anything else in front.
+  if (pathname === APP_PATH) return `${APP_PATH}/${search}${hash}`;
   if (pathname !== "/") return null;
   const params = new URLSearchParams(search);
   const carriesApp = hash.startsWith("#/") || APP_PARAMS.some((p) => params.has(p));

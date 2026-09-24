@@ -55,10 +55,10 @@ docker build -t mygist .
 docker run -p 1120:1120 -e DATABASE_URL="postgresql://…" mygist
 ```
 
-One image serves the landing page at `/`, the web UI at `/app`, the REST API at
+One image serves the landing page at `/`, the web UI at `/app/`, the REST API at
 `/api`, the MCP endpoint at `/mcp`, and the documentation at `/docs`. Sign-in runs in a second container.
 
-Then register an account at `http://127.0.0.1:1120/app` and point your client at
+Then register an account at `http://127.0.0.1:1120/app/` and point your client at
 `http://127.0.0.1:1120/mcp`.
 [Quick start](https://mygist.thuradev.qzz.io/docs/use/quick-start) walks through
 it; [Self-hosting](https://mygist.thuradev.qzz.io/docs/run/self-hosting) covers

@@ -1244,7 +1244,6 @@ def register_static_routes(app: FastAPI, static_dir: Path) -> bool:
     # and consentPage (auth/src/oauth.js), real paths because it appends query
     # parameters to them.
     @app.get("/", include_in_schema=False)
-    @app.get("/app", include_in_schema=False)
     @app.get("/app/", include_in_schema=False)
     @app.get("/app/sign-in", include_in_schema=False)
     @app.get("/app/consent", include_in_schema=False)
@@ -1253,6 +1252,14 @@ def register_static_routes(app: FastAPI, static_dir: Path) -> bool:
         return FileResponse(
             static_dir / "index.html", headers={"Cache-Control": "no-cache"}
         )
+
+    # /app/ is the canonical address, so hash routes read /app/#/profile. A
+    # bare /app is sent there; the browser carries any #fragment across the
+    # redirect itself.
+    @app.get("/app", include_in_schema=False)
+    async def spa_app_slash(request: Request) -> Response:
+        query = f"?{request.url.query}" if request.url.query else ""
+        return RedirectResponse(f"/app/{query}", status_code=308)
 
     # Where the OAuth screens lived before the app moved under /app. An
     # authorize flow already in flight, or a client that cached the old URL,

@@ -153,7 +153,7 @@ def test_index_is_served_at_root(static_app):
     assert "MyGist" in resp.text
 
 
-@pytest.mark.parametrize("path", ["/app", "/app/", "/app/sign-in", "/app/consent"])
+@pytest.mark.parametrize("path", ["/app/", "/app/sign-in", "/app/consent"])
 def test_the_app_and_its_oauth_screens_share_the_shell(static_app, path):
     """main.jsx picks landing or app from the path; the server only has to
     hand every one of them the same index.html."""
@@ -161,6 +161,13 @@ def test_the_app_and_its_oauth_screens_share_the_shell(static_app, path):
     assert resp.status_code == 200
     assert "MyGist" in resp.text
     assert resp.headers["cache-control"] == "no-cache"
+
+
+def test_bare_app_gets_its_slash(static_app):
+    """/app/ is canonical, so hash routes read /app/#/profile, not /app#/."""
+    resp = TestClient(static_app).get("/app?invite=X", follow_redirects=False)
+    assert resp.status_code == 308
+    assert resp.headers["location"] == "/app/?invite=X"
 
 
 @pytest.mark.parametrize("path", ["/sign-in", "/consent"])
