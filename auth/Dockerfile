@@ -18,6 +18,12 @@ RUN npm ci --omit=dev --prefer-offline
 
 COPY src/ ./src/
 
+# Better Auth turns its rate limiter on only when NODE_ENV is "production" --
+# including the 3-per-10s rule on sign-in and the OAuth register, token and
+# authorize limits in src/oauth.js. Unset, every one of them is off. This is
+# the production image, so it says so rather than relying on the platform to.
+ENV NODE_ENV=production
+
 # curl for the healthcheck; alpine ships without it.
 RUN apk add --no-cache curl
 
