@@ -12,30 +12,15 @@ describe("EyebrowBand", () => {
     expect(screen.getByRole("heading", { name: "Code Style", level: 3 })).toBeInTheDocument();
   });
 
-  it("sets the label in mono, uppercase and tracked, which is what makes it an eyebrow", () => {
-    // caption-2: 13px Geist Mono, +0.06em, uppercase, muted. Mono is reserved
-    // for strings that really are machine output -- the build hash, and these
-    // labels -- so this is the one place in the editor it appears.
+  it("is a real heading, one step above the subsection titles, not an eyebrow", () => {
+    // It was 13px mono uppercase, smaller than the 16px titles beneath it, so
+    // the hierarchy read upside down.
     render(<EyebrowBand title="Code Style" />);
     const label = screen.getByRole("heading", { name: "Code Style" });
-    expect(label.className).toContain("font-mono");
-    expect(label.className).toContain("uppercase");
-    expect(label.className).toContain("tracking-[0.06em]");
-    expect(label.className).toContain("text-[13px]");
-    expect(label.className).toContain("text-muted-foreground");
-  });
-
-  it("rules out to the end of the row, decoratively", () => {
-    // The rule is what makes the label read as a band rather than a stray
-    // heading. It is aria-hidden and NOT a separator role: it does not divide
-    // anything, it belongs to the label.
-    render(<EyebrowBand title="Code Style" />);
-    const rule = document.querySelector("[data-eyebrow-rule]");
-    expect(rule).not.toBeNull();
-    expect(rule).toHaveAttribute("aria-hidden", "true");
-    expect(rule.className).toContain("flex-1");
-    expect(rule.className).toContain("h-px");
-    expect(screen.queryAllByRole("separator")).toHaveLength(0);
+    expect(label.className).toContain("text-lg");
+    expect(label.className).toContain("font-semibold");
+    expect(label.className).not.toContain("font-mono");
+    expect(label.className).not.toContain("uppercase");
   });
 
   it("keeps the group's info button, in the band's own row", () => {

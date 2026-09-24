@@ -159,5 +159,10 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // `coarse:` -- a touch screen. Tap targets grow to 44px there without
+    // making every button that big under a mouse, where density is the point.
+    ({ addVariant }) => addVariant("coarse", "@media (pointer: coarse)"),
+  ],
 }

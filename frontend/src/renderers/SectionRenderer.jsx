@@ -128,9 +128,11 @@ export default function SectionRenderer({
   const countFor = (node, value) => {
     if (node.kind !== "fields") return null;
     const { filled, total } = fillSummary(node, value);
-    if (total === 0) return null;
+    // A full node says nothing: "7 of 7" on every finished card is noise, and
+    // the count exists to point at gaps.
+    if (total === 0 || filled === total) return null;
     return (
-      <span data-fill-summary className="text-[13px] tabular-nums text-muted-foreground">
+      <span data-fill-summary className="text-sm tabular-nums text-muted-foreground">
         {filled === 0 ? "Nothing yet" : `${filled} of ${total}`}
       </span>
     );
@@ -180,7 +182,7 @@ export default function SectionRenderer({
         <div key={key} data-ui-node={node.title} className="space-y-1.5">
           {node.title && <NodeLabel title={node.title} depth={depth} info={node.info} />}
           {node.description && (
-            <p className="text-[13px] text-muted-foreground">{node.description}</p>
+            <p className="text-sm text-muted-foreground">{node.description}</p>
           )}
           {content}
         </div>
@@ -206,7 +208,9 @@ export default function SectionRenderer({
         data-band={band}
         // Concatenated, never replacing: `scroll-mt` clears the 60px sticky
         // header so a rail click does not land with the title underneath it.
-        className={band ? "scroll-mt-[60px]" : undefined}
+        // The section's first node sits straight under the page title, where
+        // a rule would only separate the title from its own content.
+        className={[band && "scroll-mt-[60px]", key === "0" && "border-t-0 pt-0"].filter(Boolean).join(" ") || undefined}
       >
         {content}
       </SubsectionCard>
@@ -288,12 +292,12 @@ export default function SectionRenderer({
         key={key}
         data-ui-node={node.title}
         data-band={band}
-        className={`space-y-4${band ? " scroll-mt-[60px]" : ""}`}
+        className={`space-y-5${band ? " scroll-mt-[60px]" : ""}`}
       >
         {node.title && (
           <EyebrowBand title={node.title} info={node.info} description={node.description} />
         )}
-        <div data-card-grid className={`grid gap-4${twoUp ? " lg:grid-cols-2" : ""}`}>
+        <div data-card-grid className={`grid gap-x-8 gap-y-6${twoUp ? " lg:grid-cols-2" : ""}`}>
           {cards}
         </div>
       </div>
@@ -309,7 +313,7 @@ export default function SectionRenderer({
       .filter(Boolean);
     if (cards.length === 0) return null;
     return (
-      <div key={`run:${items[0].index}`} className="space-y-4">
+      <div key={`run:${items[0].index}`} className="space-y-6">
         {cards}
       </div>
     );
@@ -321,15 +325,15 @@ export default function SectionRenderer({
     // space-y-8 = 32 between runs, and between the title block and the first
     // one. An empty run returns null and contributes no element, so it cannot
     // leave a gap behind.
-    <div className="space-y-8">
+    <div className="space-y-10">
       {/* The section's own actions (History, Hide) sit beside its title:
           they act on this section, so they belong next to its name rather
           than in Settings. Passed in, because they need App's state. */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-1">
-          <h2 className="text-xl font-semibold text-foreground">{pack.title}</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">{pack.title}</h2>
           {pack.description && (
-            <p className="text-[13px] text-muted-foreground">{pack.description}</p>
+            <p className="text-sm text-muted-foreground">{pack.description}</p>
           )}
         </div>
         {headerActions && <div className="flex shrink-0 items-center gap-2">{headerActions}</div>}

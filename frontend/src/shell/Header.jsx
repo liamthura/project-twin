@@ -116,7 +116,7 @@ export function Header({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[13px] font-medium transition-colors duration-fast ease-standard hover:bg-muted/50"
+                className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[13px] font-medium transition-colors duration-fast ease-standard hover:bg-muted/50 coarse:min-h-11"
               >
                 <User className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                 <span className="max-w-[128px] truncate">{accountName || "Account"}</span>

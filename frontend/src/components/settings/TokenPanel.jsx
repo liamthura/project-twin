@@ -14,7 +14,7 @@
  * Read has no switch because it is the floor for every token, not a choice.
  */
 import { useEffect, useState } from "react";
-import { Check, Copy, Key, Loader2, Trash2 } from "lucide-react";
+import { Check, Copy, Key, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -238,13 +238,13 @@ export function TokenPanel({ isOpen }) {
                 </div>
               ) : (
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => setConfirmRevokeId(t.id)}
-                  title="Revoke token"
+                  aria-label={`Revoke token ${t.label}`}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  Revoke
                 </Button>
               )}
             </div>

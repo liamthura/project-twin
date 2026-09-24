@@ -2235,26 +2235,18 @@ describe("sort control", () => {
   // it, which is exactly why the assertion is worth writing down.
   const countEl = () => screen.getByText(/^\d+( of \d+)? entr(y|ies)$/);
 
-  it("puts the count last in the row and pushes it to the far right", () => {
+  it("says nothing about length while nothing is filtering", () => {
+    // Wave 3: "3 entries" over every list was the editor's most repeated line,
+    // and the rows already show how long the list is.
     render(<ListRenderer node={sortNode} items={entries} onItems={vi.fn()} />);
-
-    const count = countEl();
-    // DOCUMENT_POSITION_FOLLOWING == `count` comes after the control in
-    // document order, which is the ordering claim; ml-auto is what turns that
-    // ordering into the visual gap between them.
-    const rel = control().compareDocumentPosition(count);
-    expect(rel & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(count.className).toContain("ml-auto");
+    expect(screen.queryByText(/entr(y|ies)$/)).not.toBeInTheDocument();
   });
 
-  it("leaves a lone count unpushed, having nothing to sit opposite", () => {
-    // No facets, no date field: the row is the count by itself, and shoving it
-    // against the right edge would just look like a mistake.
-    const plain = listNode(["entries"], "topic");
-    render(<ListRenderer node={plain} items={[{ topic: "Alpha" }]} onItems={vi.fn()} />);
-
-    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
-    expect(countEl()).toHaveTextContent("1 entry");
-    expect(countEl().className).not.toContain("ml-auto");
+  it("counts what a search leaves, last in the row", async () => {
+    const node = listNode(["entries"], "topic", [], { node: { search: true } });
+    const items = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta"].map((topic) => ({ topic }));
+    render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search" }), "eta");
+    expect(countEl()).toHaveTextContent("3 of 7 entries");
   });
 });

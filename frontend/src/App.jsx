@@ -46,7 +46,7 @@ import SectionRenderer from "@/renderers/SectionRenderer";
 import { outline } from "@/renderers/paths";
 import { Header } from "@/shell/Header";
 import { Rail } from "@/shell/Rail";
-import { SectionSheet } from "@/shell/SectionSheet";
+import { SectionMenu } from "@/shell/SectionMenu";
 import { useScrollSpy } from "@/shell/useScrollSpy";
 import { useKeyedDebounce } from "@/lib/useKeyedDebounce";
 
@@ -768,7 +768,7 @@ export default function App() {
           <AddEmailBanner onAddEmail={() => openSettings("account")} />
         </div>
 
-        <SectionSheet {...shellProps} />
+        <SectionMenu {...shellProps} />
 
         <div className="flex flex-col gap-6 md:flex-row">
           <Rail {...shellProps} />

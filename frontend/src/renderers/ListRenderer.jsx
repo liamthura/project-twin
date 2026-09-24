@@ -368,9 +368,10 @@ export default function ListRenderer({
       {/* The count sits WITH the filters rather than in a toolbar above them:
           it is feedback on what they did ("2 of 7"), and a row away from the
           controls that change it there was nothing to connect the two.
-          Rendered even for a node with neither facets nor search, where this
-          row is the count alone -- it is the only thing that tells the reader
-          how long the list is.
+          Only while something is filtering (wave 3). Unfiltered, the rows
+          themselves say how long the list is, and "3 entries" over every list
+          was the most repeated line in the editor. With no controls and no
+          filter the row is hidden, so it adds no gap.
 
           Within the row the controls lead and the count is pushed to the far
           right, which is the prototype's arrangement: every toolbar row there
@@ -380,7 +381,7 @@ export default function ListRenderer({
           `ml-auto` rather than `justify-between` on the row because the row can
           hold three things (facets, sort, count) and justify-between would
           spread the two controls apart instead of keeping them grouped. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className={`${hasRowControls || q || facetsActive ? "flex" : "hidden"} flex-wrap items-center gap-x-4 gap-y-2`}>
         {/* Facets: display-only row filters, drawn above the list. Each entry
             in node.facets names an enum storage key; `facetOptions` above
             resolves that field's option set. A field with no resolvable
@@ -447,15 +448,16 @@ export default function ListRenderer({
             with no facets and no sort this is the row's only child, and a lone
             count belongs where it has always been rather than stranded against
             the right edge with nothing to sit opposite. */}
-        <div className={`text-sm text-muted-foreground${hasRowControls ? " ml-auto" : ""}`}>
-          {q || facetsActive ? `${visible.length} of ${items.length}` : items.length}{" "}
-          {items.length === 1 ? "entry" : "entries"}
-        </div>
+        {(q || facetsActive) && (
+          <div className={`text-sm text-muted-foreground${hasRowControls ? " ml-auto" : ""}`}>
+            {visible.length} of {items.length} {items.length === 1 ? "entry" : "entries"}
+          </div>
+        )}
       </div>
 
       {suggestions.length > 0 && (
         <div className="space-y-1.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="text-xs font-medium text-muted-foreground">
             Suggested (tap to add)
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -570,13 +572,17 @@ export default function ListRenderer({
                     is what lets `truncate` work at all inside a flex child. */}
                 <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
                 <span className="block truncate text-sm font-medium">{item[titleField]}</span>
-                <span className="mt-1 flex flex-wrap items-center gap-1.5 sm:mt-0 sm:flex-1 sm:flex-nowrap">
+                <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 sm:mt-0 sm:flex-1 sm:flex-nowrap">
+                  {/* Plain text with its label, not a mono pill: a bare
+                      "2025-09-20" chip never said whether it was a start, an
+                      end or a last edit. */}
                   {displayFields
                     .filter((f) => item[f] != null && item[f] !== "")
                     .map((f) => (
-                      <Badge key={f} variant="secondary" className="gap-1 text-[10px] font-mono">
-                        {formatDisplay(item[f], formats[f])}
-                      </Badge>
+                      <span key={f} data-row-meta className={`whitespace-nowrap text-xs tabular-nums text-muted-foreground first-letter:uppercase`}>
+                        {fieldLabel(meta, f).text}{" "}
+                        <span className="text-foreground/80">{formatDisplay(item[f], formats[f])}</span>
+                      </span>
                     ))}
                   {/* count_badges: opt-in "N <field>" chips for array-valued
                       storage keys, e.g. "3 references". Read-only, like
@@ -597,9 +603,9 @@ export default function ListRenderer({
                       const n = item[f].length;
                       const label = f.replace(/_/g, " ");
                       return (
-                        <Badge key={`count:${f}`} variant="secondary" className="gap-1 text-[10px] font-mono">
+                        <span key={`count:${f}`} data-row-meta className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
                           {n} {n === 1 ? label.replace(/s$/, "") : label}
-                        </Badge>
+                        </span>
                       );
                     })}
                   {badges.filter((b) => item[b]).map((b) => {
@@ -609,7 +615,7 @@ export default function ListRenderer({
                       <Badge
                         key={b}
                         variant={chip ? "outline" : "secondary"}
-                        className={`gap-1 text-[10px] ${chip || ""}`}
+                        className={`gap-1 text-xs font-medium ${chip || ""}`}
                       >
                         <ValueIcon value={value} className="h-2.5 w-2.5" />
                         {value.replace(/_/g, " ")}
@@ -679,7 +685,7 @@ export default function ListRenderer({
                         <Label className={`text-xs${fieldLabel(meta, f).capitalize}`}>
                           {fieldLabel(meta, f).text}
                         </Label>
-                        <p className="font-mono text-xs text-muted-foreground">
+                        <p className="text-xs tabular-nums text-muted-foreground">
                           {formatDisplay(item[f], formats[f])}
                         </p>
                       </div>

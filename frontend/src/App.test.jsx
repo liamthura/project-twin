@@ -89,7 +89,7 @@ function mockApi({ packs, disabledSections = [], pendingCount = 0 }) {
 // navigation landmark rather than role="tab". The behaviours are unchanged --
 // what is asserted is the same set of facts, through the shell that exists now.
 //
-// Scoped to the rail deliberately: the mobile SectionSheet is in the DOM too
+// Scoped to the rail deliberately: the mobile SectionMenu is in the DOM too
 // (jsdom applies no CSS, so `md:hidden` hides nothing here), and an unscoped
 // query would match its trigger as well.
 const rail = () => screen.getByRole("navigation", { name: "Sections" });

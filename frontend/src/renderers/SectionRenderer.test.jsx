@@ -555,7 +555,8 @@ describe("SectionRenderer", () => {
     it("labels the body timestamp so it reads as a field, not a stray string", async () => {
       const { user } = renderSection({ pack: learningLogPack, initial: learningLogData });
       await user.click(screen.getByText("React Server Components"));
-      expect(screen.getByText("timestamp")).toBeInTheDocument();
+      // Twice: the collapsed row labels its timestamp too now.
+      expect(screen.getAllByText("timestamp").length).toBeGreaterThan(1);
     });
 
     it("gives each key decision its own editable row", async () => {
@@ -2470,25 +2471,12 @@ describe("the Add trigger and the entry count", () => {
     ).toHaveLength(1);
   });
 
-  it("shows the entry count beside the filter row rather than above the list", () => {
+  it("shows no entry count while nothing is filtering", () => {
+    // Wave 3: the rows say how long the list is; the count only answers a
+    // filter or a search ("2 of 7 entries"), and ListRenderer's tests cover it.
     renderSection({ pack: preferencesPack, initial: preferencesData });
-    const nodeEl = uiNode("Likes & Dislikes");
-
-    const count = within(nodeEl).getByText(/\d+ entr(y|ies)/);
-    // Same row as the filters, so the count reads as feedback on them.
-    expect(count.parentElement).toContainElement(
-      within(nodeEl).getByRole("group", { name: "Filters" })
-    );
-  });
-
-  it("still shows the count for a list with no filters and no search box", () => {
-    // It is the only thing telling the reader how long the list is, so it is
-    // not conditional on there being a filter to sit beside.
-    renderSection({ pack: preferencesPack, initial: preferencesData });
-    const nodeEl = uiNode("When I'm feeling...");
-
-    expect(within(nodeEl).queryByRole("group", { name: "Filters" })).not.toBeInTheDocument();
-    expect(within(nodeEl).getByText(/2 entries/)).toBeInTheDocument();
+    expect(within(uiNode("Likes & Dislikes")).queryByText(/\d+ entr(y|ies)/)).not.toBeInTheDocument();
+    expect(within(uiNode("When I'm feeling...")).queryByText(/\d+ entr(y|ies)/)).not.toBeInTheDocument();
   });
 });
 
@@ -2513,10 +2501,10 @@ describe("scroll-spy anchors", () => {
 
   it("keeps the wrapper's own spacing class rather than replacing it", () => {
     // The band attribute rides on the existing wrapper. Overwriting className
-    // instead of extending it would strip space-y-4 and silently reflow every
+    // instead of extending it would strip space-y-5 and silently reflow every
     // grouped section in the app.
     render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
-    expect(document.querySelector('[data-band="code-style"]').className).toContain("space-y-4");
+    expect(document.querySelector('[data-band="code-style"]').className).toContain("space-y-5");
   });
 
   it("stamps nothing on a section whose only node is untitled", () => {
@@ -2555,7 +2543,7 @@ describe("scroll-spy anchors", () => {
 // ---------------------------------------------------------------------------
 describe("the section's structure", () => {
   const cards = () => [...document.querySelectorAll("[data-subsection-card]")];
-  const bands = () => [...document.querySelectorAll("[data-eyebrow-rule]")];
+  const bands = () => [...document.querySelectorAll("[data-eyebrow]")];
 
   it("puts the section's name and description in a title block, outside every card", () => {
     render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
@@ -2584,10 +2572,10 @@ describe("the section's structure", () => {
     render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "Code Style", level: 3 }).className).toContain(
-      "font-mono"
+      "text-lg"
     );
     const group = uiNode("Code Style");
-    expect(group.querySelector("[data-eyebrow-rule]")).not.toBeNull();
+    expect(group.querySelector("[data-eyebrow]")).not.toBeNull();
     expect(
       within(group).getByRole("heading", { name: "Preferred Languages", level: 4 })
     ).toBeInTheDocument();
@@ -2601,7 +2589,7 @@ describe("the section's structure", () => {
 
     const likes = uiNode("Likes & Dislikes");
     expect(likes.hasAttribute("data-subsection-card")).toBe(true);
-    expect(likes.querySelector("[data-eyebrow-rule]")).toBeNull();
+    expect(likes.querySelector("[data-eyebrow]")).toBeNull();
     // One band per group, and no more.
     expect(bands()).toHaveLength(3);
   });
@@ -2624,18 +2612,18 @@ describe("the section's structure", () => {
     expect(within(cards()[0]).getByText("Add", { selector: "button" })).toBeInTheDocument();
   });
 
-  it("spaces runs 32px apart and cards within a run 16px", () => {
+  it("spaces runs 40px apart and groups within a run 24px", () => {
     // A run is one group, or one consecutive stretch of ungrouped leaves.
     render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
 
     // h2 -> title block -> header row (title and actions) -> the column.
     const column = screen.getByRole("heading", { level: 2 }).parentElement.parentElement.parentElement;
-    expect(column.className).toContain("space-y-8");
+    expect(column.className).toContain("space-y-10");
     // profile: [Personal Information, Education, Work Experience], [Contact &
     // Links], [Languages] -- the group is its own run, and the leaf after it
     // starts another rather than joining it.
     expect(column.children).toHaveLength(4); // title block + three runs
-    expect(uiNode("Contact & Links").className).toContain("space-y-4");
+    expect(uiNode("Contact & Links").className).toContain("space-y-5");
   });
 
   it("starts a new run for a leaf that follows a group, rather than tucking it under the band", () => {
@@ -2705,7 +2693,7 @@ describe("the section's structure", () => {
       const inner = uiNode("Inner");
       expect(inner.hasAttribute("data-subsection-card")).toBe(true);
       expect(screen.getByRole("heading", { name: "Inner", level: 4 })).toBeInTheDocument();
-      expect(inner.querySelector("[data-eyebrow-rule]")).toBeNull();
+      expect(inner.querySelector("[data-eyebrow]")).toBeNull();
     });
 
     it("puts the nested group's children inside that one card, each with its own label", () => {
@@ -2790,7 +2778,8 @@ describe("the fields count in a card header", () => {
     ],
   };
 
-  it("reports how many of the declared keys are filled", () => {
+  it("says nothing once every declared key is filled", () => {
+    // "3 of 3" on every finished card is noise; the count points at gaps.
     render(
       <SectionRenderer
         pack={pack}
@@ -2798,7 +2787,7 @@ describe("the fields count in a card header", () => {
         onChange={vi.fn()}
       />
     );
-    expect(summaryOf("Default style").textContent).toBe("3 of 3");
+    expect(cardOf("Default style").querySelector("[data-fill-summary]")).toBeNull();
   });
 
   it("counts only what is answered", () => {
@@ -2848,7 +2837,9 @@ describe("the fields count in a card header", () => {
     // The real case, and the one the prototype shows at 6 of 7 (114:366). It
     // binds path [] -- the section root -- so a count computed from the whole
     // data object rather than the node's fields would be wrong here first.
-    renderSection({ pack: profilePack, initial: profileData });
+    // One declared key left empty, so the count has a gap to report.
+    const [firstKey] = profilePack.sections[0].element.fields.map((f) => f.name);
+    renderSection({ pack: profilePack, initial: { ...profileData, [firstKey]: "" } });
     const summary = summaryOf("Personal Information");
     const declared = profilePack.sections[0].element.fields.length;
     expect(summary.textContent).toMatch(new RegExp(`^\\d+ of ${declared}$`));
@@ -2989,7 +2980,7 @@ describe("scroll-spy anchors, after the restructure", () => {
     render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
 
     const anchor = document.querySelector('[data-band="code-style"]');
-    expect(anchor.querySelector("[data-eyebrow-rule]")).not.toBeNull();
+    expect(anchor.querySelector("[data-eyebrow]")).not.toBeNull();
     expect(anchor.querySelectorAll("[data-subsection-card]").length).toBeGreaterThan(1);
   });
 

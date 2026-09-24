@@ -25,15 +25,13 @@ describe("SubsectionCard", () => {
     expect(title.className).toContain("font-semibold");
   });
 
-  it("carries the card geometry the prototype measures", () => {
-    // Figma 114:363: radius 12, padding 16, 1px border, no shadow at rest.
-    // rounded-xl is calc(var(--radius) + 4px) via the config, so the concentric
-    // 12/8/6 scale holds if --radius ever moves.
+  it("is a hairline group, not a box", () => {
+    // Wave 3: a card held a bordered list of bordered inputs, three boxes
+    // deep. A rule above and the spacing do the grouping now.
     render(<SubsectionCard title="Education" depth={0}>rows</SubsectionCard>);
-    expect(card().className).toContain("rounded-xl");
-    expect(card().className).toContain("p-4");
-    expect(card().className).toContain("border");
-    expect(card().className).toContain("shadow-none");
+    expect(card().className).toContain("border-t");
+    expect(card().className).not.toContain("rounded-xl");
+    expect(card().className).not.toContain("p-4");
   });
 
   it("puts the header 12px above its content", () => {

@@ -65,7 +65,8 @@ export function ArrayInput({ items = [], onChange, placeholder }) {
                 type="button"
                 aria-label={`Remove ${item}`}
                 onClick={() => removeItem(index)}
-                className="ml-1 hover:text-destructive transition-colors"
+                // tap-target: the glyph stays 12px, an invisible pad takes the tap.
+                className="tap-target ml-1 hover:text-destructive transition-colors"
               >
                 <X className="h-3 w-3" />
               </button>
