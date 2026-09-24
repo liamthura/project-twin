@@ -45,6 +45,7 @@ documents a bare `docker run -p 1120:1120` with no reverse proxy at all as a
 supported deployment.
 """
 
+import ipaddress
 import json
 import logging
 import os
@@ -86,6 +87,35 @@ _DROP_FROM_RESPONSE = _HOP_BY_HOP | {"content-encoding", "content-length"}
 
 # The header this proxy asserts rather than forwards. See the module docstring.
 _CLIENT_IP = "x-forwarded-for"
+
+# A CDN in front of the edge proxy (Cloudflare) terminates the visitor's
+# connection, so the peer this server sees is the CDN's edge, shared by
+# everyone near it -- one sign-in bucket for a whole region. The CDN states the
+# visitor's address in its own header, and that header is believed ONLY when
+# the peer is inside the CDN's published ranges: anyone else can write it.
+#
+#   AUTH_CLIENT_IP_HEADER=cf-connecting-ip
+#   AUTH_CLIENT_IP_HEADER_FROM=<Cloudflare's ranges, comma-separated>
+#
+# The peer here is uvicorn's `request.client`, so the edge proxy between the
+# CDN and this container must be in FORWARDED_ALLOW_IPS for it to be the CDN's
+# address rather than the edge proxy's. See docs run/self-hosting.
+CLIENT_IP_HEADER = os.getenv("AUTH_CLIENT_IP_HEADER", "").strip().lower()
+
+
+def _networks(raw: str) -> list:
+    nets = []
+    for entry in (e.strip() for e in raw.split(",")):
+        if not entry:
+            continue
+        try:
+            nets.append(ipaddress.ip_network(entry, strict=False))
+        except ValueError:
+            logger.warning("AUTH_CLIENT_IP_HEADER_FROM: ignoring %r, not an IP range", entry)
+    return nets
+
+
+CLIENT_IP_HEADER_FROM = _networks(os.getenv("AUTH_CLIENT_IP_HEADER_FROM", ""))
 
 # Dropped from the REQUEST. Host is left to httpx so it matches the upstream
 # address rather than the public one. The inbound client-IP header is dropped
@@ -163,8 +193,27 @@ def _request_headers(request: Request) -> dict:
         if k.lower() not in _DROP_FROM_REQUEST
     }
     if request.client is not None:
-        headers[_CLIENT_IP] = request.client.host
+        headers[_CLIENT_IP] = _client_ip(request)
     return headers
+
+
+def _parse_ip(value: str):
+    try:
+        return ipaddress.ip_address(value.strip())
+    except ValueError:
+        return None
+
+
+def _client_ip(request: Request) -> str:
+    """The peer, or the visitor address a trusted CDN peer vouches for."""
+    peer = request.client.host
+    if not (CLIENT_IP_HEADER and CLIENT_IP_HEADER_FROM):
+        return peer
+    peer_ip = _parse_ip(peer)
+    if peer_ip is None or not any(peer_ip in net for net in CLIENT_IP_HEADER_FROM):
+        return peer
+    stated = _parse_ip(request.headers.get(CLIENT_IP_HEADER, ""))
+    return str(stated) if stated is not None else peer
 
 
 def build_response(upstream: httpx.Response) -> Response:

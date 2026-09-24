@@ -301,3 +301,42 @@ def test_a_set_cookie_from_upstream_is_never_remembered():
     assert len(list(client.cookies.jar)) == 0
 
     auth_proxy._client = None
+
+
+def _peer_request(peer, headers):
+    return Request({
+        "type": "http", "method": "GET", "path": "/auth/session",
+        "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+        "client": (peer, 443),
+    })
+
+
+def _trust_cdn(monkeypatch):
+    monkeypatch.setattr(auth_proxy, "CLIENT_IP_HEADER", "cf-connecting-ip")
+    monkeypatch.setattr(auth_proxy, "CLIENT_IP_HEADER_FROM", auth_proxy._networks("172.64.0.0/13, 2606:4700::/32"))
+
+
+def test_a_cdn_peer_is_believed_about_the_visitor(monkeypatch):
+    """Behind Cloudflare every visitor arrived as an edge address, so the whole
+    region shared one sign-in bucket."""
+    _trust_cdn(monkeypatch)
+    req = _peer_request("172.71.241.128", {"CF-Connecting-IP": "81.2.69.160"})
+    assert auth_proxy._request_headers(req)["x-forwarded-for"] == "81.2.69.160"
+
+
+def test_anyone_else_writing_the_cdn_header_is_ignored(monkeypatch):
+    _trust_cdn(monkeypatch)
+    req = _peer_request("81.2.69.99", {"CF-Connecting-IP": "9.9.9.9"})
+    assert auth_proxy._request_headers(req)["x-forwarded-for"] == "81.2.69.99"
+
+
+def test_a_cdn_peer_with_a_junk_header_falls_back_to_the_peer(monkeypatch):
+    _trust_cdn(monkeypatch)
+    req = _peer_request("172.71.241.128", {"CF-Connecting-IP": "9.9.9.9, 1.1.1.1"})
+    assert auth_proxy._request_headers(req)["x-forwarded-for"] == "172.71.241.128"
+
+
+def test_unconfigured_the_cdn_header_means_nothing(monkeypatch):
+    monkeypatch.setattr(auth_proxy, "CLIENT_IP_HEADER", "")
+    req = _peer_request("172.71.241.128", {"CF-Connecting-IP": "9.9.9.9"})
+    assert auth_proxy._request_headers(req)["x-forwarded-for"] == "172.71.241.128"
