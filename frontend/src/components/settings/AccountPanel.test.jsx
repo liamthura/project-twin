@@ -68,7 +68,7 @@ beforeEach(() => {
   listAccounts.mockResolvedValue([]);
   // The panel reads `?error=` off the URL on mount, so a test that puts one
   // there must not leak it into the next one.
-  window.history.replaceState(null, "", "/");
+  window.history.replaceState(null, "", "/app/");
 });
 
 describe("who you are", () => {
@@ -329,7 +329,7 @@ describe("a link attempt that came back with an error", () => {
     window.history.replaceState(
       null,
       "",
-      "/?error=account_already_linked_to_different_user",
+      "/app/?error=account_already_linked_to_different_user",
     );
     open();
 

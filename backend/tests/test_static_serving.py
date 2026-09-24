@@ -153,6 +153,56 @@ def test_index_is_served_at_root(static_app):
     assert "MyGist" in resp.text
 
 
+@pytest.mark.parametrize("path", ["/app/", "/app/sign-in", "/app/consent"])
+def test_the_app_and_its_oauth_screens_share_the_shell(static_app, path):
+    """main.jsx picks landing or app from the path; the server only has to
+    hand every one of them the same index.html."""
+    resp = TestClient(static_app).get(path)
+    assert resp.status_code == 200
+    assert "MyGist" in resp.text
+    assert resp.headers["cache-control"] == "no-cache"
+
+
+def test_the_app_path_agrees_across_frontend_auth_and_backend(static_app):
+    """The app's path is spelled in three languages: APP_PATH in the SPA,
+    loginPage/consentPage in the auth service, and the routes above. Nothing
+    else ties them together, so a change to one that misses the others would
+    send every OAuth sign-in to a page this server does not serve."""
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    paths_js = (root / "frontend/src/lib/paths.js").read_text()
+    oauth_js = (root / "auth/src/oauth.js").read_text()
+
+    app_path = re.search(r'APP_PATH = "([^"]+)"', paths_js).group(1)
+    pages = dict(re.findall(r'(loginPage|consentPage): "([^"]+)"', oauth_js))
+
+    assert set(pages) == {"loginPage", "consentPage"}
+    client = TestClient(static_app)
+    for page in pages.values():
+        assert page.startswith(f"{app_path}/")
+        assert client.get(page).status_code == 200
+    assert client.get(f"{app_path}/").status_code == 200
+
+
+def test_bare_app_gets_its_slash(static_app):
+    """/app/ is canonical, so hash routes read /app/#/profile, not /app#/."""
+    resp = TestClient(static_app).get("/app?invite=X", follow_redirects=False)
+    assert resp.status_code == 308
+    assert resp.headers["location"] == "/app/?invite=X"
+
+
+@pytest.mark.parametrize("path", ["/sign-in", "/consent"])
+def test_old_oauth_paths_move_under_app_with_the_query(static_app, path):
+    """An authorize flow already in flight when the app moved still lands:
+    the query is the flow, so it has to survive the redirect."""
+    resp = TestClient(static_app).get(
+        f"{path}?client_id=abc&state=xyz", follow_redirects=False)
+    assert resp.status_code == 308
+    assert resp.headers["location"] == f"/app{path}?client_id=abc&state=xyz"
+
+
 def test_index_is_not_cached(static_app):
     """The shell names the content-hashed asset files, so caching it would
     pin clients to a stale build."""

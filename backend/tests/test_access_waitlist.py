@@ -187,13 +187,13 @@ def test_admit_prints_a_link_when_it_knows_the_origin(waiting):
 
     assert result.returncode == 0
     code = next(w for w in result.stdout.split() if len(w) == 9 and w[4] == "-")
-    assert f"https://mygist.example.com/?invite={code}" in result.stdout
+    assert f"https://mygist.example.com/app/?invite={code}" in result.stdout
 
 
 def test_a_trailing_slash_on_the_origin_does_not_double_up(waiting):
     result = run_cli("admit", waiting, "--url", "https://mygist.example.com/")
-    assert "com//?invite=" not in result.stdout
-    assert "com/?invite=" in result.stdout
+    assert "com//app" not in result.stdout
+    assert "com/app/?invite=" in result.stdout
 
 
 def test_admit_says_how_to_get_a_link_when_it_has_no_origin(waiting):
@@ -233,7 +233,7 @@ def test_send_prints_the_message_when_no_provider_is_configured(waiting):
     assert "Not sent" in result.stdout
     assert "RESEND_API_KEY" in result.stdout
     # The message itself has to be readable, or there is nothing to copy.
-    assert "https://mygist.example.com/?invite=" in result.stdout
+    assert "https://mygist.example.com/app/?invite=" in result.stdout
     assert "Your MyGist invite" in result.stdout
     # And it still did the database half.
     assert waitlist_store.pending_count() == 0

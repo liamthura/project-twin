@@ -20,6 +20,8 @@ vi.mock("@/lib/session.js", async (importOriginal) => {
 });
 
 import App from "@/App";
+import Home from "@/Home";
+import { hasSession } from "@/lib/session.js";
 
 beforeAll(() => {
   window.matchMedia =
@@ -39,37 +41,39 @@ beforeEach(() => {
 });
 
 describe("The no-credential gate", () => {
-  it("shows a visitor the landing page, not a sign-in form", async () => {
-    render(<App />);
+  it("shows a visitor at / the landing page, not a sign-in form", async () => {
+    render(<Home />);
 
     expect(
       await screen.findByRole("heading", { name: "Explain yourself once.", level: 1 }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
     expect(screen.queryByText("Welcome to MyGist")).not.toBeInTheDocument();
   });
 
-  it("hands over to the auth screen when sign in is chosen", async () => {
-    const user = userEvent.setup();
-    render(<App />);
+  it("offers a signed-in visitor at / the app instead of sign-in", async () => {
+    hasSession.mockResolvedValueOnce(true);
+    render(<Home />);
 
-    await screen.findByRole("heading", { name: "Explain yourself once.", level: 1 });
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
-
-    expect(await screen.findByText("Welcome to MyGist")).toBeInTheDocument();
-    // goToRoute uses pushState, which fires no hashchange -- the route has to
-    // reach App by the setter at the call site, and this is what proves it.
-    expect(window.location.hash).toBe("#/signin");
+    expect(await screen.findByRole("button", { name: "Open app" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in" })).not.toBeInTheDocument();
   });
 
-  it("goes straight to the auth screen for a deep link to #/signin", async () => {
-    window.history.replaceState(null, "", "/#/signin");
+  it("shows the sign-in form, not the landing page, at /app without a credential", async () => {
+    window.history.replaceState(null, "", "/app/");
     render(<App />);
 
     expect(await screen.findByText("Welcome to MyGist")).toBeInTheDocument();
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("heading", { name: "Explain yourself once." }),
-      ).not.toBeInTheDocument(),
-    );
+    expect(
+      screen.queryByRole("heading", { name: "Explain yourself once." }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("goes straight to the auth screen for a deep link to /app/#/signin", async () => {
+    window.history.replaceState(null, "", "/app/#/signin");
+    render(<App />);
+
+    expect(await screen.findByText("Welcome to MyGist")).toBeInTheDocument();
+    expect(window.location.hash).toBe("#/signin");
   });
 });

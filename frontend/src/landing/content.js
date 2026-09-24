@@ -22,6 +22,7 @@ export const HERO = {
   emailPlaceholder: "you@email.com",
   note: "Invite-only while it's small. One email when your invite lands.",
   signIn: { prefix: "Already have a code?", label: "Sign in." },
+  openApp: { prefix: "You're signed in.", label: "Open the app." },
   /**
    * The caption under the client chips, moved out of Hero.jsx so it sits with
    * the rest of the copy deck.

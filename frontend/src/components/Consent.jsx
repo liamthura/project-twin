@@ -46,6 +46,7 @@ import { authFetch, getSession } from "@/lib/session.js";
 // request -- `offline_access`, `openid` -- is the client's business, not the
 // user's, and is passed through rather than decided on.
 import { READ, PROPOSE, WRITE, PERSONA_SCOPES, SCOPE_LABELS } from "@/lib/scopes.js";
+import { APP_PATH } from "@/lib/paths.js";
 
 async function readError(res, fallback) {
   const body = await res.json().catch(() => ({}));
@@ -242,7 +243,7 @@ export default function Consent({ client: clientProp, username: usernameProp } =
       description={
         <>
           Signing in as <strong className="text-foreground">{username}</strong>. Not you?{" "}
-          <a href="/sign-in" className="underline hover:text-foreground">
+          <a href={`${APP_PATH}/sign-in`} className="underline hover:text-foreground">
             Switch account
           </a>
           .

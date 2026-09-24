@@ -29,7 +29,7 @@ import { WelcomeAuth } from "@/components/WelcomeAuth";
 import { ResetPassword } from "@/components/ResetPassword";
 import { AddEmailBanner } from "@/components/AddEmailBanner";
 import Consent from "@/components/Consent";
-import Landing from "@/landing/Landing";
+import { APP_PATH } from "@/lib/paths.js";
 import {
   DEFAULT_ONBOARDING_STEP,
   goToRoute,
@@ -77,15 +77,15 @@ export default function App() {
   // change), so a component that returns here never does so having already
   // called a hook on a previous render.
   const oauthScreen = window.location.pathname;
-  if (oauthScreen === "/consent") return <Consent />;
-  if (oauthScreen === "/sign-in") {
+  if (oauthScreen === `${APP_PATH}/consent`) return <Consent />;
+  if (oauthScreen === `${APP_PATH}/sign-in`) {
     // Captured now rather than read again in onSuccess below, so this does
     // not depend on WelcomeAuth's own address-bar handling: goToRoute
     // preserves window.location.search on every hash change, and the only
     // param it ever strips is `invite`, which never appears here -- but this
     // stays correct regardless of what WelcomeAuth does internally.
     const oauthQuery = window.location.search;
-    // /sign-in is a real, bookmarkable path, so it gets opened with no OAuth
+    // /app/sign-in is a real, bookmarkable path, so it gets opened with no OAuth
     // query behind it -- and /oauth2/authorize with an empty query is an
     // error page, not a sign-in. client_id is the parameter that makes this a
     // connection request; without it there is no flow to resume and the app
@@ -98,12 +98,12 @@ export default function App() {
         intent={isOAuthRequest ? "connect" : "app"}
         onSuccess={() => {
           if (!isOAuthRequest) {
-            window.location.assign("/");
+            window.location.assign(`${APP_PATH}/`);
             return;
           }
           // Better Auth's /oauth2/authorize re-evaluates now that a session
           // cookie exists, and continues the flow it interrupted -- on to
-          // /consent, or straight through for a client that has one already.
+          // /app/consent, or straight through for a client that has one already.
           window.location.assign(`/auth/oauth2/authorize${oauthQuery}`);
         }}
       />
@@ -596,20 +596,6 @@ export default function App() {
   // an HttpOnly cookie, so a signed-in account has no token here and would
   // otherwise be shown the sign-in screen the moment any request failed --
   // told to sign in while already signed in.
-  // No credential and no auth route asked for: this is a visitor, not a user
-  // locked out. Show them the page that explains what MyGist is. Sign in and
-  // the landing page hands over to WelcomeAuth below.
-  if (showingAuth && !isAuthRoute(route)) {
-    return (
-      <Landing
-        onSignIn={() => {
-          goToRoute("signin");
-          setRoute("signin");
-        }}
-      />
-    );
-  }
-
   if (showingAuth) {
     // No SettingsDialog here any more. The only thing that opened it on this
     // screen was "Use an access token instead", and with that gone it had no

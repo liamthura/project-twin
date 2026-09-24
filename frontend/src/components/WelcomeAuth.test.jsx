@@ -666,8 +666,8 @@ describe("WelcomeAuth with SSO configured", () => {
 
     expect(startSsoSignIn).toHaveBeenCalledWith(
       expect.objectContaining({
-        callbackURL: "/",
-        newUserCallbackURL: "/?onboarding=1",
+        callbackURL: "/app/",
+        newUserCallbackURL: "/app/?onboarding=1",
       }),
     );
   });
@@ -762,7 +762,7 @@ describe("callback URLs Better Auth will actually accept", () => {
       await screen.findByRole("button", { name: /continue with tdev door/i }),
     );
     expect(startSsoSignIn).toHaveBeenCalledWith(
-      expect.objectContaining({ newUserCallbackURL: "/?onboarding=1" }),
+      expect.objectContaining({ newUserCallbackURL: "/app/?onboarding=1" }),
     );
   });
 });

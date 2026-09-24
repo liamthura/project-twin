@@ -11,7 +11,7 @@ import { Column } from "./primitives";
  * Mobile carries the same three at smaller type rather than collapsing into a
  * hamburger, because three items do not need a menu.
  */
-export function Nav({ onSignIn, onJoin, joined = false }) {
+export function Nav({ onSignIn, onOpenApp, signedIn = false, onJoin, joined = false }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background">
       <Column className="flex h-16 items-center justify-between md:h-[72px]">
@@ -29,10 +29,10 @@ export function Nav({ onSignIn, onJoin, joined = false }) {
           </a>
           <button
             type="button"
-            onClick={onSignIn}
+            onClick={signedIn ? onOpenApp : onSignIn}
             className="rounded-md text-[13px] text-foreground hover:text-link md:text-sm"
           >
-            Sign in
+            {signedIn ? "Open app" : "Sign in"}
           </button>
           {/* Once the visitor has joined, the CTA is not a thing to do any
               more. It used to stay, and `scrollToWaitlist` then scrolled to a
