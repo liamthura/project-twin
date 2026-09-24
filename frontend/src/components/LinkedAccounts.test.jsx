@@ -23,7 +23,7 @@ const AUTHENTIK = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  window.history.replaceState(null, "", "/");
+  window.history.replaceState(null, "", "/app/");
 });
 
 it("shows nothing on an instance that does not federate sign-in", () => {
@@ -36,7 +36,7 @@ it("shows nothing on an instance that does not federate sign-in", () => {
 it("offers to link when the account has no provider yet", async () => {
   const user = userEvent.setup();
   // A real route, so "does the hash survive" is a question this can answer.
-  window.history.replaceState(null, "", "/#/preferences");
+  window.history.replaceState(null, "", "/app/#/preferences");
   render(<LinkedAccounts accounts={[CREDENTIAL]} sso />);
 
   await user.click(screen.getByRole("button", { name: /link tdev door/i }));
@@ -47,14 +47,14 @@ it("offers to link when the account has no provider yet", async () => {
   // with "Invalid callbackURL" and the link never starts. Returning someone to
   // the exact section is not expressible; landing on the default one is.
   const [args] = startSsoLink.mock.calls[0];
-  expect(args.callbackURL).toBe("/");
-  expect(args.errorCallbackURL).toBe("/");
+  expect(args.callbackURL).toBe("/app/");
+  expect(args.errorCallbackURL).toBe("/app/");
 
   // The constraint itself, so this fails for a legible reason if anyone puts
   // the hash back.
   const accepts = (u) =>
     /^\/(?!\/|\\|%2f|%5c)[\w\-.\+/@]*(?:\?[\w\-.\+/=&%@]*)?$/.test(u);
-  expect(accepts("/#/preferences")).toBe(false);
+  expect(accepts("/app/#/preferences")).toBe(false);
   expect(accepts(args.callbackURL)).toBe(true);
 });
 

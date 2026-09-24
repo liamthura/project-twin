@@ -85,7 +85,7 @@ export default function App() {
     // param it ever strips is `invite`, which never appears here -- but this
     // stays correct regardless of what WelcomeAuth does internally.
     const oauthQuery = window.location.search;
-    // /sign-in is a real, bookmarkable path, so it gets opened with no OAuth
+    // /app/sign-in is a real, bookmarkable path, so it gets opened with no OAuth
     // query behind it -- and /oauth2/authorize with an empty query is an
     // error page, not a sign-in. client_id is the parameter that makes this a
     // connection request; without it there is no flow to resume and the app
@@ -103,7 +103,7 @@ export default function App() {
           }
           // Better Auth's /oauth2/authorize re-evaluates now that a session
           // cookie exists, and continues the flow it interrupted -- on to
-          // /consent, or straight through for a client that has one already.
+          // /app/consent, or straight through for a client that has one already.
           window.location.assign(`/auth/oauth2/authorize${oauthQuery}`);
         }}
       />

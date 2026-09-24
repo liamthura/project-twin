@@ -291,7 +291,7 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
     setFormError(null);
     setSsoPending(true);
     try {
-      // /sign-in is a real, bookmarkable path that is also where an OAuth flow
+      // /app/sign-in is a real, bookmarkable path that is also where an OAuth flow
       // is interrupted. client_id is what tells the two apart -- the same test
       // App.jsx makes before resuming a flow after a password sign-in.
       const query = window.location.search;
