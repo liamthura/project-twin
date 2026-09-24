@@ -49,8 +49,7 @@
           {
             "name": "source",
             "show": [
-              "form",
-              "badge"
+              "form"
             ],
             "placeholder": "e.g. conversation, article, course",
             "default": "manual",

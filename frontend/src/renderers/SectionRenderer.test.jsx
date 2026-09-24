@@ -555,8 +555,7 @@ describe("SectionRenderer", () => {
     it("labels the body timestamp so it reads as a field, not a stray string", async () => {
       const { user } = renderSection({ pack: learningLogPack, initial: learningLogData });
       await user.click(screen.getByText("React Server Components"));
-      // Twice: the collapsed row labels its timestamp too now.
-      expect(screen.getAllByText("timestamp").length).toBeGreaterThan(1);
+      expect(screen.getByText("timestamp")).toBeInTheDocument();
     });
 
     it("gives each key decision its own editable row", async () => {
@@ -3002,5 +3001,18 @@ describe("scroll-spy anchors, after the restructure", () => {
     render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
     expect(anchors().length).toBeGreaterThan(0);
     for (const el of anchors()) expect(el.className).toContain("scroll-mt-[60px]");
+  });
+});
+
+describe("learning log rows", () => {
+  it("show the topic, and the timestamp alone at the right edge", () => {
+    renderSection({ pack: learningLogPack, initial: learningLogData });
+    const row = screen.getByText("React Server Components").closest(".cursor-pointer");
+    const stamp = row.querySelector("[data-row-sort-value]");
+    expect(stamp).not.toBeNull();
+    expect(stamp.textContent).toMatch(/^\d{4}-\d{2}-\d{2}/);
+    expect(within(row).queryByText(/timestamp/i)).not.toBeInTheDocument();
+    // Straight after the title block, so it sits on the right.
+    expect(stamp.previousElementSibling).toContainElement(screen.getByText("React Server Components"));
   });
 });
