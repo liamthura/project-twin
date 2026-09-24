@@ -108,17 +108,30 @@ describe("what a token row says", () => {
 });
 
 describe("minting one", () => {
-  it("passes exactly the toggled scopes to createToken", async () => {
+  it("mints read and propose by default, never a direct write", async () => {
+    // Nothing lands without the user: direct writes are opted into.
     render(<TokenPanel isOpen />);
     await waitFor(() => expect(listTokens).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByLabelText(/Change your persona directly/i));
     fireEvent.click(screen.getByRole("button", { name: /generate token/i }));
 
     await waitFor(() => expect(createToken).toHaveBeenCalled());
     const [label, scopes] = createToken.mock.calls[0];
     expect(label).toBe("mcp");
     expect(scopes).toEqual(["persona:read", "persona:propose"]);
+  });
+
+  it("adds write only when it is switched on", async () => {
+    render(<TokenPanel isOpen />);
+    await waitFor(() => expect(listTokens).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByLabelText(/Change your persona directly/i));
+    expect(screen.getByText(/skip your review queue/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /generate token/i }));
+
+    await waitFor(() => expect(createToken).toHaveBeenCalled());
+    expect(createToken.mock.calls[0][1]).toEqual(
+      ["persona:read", "persona:propose", "persona:write"]);
   });
 
   it("shows the secret once, and warns that it will not come back", async () => {
