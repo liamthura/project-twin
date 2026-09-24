@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Settings, RefreshCw, Loader2 } from "lucide-react";
+import { Settings, RefreshCw, Loader2, History, EyeOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -9,8 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { EmptyState } from "@/components/ui/empty-state";
+import { ToastAction } from "@/components/ui/toast";
 import { Toaster } from "@/components/ui/toaster";
 import ProposalsPanel from "@/components/ProposalsPanel";
 import { useToast } from "@/components/ui/use-toast";
@@ -23,8 +22,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
-import { api, getAuthToken } from "@/lib/api.js";
-import { hasSession } from "@/lib/session.js";
+import { HistoryPanel } from "@/components/settings/HistoryPanel";
+import { api, getAuthToken, clearConfig } from "@/lib/api.js";
+import { hasSession, signOut } from "@/lib/session.js";
 import { WelcomeAuth } from "@/components/WelcomeAuth";
 import { ResetPassword } from "@/components/ResetPassword";
 import { AddEmailBanner } from "@/components/AddEmailBanner";
@@ -143,8 +143,6 @@ export default function App() {
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, [theme]);
-  const cycleTheme = () =>
-    setTheme((t) => (t === "light" ? "dark" : t === "dark" ? "system" : "light"));
   const { toast } = useToast();
 
 
@@ -158,6 +156,12 @@ export default function App() {
   const [{ section: activeSection, band: activeBand }, setPlace] = useState(() =>
     parseRoute(readRoute() || "profile")
   );
+  // Opened at /app/ with no route: the one case where the app picks where to
+  // land. With proposals waiting that is Review, since approving them is the
+  // loop the product runs on. A deep link or a refresh names its own place and
+  // is never redirected, and neither is anyone who has already moved.
+  const coldOpenRef = useRef(!readRoute());
+  const [historyFor, setHistoryFor] = useState(null);
 
   // A band we owe a scroll to, and have not delivered yet.
   //
@@ -257,6 +261,7 @@ export default function App() {
    * chose. Scroll-spy replaces instead -- see the effect below.
    */
   const navigate = useCallback((section, band) => {
+    coldOpenRef.current = false;
     setPlace({ section, band: band ?? null });
     goToRoute(band ? `${section}/${band}` : section);
     // A section click means "start at the top", which is where a section change
@@ -294,7 +299,7 @@ export default function App() {
     // `valid` and would be rewritten to profile the moment settings resolved.
     // Its own step correction lives in the branch that renders it.
     if (isOnboardingRoute(activeSection)) return;
-    const valid = new Set([...enabledKeys.split(","), "review", "sections"]);
+    const valid = new Set([...enabledKeys.split(","), "review"]);
     if (!valid.has(activeSection)) {
       setPlace({ section: "profile", band: null });
       goToRoute("profile", { replace: true });
@@ -396,7 +401,17 @@ export default function App() {
   const refreshPendingCount = useCallback(async () => {
     try {
       const data = await api("/proposals/count");
-      setPendingCount(data?.total ?? 0);
+      const total = data?.total ?? 0;
+      setPendingCount(total);
+      // Decided once, on the first count: proposals arriving later never
+      // pull the reader away from what they are doing.
+      if (coldOpenRef.current) {
+        coldOpenRef.current = false;
+        if (total > 0) {
+          setPlace({ section: "review", band: null });
+          goToRoute("review", { replace: true });
+        }
+      }
     } catch (_) {
       // Non-fatal: a missing dot is better than a broken page.
     }
@@ -701,8 +716,42 @@ export default function App() {
     activeSection,
     activeBand,
     pendingCount,
-    version: `v${__APP_VERSION__} (${__APP_COMMIT__})`,
+    hiddenPacks: packs.filter((p) => !p.core && !p.enabled),
+    onEnablePack: async (key) => {
+      await togglePack(key, true);
+      navigate(key, null);
+    },
     onNavigate: navigate,
+  };
+
+  // Hiding keeps the data -- togglePack only changes settings -- so it needs
+  // no confirm, and the toast carries the way back.
+  const hideSection = (pack) => {
+    togglePack(pack.key, false);
+    navigate("profile", null);
+    toast({
+      title: `${pack.title} hidden`,
+      description: "Its data is kept. Add it again from More sections.",
+      action: (
+        <ToastAction
+          altText={`Show ${pack.title} again`}
+          onClick={async () => {
+            await togglePack(pack.key, true);
+            navigate(pack.key, null);
+          }}
+        >
+          Undo
+        </ToastAction>
+      ),
+    });
+  };
+
+  const handleSignOut = async () => {
+    // The session cookie is HttpOnly, so only the service can revoke it.
+    await signOut();
+    clearConfig();
+    loadAllData();
+    loadSettings();
   };
 
   return (
@@ -711,7 +760,8 @@ export default function App() {
         saveState={saveState}
         isConnected={isConnected}
         theme={theme}
-        onCycleTheme={cycleTheme}
+        onSetTheme={setTheme}
+        onSignOut={handleSignOut}
         accountName={packData.profile?.preferred_name || packData.profile?.name}
         onOpenSettings={() => openSettings()}
         onSaveNow={saveAll}
@@ -720,9 +770,13 @@ export default function App() {
       <div className="mx-auto max-w-6xl px-4 py-8">
         {/* Above the navigation rather than in a corner: an account that cannot
             be recovered is worth one line of the page until it can be. */}
-        <div className="mb-4 empty:mb-0">
-          <AddEmailBanner onAddEmail={() => openSettings("account")} />
-        </div>
+        {/* Profile only, like the Getting-started card: a nag that follows
+            the reader to every section is an interruption, not a reminder. */}
+        {activeSection === "profile" && (
+          <div className="mb-4 empty:mb-0">
+            <AddEmailBanner onAddEmail={() => openSettings("account")} />
+          </div>
+        )}
 
         <SectionSheet {...shellProps} />
 
@@ -755,6 +809,20 @@ export default function App() {
                 // Every successful write moves this, so the card the reader was
                 // editing ticks once -- autosave flush or an explicit Save now.
                 savedAt={lastSaved}
+                headerActions={
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => setHistoryFor(activePack.key)}>
+                      <History className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                      History
+                    </Button>
+                    {!activePack.core && (
+                      <Button variant="ghost" size="sm" onClick={() => hideSection(activePack)}>
+                        <EyeOff className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                        Hide
+                      </Button>
+                    )}
+                  </>
+                }
               />
             )}
 
@@ -774,46 +842,31 @@ export default function App() {
               />
             )}
 
-            {activeSection === "sections" && (
-              <Card>
-                <CardHeader className="border-b">
-                  <CardTitle>Manage Sections</CardTitle>
-                  <CardDescription>
-                    Turn optional sections on or off. Disabled sections are
-                    hidden from the rail, but their data is preserved and
-                    restored when re-enabled.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {packs.filter((p) => !p.core).length === 0 && (
-                    <EmptyState>No toggleable sections available.</EmptyState>
-                  )}
-                  {packs.filter((p) => !p.core).map((p) => (
-                    <div
-                      key={p.key}
-                      className="flex items-center justify-between gap-6 border-b border-border py-4 first:pt-1 last:border-b-0 last:pb-1"
-                    >
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium leading-none">{p.title}</p>
-                        {p.description && (
-                          <p className="text-xs leading-relaxed text-muted-foreground">
-                            {p.description}
-                          </p>
-                        )}
-                      </div>
-                      <Switch
-                        checked={p.enabled}
-                        onCheckedChange={(next) => togglePack(p.key, next)}
-                        aria-label={`Toggle ${p.title}`}
-                      />
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
           </div>
         </div>
       </div>
+
+      {/* History, scoped to the section it was opened from. */}
+      <Dialog open={historyFor !== null} onOpenChange={(open) => !open && setHistoryFor(null)}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>
+              History: {sectionTitles[historyFor] || historyFor}
+            </DialogTitle>
+            <DialogDescription>
+              Kept automatically whenever anything changes this section. A
+              restore can itself be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {historyFor && (
+            <HistoryPanel
+              fixedSection={historyFor}
+              sectionTitle={sectionTitles[historyFor]}
+              onRestored={refreshSection}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmation Dialog */}
       <Dialog open={confirmDialog.isOpen} onOpenChange={handleCancel}>

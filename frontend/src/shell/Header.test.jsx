@@ -61,23 +61,7 @@ describe("Header", () => {
     expect(screen.getByText("Disconnected")).toBeInTheDocument();
   });
 
-  describe("the theme control", () => {
-    it("announces the current theme and that it can be changed", () => {
-      renderHeader({ theme: "dark" });
-      expect(
-        screen.getByRole("button", { name: "Theme: dark. Click to change." })
-      ).toBeInTheDocument();
-    });
-
-    it("cycles on click", async () => {
-      const onCycleTheme = vi.fn();
-      renderHeader({ theme: "light", onCycleTheme });
-      await userEvent.click(screen.getByRole("button", { name: /^Theme:/ }));
-      expect(onCycleTheme).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("the account chip", () => {
+  describe("the account menu", () => {
     it("shows the name it was given", () => {
       renderHeader({ accountName: "Liam" });
       expect(screen.getByRole("button", { name: "Liam" })).toBeInTheDocument();
@@ -88,11 +72,36 @@ describe("Header", () => {
       expect(screen.getByRole("button", { name: "Account" })).toBeInTheDocument();
     });
 
-    it("opens settings on click", async () => {
+    it("opens Settings from the menu", async () => {
       const onOpenSettings = vi.fn();
       renderHeader({ accountName: "Liam", onOpenSettings });
       await userEvent.click(screen.getByRole("button", { name: "Liam" }));
+      await userEvent.click(await screen.findByRole("menuitem", { name: "Settings" }));
       expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it("offers each theme by name, marks the current one, and sets the one chosen", async () => {
+      // The old control was a lone icon that cycled on click: it said neither
+      // what it was nor what the next click would do.
+      const onSetTheme = vi.fn();
+      renderHeader({ theme: "dark", onSetTheme });
+      await userEvent.click(screen.getByRole("button", { name: "Account" }));
+      expect(await screen.findByRole("menuitem", { name: "Dark theme, current" })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("menuitem", { name: "Light theme" }));
+      expect(onSetTheme).toHaveBeenCalledWith("light");
+    });
+
+    it("signs out from the menu", async () => {
+      const onSignOut = vi.fn();
+      renderHeader({ onSignOut });
+      await userEvent.click(screen.getByRole("button", { name: "Account" }));
+      await userEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
+      expect(onSignOut).toHaveBeenCalledTimes(1);
+    });
+
+    it("no longer has a standalone theme button", () => {
+      renderHeader();
+      expect(screen.queryByRole("button", { name: /^Theme:/ })).not.toBeInTheDocument();
     });
   });
 

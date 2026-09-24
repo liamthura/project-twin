@@ -7,14 +7,19 @@
  * otherwise hold email, password, sign out, two preferences, export and import.
  */
 import { useRef, useState } from "react";
-import { Download, Loader2, Upload } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Loader2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { segmentClass } from "@/components/ui/segmented-control";
 import { useToast } from "@/components/ui/use-toast";
 import { exportData, importData } from "@/lib/api.js";
 
-export function DataPanel() {
+/**
+ * `advanced` is the Server panel, passed in by the dialog: which instance the
+ * app talks to is set once if ever, so it sits here collapsed rather than as a
+ * tab of its own.
+ */
+export function DataPanel({ advanced = null, advancedOpen = false, onAdvancedOpenChange } = {}) {
   const { toast } = useToast();
 
   const [exporting, setExporting] = useState(false);
@@ -201,6 +206,25 @@ export function DataPanel() {
           />
         </div>
       </div>
+
+      {advanced && (
+        <div className="border-t pt-4">
+          <button
+            type="button"
+            aria-expanded={advancedOpen}
+            onClick={() => onAdvancedOpenChange?.(!advancedOpen)}
+            className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+          >
+            {advancedOpen ? (
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            )}
+            Advanced: server
+          </button>
+          {advancedOpen && <div className="mt-3">{advanced}</div>}
+        </div>
+      )}
     </div>
   );
 }

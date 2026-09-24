@@ -26,13 +26,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { whoami } from "@/lib/api.js";
-import { SETTINGS_TABS, isTabAvailable, defaultTab } from "./settingsTabs.js";
+import { SETTINGS_TABS, defaultTab, resolveTab } from "./settingsTabs.js";
 import { AccountPanel } from "./AccountPanel";
 import { ServerPanel } from "./ServerPanel";
-import { TokenPanel } from "./TokenPanel";
-import { AppsPanel } from "./AppsPanel";
+import { ConnectionsPanel } from "./ConnectionsPanel";
 import { DataPanel } from "./DataPanel";
-import { HistoryPanel } from "./HistoryPanel";
+
+const VERSION =
+  typeof __APP_VERSION__ === "undefined" ? null : `v${__APP_VERSION__} (${__APP_COMMIT__})`;
 
 export function SettingsDialog({
   isOpen,
@@ -46,37 +47,49 @@ export function SettingsDialog({
   // Also App's. Needed only to write onboarding state back without clearing it:
   // SettingsUpdate requires disabled_sections and writes what it is sent.
   disabledSections = [],
-  // Where to land once signed in. A caller that opened Settings to fix one
-  // thing ("Review access") should not leave the reader hunting for it.
+  // Where to land once signed in. Older ids ("tokens", "apps", "server") are
+  // mapped to where those panels live now -- see settingsTabs.js.
   initialTab = null,
 }) {
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [checked, setChecked] = useState(false);
   const [username, setUsername] = useState(null);
-  const [activeTab, setActiveTab] = useState(defaultTab(false));
+  const [activeTab, setActiveTab] = useState(defaultTab());
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return undefined;
     let cancelled = false;
+    const { tab, advanced } = resolveTab(initialTab);
     setIsSignedIn(false);
+    setChecked(false);
     setUsername(null);
-    setActiveTab(defaultTab(false));
+    setActiveTab(tab);
+    setAdvancedOpen(advanced);
     whoami()
       .then((me) => {
         if (cancelled) return;
         setIsSignedIn(true);
         setUsername(me.username || "your account");
-        setActiveTab(
-          initialTab && isTabAvailable(initialTab, true) ? initialTab : defaultTab(true),
-        );
       })
       .catch(() => {
-        // Signed out is a state, not an error. Server is the tab that still
-        // works without a credential, and it is already selected.
+        // Signed out is a state, not an error: the Server panel is what shows.
+      })
+      .finally(() => {
+        if (!cancelled) setChecked(true);
       });
     return () => {
       cancelled = true;
     };
   }, [isOpen, initialTab]);
+
+  const serverPanel = (
+    <ServerPanel
+      isSignedIn={isSignedIn}
+      onConnectionChange={onConnectionChange}
+      onClose={onClose}
+    />
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -84,52 +97,56 @@ export function SettingsDialog({
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
-            Your account, this server, and the clients connected to it.
+            {isSignedIn
+              ? "Your account, what is connected to it, and your data."
+              : "Which MyGist server this app talks to."}
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            {SETTINGS_TABS.map((tab) => {
-              const available = isTabAvailable(tab.id, isSignedIn);
-              return (
-                <TabsTrigger
-                  key={tab.id}
-                  value={tab.id}
-                  disabled={!available}
-                  title={available ? undefined : "Sign in to reach this"}
-                >
-                  {tab.label}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-        </Tabs>
+        {/* A fixed floor, so switching tabs does not make the dialog jump.
+            Panels render below the tab row rather than through TabsContent:
+            Radix mounts every TabsContent it is given, which would fire every
+            panel's fetches the moment the dialog opened. */}
+        <div className="min-h-[420px]">
+          {checked && !isSignedIn && serverPanel}
 
-        {activeTab === "account" && isSignedIn && (
-          <AccountPanel
-            isOpen
-            username={username}
-            isAutosaveEnabled={isAutosaveEnabled}
-            onAutosaveChange={onAutosaveChange}
-            disabledSections={disabledSections}
-            onSignedOut={() => {
-              onConnectionChange?.();
-              onClose();
-            }}
-          />
-        )}
-        {activeTab === "server" && (
-          <ServerPanel
-            isSignedIn={isSignedIn}
-            onConnectionChange={onConnectionChange}
-            onClose={onClose}
-          />
-        )}
-        {activeTab === "tokens" && isSignedIn && <TokenPanel isOpen />}
-        {activeTab === "apps" && isSignedIn && <AppsPanel isOpen />}
-        {activeTab === "history" && isSignedIn && <HistoryPanel />}
-        {activeTab === "data" && isSignedIn && <DataPanel />}
+          {isSignedIn && (
+            <div className="space-y-4">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList>
+                  {SETTINGS_TABS.map((tab) => (
+                    <TabsTrigger key={tab.id} value={tab.id}>
+                      {tab.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+
+              {activeTab === "account" && (
+                <AccountPanel
+                  isOpen
+                  username={username}
+                  isAutosaveEnabled={isAutosaveEnabled}
+                  onAutosaveChange={onAutosaveChange}
+                  disabledSections={disabledSections}
+                  version={VERSION}
+                  onSignedOut={() => {
+                    onConnectionChange?.();
+                    onClose();
+                  }}
+                />
+              )}
+              {activeTab === "connections" && <ConnectionsPanel />}
+              {activeTab === "data" && (
+                <DataPanel
+                  advanced={serverPanel}
+                  advancedOpen={advancedOpen}
+                  onAdvancedOpenChange={setAdvancedOpen}
+                />
+              )}
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

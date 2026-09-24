@@ -1,30 +1,33 @@
 /**
- * The settings dialog's tabs, and who can see them.
+ * The settings dialog's tabs, and where an older tab id now lives.
  *
- * The gating rule is the reverse of the one it replaces. The old dialog
- * disabled every tab but `connection`, because `connection` was the panel
- * holding server configuration -- and it held account identity too, which is
- * why it could not be split. Once those are separate tabs, Server is the only
- * one that means anything without a credential: it is where you say which
- * instance to talk to, and where a token is pasted.
+ * Three, down from six: Tokens and Connected apps were two tabs doing one job
+ * and are now Connections; History moved next to the section it restores;
+ * Server moved under Data as Advanced, since it is set once if ever.
  *
- * Pure, so the rule is testable without rendering a dialog.
+ * Signed out, the dialog shows the Server panel alone -- the one thing it can
+ * do without a credential -- so every tab here needs one.
+ *
+ * Pure, so the rules are testable without rendering a dialog.
  */
 export const SETTINGS_TABS = [
-  { id: "account", label: "Account", needsCredential: true },
-  { id: "server", label: "Server", needsCredential: false },
-  { id: "tokens", label: "Tokens", needsCredential: true },
-  { id: "apps", label: "Connected apps", needsCredential: true },
-  { id: "history", label: "History", needsCredential: true },
-  { id: "data", label: "Data", needsCredential: true },
+  { id: "account", label: "Account" },
+  { id: "connections", label: "Connections" },
+  { id: "data", label: "Data" },
 ];
 
-export function isTabAvailable(id, isSignedIn) {
-  const tab = SETTINGS_TABS.find((t) => t.id === id);
-  if (!tab) return false;
-  return isSignedIn || !tab.needsCredential;
+// Ids callers still pass: Wave 1's "Review access" links name "tokens" and
+// "apps", and the load-error screen asks for "server".
+const MOVED = { tokens: "connections", apps: "connections", server: "data", history: "account" };
+
+export function defaultTab() {
+  return "account";
 }
 
-export function defaultTab(isSignedIn) {
-  return isSignedIn ? "account" : "server";
+/** Which tab a requested id opens, and whether Data's Advanced section (the
+ *  Server panel) should start expanded. Unknown ids open the default. */
+export function resolveTab(id) {
+  const tab = MOVED[id] || id;
+  const known = SETTINGS_TABS.some((t) => t.id === tab);
+  return { tab: known ? tab : defaultTab(), advanced: id === "server" };
 }

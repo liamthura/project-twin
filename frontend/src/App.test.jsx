@@ -135,6 +135,35 @@ describe("App: the rail says when something is waiting", () => {
   });
 });
 
+describe("App: where it opens", () => {
+  // A plain replaceState, not location.hash = "": that leaves a bare "#" and
+  // jsdom does not always fire hashchange for it.
+  beforeEach(() => window.history.replaceState(null, "", "/app/"));
+
+  it("opens on Review when something is waiting and no route was asked for", async () => {
+    mockApi({ packs: packsFixture, pendingCount: 2 });
+    render(<App />);
+    await waitFor(() => expect(window.location.hash).toBe("#/review"));
+    expect(railItem(/Review/)).toHaveAttribute("aria-current", "page");
+  });
+
+  it("opens on Profile when nothing is waiting", async () => {
+    mockApi({ packs: packsFixture, pendingCount: 0 });
+    render(<App />);
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/proposals/count"));
+    expect(railItem(/Profile/)).toHaveAttribute("aria-current", "page");
+  });
+
+  it("never redirects a deep link, even with something waiting", async () => {
+    window.history.replaceState(null, "", "/app/#/preferences");
+    mockApi({ packs: packsFixture, pendingCount: 2 });
+    render(<App />);
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/proposals/count"));
+    expect(window.location.hash).toBe("#/preferences");
+    expect(railItem(/Preferences/)).toHaveAttribute("aria-current", "page");
+  });
+});
+
 describe("App: circle and learning_log render through the renderer kit", () => {
   it("renders Circle and Learning Log after Preferences, in manifest position order, keeping their original icons", async () => {
     mockApi({ packs: packsFixture });
@@ -201,8 +230,10 @@ describe("App: circle and learning_log render through the renderer kit", () => {
     // with no action. The preference moved out of the header in slice 1, so
     // reaching it means opening Connection Settings -- and turning it off does
     // NOT itself save (only the ON transition flushes).
+    // Settings lives in the account menu now.
     await user.click(screen.getByRole("button", { name: "Account" }));
-    await user.click(screen.getByRole("switch", { name: "Auto-save" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Settings" }));
+    await user.click(await screen.findByRole("switch", { name: "Auto-save" }));
     // Radix marks the rest of the page aria-hidden while a dialog is open, so
     // the header is genuinely unreachable until this closes -- which is correct
     // behaviour, and means the test has to close it like a user would.
@@ -405,8 +436,10 @@ describe("App: save feedback", () => {
     render(<App />);
     await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
 
+    // Settings lives in the account menu now.
     await user.click(screen.getByRole("button", { name: "Account" }));
-    await user.click(screen.getByRole("switch", { name: "Auto-save" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Settings" }));
+    await user.click(await screen.findByRole("switch", { name: "Auto-save" }));
     await user.keyboard("{Escape}");
 
     expect(chip()).toHaveAttribute("data-save-state", "saved");
@@ -427,8 +460,10 @@ describe("App: save feedback", () => {
     render(<App />);
     await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
 
+    // Settings lives in the account menu now.
     await user.click(screen.getByRole("button", { name: "Account" }));
-    await user.click(screen.getByRole("switch", { name: "Auto-save" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Settings" }));
+    await user.click(await screen.findByRole("switch", { name: "Auto-save" }));
     await user.keyboard("{Escape}");
     await user.type(screen.getByLabelText("Name"), "M");
 

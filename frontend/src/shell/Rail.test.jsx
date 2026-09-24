@@ -21,7 +21,6 @@ function renderRail(props = {}) {
       activeSection="preferences"
       activeBand={null}
       pendingCount={0}
-      version="v2.0.0 (abc1234)"
       onNavigate={vi.fn()}
       {...props}
     />
@@ -29,11 +28,31 @@ function renderRail(props = {}) {
 }
 
 describe("Rail", () => {
-  it("lists every pack, plus Review and Sections", () => {
+  it("lists Review first, then every pack", () => {
+    // Review is the one place something waits for the reader, so it leads.
     renderRail();
+    const names = within(rail())
+      .getAllByRole("button")
+      .map((b) => b.textContent.trim());
+    expect(names[0]).toMatch(/^Review/);
     for (const p of PACKS) expect(item(p.title)).toBeInTheDocument();
-    expect(item("Review")).toBeInTheDocument();
-    expect(item("Sections")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Sections$/ })).not.toBeInTheDocument();
+  });
+
+  it("offers the hidden optional sections under More sections, and adds one", async () => {
+    const onEnablePack = vi.fn();
+    const media = { key: "media", title: "Media", description: "Favourites" };
+    renderRail({ hiddenPacks: [media], onEnablePack });
+    const more = screen.getByRole("button", { name: /More sections/ });
+    expect(more).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(more);
+    await userEvent.click(screen.getByRole("button", { name: "Add Media" }));
+    expect(onEnablePack).toHaveBeenCalledWith("media");
+  });
+
+  it("shows no More sections when nothing is hidden", () => {
+    renderRail({ hiddenPacks: [] });
+    expect(screen.queryByRole("button", { name: /More sections/ })).not.toBeInTheDocument();
   });
 
   it("marks the active section, and only it", () => {
@@ -129,12 +148,6 @@ describe("Rail", () => {
     expect(rail().querySelector("hr")).not.toBeNull();
   });
 
-  it("shows the build version, in mono, at the foot", () => {
-    renderRail();
-    const version = screen.getByText("v2.0.0 (abc1234)");
-    expect(version.className).toContain("font-mono");
-  });
-
   it("sticks below the header rather than scrolling away with the page", () => {
     renderRail();
     expect(rail().className).toContain("sticky");
@@ -150,11 +163,11 @@ describe("the disclosure caret", () => {
     expect(item("Profile").querySelector(".lucide-chevron-right")).not.toBeNull();
   });
 
-  it("does not appear on Review or Sections, which have none", () => {
-    // A caret promises something to expand. Neither of these is a persona
-    // section and neither has bands, so the promise is false.
+  it("does not appear on Review, which has none", () => {
+    // A caret promises something to expand. Review is not a persona section
+    // and has no bands, so the promise is false.
     renderRail();
-    for (const name of ["Review", "Sections"]) {
+    for (const name of ["Review"]) {
       expect(item(name).querySelector(".lucide-chevron-down")).toBeNull();
       expect(item(name).querySelector(".lucide-chevron-right")).toBeNull();
     }

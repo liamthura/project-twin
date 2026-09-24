@@ -44,8 +44,20 @@ describe("SectionSheet", () => {
     for (const p of PACKS) {
       expect(within(sheet()).getByRole("button", { name: new RegExp(p.title) })).toBeInTheDocument();
     }
-    expect(within(sheet()).getByRole("button", { name: /Review/ })).toBeInTheDocument();
-    expect(within(sheet()).getByRole("button", { name: /Sections/ })).toBeInTheDocument();
+    const names = within(sheet()).getAllByRole("button").map((b) => b.textContent.trim());
+    // Same order as the rail: Review leads.
+    expect(names.find((n) => /Review|Profile|Preferences/.test(n))).toMatch(/^Review/);
+    expect(within(sheet()).queryByRole("button", { name: /^Sections$/ })).not.toBeInTheDocument();
+  });
+
+  it("lets a hidden section be added from the phone too", async () => {
+    // The Sections page is gone, so this is the only way on mobile.
+    const onEnablePack = vi.fn();
+    renderSheet({ hiddenPacks: [{ key: "media", title: "Media" }], onEnablePack });
+    await userEvent.click(trigger());
+    await userEvent.click(within(sheet()).getByRole("button", { name: /More sections/ }));
+    await userEvent.click(within(sheet()).getByRole("button", { name: "Add Media" }));
+    expect(onEnablePack).toHaveBeenCalledWith("media");
   });
 
   it("nests the active section's bands beneath it, and no other section's", async () => {

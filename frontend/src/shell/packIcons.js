@@ -8,7 +8,6 @@ import {
   Package,
   Palette,
   Settings,
-  SlidersHorizontal,
   Target,
   User,
   Users,
@@ -32,7 +31,6 @@ const PACK_ICONS = {
 };
 
 export const REVIEW_ICON = Inbox;
-export const SECTIONS_ICON = SlidersHorizontal;
 
 /** A pack's icon, falling back to a generic one so a new pack still renders. */
 export function packIcon(key) {

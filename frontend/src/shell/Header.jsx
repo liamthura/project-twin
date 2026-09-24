@@ -1,7 +1,19 @@
-import { Monitor, Moon, Sun, User, WifiOff } from "lucide-react";
+import { Check, LogOut, Monitor, Moon, Settings, Sun, User, WifiOff } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const THEMES = [
+  { id: "light", label: "Light", Icon: Sun },
+  { id: "dark", label: "Dark", Icon: Moon },
+  { id: "system", label: "System", Icon: Monitor },
+];
 
 /** The three states, and the word each shows. `unsaved` is the only one that
  *  offers an action, because it is the only one where the user can do anything. */
@@ -26,12 +38,12 @@ export function Header({
   saveState = "saved",
   isConnected = true,
   theme = "system",
-  onCycleTheme,
+  onSetTheme,
+  onSignOut,
   accountName,
   onOpenSettings,
   onSaveNow,
 }) {
-  const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
 
   return (
     <header className="sticky top-0 z-20 border-b bg-card pt-[env(safe-area-inset-top)]">
@@ -97,24 +109,44 @@ export function Header({
             </Badge>
           )}
 
-          <button
-            type="button"
-            onClick={onCycleTheme}
-            aria-label={`Theme: ${theme}. Click to change.`}
-            title={`Theme: ${theme}`}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors duration-fast ease-standard hover:text-foreground"
-          >
-            <ThemeIcon className="h-4 w-4" />
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[13px] font-medium transition-colors duration-fast ease-standard hover:bg-muted/50"
-          >
-            <User className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="max-w-[128px] truncate">{accountName || "Account"}</span>
-          </button>
+          {/* One menu for everything about you rather than the app: Settings,
+              theme and sign-out. The theme used to be a lone icon that cycled
+              on click, which said neither what it was nor what it would do. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[13px] font-medium transition-colors duration-fast ease-standard hover:bg-muted/50"
+              >
+                <User className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                <span className="max-w-[128px] truncate">{accountName || "Account"}</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onSelect={() => onOpenSettings?.()}>
+                <Settings className="h-4 w-4" aria-hidden="true" />
+                Settings
+              </DropdownMenuItem>
+              <div className="my-1 h-px bg-border" role="separator" />
+              <p className="px-2 pb-1 pt-1.5 text-xs text-muted-foreground">Theme</p>
+              {THEMES.map(({ id, label, Icon }) => (
+                <DropdownMenuItem
+                  key={id}
+                  onSelect={() => onSetTheme?.(id)}
+                  aria-label={theme === id ? `${label} theme, current` : `${label} theme`}
+                >
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                  {label}
+                  {theme === id && <Check className="ml-auto h-4 w-4" aria-hidden="true" />}
+                </DropdownMenuItem>
+              ))}
+              <div className="my-1 h-px bg-border" role="separator" />
+              <DropdownMenuItem onSelect={() => onSignOut?.()}>
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

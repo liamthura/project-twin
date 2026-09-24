@@ -39,16 +39,24 @@ function whenText(iso) {
   });
 }
 
-export function HistoryPanel() {
+/**
+ * `fixedSection` scopes the panel to one section and drops the picker: opened
+ * from a section's own header, the section is the one you are looking at.
+ * `onRestored(section)` lets the page refetch it -- without that, the editor
+ * keeps showing the pre-restore data, and the next autosave writes it back
+ * over the version that was just restored.
+ */
+export function HistoryPanel({ fixedSection = null, sectionTitle = null, onRestored } = {}) {
   const { toast } = useToast();
 
   const [packs, setPacks] = useState([]);
-  const [section, setSection] = useState("");
+  const [section, setSection] = useState(fixedSection || "");
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [reverting, setReverting] = useState(null);
 
   useEffect(() => {
+    if (fixedSection) return undefined;
     let cancelled = false;
     api("/settings")
       .then((s) => {
@@ -67,7 +75,7 @@ export function HistoryPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fixedSection]);
 
   const load = async (key) => {
     if (!key) return;
@@ -97,11 +105,12 @@ export function HistoryPanel() {
       await revertHistory(section, version.id);
       toast({
         title: "Section restored",
-        description: `${section} is back to how it was on ${whenText(
+        description: `${sectionTitle || section} is back to how it was on ${whenText(
           version.replaced_at
         )}. This is itself undoable.`,
         variant: "success",
       });
+      onRestored?.(section);
       await load(section);
     } catch (error) {
       toast({
@@ -117,24 +126,31 @@ export function HistoryPanel() {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="history-section">Section</Label>
-        <Select value={section} onValueChange={setSection}>
-          <SelectTrigger id="history-section">
-            <SelectValue placeholder="Choose a section" />
-          </SelectTrigger>
-          <SelectContent>
-            {packs.map((pack) => (
-              <SelectItem key={pack.key} value={pack.key}>
-                {pack.title}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground">
-          The last {versions.length === 1 ? "version" : "versions"} of this
-          section, kept automatically whenever anything writes to it. Restoring
-          one can itself be undone.
-        </p>
+        {!fixedSection && (
+          <>
+            <Label htmlFor="history-section">Section</Label>
+            <Select value={section} onValueChange={setSection}>
+              <SelectTrigger id="history-section">
+                <SelectValue placeholder="Choose a section" />
+              </SelectTrigger>
+              <SelectContent>
+                {packs.map((pack) => (
+                  <SelectItem key={pack.key} value={pack.key}>
+                    {pack.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
+        {/* Scoped, the dialog around it already says this. */}
+        {!fixedSection && (
+          <p className="text-xs text-muted-foreground">
+            The last {versions.length === 1 ? "version" : "versions"} of this
+            section, kept automatically whenever anything writes to it. Restoring
+            one can itself be undone.
+          </p>
+        )}
       </div>
 
       {loading ? (

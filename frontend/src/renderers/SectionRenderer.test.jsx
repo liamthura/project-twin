@@ -2628,7 +2628,8 @@ describe("the section's structure", () => {
     // A run is one group, or one consecutive stretch of ungrouped leaves.
     render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
 
-    const column = screen.getByRole("heading", { level: 2 }).parentElement.parentElement;
+    // h2 -> title block -> header row (title and actions) -> the column.
+    const column = screen.getByRole("heading", { level: 2 }).parentElement.parentElement.parentElement;
     expect(column.className).toContain("space-y-8");
     // profile: [Personal Information, Education, Work Experience], [Contact &
     // Links], [Languages] -- the group is its own run, and the leaf after it

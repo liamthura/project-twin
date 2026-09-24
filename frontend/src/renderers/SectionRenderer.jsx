@@ -38,7 +38,9 @@ import { EyebrowBand } from "./EyebrowBand";
 import { SubsectionCard } from "./SubsectionCard";
 import { fillSummary } from "./fillSummary";
 
-export default function SectionRenderer({ pack, data, onChange, onShowConfirmation, savedAt }) {
+export default function SectionRenderer({
+  pack, data, onChange, onShowConfirmation, savedAt, headerActions = null,
+}) {
   const { sections } = normalizeUi(pack);
 
   // The rail's scroll-spy anchors, keyed by the node's index among the section's
@@ -320,11 +322,17 @@ export default function SectionRenderer({ pack, data, onChange, onShowConfirmati
     // one. An empty run returns null and contributes no element, so it cannot
     // leave a gap behind.
     <div className="space-y-8">
-      <div className="space-y-1">
-        <h2 className="text-xl font-semibold text-foreground">{pack.title}</h2>
-        {pack.description && (
-          <p className="text-[13px] text-muted-foreground">{pack.description}</p>
-        )}
+      {/* The section's own actions (History, Hide) sit beside its title:
+          they act on this section, so they belong next to its name rather
+          than in Settings. Passed in, because they need App's state. */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-xl font-semibold text-foreground">{pack.title}</h2>
+          {pack.description && (
+            <p className="text-[13px] text-muted-foreground">{pack.description}</p>
+          )}
+        </div>
+        {headerActions && <div className="flex shrink-0 items-center gap-2">{headerActions}</div>}
       </div>
       {runs.map((run) =>
         run.kind === "group"
