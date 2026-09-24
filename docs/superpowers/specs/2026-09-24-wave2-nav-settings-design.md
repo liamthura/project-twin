@@ -1,7 +1,7 @@
 # Wave 2: navigation and Settings
 
 **Date:** 2026-09-24
-**Status:** Draft, awaiting sign-off
+**Status:** Built, then revised after review (see the end)
 **Source:** `.impeccable/critique/2026-09-24T19-26-30Z__frontend-src-app-jsx.md`
 (25/40). Wave 1 (trust fixes) and the move to `/app/` are merged.
 
@@ -100,3 +100,20 @@ Shown on Profile only, the same rule the Getting-started card already follows
 - History: opened from a section header, it lists only that section.
 - Header: theme and sign-out reachable from the account menu.
 - One pass on the running preview at 1440 and 390, as for Wave 1.
+
+## Revised after review (2026-09-24)
+
+Three changes from Liam after trying the first build:
+
+- **Sections are switched on and off in one control pane, Settings →
+  Sections**, not by an Add in the rail and a Hide in each section header.
+  Switching a section off is not a view preference: it removes the section
+  from every AI read and write path (`get_context`, `search_context`,
+  `get_entity`, `get_raw`, `persona_modify` all check it), so it belongs with
+  the other settings and says so. The rail keeps a small "Manage sections"
+  link into that pane.
+- **Settings is a page, `#/settings/<tab>`**, not a dialog: four tabs had
+  outgrown a modal. Tabs: Account, Connections, Sections, Data. The load-error
+  screen, where the shell cannot render, gets its own inline "Change server".
+- **The add-email banner shows on every screen again.** It is a nudge, and a
+  nudge that only appears on Profile is easy to never see.
