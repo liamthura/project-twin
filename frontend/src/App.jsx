@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Settings, RefreshCw, Loader2, History, EyeOff } from "lucide-react";
+import { Settings, RefreshCw, Loader2, History } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ToastAction } from "@/components/ui/toast";
 import { Toaster } from "@/components/ui/toaster";
 import ProposalsPanel from "@/components/ProposalsPanel";
 import { useToast } from "@/components/ui/use-toast";
@@ -21,7 +20,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { SettingsDialog } from "@/components/settings/SettingsDialog";
+import { SettingsPage } from "@/components/settings/SettingsPage";
+import { ServerPanel } from "@/components/settings/ServerPanel";
+import { resolveTab } from "@/components/settings/settingsTabs.js";
 import { HistoryPanel } from "@/components/settings/HistoryPanel";
 import { api, getAuthToken, clearConfig } from "@/lib/api.js";
 import { hasSession, signOut } from "@/lib/session.js";
@@ -121,12 +122,12 @@ export default function App() {
   // chip reads, and it is cleared only by a save that actually succeeded -- so a
   // failed write leaves the chip honest and Save now still on offer.
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [showConnectionSettings, setShowConnectionSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState(null);
-  const openSettings = (tab = null) => {
-    setSettingsTab(tab);
-    setShowConnectionSettings(true);
-  };
+  // Settings is a page, #/settings/<tab>. Older tab ids ("tokens", "apps",
+  // "server") are mapped to where those panels live now.
+  const openSettings = (tab = null) => navigate("settings", resolveTab(tab));
+  // The load-error screen's own way to point the app at another server: the
+  // shell (and so the Settings page) cannot render until a server answers.
+  const [showServerPanel, setShowServerPanel] = useState(false);
 
   // Theme: "light" | "dark" | "system" (system follows the OS live)
   const [theme, setTheme] = useState(
@@ -299,6 +300,15 @@ export default function App() {
     // `valid` and would be rewritten to profile the moment settings resolved.
     // Its own step correction lives in the branch that renders it.
     if (isOnboardingRoute(activeSection)) return;
+    // Settings' second segment is a tab, not a band.
+    if (activeSection === "settings") {
+      const tab = resolveTab(activeBand);
+      if (tab !== activeBand) {
+        setPlace({ section: "settings", band: tab });
+        goToRoute(`settings/${tab}`, { replace: true });
+      }
+      return;
+    }
     const valid = new Set([...enabledKeys.split(","), "review"]);
     if (!valid.has(activeSection)) {
       setPlace({ section: "profile", band: null });
@@ -651,29 +661,26 @@ export default function App() {
               Try again
             </Button>
             <Button
-              onClick={() => openSettings("server")}
+              onClick={() => setShowServerPanel((v) => !v)}
               variant="outline"
               className="w-full"
+              aria-expanded={showServerPanel}
             >
               <Settings className="h-4 w-4 mr-2" />
-              Configure Server
+              Change server
             </Button>
-            <p className="text-xs text-muted-foreground text-center">
-              Connect to a remote server or run locally
-            </p>
+            {showServerPanel && (
+              <ServerPanel
+                isSignedIn={false}
+                onConnectionChange={() => {
+                  loadAllData();
+                  loadSettings();
+                }}
+                onClose={() => setShowServerPanel(false)}
+              />
+            )}
           </CardContent>
         </Card>
-        <SettingsDialog
-          isOpen={showConnectionSettings}
-          disabledSections={disabledSections}
-          onClose={() => setShowConnectionSettings(false)}
-          onConnectionChange={() => {
-            loadAllData();
-            loadSettings();
-          }}
-          isAutosaveEnabled={isAutosaveEnabled}
-          onAutosaveChange={handleAutosaveChange}
-        />
       </div>
     );
   }
@@ -716,34 +723,7 @@ export default function App() {
     activeSection,
     activeBand,
     pendingCount,
-    hiddenPacks: packs.filter((p) => !p.core && !p.enabled),
-    onEnablePack: async (key) => {
-      await togglePack(key, true);
-      navigate(key, null);
-    },
     onNavigate: navigate,
-  };
-
-  // Hiding keeps the data -- togglePack only changes settings -- so it needs
-  // no confirm, and the toast carries the way back.
-  const hideSection = (pack) => {
-    togglePack(pack.key, false);
-    navigate("profile", null);
-    toast({
-      title: `${pack.title} hidden`,
-      description: "Its data is kept. Add it again from More sections.",
-      action: (
-        <ToastAction
-          altText={`Show ${pack.title} again`}
-          onClick={async () => {
-            await togglePack(pack.key, true);
-            navigate(pack.key, null);
-          }}
-        >
-          Undo
-        </ToastAction>
-      ),
-    });
   };
 
   const handleSignOut = async () => {
@@ -770,13 +750,12 @@ export default function App() {
       <div className="mx-auto max-w-6xl px-4 py-8">
         {/* Above the navigation rather than in a corner: an account that cannot
             be recovered is worth one line of the page until it can be. */}
-        {/* Profile only, like the Getting-started card: a nag that follows
-            the reader to every section is an interruption, not a reminder. */}
-        {activeSection === "profile" && (
-          <div className="mb-4 empty:mb-0">
-            <AddEmailBanner onAddEmail={() => openSettings("account")} />
-          </div>
-        )}
+        {/* On every screen, deliberately: it is a nudge. An account with no
+            email cannot be recovered, which is worth a line of the page until
+            it is fixed or dismissed. */}
+        <div className="mb-4 empty:mb-0">
+          <AddEmailBanner onAddEmail={() => openSettings("account")} />
+        </div>
 
         <SectionSheet {...shellProps} />
 
@@ -810,19 +789,27 @@ export default function App() {
                 // editing ticks once -- autosave flush or an explicit Save now.
                 savedAt={lastSaved}
                 headerActions={
-                  <>
-                    <Button variant="outline" size="sm" onClick={() => setHistoryFor(activePack.key)}>
-                      <History className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                      History
-                    </Button>
-                    {!activePack.core && (
-                      <Button variant="ghost" size="sm" onClick={() => hideSection(activePack)}>
-                        <EyeOff className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                        Hide
-                      </Button>
-                    )}
-                  </>
+                  <Button variant="outline" size="sm" onClick={() => setHistoryFor(activePack.key)}>
+                    <History className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                    History
+                  </Button>
                 }
+              />
+            )}
+
+            {activeSection === "settings" && (
+              <SettingsPage
+                tab={activeBand}
+                onTabChange={(tab) => navigate("settings", tab)}
+                isAutosaveEnabled={isAutosaveEnabled}
+                onAutosaveChange={handleAutosaveChange}
+                disabledSections={disabledSections}
+                packs={packs}
+                onTogglePack={togglePack}
+                onConnectionChange={() => {
+                  loadAllData();
+                  loadSettings();
+                }}
               />
             )}
 
@@ -885,20 +872,6 @@ export default function App() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Connection Settings Dialog */}
-      <SettingsDialog
-        isOpen={showConnectionSettings}
-        initialTab={settingsTab}
-        disabledSections={disabledSections}
-        onClose={() => setShowConnectionSettings(false)}
-        onConnectionChange={() => {
-          loadAllData();
-          loadSettings();
-        }}
-        isAutosaveEnabled={isAutosaveEnabled}
-        onAutosaveChange={handleAutosaveChange}
-      />
 
       <Toaster />
     </div>

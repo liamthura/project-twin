@@ -39,20 +39,11 @@ describe("Rail", () => {
     expect(screen.queryByRole("button", { name: /^Sections$/ })).not.toBeInTheDocument();
   });
 
-  it("offers the hidden optional sections under More sections, and adds one", async () => {
-    const onEnablePack = vi.fn();
-    const media = { key: "media", title: "Media", description: "Favourites" };
-    renderRail({ hiddenPacks: [media], onEnablePack });
-    const more = screen.getByRole("button", { name: /More sections/ });
-    expect(more).toHaveAttribute("aria-expanded", "false");
-    await userEvent.click(more);
-    await userEvent.click(screen.getByRole("button", { name: "Add Media" }));
-    expect(onEnablePack).toHaveBeenCalledWith("media");
-  });
-
-  it("shows no More sections when nothing is hidden", () => {
-    renderRail({ hiddenPacks: [] });
-    expect(screen.queryByRole("button", { name: /More sections/ })).not.toBeInTheDocument();
+  it("links to Settings -> Sections, where sections are switched on and off", async () => {
+    const onNavigate = vi.fn();
+    renderRail({ onNavigate });
+    await userEvent.click(screen.getByRole("button", { name: "Manage sections" }));
+    expect(onNavigate).toHaveBeenCalledWith("settings", "sections");
   });
 
   it("marks the active section, and only it", () => {

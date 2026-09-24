@@ -1,10 +1,9 @@
 import { Fragment } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, SlidersHorizontal } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { outline } from "@/renderers/paths";
 import { REVIEW_ICON, packIcon } from "./packIcons";
-import { MoreSections } from "./MoreSections";
 
 /** Sub-item row height, in px. The marker's travel is computed from it, so the
  *  two cannot drift: change `h-8` below and change this. */
@@ -31,8 +30,6 @@ export function Rail({
   activeSection,
   activeBand,
   pendingCount = 0,
-  hiddenPacks = [],
-  onEnablePack,
   onNavigate,
 }) {
   const activePack = packs.find((p) => p.key === activeSection);
@@ -159,9 +156,17 @@ export function Rail({
         ))}
       </ul>
 
-      <div className="mt-2">
-        <MoreSections hiddenPacks={hiddenPacks} onEnablePack={onEnablePack} />
-      </div>
+      {/* A way into Settings -> Sections, where sections are switched on and
+          off. Not a destination of its own: that choice also decides what AI
+          clients can read, so it lives with the other settings. */}
+      <button
+        type="button"
+        onClick={() => onNavigate("settings", "sections")}
+        className="mt-3 flex h-8 w-full items-center gap-2 rounded-lg px-3 text-left text-[13px] text-muted-foreground transition-colors duration-fast ease-standard hover:bg-muted/60 hover:text-foreground"
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        Manage sections
+      </button>
     </nav>
   );
 }

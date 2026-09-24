@@ -50,14 +50,12 @@ describe("SectionSheet", () => {
     expect(within(sheet()).queryByRole("button", { name: /^Sections$/ })).not.toBeInTheDocument();
   });
 
-  it("lets a hidden section be added from the phone too", async () => {
-    // The Sections page is gone, so this is the only way on mobile.
-    const onEnablePack = vi.fn();
-    renderSheet({ hiddenPacks: [{ key: "media", title: "Media" }], onEnablePack });
+  it("links to Settings -> Sections from the phone too", async () => {
+    const onNavigate = vi.fn();
+    renderSheet({ onNavigate });
     await userEvent.click(trigger());
-    await userEvent.click(within(sheet()).getByRole("button", { name: /More sections/ }));
-    await userEvent.click(within(sheet()).getByRole("button", { name: "Add Media" }));
-    expect(onEnablePack).toHaveBeenCalledWith("media");
+    await userEvent.click(within(sheet()).getByRole("button", { name: "Manage sections" }));
+    expect(onNavigate).toHaveBeenCalledWith("settings", "sections");
   });
 
   it("nests the active section's bands beneath it, and no other section's", async () => {

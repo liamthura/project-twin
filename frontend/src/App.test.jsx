@@ -154,6 +154,15 @@ describe("App: where it opens", () => {
     expect(railItem(/Profile/)).toHaveAttribute("aria-current", "page");
   });
 
+  it("serves Settings as a page, correcting an old tab id in the address", async () => {
+    window.history.replaceState(null, "", "/app/#/settings/tokens");
+    mockApi({ packs: packsFixture });
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "Settings", level: 2 })).toBeInTheDocument();
+    await waitFor(() => expect(window.location.hash).toBe("#/settings/connections"));
+    expect(screen.getByRole("tab", { name: "Connections" })).toHaveAttribute("aria-selected", "true");
+  });
+
   it("never redirects a deep link, even with something waiting", async () => {
     window.history.replaceState(null, "", "/app/#/preferences");
     mockApi({ packs: packsFixture, pendingCount: 2 });
@@ -230,10 +239,12 @@ describe("App: circle and learning_log render through the renderer kit", () => {
     // with no action. The preference moved out of the header in slice 1, so
     // reaching it means opening Connection Settings -- and turning it off does
     // NOT itself save (only the ON transition flushes).
-    // Settings lives in the account menu now.
+    // Settings is a page, reached from the account menu; back to Profile after.
     await user.click(screen.getByRole("button", { name: "Account" }));
     await user.click(await screen.findByRole("menuitem", { name: "Settings" }));
     await user.click(await screen.findByRole("switch", { name: "Auto-save" }));
+    await user.click(railItem(/Profile/));
+    await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
     // Radix marks the rest of the page aria-hidden while a dialog is open, so
     // the header is genuinely unreachable until this closes -- which is correct
     // behaviour, and means the test has to close it like a user would.
@@ -436,11 +447,12 @@ describe("App: save feedback", () => {
     render(<App />);
     await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
 
-    // Settings lives in the account menu now.
+    // Settings is a page, reached from the account menu; back to Profile after.
     await user.click(screen.getByRole("button", { name: "Account" }));
     await user.click(await screen.findByRole("menuitem", { name: "Settings" }));
     await user.click(await screen.findByRole("switch", { name: "Auto-save" }));
-    await user.keyboard("{Escape}");
+    await user.click(railItem(/Profile/));
+    await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
 
     expect(chip()).toHaveAttribute("data-save-state", "saved");
     expect(screen.queryByRole("button", { name: /save now/i })).not.toBeInTheDocument();
@@ -460,11 +472,12 @@ describe("App: save feedback", () => {
     render(<App />);
     await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
 
-    // Settings lives in the account menu now.
+    // Settings is a page, reached from the account menu; back to Profile after.
     await user.click(screen.getByRole("button", { name: "Account" }));
     await user.click(await screen.findByRole("menuitem", { name: "Settings" }));
     await user.click(await screen.findByRole("switch", { name: "Auto-save" }));
-    await user.keyboard("{Escape}");
+    await user.click(railItem(/Profile/));
+    await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
     await user.type(screen.getByLabelText("Name"), "M");
 
     api.mockImplementation((endpoint, opts) => {

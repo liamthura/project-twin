@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { outline } from "@/renderers/paths";
 import { REVIEW_ICON, packIcon } from "./packIcons";
-import { MoreSections } from "./MoreSections";
 
 /**
  * Mobile navigation: a sticky `Section ▾` trigger under the header, and a
@@ -28,8 +27,6 @@ export function SectionSheet({
   activeSection,
   activeBand,
   pendingCount = 0,
-  hiddenPacks = [],
-  onEnablePack,
   onNavigate,
 }) {
   const [open, setOpen] = useState(false);
@@ -37,7 +34,7 @@ export function SectionSheet({
   const activePack = packs.find((p) => p.key === activeSection);
   const activeTitle =
     activePack?.title ??
-    (activeSection === "review" ? "Review" : "Section");
+    ({ review: "Review", settings: "Settings" }[activeSection] ?? "Section");
 
   // Navigating always closes: leaving the sheet up over the content it just
   // scrolled to would hide the thing the tap was for.
@@ -132,9 +129,14 @@ export function SectionSheet({
             </ul>
             <hr className="my-2 border-border" />
             <ul>{packs.map((p) => destination(p.key, p.title, packIcon(p.key)))}</ul>
-            <div className="mt-2">
-              <MoreSections hiddenPacks={hiddenPacks} onEnablePack={onEnablePack} large />
-            </div>
+            <button
+              type="button"
+              onClick={() => go("settings", "sections")}
+              className="mt-2 flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-muted-foreground"
+            >
+              <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden="true" />
+              Manage sections
+            </button>
           </nav>
         </DialogContent>
       </Dialog>
