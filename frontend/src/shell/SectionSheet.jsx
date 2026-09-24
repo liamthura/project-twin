@@ -10,7 +10,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { outline } from "@/renderers/paths";
-import { REVIEW_ICON, SECTIONS_ICON, packIcon } from "./packIcons";
+import { REVIEW_ICON, packIcon } from "./packIcons";
+import { MoreSections } from "./MoreSections";
 
 /**
  * Mobile navigation: a sticky `Section ▾` trigger under the header, and a
@@ -27,7 +28,8 @@ export function SectionSheet({
   activeSection,
   activeBand,
   pendingCount = 0,
-  version,
+  hiddenPacks = [],
+  onEnablePack,
   onNavigate,
 }) {
   const [open, setOpen] = useState(false);
@@ -35,7 +37,7 @@ export function SectionSheet({
   const activePack = packs.find((p) => p.key === activeSection);
   const activeTitle =
     activePack?.title ??
-    (activeSection === "review" ? "Review" : activeSection === "sections" ? "Sections" : "Section");
+    (activeSection === "review" ? "Review" : "Section");
 
   // Navigating always closes: leaving the sheet up over the content it just
   // scrolled to would hide the thing the tap was for.
@@ -111,10 +113,7 @@ export function SectionSheet({
             <DialogTitle className="text-base">Go to</DialogTitle>
           </DialogHeader>
           <nav aria-label="Sections" className="overflow-y-auto px-2 pb-6">
-            <ul>{packs.map((p) => destination(p.key, p.title, packIcon(p.key)))}</ul>
-            {/* Same load-bearing divider as the rail: Review and Sections are
-                not persona sections. */}
-            <hr className="my-2 border-border" />
+            {/* Same order as the rail: Review first, then the sections. */}
             <ul>
               {destination(
                 "review",
@@ -130,11 +129,12 @@ export function SectionSheet({
                   </Badge>
                 ) : null
               )}
-              {destination("sections", "Sections", SECTIONS_ICON)}
             </ul>
-            {version && (
-              <p className="mt-4 px-3 font-mono text-[11px] text-muted-foreground">{version}</p>
-            )}
+            <hr className="my-2 border-border" />
+            <ul>{packs.map((p) => destination(p.key, p.title, packIcon(p.key)))}</ul>
+            <div className="mt-2">
+              <MoreSections hiddenPacks={hiddenPacks} onEnablePack={onEnablePack} large />
+            </div>
           </nav>
         </DialogContent>
       </Dialog>

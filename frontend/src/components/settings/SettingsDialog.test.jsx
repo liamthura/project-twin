@@ -63,23 +63,37 @@ describe("signed in", () => {
     expect(await screen.findByText(/Liam/)).toBeInTheDocument();
   });
 
-  it("lands on the tab a caller asked for", async () => {
-    // "Review access" in the review queue opens Connected apps, not Account.
+  it("lands on the tab a caller asked for, under its new name", async () => {
+    // "Review access" in the review queue still asks for "apps"; it lives in
+    // Connections now.
     render(
       <SettingsDialog isOpen onClose={vi.fn()} initialTab="apps" disabledSections={[]} />,
     );
     await waitFor(() =>
-      expect(screen.getByRole("tab", { name: "Connected apps" }))
+      expect(screen.getByRole("tab", { name: "Connections" }))
         .toHaveAttribute("aria-selected", "true"));
     expect(listConnectedApps).toHaveBeenCalled();
   });
 
-  it("offers all five tabs, enabled", async () => {
+  it("offers three tabs: Account, Connections, Data", async () => {
     open();
-    await waitFor(() => expect(whoami).toHaveBeenCalled());
-    for (const label of ["Account", "Server", "Tokens", "Connected apps", "Data"]) {
-      expect(screen.getByRole("tab", { name: label })).toBeEnabled();
-    }
+    await screen.findByRole("tablist");
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "Account",
+      "Connections",
+      "Data",
+    ]);
+  });
+
+  it("opens Data with the server settings expanded when asked for Server", async () => {
+    render(
+      <SettingsDialog isOpen onClose={vi.fn()} initialTab="server" disabledSections={[]} />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Data" }))
+        .toHaveAttribute("aria-selected", "true"));
+    expect(screen.getByRole("button", { name: /Advanced: server/ }))
+      .toHaveAttribute("aria-expanded", "true");
   });
 
   it("does not fetch a panel until its tab is opened", async () => {
@@ -94,9 +108,9 @@ describe("signed in", () => {
     expect(listTokens).not.toHaveBeenCalled();
     expect(listConnectedApps).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("tab", { name: "Tokens" }));
+    await user.click(screen.getByRole("tab", { name: "Connections" }));
     await waitFor(() => expect(listTokens).toHaveBeenCalled());
-    expect(listConnectedApps).not.toHaveBeenCalled();
+    expect(listConnectedApps).toHaveBeenCalled();
   });
 
   it("offers a way to sign out", async () => {
@@ -117,19 +131,16 @@ describe("signed out", () => {
     whoami.mockImplementation(() => Promise.reject(new Error("Unauthorized")));
   });
 
-  it("opens on Server, which is the only tab that would render", async () => {
+  it("shows the server settings, which are all it can offer", async () => {
     open();
     await waitFor(() => expect(whoami).toHaveBeenCalled());
     expect(await screen.findByText(/This instance/i)).toBeInTheDocument();
   });
 
-  it("disables the four that need a credential", async () => {
+  it("shows no tabs, since every one of them needs a credential", async () => {
     open();
-    await waitFor(() => expect(whoami).toHaveBeenCalled());
-    for (const label of ["Account", "Tokens", "Connected apps", "Data"]) {
-      expect(screen.getByRole("tab", { name: label })).toBeDisabled();
-    }
-    expect(screen.getByRole("tab", { name: "Server" })).toBeEnabled();
+    expect(await screen.findByText(/This instance/i)).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 
   it("offers no way to sign out, because there is nothing to sign out of", async () => {
@@ -148,8 +159,8 @@ describe("signed out", () => {
       JSON.stringify({ serverUrl: "/api", token: "revoked-token" }),
     );
     open();
-    await waitFor(() => expect(whoami).toHaveBeenCalled());
-    expect(screen.getByRole("tab", { name: "Account" })).toBeDisabled();
+    expect(await screen.findByText(/This instance/i)).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Account" })).not.toBeInTheDocument();
   });
 });
 

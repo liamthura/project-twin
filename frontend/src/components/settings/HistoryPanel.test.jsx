@@ -76,4 +76,21 @@ describe("HistoryPanel", () => {
     render(<HistoryPanel />);
     expect(await screen.findByText(/nothing to restore yet/i)).toBeInTheDocument();
   });
+
+  it("scoped to a section, lists only that section and offers no picker", async () => {
+    render(<HistoryPanel fixedSection="preferences" sectionTitle="Preferences" />);
+    await waitFor(() => expect(listHistory).toHaveBeenCalledWith("preferences"));
+    expect(listHistory).not.toHaveBeenCalledWith("projects");
+    expect(screen.queryByLabelText("Section")).not.toBeInTheDocument();
+  });
+
+  it("tells the page which section it restored, so the editor can refetch it", async () => {
+    // Without the refetch the editor keeps the pre-restore data, and the next
+    // autosave writes it straight back over the restore.
+    const onRestored = vi.fn();
+    render(<HistoryPanel fixedSection="preferences" onRestored={onRestored} />);
+    const buttons = await screen.findAllByRole("button", { name: /restore this/i });
+    fireEvent.click(buttons[0]);
+    await waitFor(() => expect(onRestored).toHaveBeenCalledWith("preferences"));
+  });
 });

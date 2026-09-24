@@ -22,10 +22,10 @@ desktop views.
 | `editor-entry-expanded.png` | A project row open: detail fields, tags, nested lists |
 | `editor-phone.png` | The editor at 390×844, section dropdown collapsed |
 | `learning-log-entry.png` | A learning log entry open |
-| `sections-manager.png` | The Sections manager, one opt-in section off |
-| `settings-tokens.png` | Settings → Tokens: the list and the create form |
-| `settings-tokens-new.png` | The one look at a new token's secret |
-| `settings-data.png` | Settings → Data: export, import, import mode |
+| `more-sections.png` | More sections open in the menu, two opt-in sections off; History and Hide in the section header |
+| `settings-tokens.png` | Settings → Connections: connected apps, the token list and the create form |
+| `settings-tokens-new.png` | The one look at a new token's secret (revoked straight after) |
+| `settings-data.png` | Settings → Data: export, import mode, import, Advanced |
 
 ## The conversation figures
 

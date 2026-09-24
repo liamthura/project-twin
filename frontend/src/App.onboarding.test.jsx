@@ -126,7 +126,7 @@ describe("App on an onboarding route", () => {
     expect(await screen.findByText(/getting started/i)).toBeInTheDocument();
     unmount();
 
-    window.location.hash = "#/sections";
+    window.location.hash = "#/review";
     render(<App />);
     await waitFor(() => expect(screen.getByRole("banner")).toBeInTheDocument());
     expect(screen.queryByText(/getting started/i)).not.toBeInTheDocument();

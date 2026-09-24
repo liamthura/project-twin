@@ -3,7 +3,8 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { outline } from "@/renderers/paths";
-import { REVIEW_ICON, SECTIONS_ICON, packIcon } from "./packIcons";
+import { REVIEW_ICON, packIcon } from "./packIcons";
+import { MoreSections } from "./MoreSections";
 
 /** Sub-item row height, in px. The marker's travel is computed from it, so the
  *  two cannot drift: change `h-8` below and change this. */
@@ -30,7 +31,8 @@ export function Rail({
   activeSection,
   activeBand,
   pendingCount = 0,
-  version,
+  hiddenPacks = [],
+  onEnablePack,
   onNavigate,
 }) {
   const activePack = packs.find((p) => p.key === activeSection);
@@ -86,6 +88,29 @@ export function Rail({
       aria-label="Sections"
       className="sticky top-[60px] hidden w-60 shrink-0 self-start md:block"
     >
+      {/* Review first: it is the one place something waits for the reader,
+          and the approve loop is the product. The divider is load-bearing --
+          Review is not a persona section and must not read as one. */}
+      <ul className="space-y-0.5">
+        {sectionItem(
+          "review",
+          "Review",
+          REVIEW_ICON,
+          pendingCount > 0 ? (
+            // The number is the visible affordance; the label is what a screen
+            // reader gets, because a bare "3" beside "Review" does not say
+            // three of what.
+            <Badge
+              variant="secondary"
+              aria-label={`${pendingCount} waiting`}
+              className="ml-auto shrink-0 px-1.5 tabular-nums"
+            >
+              {pendingCount}
+            </Badge>
+          ) : null
+        )}
+      </ul>
+      <hr className="my-2 border-border" />
       <ul className="space-y-0.5">
         {packs.map((p) => (
           // A Fragment with a key, not a bare <>: the section item and its
@@ -134,38 +159,9 @@ export function Rail({
         ))}
       </ul>
 
-      {/* Load-bearing, not decoration: Review and Sections are not persona
-          sections and must not read as though they were. */}
-      <hr className="my-2 border-border" />
-
-      <ul className="space-y-0.5">
-        {sectionItem(
-          "review",
-          "Review",
-          REVIEW_ICON,
-          pendingCount > 0 ? (
-            // The number, not a dot. pendingCount is already fetched; spending
-            // it on decoration and then explaining it in sr-only text was the
-            // old shape.
-            <Badge
-              variant="secondary"
-              // The number is the visible affordance; the label is what a screen
-              // reader gets, because a bare "3" beside "Review" does not say
-              // three of what. The old dot carried that sentence in sr-only
-              // text, and the intent outlives the dot.
-              aria-label={`${pendingCount} waiting`}
-              className="ml-auto shrink-0 px-1.5 tabular-nums"
-            >
-              {pendingCount}
-            </Badge>
-          ) : null
-        )}
-        {sectionItem("sections", "Sections", SECTIONS_ICON)}
-      </ul>
-
-      {version && (
-        <p className="mt-4 px-3 font-mono text-[11px] text-muted-foreground">{version}</p>
-      )}
+      <div className="mt-2">
+        <MoreSections hiddenPacks={hiddenPacks} onEnablePack={onEnablePack} />
+      </div>
     </nav>
   );
 }

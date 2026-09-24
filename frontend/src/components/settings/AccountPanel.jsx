@@ -65,6 +65,7 @@ export function AccountPanel({
   onAutosaveChange = () => {},
   disabledSections = [],
   onSignedOut = () => {},
+  version = null,
 }) {
   const { toast } = useToast();
 
@@ -326,6 +327,10 @@ export function AccountPanel({
           </div>
         )}
       </div>
+
+      {version && (
+        <p className="border-t pt-3 font-mono text-[11px] text-muted-foreground">{version}</p>
+      )}
     </div>
   );
 }
