@@ -539,6 +539,13 @@ export default function ListRenderer({
     const item = items[idx];
     // Only the fields this row actually carries a value for -- a blank line
     // labelled "timestamp" is worse than no line.
+    // Anything under the title on a phone? Without it the row is one line
+    // and centres like one.
+    const present = (f) => item[f] != null && item[f] !== "";
+    const hasMeta =
+      displayFields.some((f) => f !== sortField && present(f)) ||
+      countBadges.some((f) => Array.isArray(item[f]) && item[f].length > 0) ||
+      badges.some((b) => item[b]);
     const bodyDisplayFields = displayFields.filter(
       (f) => item[f] != null && item[f] !== ""
     );
@@ -562,9 +569,9 @@ export default function ListRenderer({
                   chevron and the buttons against the middle of a two-line
                   block. From `sm` up the inner div goes back to one row and
                   everything lines up as before. */}
-              <div className="flex cursor-pointer items-start gap-2 px-3 py-2.5 hover:bg-muted/40 sm:items-center"
+              <div className={`flex cursor-pointer ${hasMeta ? "items-start" : "items-center"} gap-2 px-3 py-2.5 hover:bg-muted/40 sm:items-center`}
                 onClick={() => setExpanded({ ...expanded, [idx]: !expanded[idx] })}>
-                <ChevronDown className={`mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform sm:mt-0 ${expanded[idx] ? "" : "-rotate-90"}`} />
+                <ChevronDown className={`${hasMeta ? "mt-0.5" : ""} h-4 w-4 shrink-0 text-muted-foreground transition-transform sm:mt-0 ${expanded[idx] ? "" : "-rotate-90"}`} />
                 {/* The badges used to sit beside the title in one row, and on a
                     375px screen a source chip plus a timestamp chip left the
                     title nothing to truncate into -- entries were unreadable,
@@ -572,12 +579,12 @@ export default function ListRenderer({
                     is what lets `truncate` work at all inside a flex child. */}
                 <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
                 <span className="block truncate text-sm font-medium">{item[titleField]}</span>
-                <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 sm:mt-0 sm:flex-1 sm:flex-nowrap">
+                <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 empty:hidden sm:mt-0 sm:flex-1 sm:flex-nowrap">
                   {/* Plain text with its label, not a mono pill: a bare
                       "2025-09-20" chip never said whether it was a start, an
                       end or a last edit. */}
                   {displayFields
-                    .filter((f) => item[f] != null && item[f] !== "")
+                    .filter((f) => f !== sortField && item[f] != null && item[f] !== "")
                     .map((f) => (
                       <span key={f} data-row-meta className={`whitespace-nowrap text-xs tabular-nums text-muted-foreground first-letter:uppercase`}>
                         {fieldLabel(meta, f).text}{" "}
@@ -624,6 +631,24 @@ export default function ListRenderer({
                   })}
                 </span>
                 </div>
+                {/* The field the list is ordered by sits against the right
+                    edge, value only: a timeline reads down that column, and
+                    the Sort control above already says what it is. */}
+                {sortField && item[sortField] != null && item[sortField] !== "" && (
+                  <span data-row-sort-value className="shrink-0 self-center whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                    {/* Date only on a phone, so the topic keeps the width. */}
+                    {(() => {
+                      const full = String(formatDisplay(item[sortField], formats[sortField]));
+                      if (!full.includes(" ")) return full;
+                      return (
+                        <>
+                          <span className="sm:hidden">{full.split(" ")[0]}</span>
+                          <span className="hidden sm:inline">{full}</span>
+                        </>
+                      );
+                    })()}
+                  </span>
+                )}
                 {pinnedField && (
                   <Button variant="ghost" size="icon"
                     className={`h-7 w-7 shrink-0 ${
