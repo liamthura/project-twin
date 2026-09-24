@@ -193,6 +193,18 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   position: absolute;
   inset: -6px;
 }
+/* On a touch screen the invisible pad is at least 44px square, centred on the
+   control, however small the control draws. */
+@media (pointer: coarse) {
+  .tap-target::after {
+    inset: auto;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
 
 /* Scroll without a visible scrollbar (mobile tab strip) */
 .scrollbar-none {

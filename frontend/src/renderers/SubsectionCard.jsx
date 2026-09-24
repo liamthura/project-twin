@@ -1,10 +1,11 @@
-// One subsection, one card. The unit the restructure is built on: the section
+// One subsection, one group. The unit the restructure is built on: the section
 // used to be a single Card holding every node under nested headings, which made
 // a manifest's shape read as one long form rather than as a set of things you
 // can deal with separately.
 //
-// Figma 114:363 / 114:413: radius 12, padding 16, header 12 above content, 1px
-// border, no shadow at rest (shadow is reserved for things that float).
+// A hairline above, not a box around (wave 3). As bordered cards these held
+// bordered lists and bordered inputs, three boxes deep; the list is now the
+// only box, and the rule plus spacing does the grouping.
 //
 // The header is one row: what this is on the left, what you can do to it on the
 // right. Which right-hand affordance appears is decided by the node's kind and
@@ -13,7 +14,6 @@
 // gets nothing because the control shows its own state.
 import { Check } from "lucide-react";
 
-import { Card } from "@/components/ui/card";
 import { InfoButton } from "@/components/ui/info-button";
 import { cn } from "@/lib/utils";
 
@@ -40,9 +40,9 @@ export function SubsectionCard({
   const hasRight = Boolean(tick || count || action);
 
   return (
-    <Card
+    <section
       data-subsection-card
-      className={cn("rounded-xl p-4 shadow-none", className)}
+      className={cn("border-t border-border pt-4", className)}
       {...rest}
     >
       <div data-card-header className="flex items-start justify-between gap-2">
@@ -68,11 +68,11 @@ export function SubsectionCard({
           -- but eleven nodes across the manifests declare one, and the copy
           used to render nowhere at all for `fields` and `list` nodes, which was
           a bug worth fixing rather than repeating. */}
-      {description && <p className="mt-1 text-[13px] text-muted-foreground">{description}</p>}
+      {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       <div data-card-content className="mt-3">
         {children}
       </div>
-    </Card>
+    </section>
   );
 }
 

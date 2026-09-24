@@ -35,7 +35,7 @@
  * "is this still in use?" with a confidently wrong date.
  */
 import { useState } from "react";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 // Read is the floor for every grant (Consent.jsx never lets it be declined),
@@ -115,13 +115,12 @@ export default function ConnectedApps({ grants, onRevoke }) {
                 </div>
               ) : (
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => setConfirmId(grant.id)}
-                  title="Revoke access"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  Revoke access
                 </Button>
               )}
             </div>

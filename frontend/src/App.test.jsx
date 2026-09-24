@@ -89,7 +89,7 @@ function mockApi({ packs, disabledSections = [], pendingCount = 0 }) {
 // navigation landmark rather than role="tab". The behaviours are unchanged --
 // what is asserted is the same set of facts, through the shell that exists now.
 //
-// Scoped to the rail deliberately: the mobile SectionSheet is in the DOM too
+// Scoped to the rail deliberately: the mobile SectionMenu is in the DOM too
 // (jsdom applies no CSS, so `md:hidden` hides nothing here), and an unscoped
 // query would match its trigger as well.
 const rail = () => screen.getByRole("navigation", { name: "Sections" });
@@ -412,6 +412,27 @@ describe("App: save feedback", () => {
     const toasts = document.querySelector("ol");
     expect(toasts).not.toBeNull();
     expect(within(toasts).queryByText("Saved")).not.toBeInTheDocument();
+  });
+
+  it("sends waiting edits at once when the page is hidden, not 1.5s later", async () => {
+    // Closing a tab on mobile hides it first; anything still in the debounce
+    // would otherwise be lost with the page.
+    mockApi({ packs: packsFixture });
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
+    await user.type(screen.getByLabelText("Name"), "M");
+
+    // Mock calls are not cleared between tests in this file; count from here.
+    const before = api.mock.calls.length;
+    const puts = () =>
+      api.mock.calls.slice(before).filter(([e, o]) => e === "/files/profile" && o?.method === "PUT");
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+
+    expect(puts()).toHaveLength(1);
+    expect(puts()[0][1].keepalive).toBe(true);
   });
 
   it("still interrupts when a save fails", async () => {

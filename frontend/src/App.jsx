@@ -46,27 +46,9 @@ import SectionRenderer from "@/renderers/SectionRenderer";
 import { outline } from "@/renderers/paths";
 import { Header } from "@/shell/Header";
 import { Rail } from "@/shell/Rail";
-import { SectionSheet } from "@/shell/SectionSheet";
+import { SectionMenu } from "@/shell/SectionMenu";
 import { useScrollSpy } from "@/shell/useScrollSpy";
-
-// Debounce hook
-function useDebounce(callback, delay) {
-  const timeoutRef = useRef(null);
-
-  const debouncedCallback = useCallback(
-    (...args) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => {
-        callback(...args);
-      }, delay);
-    },
-    [callback, delay]
-  );
-
-  return debouncedCallback;
-}
+import { useKeyedDebounce } from "@/lib/useKeyedDebounce";
 
 // Main App
 export default function App() {
@@ -486,12 +468,18 @@ export default function App() {
     }
   };
 
-  const saveFile = async (fileType, data) => {
+  // `closing`: the page is being hidden or shut, so ask for a request that
+  // outlives it. Browsers cap keepalive bodies at 64KB and reject bigger ones
+  // outright, so a large section goes as a normal request and the beforeunload
+  // prompt below is what protects it.
+  const saveFile = async (fileType, data, { closing = false } = {}) => {
     setIsSaving(true);
     try {
+      const body = JSON.stringify({ data });
       await api(`/files/${fileType}`, {
         method: "PUT",
-        body: JSON.stringify({ data }),
+        body,
+        keepalive: closing && body.length < 60000,
       });
       setLastSaved(new Date());
       setHasUnsavedChanges(false);
@@ -512,11 +500,34 @@ export default function App() {
     }
   };
 
-  const debouncedSave = useDebounce(saveFile, 1500);
+  const autosave = useKeyedDebounce(saveFile, 1500);
+
+  // Leaving the page must not lose the last 1.5s of typing. Hiding it (tab
+  // switch, app switch, the first step of closing on mobile) sends whatever is
+  // waiting; closing with anything still unsent or unsaved asks first.
+  const unsavedRef = useRef(false);
+  unsavedRef.current = hasUnsavedChanges || isSaving;
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") autosave.flush({ closing: true });
+    };
+    const onBeforeUnload = (e) => {
+      if (!autosave.hasPending() && !unsavedRef.current) return;
+      autosave.flush({ closing: true });
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, [autosave]);
 
   const handlePackChange = (key) => (newData) => {
     setPackData((prev) => ({ ...prev, [key]: newData }));
-    if (isAutosaveEnabled) debouncedSave(key, newData);
+    if (isAutosaveEnabled) autosave.schedule(key, newData);
     // With autosave on, the flush is already on its way and the chip would
     // flicker "Unsaved" for 1.5s per keystroke with a Save now button coming and
     // going inside it.
@@ -757,7 +768,7 @@ export default function App() {
           <AddEmailBanner onAddEmail={() => openSettings("account")} />
         </div>
 
-        <SectionSheet {...shellProps} />
+        <SectionMenu {...shellProps} />
 
         <div className="flex flex-col gap-6 md:flex-row">
           <Rail {...shellProps} />
