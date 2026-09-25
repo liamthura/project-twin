@@ -207,7 +207,7 @@ export function TokenPanel({ isOpen }) {
                 </p>
                 {/* Not mono. This reads as a sentence, not a scope string. */}
                 <p className="text-xs text-muted-foreground">
-                  created {formatDate(t.created_at) || "unknown"} &middot; last used{" "}
+                  Created {formatDate(t.created_at) || "unknown"} &middot; last used{" "}
                   {formatDate(t.last_used_at) || "never"}
                   {formatDate(t.expires_at) && (
                     <> &middot; expires {formatDate(t.expires_at)}</>

@@ -653,11 +653,9 @@ describe("SectionRenderer", () => {
       exclusions: { id: MACHINE_ID, related: LINK_GRAPH },
     });
 
-    it("offers the info dialog carried by the manifest", async () => {
-      const { user } = renderSection({ pack: circlePack, initial: circleData });
-      await user.click(screen.getByRole("button", { name: "About Circle" }));
-      expect(screen.getByText(/Track the important people/)).toBeInTheDocument();
-      expect(screen.getByText(/The person's full name/)).toBeInTheDocument();
+    it("carries no info dialog: its tips only restated the field labels", () => {
+      renderSection({ pack: circlePack, initial: circleData });
+      expect(screen.queryByRole("button", { name: "About Circle" })).not.toBeInTheDocument();
     });
 
     // The brief's version of this test rendered the section unexpanded and
@@ -916,14 +914,12 @@ describe("SectionRenderer", () => {
       expect(screen.getByText(/A short phrase or sentence/)).toBeInTheDocument();
     });
 
-    it("keeps the projects info dialog on a distinct name, not a second `About this section`", async () => {
-      const { user } = renderSection({ pack: projectsPack, initial: projectsData });
-      // Two info blocks in one section: if both fell back to the generic
-      // name, `getByRole` here would throw on finding two matches -- which is
-      // the ambiguity a screen-reader user would hear.
-      await user.click(screen.getByRole("button", { name: "About Projects" }));
-      expect(screen.getByText(/Track your active work/)).toBeInTheDocument();
-      expect(screen.getByText(/Clear, descriptive title/)).toBeInTheDocument();
+    it("gives Projects a description line instead of a dialog", () => {
+      // Its tips were one line per field label. Top of Mind keeps its dialog:
+      // "a scratchpad before it becomes a project" is not in any label.
+      renderSection({ pack: projectsPack, initial: projectsData });
+      expect(screen.queryByRole("button", { name: "About Projects" })).not.toBeInTheDocument();
+      expect(screen.getByText("What you are building, and what you have finished")).toBeInTheDocument();
     });
   });
 
@@ -1275,12 +1271,12 @@ describe("SectionRenderer", () => {
 
     // ---- info dialogs ----
 
-    it("carries both bespoke-editor info dialogs, each reachable by its own name", async () => {
-      const { user } = renderSection({ pack: knowledgePack, initial: knowledgeData });
-
-      await user.click(screen.getByRole("button", { name: "About Skills & Domains" }));
-      expect(screen.getByText(/tracks your technical and professional skills/)).toBeInTheDocument();
-      expect(screen.getByText(/Be specific/)).toBeInTheDocument();
+    it("gives Skills & Domains a description line instead of a dialog", () => {
+      renderSection({ pack: knowledgePack, initial: knowledgeData });
+      expect(
+        screen.queryByRole("button", { name: "About Skills & Domains" })
+      ).not.toBeInTheDocument();
+      expect(screen.getByText("What you know, how well, and where you used it")).toBeInTheDocument();
     });
 
     it("keeps the mental tabs info dialog on a distinct name, not a second generic one", async () => {
@@ -1625,7 +1621,7 @@ describe("section headings and info placement", () => {
   it("puts each list's info button beside its own heading, not in the list body", () => {
     renderSection({ pack: projectsPack, initial: projectsData });
 
-    for (const title of ["Top of Mind", "Projects"]) {
+    for (const title of ["Top of Mind"]) {
       const heading = screen.getAllByRole("heading", { name: title }).at(-1);
       const button = screen.getByRole("button", { name: `About ${title}` });
       // Same heading row, so the icon reads as belonging to that heading.
@@ -2379,15 +2375,31 @@ describe("section headings and info placement", () => {
     });
   });
 
-  it("keeps an untitled section's info beside the card title, where its only heading is", () => {
+  it("keeps an untitled section's heading in the outline without drawing it twice", () => {
     renderSection({ pack: circlePack, initial: circleData });
 
-    const button = screen.getByRole("button", { name: "About Circle" });
-    // Beside the heading, not inside it. The pack title used to render the "i"
-    // INSIDE its CardTitle, which put the button's own label into the heading's
-    // accessible name; every node-level heading already did it this way.
+    // The page title already says "Circle"; the list's borrowed heading used
+    // to say it again, 16px under the 24px one.
     const cardTitle = screen.getByRole("heading", { name: "Circle", level: 3 });
-    expect(cardTitle.parentElement).toContainElement(button);
+    expect(cardTitle).toHaveClass("sr-only");
+    expect(screen.getByRole("heading", { name: "Circle", level: 2 })).not.toHaveClass("sr-only");
+  });
+
+  it("moves a lone untitled list's Add up beside History, and it still adds", async () => {
+    const user = userEvent.setup();
+    render(
+      <SectionRenderer
+        pack={goalsPack}
+        data={goalsData}
+        onChange={() => {}}
+        headerActions={<button type="button">History</button>}
+      />
+    );
+
+    const add = screen.getByRole("button", { name: /^Add/ });
+    expect(screen.getByRole("button", { name: "History" }).parentElement).toContainElement(add);
+    await user.click(add);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("labels each Add button with the singular entity, not the plural heading", () => {
@@ -2439,17 +2451,15 @@ describe("the Add trigger and the entry count", () => {
     expect(within(nodeEl).getAllByText("Add", { selector: "button" })).toHaveLength(1);
   });
 
-  it("puts an untitled node's Add trigger in its own card's header row, the only heading it has", () => {
-    // Same reason the untitled node's "i" sits there: a node with no title of
-    // its own is the section's main list, so the heading that describes it is
-    // the one its card borrows from the pack. Scoped to level 3 because the page
-    // title block above now reads the same word at h2.
+  it("puts a lone untitled list's Add in the page header row, beside the section's actions", () => {
+    // The list's own heading is not drawn -- the page title already names it --
+    // so the card header has nothing to hold the trigger beside. The page
+    // header is the heading that describes this list.
     renderSection({ pack: goalsPack, initial: goalsData });
 
-    const cardTitle = screen.getByRole("heading", { name: /Goals/, level: 3 });
-    const headerRow = cardTitle.parentElement.parentElement;
+    const headerRow = screen.getByRole("heading", { level: 2 }).parentElement.parentElement;
     expect(headerRow).toContainElement(headerAdd());
-    // The row is the header's, not the whole Card's -- otherwise this would
+    // The row is the header's, not the whole section's -- otherwise this would
     // pass with the button still sitting down in the list body.
     expect(headerRow).not.toContainElement(screen.getByText("Ship MyGist v3"));
     expect(screen.getAllByText("Add", { selector: "button" })).toHaveLength(1);
@@ -2599,16 +2609,15 @@ describe("the section's structure", () => {
     expect(document.querySelectorAll("hr")).toHaveLength(0);
   });
 
-  it("titles an untitled node's card with the pack's own name", () => {
-    // Figma 114:604 does exactly this -- "Goals" at 20px in the title block and
-    // again at 16px in the card header. The card is the only header that node
-    // has, and it is where its Add and its info have to live.
+  it("titles an untitled node's card with the pack's own name, for the outline only", () => {
+    // Figma 114:604 drew "Goals" twice, 20px then 16px. The outline keeps both
+    // levels; the screen shows the page title alone.
     renderSection({ pack: goalsPack, initial: goalsData });
 
     expect(screen.getByRole("heading", { name: goalsPack.title, level: 2 })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: goalsPack.title, level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: goalsPack.title, level: 3 })).toHaveClass("sr-only");
     expect(cards()).toHaveLength(1);
-    expect(within(cards()[0]).getByText("Add", { selector: "button" })).toBeInTheDocument();
+    expect(within(cards()[0]).queryByText("Add", { selector: "button" })).not.toBeInTheDocument();
   });
 
   it("spaces runs 40px apart and groups within a run 24px", () => {

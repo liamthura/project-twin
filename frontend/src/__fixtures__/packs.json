@@ -212,18 +212,6 @@
         "path": [],
         "title": "Personal Information",
         "description": "Your basic identity and current status",
-        "info": {
-          "overview": "This section captures who you are at a glance. It helps AI assistants address you correctly and understand your current context (student, professional, location, etc.).",
-          "tips": [
-            "Name: Your full legal name as it appears on official documents.",
-            "Preferred Name: The name you'd like AI to call you (nickname, first name, etc.).",
-            "Current Role: Your primary occupation or status, e.g. 'Final Year Student', 'Software Engineer', 'Freelance Designer'.",
-            "Organisation: Your school, university, or employer.",
-            "Location: City and country—helps with locale-specific suggestions (holidays, time zones, spelling conventions).",
-            "Nationality: Useful for cultural context and language defaults.",
-            "Bio: A 2–3 sentence summary of who you are, your interests, and what you're working on. Think of it as your elevator pitch."
-          ]
-        },
         "element": {
           "entity": "basic_info",
           "description": "Update-only singleton for top-level profile fields",
@@ -268,20 +256,6 @@
         ],
         "title": "Education",
         "description": "Your educational background and qualifications",
-        "info": {
-          "overview": "Document your educational journey—schools, degrees, and achievements. This helps AI understand your academic background and tailor advice accordingly.",
-          "tips": [
-            "Add one entry per institution or degree (e.g., separate entries for high school and university).",
-            "Institution Name: Full official name of the school or university.",
-            "Degree Level: e.g., 'High School Diploma', 'BSc', 'MSc', 'PhD'.",
-            "Field of Study: Your major, concentration, or programme name.",
-            "Status: Whether you're currently enrolled, have completed, or left incomplete.",
-            "Years: Start and end (or expected end) years.",
-            "Coursework: Key modules or classes you've taken.",
-            "Clubs & Societies: Extracurricular involvement.",
-            "Highlights: Notable achievements like awards, high grades, leadership roles, or recognitions."
-          ]
-        },
         "search": true,
         "element": {
           "entity": "education",
@@ -433,17 +407,6 @@
         ],
         "title": "Work Experience",
         "description": "Your professional experience",
-        "info": {
-          "overview": "List your professional experiences—jobs, internships, placements, and volunteer work. This helps AI understand your skills and career trajectory.",
-          "tips": [
-            "Add one entry per role. If you held multiple roles at the same company, consider separate entries.",
-            "Role: Your job title or position.",
-            "Company: The organisation you worked for.",
-            "Type: e.g., 'Full-time', 'Part-time', 'Internship', 'Placement', 'Volunteer', 'Freelance'.",
-            "Period: Date range in a readable format, e.g., 'Jan 2023 – Jun 2024' or 'Summer 2022'.",
-            "Highlights: 3–6 bullet points describing what you did and achieved. Focus on outcomes and impact."
-          ]
-        },
         "search": true,
         "element": {
           "entity": "work_experience",
@@ -524,13 +487,6 @@
         "kind": "group",
         "title": "Contact & Links",
         "description": "How to reach you and your online presence",
-        "info": {
-          "overview": "Provide ways to reach you and links to your online profiles. AI can use this to reference your portfolio or suggest networking opportunities.",
-          "tips": [
-            "Emails: Add all relevant email addresses and tag their purpose (Primary, Work, School, etc.).",
-            "Links: Your portfolio, GitHub, LinkedIn or personal site — label each one."
-          ]
-        },
         "sections": [
           {
             "kind": "list",
@@ -602,13 +558,6 @@
         ],
         "title": "Languages",
         "description": "Languages you speak and your fluency level",
-        "info": {
-          "overview": "Languages you speak and your fluency level. This helps AI communicate with you appropriately and understand your linguistic capabilities.",
-          "tips": [
-            "Add one entry per language.",
-            "Fluency: native, fluent, conversational or basic."
-          ]
-        },
         "element": {
           "entity": "language",
           "identifier": "name",
@@ -865,20 +814,7 @@
           "domains"
         ],
         "title": "Skills & Domains",
-        "info": {
-          "overview": "This section tracks your technical and professional skills. It helps AI understand what you know, how well you know it, and in what context you've applied it.",
-          "tips": [
-            "Skill Name: Be specific—use 'Python' not 'Programming', or 'React' not just 'Frontend'.",
-            "Proficiency Levels explained:",
-            "  • Beginner: Just started learning, basic understanding.",
-            "  • Learning: Actively studying, can do simple tasks.",
-            "  • Intermediate: Comfortable with common use cases, some hands-on experience.",
-            "  • Advanced: Deep knowledge, can solve complex problems independently.",
-            "  • Expert: Mastery level, can teach others and handle edge cases.",
-            "Notes: Add context about where and how you've used the skill—projects, tools, or specific experience.",
-            "References: Optional links to tutorials, documentation, or learning resources you've found helpful."
-          ]
-        },
+        "description": "What you know, how well, and where you used it",
         "search": true,
         "facets": [
           "level"
@@ -970,6 +906,7 @@
           "mental_tabs"
         ],
         "title": "Mental Tabs",
+        "description": "Things worth remembering that are not skills: lists, recommendations, notes",
         "info": {
           "overview": "Mental Tabs are your personal knowledge snippets—random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
           "tips": [
@@ -1182,14 +1119,6 @@
         "kind": "group",
         "title": "Code Style",
         "description": "Your preferred programming languages, frameworks, and tools",
-        "info": {
-          "overview": "Your preferred programming languages, frameworks, and tools. AI uses these to pick idioms and examples that match how you actually work.",
-          "tips": [
-            "Languages: what you reach for by default, not everything you have ever used.",
-            "Frameworks: the ones you want code examples written against.",
-            "Tools: editors, runtimes and services worth assuming you have."
-          ]
-        },
         "sections": [
           {
             "kind": "strings",
@@ -1227,14 +1156,6 @@
         "kind": "group",
         "title": "Communication",
         "description": "How you prefer AI responses to be formatted",
-        "info": {
-          "overview": "How you prefer AI responses to be formatted. This is the baseline; mood overrides below adjust it situationally.",
-          "tips": [
-            "Tone: how it should sound — e.g. friendly but professional.",
-            "Detail Level: how much to say and how to structure it.",
-            "Locale: spelling and conventions, e.g. British English."
-          ]
-        },
         "sections": [
           {
             "kind": "fields",
@@ -1307,7 +1228,6 @@
             ],
             "title": "Response Format",
             "description": "How you want answers shaped",
-            "control": "input",
             "placeholder": "e.g. code blocks for anything over three lines",
             "element": {
               "entity": "response_format",
@@ -1322,13 +1242,6 @@
         "kind": "group",
         "title": "Learning Style",
         "description": "How you learn best, and how you like work approached",
-        "info": {
-          "overview": "How you learn best, so explanations arrive in a shape that works for you.",
-          "tips": [
-            "Preferred: the formats that land — worked examples, diagrams, analogies.",
-            "Avoid: what reliably loses you — walls of text, unexplained jargon."
-          ]
-        },
         "sections": [
           {
             "kind": "strings",
@@ -1511,6 +1424,7 @@
           "top_of_mind"
         ],
         "title": "Top of Mind",
+        "description": "Ideas and questions that are not a project yet",
         "info": {
           "overview": "Capture quick ideas, thoughts, or things you want to explore. Think of it as a scratchpad for inspiration before it becomes a full project.",
           "tips": [
@@ -1552,18 +1466,7 @@
           "projects"
         ],
         "title": "Projects",
-        "info": {
-          "overview": "Track your active work, side projects, and completed endeavors. This helps AI understand what you're building and can reference past experience.",
-          "tips": [
-            "Name: Clear, descriptive title for the project.",
-            "Status: Idea (still in ideation/research), Active (currently working on it), Paused (temporarily on hold), Completed (finished and shipped), Archived (no longer relevant but kept for reference).",
-            "Description: What the project is about and your goals.",
-            "Tags: Keywords for easy filtering and AI context.",
-            "References: Links to repos, docs, designs, or related resources.",
-            "Highlights: Wins and milestones worth remembering.",
-            "Notes: Progress updates, blockers, or lessons learned."
-          ]
-        },
+        "description": "What you are building, and what you have finished",
         "search": true,
         "facets": [
           "status"
@@ -1842,17 +1745,7 @@
           "hobbies"
         ],
         "title": "Hobbies & Activities",
-        "info": {
-          "overview": "Track activities you enjoy outside of work. This helps AI understand your lifestyle and can suggest relevant recommendations.",
-          "tips": [
-            "Name: The hobby or activity.",
-            "Skill Level: Beginner, Learning, Intermediate, Advanced, or Expert.",
-            "Status: Active (currently doing), Paused (on hold), or Inactive (stopped).",
-            "Specifics: Sub-areas or variations you focus on.",
-            "Notes: Your experience, goals, or what you enjoy most.",
-            "References: Links to gear, communities, or learning resources."
-          ]
-        },
+        "description": "What you do outside work",
         "search": true,
         "facets": [
           "skill_level"
@@ -1960,6 +1853,7 @@
           "interests"
         ],
         "title": "Interests",
+        "description": "What you love, and what you are curious about",
         "info": {
           "overview": "Things you're into, tagged as a passion (what you love doing or following) or a curiosity (what you want to explore). AI uses this to understand your motivations and tailor suggestions.",
           "tips": [
@@ -2009,14 +1903,7 @@
           "personality_traits"
         ],
         "title": "Personality Traits",
-        "info": {
-          "overview": "Characteristics that define how you think, work, and interact. Helps AI understand your style and adapt its responses.",
-          "tips": [
-            "Add adjectives or short phrases that describe you.",
-            "Examples: analytical, creative, detail-oriented, big-picture thinker, empathetic.",
-            "Be honest—both strengths and areas you're working on."
-          ]
-        },
+        "description": "How you think, work and deal with people",
         "placeholder": "e.g. Creative, Analytical...",
         "element": {
           "entity": "personality_trait",
@@ -2030,14 +1917,7 @@
           "values"
         ],
         "title": "Values",
-        "info": {
-          "overview": "Core principles that guide your decisions and priorities. What matters most to you in life and work.",
-          "tips": [
-            "Add words or short phrases representing your values.",
-            "Examples: integrity, growth, family, creativity, impact, balance.",
-            "These help AI align suggestions with what truly matters to you."
-          ]
-        },
+        "description": "What matters most when you decide",
         "placeholder": "e.g. Integrity, Growth...",
         "element": {
           "entity": "value",
@@ -2049,15 +1929,6 @@
         "kind": "group",
         "title": "Wellness",
         "description": "Sleep patterns, energy levels, and stress factors",
-        "info": {
-          "overview": "Track your health patterns and energy rhythms. This helps AI understand when you're at your best and what affects your wellbeing.",
-          "tips": [
-            "Sleep Schedule: When you typically go to bed and wake up (separate for weekdays vs weekends if different).",
-            "Energy Peaks: Times of day when you feel most focused and productive.",
-            "Stress Triggers: Situations, environments, or patterns that tend to increase your stress.",
-            "This info helps AI suggest optimal times for tasks and avoid recommending things during low-energy periods."
-          ]
-        },
         "sections": [
           {
             "kind": "fields",
@@ -2614,15 +2485,6 @@
         "path": [
           "connections"
         ],
-        "info": {
-          "overview": "Track the important people in your life and your relationships with them. This helps AI understand your social context and tailor suggestions accordingly.",
-          "tips": [
-            "Name: The person's full name or preferred name.",
-            "Relationship: How you know them - e.g., 'Friend from university', 'Colleague at Google', 'Mentor', 'Family member'.",
-            "Traits: Key characteristics or tags that describe them - personality, interests, expertise, etc.",
-            "Notes: Context about your relationship, shared experiences, important details to remember."
-          ]
-        },
         "search": true,
         "element": {
           "entity": "connection",

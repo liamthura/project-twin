@@ -51,17 +51,7 @@
         "hobbies"
       ],
       "title": "Hobbies & Activities",
-      "info": {
-        "overview": "Track activities you enjoy outside of work. This helps AI understand your lifestyle and can suggest relevant recommendations.",
-        "tips": [
-          "Name: The hobby or activity.",
-          "Skill Level: Beginner, Learning, Intermediate, Advanced, or Expert.",
-          "Status: Active (currently doing), Paused (on hold), or Inactive (stopped).",
-          "Specifics: Sub-areas or variations you focus on.",
-          "Notes: Your experience, goals, or what you enjoy most.",
-          "References: Links to gear, communities, or learning resources."
-        ]
-      },
+      "description": "What you do outside work",
       "search": true,
       "facets": [
         "skill_level"
@@ -169,6 +159,7 @@
         "interests"
       ],
       "title": "Interests",
+      "description": "What you love, and what you are curious about",
       "info": {
         "overview": "Things you're into, tagged as a passion (what you love doing or following) or a curiosity (what you want to explore). AI uses this to understand your motivations and tailor suggestions.",
         "tips": [
@@ -218,14 +209,7 @@
         "personality_traits"
       ],
       "title": "Personality Traits",
-      "info": {
-        "overview": "Characteristics that define how you think, work, and interact. Helps AI understand your style and adapt its responses.",
-        "tips": [
-          "Add adjectives or short phrases that describe you.",
-          "Examples: analytical, creative, detail-oriented, big-picture thinker, empathetic.",
-          "Be honest—both strengths and areas you're working on."
-        ]
-      },
+      "description": "How you think, work and deal with people",
       "placeholder": "e.g. Creative, Analytical...",
       "element": {
         "entity": "personality_trait",
@@ -239,14 +223,7 @@
         "values"
       ],
       "title": "Values",
-      "info": {
-        "overview": "Core principles that guide your decisions and priorities. What matters most to you in life and work.",
-        "tips": [
-          "Add words or short phrases representing your values.",
-          "Examples: integrity, growth, family, creativity, impact, balance.",
-          "These help AI align suggestions with what truly matters to you."
-        ]
-      },
+      "description": "What matters most when you decide",
       "placeholder": "e.g. Integrity, Growth...",
       "element": {
         "entity": "value",
@@ -258,15 +235,6 @@
       "kind": "group",
       "title": "Wellness",
       "description": "Sleep patterns, energy levels, and stress factors",
-      "info": {
-        "overview": "Track your health patterns and energy rhythms. This helps AI understand when you're at your best and what affects your wellbeing.",
-        "tips": [
-          "Sleep Schedule: When you typically go to bed and wake up (separate for weekdays vs weekends if different).",
-          "Energy Peaks: Times of day when you feel most focused and productive.",
-          "Stress Triggers: Situations, environments, or patterns that tend to increase your stress.",
-          "This info helps AI suggest optimal times for tasks and avoid recommending things during low-energy periods."
-        ]
-      },
       "sections": [
         {
           "kind": "fields",

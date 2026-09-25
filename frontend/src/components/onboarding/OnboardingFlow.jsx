@@ -183,7 +183,10 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
           </div>
         )}
 
-        <div className="flex-1">
+        {/* Not flex-1 on Connect: pinned to the foot of the window, "Skip for
+            now" floated a screen-height away from the choice it is the third
+            answer to. */}
+        <div className={current === "connect" ? undefined : "flex-1"}>
           {current === "connect" && (
             <StepConnect
               // Handing the work over is a real answer, not an abandonment:

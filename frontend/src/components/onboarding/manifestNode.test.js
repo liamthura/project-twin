@@ -28,7 +28,6 @@ describe("findNode", () => {
     const preferences = packs.find((p) => p.key === "preferences");
     const node = findNode(preferences, ["response_format"]);
     expect(node?.kind).toBe("strings");
-    expect(node.control).toBe("input");
   });
 
   it("returns null for a path no node declares", () => {

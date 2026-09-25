@@ -39,6 +39,7 @@
         "top_of_mind"
       ],
       "title": "Top of Mind",
+      "description": "Ideas and questions that are not a project yet",
       "info": {
         "overview": "Capture quick ideas, thoughts, or things you want to explore. Think of it as a scratchpad for inspiration before it becomes a full project.",
         "tips": [
@@ -80,18 +81,7 @@
         "projects"
       ],
       "title": "Projects",
-      "info": {
-        "overview": "Track your active work, side projects, and completed endeavors. This helps AI understand what you're building and can reference past experience.",
-        "tips": [
-          "Name: Clear, descriptive title for the project.",
-          "Status: Idea (still in ideation/research), Active (currently working on it), Paused (temporarily on hold), Completed (finished and shipped), Archived (no longer relevant but kept for reference).",
-          "Description: What the project is about and your goals.",
-          "Tags: Keywords for easy filtering and AI context.",
-          "References: Links to repos, docs, designs, or related resources.",
-          "Highlights: Wins and milestones worth remembering.",
-          "Notes: Progress updates, blockers, or lessons learned."
-        ]
-      },
+      "description": "What you are building, and what you have finished",
       "search": true,
       "facets": [
         "status"

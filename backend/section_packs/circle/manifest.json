@@ -25,15 +25,6 @@
       "path": [
         "connections"
       ],
-      "info": {
-        "overview": "Track the important people in your life and your relationships with them. This helps AI understand your social context and tailor suggestions accordingly.",
-        "tips": [
-          "Name: The person's full name or preferred name.",
-          "Relationship: How you know them - e.g., 'Friend from university', 'Colleague at Google', 'Mentor', 'Family member'.",
-          "Traits: Key characteristics or tags that describe them - personality, interests, expertise, etc.",
-          "Notes: Context about your relationship, shared experiences, important details to remember."
-        ]
-      },
       "search": true,
       "element": {
         "entity": "connection",
