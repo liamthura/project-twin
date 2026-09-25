@@ -279,57 +279,61 @@ export function AccountPanel({
       )}
 
       <div className="space-y-3 border-t pt-4">
-        <p className="text-sm font-medium">Preferences</p>
+        <h3 className="text-base font-semibold">Preferences</h3>
 
-        {/* Auto-save, evicted from the header in slice 1. It is a
-            once-per-lifetime preference and it was competing with content for
-            the most valuable strip on the page. The copy says what happens
-            rather than naming a mechanism -- "auto-save" alone does not tell you
-            the alternative is a button in the header. */}
-        <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-          <div className="min-w-0 space-y-1">
-            <Label htmlFor="autosave-preference" className="text-sm font-medium">
-              Save as you type
-            </Label>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Changes are saved automatically. Turn this off and the header keeps
-              a Save now button instead.
-            </p>
-          </div>
-          <Switch
-            id="autosave-preference"
-            checked={isAutosaveEnabled}
-            onCheckedChange={onAutosaveChange}
-            aria-label="Auto-save"
-          />
-        </div>
-
-        {/* Dismissing the getting-started card is not destructive -- nothing is
-            deleted, and #/onboarding/welcome still works if typed -- so this
-            brings back a card, not data. */}
-        {onboardingDismissed && (
-          <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+        {/* One bordered list, as Sections and Data are: two cards with a gap
+            between them read as two unrelated things. */}
+        <div className="divide-y rounded-lg border">
+          {/* Auto-save, evicted from the header in slice 1. It is a
+              once-per-lifetime preference and it was competing with content for
+              the most valuable strip on the page. The copy says what happens
+              rather than naming a mechanism -- "auto-save" alone does not tell you
+              the alternative is a button in the header. */}
+          <div className="flex items-center justify-between gap-3 p-3">
             <div className="min-w-0 space-y-1">
-              <p className="text-sm font-medium">Getting started</p>
+              <Label htmlFor="autosave-preference" className="text-sm font-medium">
+                Save as you type
+              </Label>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                You dismissed the setup card. Bring it back to pick up where you
-                left off.
+                Changes are saved automatically. Turn this off and the header keeps
+                a Save now button instead.
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={restoreGettingStarted}
-            >
-              Show getting started
-            </Button>
+            <Switch
+              id="autosave-preference"
+              checked={isAutosaveEnabled}
+              onCheckedChange={onAutosaveChange}
+              aria-label="Auto-save"
+            />
           </div>
-        )}
+
+          {/* Dismissing the getting-started card is not destructive -- nothing is
+              deleted, and #/onboarding/welcome still works if typed -- so this
+              brings back a card, not data. */}
+          {onboardingDismissed && (
+            <div className="flex items-center justify-between gap-3 p-3">
+              <div className="min-w-0 space-y-1">
+                <p className="text-sm font-medium">Getting started</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  You dismissed the setup card. Bring it back to pick up where you
+                  left off.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={restoreGettingStarted}
+              >
+                Show getting started
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {version && (
-        <p className="border-t pt-3 font-mono text-[11px] text-muted-foreground">{version}</p>
+        <p className="border-t pt-3 font-mono text-xs text-muted-foreground">{version}</p>
       )}
     </div>
   );

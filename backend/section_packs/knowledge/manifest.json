@@ -39,20 +39,7 @@
         "domains"
       ],
       "title": "Skills & Domains",
-      "info": {
-        "overview": "This section tracks your technical and professional skills. It helps AI understand what you know, how well you know it, and in what context you've applied it.",
-        "tips": [
-          "Skill Name: Be specific—use 'Python' not 'Programming', or 'React' not just 'Frontend'.",
-          "Proficiency Levels explained:",
-          "  • Beginner: Just started learning, basic understanding.",
-          "  • Learning: Actively studying, can do simple tasks.",
-          "  • Intermediate: Comfortable with common use cases, some hands-on experience.",
-          "  • Advanced: Deep knowledge, can solve complex problems independently.",
-          "  • Expert: Mastery level, can teach others and handle edge cases.",
-          "Notes: Add context about where and how you've used the skill—projects, tools, or specific experience.",
-          "References: Optional links to tutorials, documentation, or learning resources you've found helpful."
-        ]
-      },
+      "description": "What you know, how well, and where you used it",
       "search": true,
       "facets": [
         "level"
@@ -144,6 +131,7 @@
         "mental_tabs"
       ],
       "title": "Mental Tabs",
+      "description": "Things worth remembering that are not skills: lists, recommendations, notes",
       "info": {
         "overview": "Mental Tabs are your personal knowledge snippets—random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
         "tips": [

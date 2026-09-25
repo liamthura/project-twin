@@ -19,6 +19,9 @@ import { cn } from "@/lib/utils";
 
 export function SubsectionCard({
   title,
+  // For a section's one untitled list: the page title already names it, so
+  // the heading stays in the outline and leaves the screen.
+  titleHidden = false,
   info,
   description,
   depth = 0,
@@ -47,7 +50,11 @@ export function SubsectionCard({
     >
       <div data-card-header className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
-          <Heading className="truncate text-base font-semibold text-foreground">{title}</Heading>
+          <Heading
+            className={titleHidden ? "sr-only" : "truncate text-base font-semibold text-foreground"}
+          >
+            {title}
+          </Heading>
           <InfoButton info={info} title={title} />
         </div>
         {/* Rendered only when it holds something: a `scalar` node's header has

@@ -89,6 +89,10 @@ export default function SectionRenderer({
   // -- a `strings` or `fields` node would otherwise contribute an empty div to
   // every card header it renders.
   const wantsSlot = (node) => node.kind === "list";
+  // A section that is one untitled list (Goals, Circle, Learning Log). Its
+  // heading is not drawn, so its Add moves up beside History: left in the card
+  // header it sat alone on a row of its own, above the list's own controls.
+  const loneList = sections?.length === 1 && !sections[0].title && wantsSlot(sections[0]);
 
   // Which card, if any, is showing a save tick, and where in its 200ms-in /
   // 1.2s-hold / 200ms-out life it is. See the effect below.
@@ -195,13 +199,14 @@ export default function SectionRenderer({
         key={key}
         // A node with no title of its own is the section's main list, and the
         // heading that names it is the pack's -- so its card borrows the pack
-        // title rather than going bare. Figma 114:604 does exactly this: "Goals"
-        // at 20px in the title block, again at 16px in the card header.
+        // title for the outline and for its buttons' names, but does not draw
+        // it: "Goals" twice, 24px then 16px, 90px apart, read as a stutter.
         title={node.title || pack.title}
+        titleHidden={!node.title}
         info={node.info}
         description={node.description}
         depth={depth}
-        action={wantsSlot(node) ? actionSlot(key) : null}
+        action={wantsSlot(node) && !(loneList && key === "0") ? actionSlot(key) : null}
         count={countFor(node, value)}
         tick={tick?.key === key ? tick.phase : null}
         data-ui-node={node.title}
@@ -336,7 +341,12 @@ export default function SectionRenderer({
             <p className="text-sm text-muted-foreground">{pack.description}</p>
           )}
         </div>
-        {headerActions && <div className="flex shrink-0 items-center gap-2">{headerActions}</div>}
+        {(headerActions || loneList) && (
+          <div className="flex shrink-0 items-center gap-2">
+            {headerActions}
+            {loneList && actionSlot("0")}
+          </div>
+        )}
       </div>
       {runs.map((run) =>
         run.kind === "group"

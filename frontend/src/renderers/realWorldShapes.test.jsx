@@ -55,21 +55,25 @@ describe("a record shaped like production", () => {
     });
 
 
-    it("renders Response Format as editable text rows, not fixed switches", async () => {
+    it("renders Response Format as chips, not fixed switches", async () => {
       // Five booleans could only answer yes or no to five ideas someone else
-      // chose. Free text says what a boolean cannot.
+      // chose. Free text says what a boolean cannot. Chips rather than text
+      // rows since the polish pass: Preferences had three ways to add an item,
+      // and every other short list on the page is chips.
       const data = { response_format: ["code blocks over three lines", "next steps at the end"] };
       const { user, latest } = renderSection({ pack: preferencesPack, initial: data });
 
       const block = uiNode("Response Format");
       expect(within(block).queryByRole("switch")).not.toBeInTheDocument();
+      expect(within(block).getByText("code blocks over three lines")).toBeInTheDocument();
 
       await user.type(
-        within(block).getByDisplayValue("code blocks over three lines"), " please"
+        within(block).getByPlaceholderText(/code blocks for anything/), "British spelling{Enter}"
       );
 
-      expect(latest().response_format[0]).toBe("code blocks over three lines please");
-      expect(latest().response_format[1]).toBe("next steps at the end");
+      expect(latest().response_format).toEqual([
+        "code blocks over three lines", "next steps at the end", "British spelling",
+      ]);
     });
 
     it("does not offer a timezone control -- profile.location implies it", () => {

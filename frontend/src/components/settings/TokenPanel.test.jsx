@@ -65,7 +65,7 @@ describe("what a token row says", () => {
     // The prototype's change 9 makes this point about Connected apps: a
     // sentence is not a scope string.
     render(<TokenPanel isOpen />);
-    const line = await screen.findByText(/created 2026-08-01/);
+    const line = await screen.findByText(/Created 2026-08-01/);
     expect(line.textContent).toMatch(/last used 2026-08-12/);
     expect(line.className).not.toMatch(/font-mono/);
   });

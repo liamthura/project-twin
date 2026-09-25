@@ -37,14 +37,6 @@
       "kind": "group",
       "title": "Code Style",
       "description": "Your preferred programming languages, frameworks, and tools",
-      "info": {
-        "overview": "Your preferred programming languages, frameworks, and tools. AI uses these to pick idioms and examples that match how you actually work.",
-        "tips": [
-          "Languages: what you reach for by default, not everything you have ever used.",
-          "Frameworks: the ones you want code examples written against.",
-          "Tools: editors, runtimes and services worth assuming you have."
-        ]
-      },
       "sections": [
         {
           "kind": "strings",
@@ -82,14 +74,6 @@
       "kind": "group",
       "title": "Communication",
       "description": "How you prefer AI responses to be formatted",
-      "info": {
-        "overview": "How you prefer AI responses to be formatted. This is the baseline; mood overrides below adjust it situationally.",
-        "tips": [
-          "Tone: how it should sound — e.g. friendly but professional.",
-          "Detail Level: how much to say and how to structure it.",
-          "Locale: spelling and conventions, e.g. British English."
-        ]
-      },
       "sections": [
         {
           "kind": "fields",
@@ -162,7 +146,6 @@
           ],
           "title": "Response Format",
           "description": "How you want answers shaped",
-          "control": "input",
           "placeholder": "e.g. code blocks for anything over three lines",
           "element": {
             "entity": "response_format",
@@ -177,13 +160,6 @@
       "kind": "group",
       "title": "Learning Style",
       "description": "How you learn best, and how you like work approached",
-      "info": {
-        "overview": "How you learn best, so explanations arrive in a shape that works for you.",
-        "tips": [
-          "Preferred: the formats that land — worked examples, diagrams, analogies.",
-          "Avoid: what reliably loses you — walls of text, unexplained jargon."
-        ]
-      },
       "sections": [
         {
           "kind": "strings",

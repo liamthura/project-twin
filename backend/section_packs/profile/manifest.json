@@ -75,18 +75,6 @@
       "path": [],
       "title": "Personal Information",
       "description": "Your basic identity and current status",
-      "info": {
-        "overview": "This section captures who you are at a glance. It helps AI assistants address you correctly and understand your current context (student, professional, location, etc.).",
-        "tips": [
-          "Name: Your full legal name as it appears on official documents.",
-          "Preferred Name: The name you'd like AI to call you (nickname, first name, etc.).",
-          "Current Role: Your primary occupation or status, e.g. 'Final Year Student', 'Software Engineer', 'Freelance Designer'.",
-          "Organisation: Your school, university, or employer.",
-          "Location: City and country—helps with locale-specific suggestions (holidays, time zones, spelling conventions).",
-          "Nationality: Useful for cultural context and language defaults.",
-          "Bio: A 2–3 sentence summary of who you are, your interests, and what you're working on. Think of it as your elevator pitch."
-        ]
-      },
       "element": {
         "entity": "basic_info",
         "description": "Update-only singleton for top-level profile fields",
@@ -131,20 +119,6 @@
       ],
       "title": "Education",
       "description": "Your educational background and qualifications",
-      "info": {
-        "overview": "Document your educational journey—schools, degrees, and achievements. This helps AI understand your academic background and tailor advice accordingly.",
-        "tips": [
-          "Add one entry per institution or degree (e.g., separate entries for high school and university).",
-          "Institution Name: Full official name of the school or university.",
-          "Degree Level: e.g., 'High School Diploma', 'BSc', 'MSc', 'PhD'.",
-          "Field of Study: Your major, concentration, or programme name.",
-          "Status: Whether you're currently enrolled, have completed, or left incomplete.",
-          "Years: Start and end (or expected end) years.",
-          "Coursework: Key modules or classes you've taken.",
-          "Clubs & Societies: Extracurricular involvement.",
-          "Highlights: Notable achievements like awards, high grades, leadership roles, or recognitions."
-        ]
-      },
       "search": true,
       "element": {
         "entity": "education",
@@ -296,17 +270,6 @@
       ],
       "title": "Work Experience",
       "description": "Your professional experience",
-      "info": {
-        "overview": "List your professional experiences—jobs, internships, placements, and volunteer work. This helps AI understand your skills and career trajectory.",
-        "tips": [
-          "Add one entry per role. If you held multiple roles at the same company, consider separate entries.",
-          "Role: Your job title or position.",
-          "Company: The organisation you worked for.",
-          "Type: e.g., 'Full-time', 'Part-time', 'Internship', 'Placement', 'Volunteer', 'Freelance'.",
-          "Period: Date range in a readable format, e.g., 'Jan 2023 – Jun 2024' or 'Summer 2022'.",
-          "Highlights: 3–6 bullet points describing what you did and achieved. Focus on outcomes and impact."
-        ]
-      },
       "search": true,
       "element": {
         "entity": "work_experience",
@@ -387,13 +350,6 @@
       "kind": "group",
       "title": "Contact & Links",
       "description": "How to reach you and your online presence",
-      "info": {
-        "overview": "Provide ways to reach you and links to your online profiles. AI can use this to reference your portfolio or suggest networking opportunities.",
-        "tips": [
-          "Emails: Add all relevant email addresses and tag their purpose (Primary, Work, School, etc.).",
-          "Links: Your portfolio, GitHub, LinkedIn or personal site — label each one."
-        ]
-      },
       "sections": [
         {
           "kind": "list",
@@ -465,13 +421,6 @@
       ],
       "title": "Languages",
       "description": "Languages you speak and your fluency level",
-      "info": {
-        "overview": "Languages you speak and your fluency level. This helps AI communicate with you appropriately and understand your linguistic capabilities.",
-        "tips": [
-          "Add one entry per language.",
-          "Fluency: native, fluent, conversational or basic."
-        ]
-      },
       "element": {
         "entity": "language",
         "identifier": "name",
