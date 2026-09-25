@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 
 const apiMock = vi.hoisted(() => vi.fn());
 
@@ -25,6 +25,11 @@ vi.mock("@/lib/onboarding.js", () => ({
   saveOnboarding: () => Promise.resolve(),
   EMPTY_ONBOARDING: { dismissed: false, steps: {} },
 }));
+
+// Pinned so a test can hold the spy on a band the current section does not
+// have, which is what it reports for a render after leaving Profile.
+const spied = vi.hoisted(() => ({ band: null }));
+vi.mock("@/shell/useScrollSpy", () => ({ useScrollSpy: () => spied.band }));
 
 const App = (await import("./App")).default;
 
@@ -73,10 +78,12 @@ beforeEach(() => {
 
 afterEach(() => {
   window.location.hash = "";
+  spied.band = null;
 });
 
 describe("App on an onboarding route", () => {
   it("renders the flow with no shell around it", async () => {
+    // The retired Welcome step: an old link lands on Connect, which carries it.
     window.location.hash = "#/onboarding/welcome";
     render(<App />);
 
@@ -101,7 +108,7 @@ describe("App on an onboarding route", () => {
     await screen.findByRole("heading", { name: /welcome to mygist/i });
     await waitFor(() => {
       expect(replace).toHaveBeenCalled();
-      expect(window.location.hash).toBe("#/onboarding/welcome");
+      expect(window.location.hash).toBe("#/onboarding/connect");
     });
     expect(push).not.toHaveBeenCalled();
     replace.mockRestore();
@@ -130,5 +137,22 @@ describe("App on an onboarding route", () => {
     render(<App />);
     await waitFor(() => expect(screen.getByRole("banner")).toBeInTheDocument());
     expect(screen.queryByText(/getting started/i)).not.toBeInTheDocument();
+  });
+
+  it("lands on the step asked for, even with the spy still on Profile's band", async () => {
+    // It wrote #/onboarding/personal-information, which the step correction
+    // sent to the first step: a Start button for About you opened Connect.
+    window.location.hash = "#/profile";
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("banner")).toBeInTheDocument());
+
+    spied.band = "personal-information";
+    act(() => {
+      window.location.hash = "#/onboarding/about-you";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    await screen.findByRole("heading", { name: /about you/i, level: 1 });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(window.location.hash).toBe("#/onboarding/about-you");
   });
 });

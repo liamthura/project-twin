@@ -360,6 +360,11 @@ export default function App() {
     // the welcome screen replaces it with #/signin.
     if (isLoading || showingAuth) return;
     if (!spiedBand || spiedBand === activeBand) return;
+    // The spy lags a section change by a render: leaving Profile for
+    // onboarding, it still reports Profile's last band, and writing it would
+    // make #/onboarding/personal-information -- which the step correction
+    // then sends to the first step, wherever the reader was headed.
+    if (!activeBands.some((b) => b.id === spiedBand)) return;
     // A scroll we started is still in flight: the bands it is crossing are not
     // places the reader chose to be.
     if (pendingBandRef.current || Date.now() < spyQuietUntilRef.current) return;
@@ -368,7 +373,7 @@ export default function App() {
     // not. Guarded on a CHANGE of band, not on every observer callback.
     setPlace({ section: activeSection, band: spiedBand });
     goToRoute(`${activeSection}/${spiedBand}`, { replace: true });
-  }, [spiedBand, activeBand, activeSection, showingAuth, isLoading]);
+  }, [spiedBand, activeBand, activeSection, activeBands, showingAuth, isLoading]);
 
   // The address bar can also change under us -- the back button, or a hand-typed
   // hash. goToRoute pushes without firing either event, hence the sync at the
