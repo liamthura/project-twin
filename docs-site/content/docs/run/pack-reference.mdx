@@ -91,7 +91,7 @@ Four keys mean the same thing on every kind that accepts them:
 |---|---|
 | `title` | Heading above the node. Required on a `group`, optional everywhere else. |
 | `description` | One muted line under the title, saying what belongs here. Omit it if the title already says it. |
-| `info` | `{overview, tips[]}`, the content of the section's info dialog, for anything longer. |
+| `info` | `{overview, tips[]}`, the content of the node's info dialog. Use it only for what the field labels cannot say, such as what the list is for or how two options differ. |
 | `$comment` | A note for the next author. Ignored by the loader, every renderer, and the MCP contract. |
 
 `path` is an array of storage keys resolved against the section root. It is
