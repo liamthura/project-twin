@@ -157,7 +157,7 @@ export function InviteGate({ initialCode, onAccepted, onBack }) {
 
       <p className="text-center text-xs text-muted-foreground">
         Already have an account?{" "}
-        <button type="button" onClick={onBack} className="underline hover:text-foreground">
+        <button type="button" onClick={onBack} className="tap-target underline hover:text-foreground">
           Sign in
         </button>
       </p>

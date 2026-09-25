@@ -804,3 +804,16 @@ describe("the provider button carries the provider's colour", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("the server line in the footer", () => {
+  beforeEach(() => getInstance.mockResolvedValue({ invite_only: false }));
+
+  it("names the server by host, not as Cloud or Self-hosted", async () => {
+    // Staging read "Self-hosted": the label only asked whether the address was
+    // the one hard-coded cloud URL.
+    render(<WelcomeAuth onSuccess={() => {}} />);
+    const host = window.location.host;
+    expect(await screen.findByRole("button", { name: `Server: ${host}` })).toBeInTheDocument();
+  });
+});
+
