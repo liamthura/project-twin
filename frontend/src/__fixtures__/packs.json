@@ -592,7 +592,7 @@
   {
     "key": "goals",
     "title": "Goals",
-    "description": "What you're working toward — type, status, and target date",
+    "description": "What you're working toward, with its type, status and target date",
     "core": false,
     "default_enabled": true,
     "enabled": true,
@@ -908,7 +908,7 @@
         "title": "Mental Tabs",
         "description": "Things worth remembering that are not skills: lists, recommendations, notes",
         "info": {
-          "overview": "Mental Tabs are your personal knowledge snippets—random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
+          "overview": "Mental Tabs are your personal knowledge snippets: random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
           "tips": [
             "Title: A short, memorable name for the tab.",
             "Status: Open (still live), Closed (dealt with), Archived (kept for reference).",
@@ -1275,7 +1275,7 @@
         "info": {
           "overview": "Standing likes and dislikes every AI should know about, whatever the topic.",
           "tips": [
-            "Keep each one short and concrete — \"unsolicited sales tone\" beats \"bad writing\".",
+            "Keep each one short and concrete. \"Unsolicited sales tone\" beats \"bad writing\".",
             "Stance decides which way it reads: like or dislike.",
             "Both stances live in one list, so flipping a row's stance is a single click."
           ]
@@ -1429,7 +1429,7 @@
           "overview": "Capture quick ideas, thoughts, or things you want to explore. Think of it as a scratchpad for inspiration before it becomes a full project.",
           "tips": [
             "Idea: A short phrase or sentence describing what you're thinking about.",
-            "Note: Optional context — why this idea excites you, potential next steps, or related thoughts.",
+            "Note: Optional context, such as why this idea excites you, potential next steps, or related thoughts.",
             "Use this for: half-baked concepts, 'what if' questions, problems you want to solve, things to research later.",
             "When an idea matures, you can promote it to a full project with more details."
           ]
@@ -1857,9 +1857,9 @@
         "info": {
           "overview": "Things you're into, tagged as a passion (what you love doing or following) or a curiosity (what you want to explore). AI uses this to understand your motivations and tailor suggestions.",
           "tips": [
-            "Passion: something you care deeply about that drives you — sustainability, design, storytelling, education, technology.",
-            "Curiosity: something you want to explore or learn more about but haven't dived into yet — quantum computing, fermentation, urban planning, linguistics.",
-            "No pressure on curiosities—these can be fleeting interests or serious research areas."
+            "Passion: something you care deeply about that drives you, such as sustainability, design, storytelling, education, technology.",
+            "Curiosity: something you want to explore or learn more about but haven't dived into yet, such as quantum computing, fermentation, urban planning, linguistics.",
+            "No pressure on curiosities: these can be fleeting interests or serious research areas."
           ]
         },
         "element": {
@@ -2498,6 +2498,10 @@
             },
             {
               "name": "relationship",
+              "show": [
+                "form",
+                "row"
+              ],
               "placeholder": "e.g. Friend, Colleague, Mentor"
             },
             {

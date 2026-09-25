@@ -555,7 +555,7 @@ describe("SectionRenderer", () => {
     it("labels the body timestamp so it reads as a field, not a stray string", async () => {
       const { user } = renderSection({ pack: learningLogPack, initial: learningLogData });
       await user.click(screen.getByText("React Server Components"));
-      expect(screen.getByText("timestamp")).toBeInTheDocument();
+      expect(screen.getByText("Timestamp")).toBeInTheDocument();
     });
 
     it("gives each key decision its own editable row", async () => {
@@ -1728,7 +1728,7 @@ describe("section headings and info placement", () => {
       // An edit-field label sits directly beside its control:
       // <div><Label>specifics</Label><ScalarField/></div>. That is one level
       // shallower than the section wrappers `block` walks.
-      const specifics = screen.getByText("specifics").parentElement;
+      const specifics = screen.getByText("Specifics").parentElement;
       await user.type(within(specifics).getByRole("textbox"), "crimps{Enter}");
 
       expect(latest().hobbies[0].specifics).toEqual(["overhangs", "slab", "crimps"]);
@@ -2192,7 +2192,7 @@ describe("section headings and info placement", () => {
       await user.click(screen.getByText("Northumbria University"));
       await user.click(within(uiNode("Coursework / Modules")).getByText("Compilers"));
 
-      const topics = screen.getByText("topics").parentElement;
+      const topics = screen.getByText("Topics").parentElement;
       await user.type(within(topics).getByRole("textbox"), "optimisation{Enter}");
 
       const cw = latest().education[0].coursework;
@@ -2347,7 +2347,7 @@ describe("section headings and info placement", () => {
       const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
       await user.click(screen.getByText("ada@example.invalid"));
 
-      const purpose = screen.getByText("purpose").parentElement;
+      const purpose = screen.getByText("Purpose").parentElement;
       await user.type(within(purpose).getByRole("textbox"), "!");
 
       expect(latest().contact.emails[0].purpose).toBe("primary!");

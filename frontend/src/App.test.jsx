@@ -384,6 +384,22 @@ describe("App: save feedback", () => {
 
   const chip = () => document.querySelector("[data-save-state]");
 
+  it("shows the save chip on a section", async () => {
+    mockApi({ packs: packsFixture });
+    render(<App />);
+    await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
+    expect(chip()).not.toBeNull();
+
+  });
+
+  it("hides the save chip on Review, where there is nothing to save", async () => {
+    window.history.replaceState(null, "", "/app/#/review");
+    mockApi({ packs: packsFixture });
+    render(<App />);
+    await waitFor(() => expect(screen.getByText(/Nothing waiting/)).toBeTruthy());
+    expect(chip()).toBeNull();
+  });
+
   it("says nothing when an autosave flush succeeds", async () => {
     // Real timers, and a wait long enough to clear the 1500ms autosave debounce.
     // Fake timers would be tidier but userEvent awaits promises the fake clock

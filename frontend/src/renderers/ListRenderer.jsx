@@ -98,28 +98,19 @@ function formatDisplay(value, format) {
   return format === "date" ? date : `${date} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// A field's label, and whether CSS may capitalise it.
+// A field's label: the manifest's declared `label` as authored, or the field
+// name in sentence case -- `added_date` -> "Added date", the same rule
+// FieldsRenderer's labelFor applies, so a list row and a form never disagree
+// ("Added date" on the row, "Added Date" once expanded).
 //
-// Two different kinds of string end up in a Label here, and only one of them
-// wants `text-transform: capitalize`:
-//
-//   - a DERIVED name, `detail_level` -> "detail level". Lowercase, because
-//     nothing title-cases it in JS, so without the CSS transform it renders as
-//     "detail level". This is the case the transform exists for.
-//   - a DECLARED `label` from the manifest, which is authored copy and already
-//     cased the way its author wanted it.
-//
-// Applying the transform to declared copy is not merely redundant, it corrupts
-// it: CSS `capitalize` breaks on punctuation, so learning_log's declared
-// "Follow-up Items" rendered as "Follow-Up Items". Nothing in the pack format
-// lets an author opt out, and nothing told them why their label changed.
-//
-// So the transform follows the fallback, never the declaration.
+// Cased in JS rather than by CSS `text-transform: capitalize`, which
+// title-cased every word and, applied to declared copy, broke on punctuation:
+// learning_log's "Follow-up Items" rendered as "Follow-Up Items".
 function fieldLabel(meta, f) {
   const declared = meta.field_labels?.[f];
-  return declared !== undefined
-    ? { text: declared, capitalize: "" }
-    : { text: f.replace(/_/g, " "), capitalize: " capitalize" };
+  if (declared !== undefined) return { text: declared };
+  const words = f.replace(/_/g, " ");
+  return { text: words.charAt(0).toUpperCase() + words.slice(1) };
 }
 
 // `entities` (the whole map) and `packKey` are passed straight back into
@@ -714,9 +705,7 @@ export default function ListRenderer({
                   <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 pb-2 sm:px-9">
                     {bodyDisplayFields.map((f) => (
                       <div key={f}>
-                        {/* See fieldLabel: capitalize follows the derived name,
-                            not a declared label. */}
-                        <Label className={`text-xs${fieldLabel(meta, f).capitalize}`}>
+                        <Label className="text-xs">
                           {fieldLabel(meta, f).text}
                         </Label>
                         <p className="text-xs tabular-nums text-muted-foreground">
@@ -729,14 +718,7 @@ export default function ListRenderer({
                 <div className="grid gap-3 px-4 pb-3 sm:grid-cols-2 sm:px-9">
                   {bodyEditFields.map((f) => (
                     <div key={f} className={needsFullRow(f) ? "sm:col-span-2" : ""}>
-                      {/* capitalize stays here, but conditionally: unlike
-                          FieldsRenderer's labelFor, a DERIVED name comes from a
-                          raw `replace` with no JS title-casing, so the CSS
-                          transform is what capitalises it -- dropping it
-                          entirely would render e.g. "detail level". A DECLARED
-                          label is authored copy and must be left alone. See
-                          fieldLabel for what the transform corrupted. */}
-                      <Label className={`headline-3${fieldLabel(meta, f).capitalize}`}>
+                      <Label className="headline-3">
                         {fieldLabel(meta, f).text}
                       </Label>
                       <ScalarField

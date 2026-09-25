@@ -762,7 +762,9 @@ export default function App() {
         Skip to content
       </button>
       <Header
-        saveState={saveState}
+        // Only where there is something to save, or while a save is still
+        // outstanding from one.
+        saveState={activePack || saveState !== "saved" ? saveState : null}
         isConnected={isConnected}
         theme={theme}
         onSetTheme={setTheme}

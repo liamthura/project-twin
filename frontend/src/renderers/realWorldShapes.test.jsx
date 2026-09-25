@@ -194,7 +194,7 @@ describe("a record shaped like production", () => {
       const { user, latest } = renderSection({ pack: lifestylePack, initial: legacyHobbies });
       await user.click(screen.getByText("Badminton"));
 
-      const notes = screen.getByText("notes").parentElement;
+      const notes = screen.getByText("Notes").parentElement;
       await user.type(within(notes).getByRole("textbox"), "one session a week");
 
       expect(latest().hobbies[0].skill_level).toBe("enthusiast");
@@ -258,7 +258,7 @@ describe("a record shaped like production", () => {
       const { user, latest } = renderSection({ pack: aestheticsPack, initial: styles });
 
       await user.click(screen.getByText("Brutalist"));
-      const notes = screen.getByText("notes").parentElement;
+      const notes = screen.getByText("Notes").parentElement;
       await user.type(within(notes).getByRole("textbox"), "just liked");
 
       expect(latest().styles.find((s) => s.name === "Playful Editorial").primary).toBe(true);

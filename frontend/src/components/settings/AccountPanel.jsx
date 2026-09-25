@@ -134,7 +134,7 @@ export function AccountPanel({
     toast({
       variant: "destructive",
       title: `Could not link ${SSO_LABEL}`,
-      description: `Nothing was changed. The most likely reason is that this ${SSO_LABEL} account is already linked to a different MyGist account — check which one you signed in as, then try again. (${code})`,
+      description: `Nothing was changed. The most likely reason is that this ${SSO_LABEL} account is already linked to a different MyGist account. Check which one you signed in as, then try again. (${code})`,
     });
   }, []);
 

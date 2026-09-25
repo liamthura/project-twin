@@ -37,7 +37,7 @@ export function TokenPanel({ isOpen }) {
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [newLabel, setNewLabel] = useState("mcp");
+  const [newLabel, setNewLabel] = useState("");
   const [generating, setGenerating] = useState(false);
   const [revealed, setRevealed] = useState(null); // { id, label, token }
   const [copied, setCopied] = useState(false);
@@ -87,7 +87,9 @@ export function TokenPanel({ isOpen }) {
         ...(propose ? [PROPOSE] : []),
         ...(write ? [WRITE] : []),
       ];
-      setRevealed(await createToken(newLabel.trim() || "mcp", scopes));
+      // "mcp" used to be both the default and the fallback, which named every
+      // token after the protocol rather than the client it was for.
+      setRevealed(await createToken(newLabel.trim() || "Unnamed token", scopes));
       setCopied(false);
     } catch (err) {
       toast({
@@ -113,7 +115,7 @@ export function TokenPanel({ isOpen }) {
 
   const handleDoneReveal = () => {
     setRevealed(null);
-    setNewLabel("mcp");
+    setNewLabel("");
     setPropose(true);
     setWrite(false);
     load();
@@ -181,7 +183,7 @@ export function TokenPanel({ isOpen }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
+      <p className="max-w-prose text-sm text-muted-foreground">
         A token lets an AI client reach your persona without signing in through a
         browser. Give each client its own, so you can revoke one and keep the rest.
       </p>
@@ -259,13 +261,16 @@ export function TokenPanel({ isOpen }) {
       )}
 
       <div className="space-y-3 border-t pt-4">
-        <Label htmlFor="new-token-label">Generate token</Label>
-        <Input
-          id="new-token-label"
-          placeholder="mcp"
-          value={newLabel}
-          onChange={(e) => setNewLabel(e.target.value)}
-        />
+        <h3 className="text-base font-semibold">Generate token</h3>
+        <div className="space-y-1.5">
+          <Label htmlFor="new-token-label">Name</Label>
+          <Input
+            id="new-token-label"
+            placeholder="Which client is it for? e.g. Cursor"
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+          />
+        </div>
 
         <div className="space-y-3 rounded-lg border p-3">
           <TokenScopeRow

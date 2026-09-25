@@ -106,7 +106,7 @@ export function InviteGate({ initialCode, onAccepted, onBack }) {
         <Field
           id="invite-code"
           label="Invite code"
-          description="MyGist is in closed testing. Paste the code from your invite — case does not matter."
+          description="MyGist is in closed testing. Paste the code from your invite. Case does not matter."
           error={error}
         >
           {(control) => (

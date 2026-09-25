@@ -92,7 +92,7 @@ export function EmailSettings() {
       setEditing(false);
       setNotice(
         verified
-          ? `Check ${user.email} — we sent a link there to approve the change.`
+          ? `We sent a link to ${user.email}. Open it to approve the change.`
           : `Saved. Check ${next} for a link to confirm it.`,
       );
     } catch (err) {
@@ -139,7 +139,7 @@ export function EmailSettings() {
               ? "Without one, a forgotten password cannot be reset."
               : verified
                 ? "Verified. You can reset your password with this address."
-                : "Not verified yet — it cannot reset your password until it is."}
+                : "Not verified yet, so it can't reset your password."}
           </p>
         </div>
 

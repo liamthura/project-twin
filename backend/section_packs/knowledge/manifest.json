@@ -133,7 +133,7 @@
       "title": "Mental Tabs",
       "description": "Things worth remembering that are not skills: lists, recommendations, notes",
       "info": {
-        "overview": "Mental Tabs are your personal knowledge snippets—random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
+        "overview": "Mental Tabs are your personal knowledge snippets: random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
         "tips": [
           "Title: A short, memorable name for the tab.",
           "Status: Open (still live), Closed (dealt with), Archived (kept for reference).",

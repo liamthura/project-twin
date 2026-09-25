@@ -314,7 +314,16 @@ export default function ProposalsPanel({
 
       {rows.length === 0 ? (
         <EmptyState className="space-y-2">
-          <p>Nothing waiting. Agents propose changes here as they notice them.</p>
+          {/* Each tab says what it holds. Observations used to repeat the
+              Inbox line, so nothing anywhere said what an observation is. */}
+          {kind === "note" ? (
+            <p>
+              No observations. These are things an assistant noticed that don&apos;t
+              belong to one section yet. Promote one into a section, or delete it.
+            </p>
+          ) : (
+            <p>Nothing waiting. Assistants suggest changes here as they notice them.</p>
+          )}
           {connection?.state === "none" && (
             <p>
               Nothing is connected yet.{" "}
