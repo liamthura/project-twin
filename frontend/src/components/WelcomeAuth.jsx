@@ -68,6 +68,17 @@ function isDetached(serverUrl) {
   }
 }
 
+// The footer names the server by its host. "Cloud" or "Self-hosted" only
+// said whether the address was one hard-coded URL, so staging, or any hosted
+// copy, read as self-hosted.
+function serverHost(serverUrl) {
+  try {
+    return new URL(serverUrl, window.location.origin).host || "this site";
+  } catch {
+    return serverUrl || "this site";
+  }
+}
+
 // The API served by whatever origin handed us this page. Computed once at
 // module scope rather than per render: it cannot change while the page is
 // open, and jsdom gives it a real value so tests exercise the same branch a
@@ -535,11 +546,11 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
             </form>
           )}
 
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-center text-xs text-muted-foreground coarse:leading-[2.75rem]">
             <button
               type="button"
               onClick={() => switchMode("signin")}
-              className="underline hover:text-foreground"
+              className="tap-target underline hover:text-foreground"
             >
               Back to sign in
             </button>
@@ -592,11 +603,11 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
             </Button>
 
             {!showPasswordForm && (
-              <p className="text-center text-xs text-muted-foreground">
+              <p className="text-center text-xs text-muted-foreground coarse:leading-[2.75rem]">
                 <button
                   type="button"
                   onClick={() => setShowPasswordForm(true)}
-                  className="underline hover:text-foreground"
+                  className="tap-target underline hover:text-foreground"
                 >
                   Sign in with a password instead
                 </button>
@@ -713,14 +724,14 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
               </Button>
             </form>
 
-            <p className="text-center text-xs text-muted-foreground">
+            <p className="text-center text-xs text-muted-foreground coarse:leading-[2.75rem]">
               {mode === "signup" ? (
                 <>
                   Already have an account?{" "}
                   <button
                     type="button"
                     onClick={() => switchMode("signin")}
-                    className="underline hover:text-foreground"
+                    className="tap-target underline hover:text-foreground"
                   >
                     Sign in
                   </button>
@@ -737,7 +748,7 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
                       <button
                         type="button"
                         onClick={() => switchMode("signup")}
-                        className="underline hover:text-foreground"
+                        className="tap-target underline hover:text-foreground"
                       >
                         Use it
                       </button>
@@ -745,7 +756,7 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
                         <>
                           <br />
                           No invite yet?{" "}
-                          <a href="/" className="underline hover:text-foreground">
+                          <a href="/" className="tap-target underline hover:text-foreground">
                             Join the waitlist
                           </a>
                         </>
@@ -757,7 +768,7 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
                       <button
                         type="button"
                         onClick={() => switchMode("signup")}
-                        className="underline hover:text-foreground"
+                        className="tap-target underline hover:text-foreground"
                       >
                         Create an account
                       </button>
@@ -772,7 +783,7 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
                       <button
                         type="button"
                         onClick={() => switchMode("forgot")}
-                        className="underline hover:text-foreground"
+                        className="tap-target underline hover:text-foreground"
                       >
                         Forgot your password?
                       </button>
@@ -792,9 +803,9 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
           <button
             type="button"
             onClick={() => setShowServer((v) => !v)}
-            className="underline hover:text-foreground"
+            className="tap-target underline hover:text-foreground"
           >
-            Server: {connectionType === "cloud" ? "Cloud" : "Self-hosted"}
+            Server: {serverHost(serverUrl)}
           </button>
         </div>
       </div>
