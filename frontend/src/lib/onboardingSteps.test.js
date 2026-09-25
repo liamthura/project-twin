@@ -30,22 +30,23 @@ describe("normaliseStep", () => {
   });
 
   it.each([["nonsense"], [null], [undefined], [""], ["Welcome"]])(
-    "corrects %s to welcome",
+    "corrects %s to the first step",
     (step) => {
       expect(normaliseStep(step)).toBe(DEFAULT_ONBOARDING_STEP);
     },
   );
+
+  it.each([
+    ["welcome", "connect"],
+    ["how-you-like", "about-you"],
+  ])("forwards the retired step %s to %s, where its content went", (step, to) => {
+    expect(normaliseStep(step)).toBe(to);
+  });
 });
 
 describe("walking the steps", () => {
-  it("puts connect between the welcome and the typing", () => {
-    expect(ONBOARDING_STEPS).toEqual([
-      "welcome",
-      "connect",
-      "about-you",
-      "how-you-like",
-      "complete",
-    ]);
+  it("is three steps: connect, the typing, done", () => {
+    expect(ONBOARDING_STEPS).toEqual(["connect", "about-you", "complete"]);
   });
 
   it("reports an unknown step as the first one, matching normaliseStep", () => {
@@ -54,14 +55,13 @@ describe("walking the steps", () => {
 
   it("has no next after the last step and no previous before the first", () => {
     expect(nextStep("complete")).toBe(null);
-    expect(prevStep("welcome")).toBe(null);
+    expect(prevStep("connect")).toBe(null);
   });
 
   it("walks forwards and backwards through the middle", () => {
-    expect(nextStep("welcome")).toBe("connect");
     expect(nextStep("connect")).toBe("about-you");
-    expect(nextStep("about-you")).toBe("how-you-like");
-    expect(prevStep("complete")).toBe("how-you-like");
+    expect(nextStep("about-you")).toBe("complete");
+    expect(prevStep("complete")).toBe("about-you");
     expect(prevStep("about-you")).toBe("connect");
   });
 });
@@ -85,9 +85,11 @@ describe("which steps the server will store", () => {
     expect(isStorableStep(step)).toBe(expected);
   });
 
-  it("names no step the server would reject", () => {
+  it("names only keys that land on a step that still exists", () => {
+    // how-you-like is stored still (the Getting started card and the server
+    // both know it), and is now the second half of about-you.
     for (const step of STORABLE_STEPS) {
-      expect(ONBOARDING_STEPS).toContain(step);
+      expect(ONBOARDING_STEPS).toContain(normaliseStep(step));
     }
   });
 });

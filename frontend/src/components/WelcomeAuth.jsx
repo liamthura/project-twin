@@ -727,14 +727,42 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
                 </>
               ) : (
                 <>
-                  New to MyGist?{" "}
-                  <button
-                    type="button"
-                    onClick={() => switchMode("signup")}
-                    className="underline hover:text-foreground"
-                  >
-                    Create an account
-                  </button>
+                  {/* While sign-up is invite-only, "Create an account" promised
+                      something most visitors cannot have. Someone holding a
+                      code still gets in the same way; everyone else is pointed
+                      at the waitlist, which is the landing page's first form. */}
+                  {inviteOnly ? (
+                    <>
+                      Have an invite code?{" "}
+                      <button
+                        type="button"
+                        onClick={() => switchMode("signup")}
+                        className="underline hover:text-foreground"
+                      >
+                        Use it
+                      </button>
+                      {!isDetached(serverUrl) && (
+                        <>
+                          <br />
+                          No invite yet?{" "}
+                          <a href="/" className="underline hover:text-foreground">
+                            Join the waitlist
+                          </a>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      New to MyGist?{" "}
+                      <button
+                        type="button"
+                        onClick={() => switchMode("signup")}
+                        className="underline hover:text-foreground"
+                      >
+                        Create an account
+                      </button>
+                    </>
+                  )}
                   {/* Reset runs through Better Auth, which is same-origin only.
                       Detached mode talks to the old endpoints, which have no reset
                       at all -- offering it there would be a dead end. */}
