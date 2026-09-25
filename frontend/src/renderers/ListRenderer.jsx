@@ -571,13 +571,21 @@ export default function ListRenderer({
                   everything lines up as before. */}
               <div className={`flex cursor-pointer ${hasMeta ? "items-start" : "items-center"} gap-2 px-3 py-2.5 hover:bg-muted/40 sm:items-center`}
                 onClick={() => setExpanded({ ...expanded, [idx]: !expanded[idx] })}>
+                {/* The row opens from anywhere on it with a mouse, but only a
+                    real button is reachable by Tab and announced as
+                    expandable. Its click bubbles to the row's handler, so
+                    Enter and Space toggle through the same path. Pin and
+                    "..." stay siblings: a button inside a button is invalid,
+                    and their own stopPropagation keeps them from toggling. */}
+                <button type="button" aria-expanded={!!expanded[idx]}
+                  className={`flex min-w-0 flex-1 ${hasMeta ? "items-start" : "items-center"} gap-2 rounded-sm text-left sm:items-center ${FOCUS_RING}`}>
                 <ChevronDown className={`${hasMeta ? "mt-0.5" : ""} h-4 w-4 shrink-0 text-muted-foreground transition-transform sm:mt-0 ${expanded[idx] ? "" : "-rotate-90"}`} />
                 {/* The badges used to sit beside the title in one row, and on a
                     375px screen a source chip plus a timestamp chip left the
                     title nothing to truncate into -- entries were unreadable,
                     which is the one thing a collapsed row has to do. `min-w-0`
                     is what lets `truncate` work at all inside a flex child. */}
-                <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
+                <span className="block min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
                 <span className="block truncate text-sm font-medium">{item[titleField]}</span>
                 <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 empty:hidden sm:mt-0 sm:flex-1 sm:flex-nowrap">
                   {/* Plain text with its label, not a mono pill: a bare
@@ -630,7 +638,7 @@ export default function ListRenderer({
                     );
                   })}
                 </span>
-                </div>
+                </span>
                 {/* The field the list is ordered by sits against the right
                     edge, value only: a timeline reads down that column, and
                     the Sort control above already says what it is. */}
@@ -649,6 +657,7 @@ export default function ListRenderer({
                     })()}
                   </span>
                 )}
+                </button>
                 {pinnedField && (
                   <Button variant="ghost" size="icon"
                     className={`h-7 w-7 shrink-0 ${

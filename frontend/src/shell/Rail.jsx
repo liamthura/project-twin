@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import { ChevronDown, ChevronRight, SlidersHorizontal } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { FOCUS_RING } from "@/components/controls";
 import { outline } from "@/renderers/paths";
 import { REVIEW_ICON, packIcon } from "./packIcons";
 
@@ -11,7 +12,7 @@ const BAND_ROW_PX = 32;
 
 const ITEM_CLASS =
   "flex h-9 w-full items-center gap-2 rounded-lg px-3 text-left text-sm " +
-  "transition-colors duration-fast ease-standard hover:bg-muted/60";
+  `transition-colors duration-fast ease-standard hover:bg-muted/60 ${FOCUS_RING}`;
 
 /**
  * The desktop rail: 240px, sticky beneath the 60px header, two levels.
@@ -138,7 +139,7 @@ export function Rail({
                           type="button"
                           onClick={() => onNavigate(p.key, band.id)}
                           aria-current={band.id === activeBand ? "true" : undefined}
-                          className={`flex h-8 w-full items-center rounded-md px-2 text-left text-[13px] transition-colors duration-fast ease-standard hover:bg-muted/60 ${
+                          className={`flex h-8 w-full items-center rounded-md px-2 text-left text-[13px] transition-colors duration-fast ease-standard hover:bg-muted/60 ${FOCUS_RING} ${
                             band.id === activeBand
                               ? "font-medium text-foreground"
                               : "text-muted-foreground"
@@ -162,7 +163,7 @@ export function Rail({
       <button
         type="button"
         onClick={() => onNavigate("settings", "sections")}
-        className="mt-3 flex h-8 w-full items-center gap-2 rounded-lg px-3 text-left text-[13px] text-muted-foreground transition-colors duration-fast ease-standard hover:bg-muted/60 hover:text-foreground"
+        className={`mt-3 flex h-8 w-full items-center gap-2 rounded-lg px-3 text-left text-[13px] text-muted-foreground transition-colors duration-fast ease-standard hover:bg-muted/60 hover:text-foreground ${FOCUS_RING}`}
       >
         <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         Manage sections

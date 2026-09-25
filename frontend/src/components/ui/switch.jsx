@@ -51,6 +51,9 @@ export function Switch({ checked, onCheckedChange, className, ...props }) {
       className={cn(
         "tap-target relative inline-flex h-6 w-11 shrink-0 items-center rounded-full",
         "border transition-colors duration-200",
+        // A locked switch ("Read your persona", always granted) used to look
+        // exactly like a live one.
+        "disabled:cursor-not-allowed disabled:opacity-50",
         checked
           ? "border-link bg-link"
           : "border-input bg-muted-foreground/25 hover:bg-muted-foreground/40",

@@ -2385,6 +2385,21 @@ describe("section headings and info placement", () => {
     expect(screen.getByRole("heading", { name: "Circle", level: 2 })).not.toHaveClass("sr-only");
   });
 
+  it("opens and closes a list row from the keyboard", async () => {
+    // The row header was a div with onClick: no Tab stop, no role, so no entry
+    // could be edited without a mouse.
+    const { user } = renderSection({ pack: goalsPack, initial: goalsData });
+    const row = screen.getByRole("button", { name: /^Ship MyGist v3/, expanded: false });
+
+    row.focus();
+    await user.keyboard("{Enter}");
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByDisplayValue("Ship MyGist v3")).toBeInTheDocument();
+
+    await user.keyboard(" ");
+    expect(row).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("moves a lone untitled list's Add up beside History, and it still adds", async () => {
     const user = userEvent.setup();
     render(

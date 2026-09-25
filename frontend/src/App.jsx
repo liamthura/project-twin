@@ -752,6 +752,15 @@ export default function App() {
 
   return (
     <div className="min-h-dvh bg-background">
+      {/* A button, not an <a href="#main">: the router owns the hash, and a
+          fragment link would be read as a route and bounced to Profile. */}
+      <button
+        type="button"
+        onClick={() => document.getElementById("main-content")?.focus()}
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2 focus:ring-ring"
+      >
+        Skip to content
+      </button>
       <Header
         saveState={saveState}
         isConnected={isConnected}
@@ -781,7 +790,7 @@ export default function App() {
           {/* A plain conditional, not TabsContent. Radix Tabs mounted every
               section's content and hid all but one, so ten SectionRenderers
               were live at once; only the section being read is now built. */}
-          <div className="min-w-0 flex-1">
+          <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 focus:outline-none">
             {/* Profile only. It is the screen someone lands on, and a card that
                 followed them to every section would be an interruption rather
                 than a starting point. */}
@@ -845,7 +854,7 @@ export default function App() {
               />
             )}
 
-          </div>
+          </main>
         </div>
       </div>
 
