@@ -582,14 +582,22 @@ export default function ListRenderer({
                   {/* Plain text with its label, not a mono pill: a bare
                       "2025-09-20" chip never said whether it was a start, an
                       end or a last edit. */}
+                  {/* Dates only: text says what it is ("Colleague at Northgate"),
+                      and "Relationship" in front of every person was noise. A
+                      text value truncates rather than pushing the row wide. */}
                   {displayFields
                     .filter((f) => f !== sortField && item[f] != null && item[f] !== "")
-                    .map((f) => (
-                      <span key={f} data-row-meta className={`whitespace-nowrap text-xs tabular-nums text-muted-foreground first-letter:uppercase`}>
-                        {fieldLabel(meta, f).text}{" "}
-                        <span className="text-foreground/80">{formatDisplay(item[f], formats[f])}</span>
-                      </span>
-                    ))}
+                    .map((f) => {
+                      // By format, or by value: `added_date` declares no
+                      // format and still holds a bare "2025-09-20".
+                      const dated = ["date", "datetime"].includes(formats[f]) || ISO_DATE.test(String(item[f]));
+                      return (
+                        <span key={f} data-row-meta className={`${dated ? "whitespace-nowrap" : "min-w-0 truncate"} text-xs tabular-nums text-muted-foreground first-letter:uppercase`}>
+                          {dated && <>{fieldLabel(meta, f).text}{" "}</>}
+                          <span className="text-foreground/80">{formatDisplay(item[f], formats[f])}</span>
+                        </span>
+                      );
+                    })}
                   {/* count_badges: opt-in "N <field>" chips for array-valued
                       storage keys, e.g. "3 references". Read-only, like
                       display_fields above -- no control renders for these in

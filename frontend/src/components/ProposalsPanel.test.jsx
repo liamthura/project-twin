@@ -235,10 +235,13 @@ describe("ProposalsPanel", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<ProposalsPanel />);
       await user.click(await screen.findByRole("button", { name: /^reject /i }));
+      // The badge follows the rows on screen, not the server, until it is sent.
+      expect(screen.getByRole("tab", { name: /inbox/i })).not.toHaveTextContent("1");
       const { action } = toast.mock.calls.at(-1)[0];
       expect(action.props.altText).toBe("Undo");
       act(() => action.props.onClick());
       expect(screen.getByRole("button", { name: /^reject /i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /inbox/i })).toHaveTextContent("1");
       await act(async () => { vi.advanceTimersByTime(8000); });
       expect(api.rejectProposal).not.toHaveBeenCalled();
     } finally {

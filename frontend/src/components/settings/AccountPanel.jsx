@@ -218,7 +218,8 @@ export function AccountPanel({
           <button
             type="button"
             onClick={() => setShowPasswordForm((v) => !v)}
-            className="flex w-full items-center justify-between text-sm font-medium"
+            // tap-target: the row draws 20px tall; a phone needs 44 to hit it.
+            className="tap-target flex w-full items-center justify-between text-sm font-medium"
           >
             Change password
             {showPasswordForm ? (

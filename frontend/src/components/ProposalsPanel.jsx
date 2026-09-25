@@ -209,6 +209,19 @@ export default function ProposalsPanel({
    */
   function rejectLater(row, title) {
     const at = rows.findIndex((r) => r.id === row.id);
+    // The badges follow the queue on screen, not the server, for the 8s the
+    // two disagree: "Inbox 3" over two rows read as a row gone missing.
+    const bump = (delta) =>
+      setCounts((c) => {
+        const next = {
+          ...c,
+          [row.kind]: Math.max(0, (c[row.kind] ?? 0) + delta),
+          total: Math.max(0, c.total + delta),
+        };
+        onCountsRef.current?.(next.total);
+        return next;
+      });
+    bump(-1);
     const restore = () =>
       setRows((current) => {
         const next = [...current];
@@ -224,6 +237,7 @@ export default function ProposalsPanel({
         refreshCounts();
       } catch {
         restore();
+        bump(1);
         toast({
           title: "That did not go through",
           description: "The item is back in the queue.",
@@ -237,6 +251,7 @@ export default function ProposalsPanel({
       clearTimeout(pending.timer);
       pendingRef.current.delete(row.id);
       restore();
+      bump(1);
     };
     const shown = toast({
       title,

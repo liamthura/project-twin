@@ -2385,6 +2385,18 @@ describe("section headings and info placement", () => {
     expect(screen.getByRole("heading", { name: "Circle", level: 2 })).not.toHaveClass("sr-only");
   });
 
+  it("labels a date on the collapsed row, but not text that says what it is", () => {
+    const { unmount } = renderSection({ pack: circlePack, initial: circleData });
+    const meta = screen.getByText("Mentor from the analytical engine days").closest("[data-row-meta]");
+    expect(meta.textContent).toBe("Mentor from the analytical engine days");
+    unmount();
+
+    renderSection({ pack: projectsPack, initial: projectsData });
+    expect(screen.getAllByText(/^Added date/)[0].closest("[data-row-meta]")).toHaveTextContent(
+      /Added date \d{4}-\d{2}-\d{2}/
+    );
+  });
+
   it("opens and closes a list row from the keyboard", async () => {
     // The row header was a div with onClick: no Tab stop, no role, so no entry
     // could be edited without a mouse.
