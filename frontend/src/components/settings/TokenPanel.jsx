@@ -213,6 +213,12 @@ export function TokenPanel({ isOpen }) {
                     <> &middot; expires {formatDate(t.expires_at)}</>
                   )}
                 </p>
+                {/* The consequence, said at the moment it is chosen. */}
+                {confirmRevokeId === t.id && (
+                  <p className="text-xs font-medium text-destructive">
+                    Anything using this token stops working straight away.
+                  </p>
+                )}
               </div>
               {confirmRevokeId === t.id ? (
                 <div className="flex shrink-0 gap-2">

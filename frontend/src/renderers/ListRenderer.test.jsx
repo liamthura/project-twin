@@ -179,7 +179,7 @@ describe("ListRenderer", () => {
     expect(onShowConfirmation).toHaveBeenCalledTimes(1);
     expect(onShowConfirmation).toHaveBeenCalledWith(
       "Remove Scandinavian?",
-      "This can't be undone.",
+      "You can bring it back from History.",
       expect.any(Function)
     );
     // The deletion must wait on confirmation -- a renderer that deletes
@@ -470,7 +470,7 @@ describe("ListRenderer", () => {
 
     expect(onShowConfirmation).toHaveBeenCalledWith(
       "Remove Untitled entry?",
-      "This can't be undone.",
+      "You can bring it back from History.",
       expect.any(Function)
     );
   });
@@ -1244,7 +1244,7 @@ describe("row overflow trigger naming", () => {
     await removeRow(user, "Ada");
     expect(onShowConfirmation).toHaveBeenCalledWith(
       "Remove Ada?",
-      "This can't be undone.",
+      "You can bring it back from History.",
       expect.any(Function)
     );
   });

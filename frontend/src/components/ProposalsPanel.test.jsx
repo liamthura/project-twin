@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
+import { act, render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ProposalsPanel from "./ProposalsPanel";
 import { promotionTargets } from "./PromoteDialog";
@@ -32,7 +32,8 @@ vi.mock("@/lib/api", () => ({
   promoteProposal: vi.fn(() => Promise.resolve({ status: "promoted", section: "lifestyle" })),
 }));
 
-const toast = vi.fn();
+// Returns a handle, as the real one does: a pending reject keeps it to dismiss.
+const toast = vi.fn(() => ({ dismiss: vi.fn() }));
 vi.mock("@/components/ui/use-toast", () => ({ useToast: () => ({ toast }) }));
 
 import * as api from "@/lib/api";
@@ -79,7 +80,8 @@ describe("ProposalsPanel", () => {
     render(<ProposalsPanel />);
     // The whole point of this surface is that a person reads it and decides.
     expect(await screen.findByText("Update")).toBeInTheDocument();
-    expect(screen.getByText("domain")).toBeInTheDocument();
+    // No packs here, so the place falls back to the storage name.
+    expect(screen.getByText(/domain/)).toBeInTheDocument();
     await expandRow(user);
     expect(screen.getByText("name")).toBeInTheDocument();
     // Twice over once expanded: the row's own line and the field list.
@@ -97,16 +99,18 @@ describe("ProposalsPanel", () => {
     );
     const user = userEvent.setup();
     render(<ProposalsPanel />);
-    expect(await screen.findByText("work experience")).toBeInTheDocument();
+    expect(await screen.findByText(/work experience/)).toBeInTheDocument();
     await expandRow(user);
     expect(screen.getByText("start date")).toBeInTheDocument();
   });
 
-  it("names the tool that proposed it", async () => {
-    const user = userEvent.setup();
-    render(<ProposalsPanel />);
-    await expandRow(user);
-    expect(screen.getByText("Cursor")).toBeInTheDocument();
+  it("names the tool that proposed it, and where the change goes, without being expanded", async () => {
+    api.listProposals.mockImplementation((kind) =>
+      Promise.resolve(kind === "entity" ? [{ ...ENTITY, entity: "hobby", data: { name: "bouldering" } }] : []),
+    );
+    render(<ProposalsPanel packs={PACKS} />);
+    // The section's name, not the storage word "hobby".
+    expect(await screen.findByText(/Lifestyle · from Cursor/)).toBeInTheDocument();
   });
 
   it("shows how many tools raised the same thing", async () => {
@@ -158,8 +162,10 @@ describe("ProposalsPanel", () => {
     expect(await screen.findByText(/bouldering/)).toBeInTheDocument();
     expect(screen.getByText(/twice a week/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^approve bouldering$/i })).toBeInTheDocument();
-    // The rationale is behind the chevron.
-    expect(screen.queryByText(/Runs the on-call dashboards/)).not.toBeInTheDocument();
+    // The reason is on the face: it is the case for approving. The quote
+    // stays behind the chevron.
+    expect(screen.getByText(/Runs the on-call dashboards/)).toBeInTheDocument();
+    expect(screen.queryByText(/rebuilt the whole alerting/)).not.toBeInTheDocument();
   });
 
   it("counts the fields it cannot fit rather than truncating them away", async () => {
@@ -206,12 +212,47 @@ describe("ProposalsPanel", () => {
     );
   });
 
-  it("rejects without writing anything", async () => {
+  it("rejects without writing anything, once the Undo window has passed", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<ProposalsPanel />);
+      await user.click(await screen.findByRole("button", { name: /^reject /i }));
+      // Gone from the queue at once, but not yet sent.
+      expect(screen.queryByRole("button", { name: /^reject /i })).not.toBeInTheDocument();
+      expect(api.rejectProposal).not.toHaveBeenCalled();
+      await act(async () => { vi.advanceTimersByTime(8000); });
+      expect(api.rejectProposal).toHaveBeenCalledWith("p1");
+      expect(api.approveProposal).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("puts a rejected row back on Undo, and never sends the rejection", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<ProposalsPanel />);
+      await user.click(await screen.findByRole("button", { name: /^reject /i }));
+      const { action } = toast.mock.calls.at(-1)[0];
+      expect(action.props.altText).toBe("Undo");
+      act(() => action.props.onClick());
+      expect(screen.getByRole("button", { name: /^reject /i })).toBeInTheDocument();
+      await act(async () => { vi.advanceTimersByTime(8000); });
+      expect(api.rejectProposal).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sends a waiting rejection straight away when Review is left", async () => {
     const user = userEvent.setup();
-    render(<ProposalsPanel />);
+    const { unmount } = render(<ProposalsPanel />);
     await user.click(await screen.findByRole("button", { name: /^reject /i }));
-    await waitFor(() => expect(api.rejectProposal).toHaveBeenCalledWith("p1"));
-    expect(api.approveProposal).not.toHaveBeenCalled();
+    expect(api.rejectProposal).not.toHaveBeenCalled();
+    unmount();
+    expect(api.rejectProposal).toHaveBeenCalledWith("p1");
   });
 
   it("offers promote and delete on observations, never approve", async () => {
@@ -348,12 +389,12 @@ describe("ProposalsPanel", () => {
     }
   });
 
-  it("gives rejecting a toast but no link, because nothing changed", async () => {
+  it("gives rejecting an Undo but no link, because nothing changed", async () => {
     const user = userEvent.setup();
     render(<ProposalsPanel onViewSection={vi.fn()} sectionTitles={{}} />);
     await user.click(await screen.findByRole("button", { name: /^reject /i }));
     await waitFor(() => expect(toast).toHaveBeenCalled());
-    expect(toast.mock.calls[0][0].action).toBeUndefined();
+    expect(toast.mock.calls[0][0].action.props.altText).toBe("Undo");
   });
 
   it("says so when an action fails, and keeps the row", async () => {

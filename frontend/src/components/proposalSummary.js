@@ -69,3 +69,25 @@ export function proposalSummary(row, packs) {
   }
   return { lead, trail: "", extra: others.length };
 }
+
+// Where an entity lives, in the editor's own words: "Knowledge › Skills &
+// Domains", or just "Goals" for a section that is one untitled list. The row
+// used to print the storage name ("domain"), which the reader then had to map
+// to a section themselves before they could decide.
+export function entityPlace(entity, packs) {
+  for (const pack of packs || []) {
+    if (!pack?.entities?.[entity]) continue;
+    const node = bindingNode(pack.sections, entity);
+    return node?.title && node.title !== pack.title ? `${pack.title} › ${node.title}` : pack.title;
+  }
+  return humanise(entity);
+}
+
+function bindingNode(nodes, entity) {
+  for (const node of nodes || []) {
+    if (node?.element?.entity === entity) return node;
+    const inner = bindingNode(node?.sections, entity);
+    if (inner) return inner;
+  }
+  return null;
+}

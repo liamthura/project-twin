@@ -135,7 +135,9 @@ export function useListItems({
     if (onShowConfirmation) {
       onShowConfirmation(
         `Remove ${items[idx][titleField] || "Untitled entry"}?`,
-        "This can't be undone.",
+        // It can be: removing writes the section, and History keeps the
+        // version from before.
+        "You can bring it back from History.",
         doRemove
       );
     } else doRemove();

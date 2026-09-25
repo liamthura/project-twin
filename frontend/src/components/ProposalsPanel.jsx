@@ -32,6 +32,11 @@ const KINDS = [
 // which Radix already scopes to the tab being open.
 const QUEUE_POLL_MS = 15000;
 
+// How long a Reject or Delete waits before it reaches the server. Nothing on
+// the server takes a rejection back, so the toast's Undo is only real if the
+// request has not been sent yet.
+const UNDO_MS = 8000;
+
 export default function ProposalsPanel({
   onViewSection, onSectionChanged, onCounts, onOpenSettings, onConnect,
   sectionTitles = {}, packs = [],
@@ -45,6 +50,8 @@ export default function ProposalsPanel({
   const [connection, setConnection] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const { toast } = useToast();
+  // id -> { timer, dismiss } for each rejection still inside its Undo window.
+  const pendingRef = useRef(new Map());
 
   // Held in a ref so refreshCounts never changes identity. It is a dependency
   // of the polling effect, so a caller passing an inline arrow would otherwise
@@ -67,7 +74,10 @@ export default function ProposalsPanel({
 
   const refresh = useCallback(async (which) => {
     try {
-      setRows(await listProposals(which));
+      // A row waiting out its Undo is still on the server, and the 15s poll
+      // would otherwise bring it back.
+      const fresh = await listProposals(which);
+      setRows(fresh.filter((r) => !pendingRef.current.has(r.id)));
       setError(null);
     } catch {
       setRows([]);
@@ -78,6 +88,16 @@ export default function ProposalsPanel({
   }, []);
 
   useEffect(() => { refresh(kind); refreshCounts(); }, [kind, refresh, refreshCounts]);
+
+  // Leaving Review sends whatever is still waiting: the reader watched it go.
+  useEffect(() => () => {
+    for (const [id, pending] of pendingRef.current) {
+      clearTimeout(pending.timer);
+      pending.dismiss();
+      rejectProposal(id).catch(() => {});
+    }
+    pendingRef.current.clear();
+  }, []);
 
   useEffect(() => {
     const tick = () => {
@@ -180,6 +200,50 @@ export default function ProposalsPanel({
     } finally {
       setBusy(null);
     }
+  }
+
+  /**
+   * Reject (or Delete) now on screen, on the server once the toast has gone.
+   * The row leaves at once, as it does for Approve; Undo puts it back where it
+   * was. A failed send puts it back too, and says so.
+   */
+  function rejectLater(row, title) {
+    const at = rows.findIndex((r) => r.id === row.id);
+    const restore = () =>
+      setRows((current) => {
+        const next = [...current];
+        next.splice(Math.max(0, Math.min(at, next.length)), 0, row);
+        return next;
+      });
+    setRows((current) => current.filter((r) => r.id !== row.id));
+
+    const send = async () => {
+      pendingRef.current.delete(row.id);
+      try {
+        await rejectProposal(row.id);
+        refreshCounts();
+      } catch {
+        restore();
+        toast({
+          title: "That did not go through",
+          description: "The item is back in the queue.",
+          variant: "destructive",
+        });
+      }
+    };
+    const undo = () => {
+      const pending = pendingRef.current.get(row.id);
+      if (!pending) return;
+      clearTimeout(pending.timer);
+      pendingRef.current.delete(row.id);
+      restore();
+    };
+    const shown = toast({
+      title,
+      duration: UNDO_MS,
+      action: <ToastAction altText="Undo" onClick={undo}>Undo</ToastAction>,
+    });
+    pendingRef.current.set(row.id, { timer: setTimeout(send, UNDO_MS), dismiss: shown.dismiss });
   }
 
   // Sections that can actually receive a note, in tab order.
@@ -292,10 +356,7 @@ export default function ProposalsPanel({
                 act(row.id, "Added to your persona", () =>
                   approveProposal(row.id, undefined))
               }
-              onReject={() =>
-                act(row.id, "Rejected — it will not be proposed again", () =>
-                  rejectProposal(row.id))
-              }
+              onReject={() => rejectLater(row, "Rejected. It won't be suggested again.")}
             />
           ) : (
             <ObservationCard
@@ -304,10 +365,7 @@ export default function ProposalsPanel({
               busy={busy === row.id}
               canPromote={promotable.length > 0}
               onPromote={() => openPromote(row)}
-              onDelete={() =>
-                act(row.id, "Deleted — it will not be proposed again", () =>
-                  rejectProposal(row.id))
-              }
+              onDelete={() => rejectLater(row, "Deleted. It won't be suggested again.")}
             />
           ),
         )
