@@ -25,6 +25,7 @@ vi.mock("@/lib/onboarding.js", () => ({
 }));
 
 const OnboardingFlow = (await import("./OnboardingFlow")).default;
+const packsFixture = (await import("@/__fixtures__/packs.json")).default;
 
 beforeEach(() => {
   apiMock.mockReset();
@@ -46,68 +47,57 @@ beforeEach(() => {
 });
 
 describe("OnboardingFlow", () => {
-  it("shows Welcome, with the delegate offer above the buttons", async () => {
-    render(<OnboardingFlow step="welcome" onNavigate={vi.fn()} onLeave={vi.fn()} />);
-
+  it("opens on Connect, which carries the welcome", async () => {
+    // Welcome was a page of its own before Connect; wave 4 folded it in.
+    render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={vi.fn()} />);
     expect(
       await screen.findByRole("heading", { name: /welcome to mygist/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/don't have to type any of it/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /get started/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /skip for now/i })).toBeInTheDocument();
-  });
-
-  it("Get started goes to Connect, so the offer Welcome makes is honoured next", async () => {
-    const onNavigate = vi.fn();
-    const user = userEvent.setup();
-    render(<OnboardingFlow step="welcome" onNavigate={onNavigate} onLeave={vi.fn()} />);
-
-    await user.click(await screen.findByRole("button", { name: /get started/i }));
-    expect(onNavigate).toHaveBeenCalledWith("connect");
-  });
-
-  it("draws the diagram on Welcome, and hides it from screen readers", async () => {
-    render(<OnboardingFlow step="welcome" onNavigate={vi.fn()} onLeave={vi.fn()} />);
-    await screen.findByRole("heading", { name: /welcome to mygist/i });
-
-    // Everything it says is said in the prose beside it, so announcing it adds
-    // nothing a listener can act on.
-    const svg = document.querySelector("svg[aria-hidden='true']");
-    expect(svg).toBeInTheDocument();
-    // The motion is CSS, which is what makes globals.css's reduced-motion block
-    // cover it. A JS loop would keep running for someone who asked it not to.
-    expect(svg.querySelectorAll(".animate-dash-flow").length).toBeGreaterThan(0);
   });
 
   it("Skip for now leaves, and does not pretend a step was done", async () => {
     const onLeave = vi.fn();
     const user = userEvent.setup();
-    render(<OnboardingFlow step="welcome" onNavigate={vi.fn()} onLeave={onLeave} />);
+    render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={onLeave} />);
 
     await user.click(await screen.findByRole("button", { name: /skip for now/i }));
     expect(onLeave).toHaveBeenCalled();
     expect(saveOnboardingMock).not.toHaveBeenCalled();
   });
 
-  it("corrects an unknown step to welcome rather than rendering blank", async () => {
+  it("corrects an unknown step to the first rather than rendering blank", async () => {
     render(<OnboardingFlow step="nonsense" onNavigate={vi.fn()} onLeave={vi.fn()} />);
     expect(
       await screen.findByRole("heading", { name: /welcome to mygist/i }),
     ).toBeInTheDocument();
   });
 
-  it("shows which step of how many, and Welcome is not counted as work", async () => {
-    render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={vi.fn()} />);
-    expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument();
+  it("says which step of three, to screen readers, beside a bar", async () => {
+    render(<OnboardingFlow step="about-you" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    const label = await screen.findByText(/step 2 of 3/i);
+    expect(label.className).toContain("sr-only");
   });
 
-  it("gives Connect a way back but not a second Continue", async () => {
-    // The step ends in its own two-way choice; a Continue beside "I'll fill it
-    // in myself" would be two buttons for one decision.
-    render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={vi.fn()} />);
-    await screen.findByRole("heading", { name: /connect an assistant/i });
+  it("puts How you like answers on the About you page", async () => {
+    apiMock.mockImplementation((path) => {
+      if (path === "/all") return Promise.resolve({ data: { profile: {}, preferences: {} } });
+      if (path === "/settings") return Promise.resolve({ disabled_sections: [], packs: packsFixture });
+      return Promise.resolve({});
+    });
+    render(<OnboardingFlow step="about-you" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: /about you/i, level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /how you like answers/i, level: 2 })).toBeInTheDocument();
+  });
 
-    expect(screen.getByRole("button", { name: /^back$/i })).toBeInTheDocument();
+  it("gives Connect a way out but not a Back or a second Continue", async () => {
+    // First step, so nothing to go back to. It ends in its own two-way choice;
+    // a Continue beside "I'll fill it in myself" would be two buttons for one
+    // decision.
+    render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    await screen.findByRole("heading", { name: /welcome to mygist/i });
+
+    expect(screen.queryByRole("button", { name: /^back$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^continue$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /skip this step/i })).not.toBeInTheDocument();
   });
@@ -141,7 +131,7 @@ describe("OnboardingFlow", () => {
     // here would fail silently rather than loudly.
     const user = userEvent.setup();
     render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={vi.fn()} />);
-    await screen.findByRole("heading", { name: /connect an assistant/i });
+    await screen.findByRole("heading", { name: /welcome to mygist/i });
 
     await user.click(screen.getByRole("button", { name: /fill it in myself/i }));
     for (const [state] of saveOnboardingMock.mock.calls) {
@@ -154,14 +144,15 @@ describe("OnboardingFlow", () => {
     render(<OnboardingFlow step="about-you" onNavigate={vi.fn()} onLeave={vi.fn()} />);
 
     await user.click(await screen.findByRole("button", { name: /skip this step/i }));
-    expect(saveOnboardingMock).toHaveBeenCalledWith(
-      expect.objectContaining({ steps: { "about-you": "skipped" } }),
+    // Both halves of the page, each under its own stored key.
+    expect(saveOnboardingMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ steps: { "about-you": "skipped", "how-you-like": "skipped" } }),
       [],
     );
   });
 
   it("renders no app shell at all", async () => {
-    render(<OnboardingFlow step="welcome" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={vi.fn()} />);
     await screen.findByRole("heading", { name: /welcome to mygist/i });
     // The whole point of the standalone flow. The rail and the header are the
     // two things that must not be here.

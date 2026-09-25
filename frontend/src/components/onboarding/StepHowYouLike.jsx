@@ -1,113 +1,41 @@
 /**
- * How answers should be written.
+ * How answers should be written: the second half of the About you step.
  *
- * Two nodes rather than one, because the manifest declares two: a `fields` node
- * at `communication.default` (tone, locale, detail level) and a `strings` node
- * at `response_format`. Both are rendered by the editor's renderers, and both
- * are reached with `nodeAt` rather than described a second time here.
- *
- * `learning_style.preferred` and `.avoid` resolve too -- they are `strings`
- * nodes one level down inside the Learning Style group. They are deliberately
- * NOT here: this step already carries four controls, and six would make it a
- * form rather than a step.
+ * It was a step of its own until wave 4 cut onboarding to three. Only the
+ * `fields` node at `communication.default` (tone, locale, detail level) came
+ * along: response formats and learning style are in Preferences, and three
+ * controls under a heading is a section, where six would be another form.
  */
 import { FieldsRenderer } from "@/renderers/FieldsRenderer";
-import { StringsRenderer } from "@/renderers/StringsRenderer";
 import { getAt, setAt } from "@/renderers/paths";
-import { BlurFade } from "@/components/ui/blur-fade";
 
 import { nodeAt } from "./manifestNode";
 
 const COMMUNICATION_DEFAULT = ["communication", "default"];
-const RESPONSE_FORMAT = ["response_format"];
 
-export function StepHowYouLike({ packs, data, onChange, onOfferAssistant }) {
+export function StepHowYouLike({ packs, data, onChange }) {
   const communication = nodeAt(packs, "preferences", COMMUNICATION_DEFAULT);
-  const responseFormat = nodeAt(packs, "preferences", RESPONSE_FORMAT);
-
-  if (!communication && !responseFormat) {
-    return (
-      <div className="space-y-3">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          How you like answers
-        </h1>
-        <p className="text-muted-foreground">
-          This step is not available on this server. Carry on. You can fill this
-          in from Preferences whenever it is.
-        </p>
-        {/* Welcome promised this and Connect delivered it, two screens ago. Someone
-            who starts typing and regrets it should not have to walk backwards to
-            find the offer again. A quiet link, not a button: it competes with
-            Continue, and Continue is the expected move here. */}
-        {onOfferAssistant && (
-          <button
-            type="button"
-            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-            onClick={onOfferAssistant}
-          >
-            Let my assistant fill this in instead
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  // Both nodes live at a path inside preferences, so every write goes through
-  // the same immutable `setAt` the section root uses: keys outside the path
-  // survive by reference rather than being rebuilt.
-  const writeAt = (path) => (next) => onChange(setAt(data || {}, path, next));
+  // A server without the node leaves About you as it was; the fields are in
+  // Preferences whenever they exist.
+  if (!communication) return null;
 
   return (
-    <BlurFade duration={0.24}>
-      <div className="space-y-8">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            How you like answers
-          </h1>
-          <p className="text-muted-foreground">
-            Nothing here is required, and everything saves as you type. These apply
-            to every assistant you connect.
-          </p>
-        </div>
-
-        {communication && (
-          <FieldsRenderer
-            node={communication}
-            entity={communication.element?.entity}
-            value={getAt(data || {}, COMMUNICATION_DEFAULT)}
-            onValue={writeAt(COMMUNICATION_DEFAULT)}
-            packKey="onboarding-preferences"
-          />
-        )}
-
-        {responseFormat && (
-          <div className="space-y-2">
-            <h2 className="headline-3">{responseFormat.title}</h2>
-            <p className="text-sm text-muted-foreground">
-              {responseFormat.description}
-            </p>
-            <StringsRenderer
-              node={responseFormat}
-              items={getAt(data || {}, RESPONSE_FORMAT)}
-              onItems={writeAt(RESPONSE_FORMAT)}
-            />
-          </div>
-        )}
-
-        {/* Welcome promised this and Connect delivered it, two screens ago. Someone
-            who starts typing and regrets it should not have to walk backwards to
-            find the offer again. A quiet link, not a button: it competes with
-            Continue, and Continue is the expected move here. */}
-        {onOfferAssistant && (
-          <button
-            type="button"
-            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-            onClick={onOfferAssistant}
-          >
-            Let my assistant fill this in instead
-          </button>
-        )}
+    <section className="space-y-4 border-t pt-6">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold tracking-tight">How you like answers</h2>
+        <p className="text-sm text-muted-foreground">
+          These apply to every assistant you connect.
+        </p>
       </div>
-    </BlurFade>
+      {/* The path is inside preferences, so the write goes through `setAt`:
+          keys outside it survive by reference. */}
+      <FieldsRenderer
+        node={communication}
+        entity={communication.element?.entity}
+        value={getAt(data || {}, COMMUNICATION_DEFAULT)}
+        onValue={(next) => onChange(setAt(data || {}, COMMUNICATION_DEFAULT, next))}
+        packKey="onboarding-preferences"
+      />
+    </section>
   );
 }

@@ -100,8 +100,11 @@ describe("App: the rail says when something is waiting", () => {
   it("shows the pending count as a number on Review", async () => {
     mockApi({ packs: packsFixture, pendingCount: 3 });
     render(<App />);
-    await waitFor(() =>
-      expect(within(railItem(/Review/)).getByText("3")).toBeInTheDocument()
+    // 3s: the count arrives after /all, /settings and /proposals/count, and
+    // under a full parallel run that can pass the default second.
+    await waitFor(
+      () => expect(within(railItem(/Review/)).getByText("3")).toBeInTheDocument(),
+      { timeout: 3000 }
     );
   });
 

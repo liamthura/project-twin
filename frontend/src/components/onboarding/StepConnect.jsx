@@ -175,12 +175,16 @@ export function StepConnect({ onDelegate, onFillManually }) {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
+        {/* The first screen since wave 4: Welcome's two sentences open it
+            rather than a page of their own before it. */}
         <h1 className="text-2xl font-semibold tracking-tight">
-          Connect an assistant
+          Welcome to MyGist
         </h1>
-        <p className="text-muted-foreground">
-          Point an AI client at MyGist and it can read your persona, and suggest
-          additions for you to approve.
+        <p className="leading-relaxed text-muted-foreground">
+          MyGist keeps the context an AI assistant needs about you, so you stop
+          explaining yourself at the start of every conversation. Connect an
+          assistant and it can read that context, and fill it in for you a
+          suggestion at a time, for you to approve.
         </p>
       </div>
 

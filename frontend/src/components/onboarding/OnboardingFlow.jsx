@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api.js";
 import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
 import {
+  ONBOARDING_STEPS,
   isStorableStep,
   normaliseStep,
   nextStep,
@@ -24,17 +25,14 @@ import {
 } from "@/lib/onboardingSteps.js";
 import { getAt, setAt } from "@/renderers/paths";
 
-import { StepWelcome } from "./StepWelcome";
 import { StepConnect } from "./StepConnect";
 import { StepAboutYou } from "./StepAboutYou";
 import { StepHowYouLike } from "./StepHowYouLike";
 import { StepComplete } from "./StepComplete";
 
-// Welcome explains and is not a question, so counting it would tell someone
-// they have five things to do when they have three and a destination. Complete
-// stays in the count as that destination -- a progress bar that never fills
-// reads as unfinished work.
-const COUNTED_STEPS = ["connect", "about-you", "how-you-like", "complete"];
+// Every step counts, Complete included as the destination -- a progress bar
+// that never fills reads as unfinished work.
+const COUNTED_STEPS = ONBOARDING_STEPS;
 
 // The editor's debounce, from App.jsx. The same number on purpose: a reader who
 // learns the app's saving rhythm here should find it unchanged afterwards.
@@ -166,11 +164,13 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
     <div className="min-h-dvh bg-background">
       <div className="mx-auto flex min-h-dvh max-w-xl flex-col px-4 py-10 sm:py-16">
         {countedAt >= 0 && (
-          <div className="mb-8 space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          // The bar alone. A "Step 1 of 3" label above it said the same thing
+          // twice; the words stay for screen readers.
+          <div className="mb-8">
+            <span className="sr-only">
               Step {countedAt + 1} of {COUNTED_STEPS.length}
-            </p>
-            <div className="flex gap-1.5" role="presentation">
+            </span>
+            <div className="flex gap-1.5" aria-hidden="true">
               {COUNTED_STEPS.map((key, i) => (
                 <span
                   key={key}
@@ -184,13 +184,6 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
         )}
 
         <div className="flex-1">
-          {current === "welcome" && (
-            // `nextStep` rather than a literal: a hardcoded destination here
-            // is exactly what let Welcome jump straight over Connect when the
-            // step was inserted.
-            <StepWelcome onStart={() => go(nextStep(current))} onSkip={() => go(null)} />
-          )}
-
           {current === "connect" && (
             <StepConnect
               // Handing the work over is a real answer, not an abandonment:
@@ -212,16 +205,13 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
               data={data.profile || {}}
               onChange={(next) => write("profile", next)}
               onOfferAssistant={() => go("connect")}
-            />
-          )}
-
-          {current === "how-you-like" && (
-            <StepHowYouLike
-              packs={packs}
-              data={data.preferences || {}}
-              onChange={(next) => write("preferences", next)}
-              onOfferAssistant={() => go("connect")}
-            />
+            >
+              <StepHowYouLike
+                packs={packs}
+                data={data.preferences || {}}
+                onChange={(next) => write("preferences", next)}
+              />
+            </StepAboutYou>
           )}
 
           {current === "complete" && (
@@ -230,18 +220,18 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
         </div>
 
         {/* Connect ends in its own two-way choice and Complete has its own
-            single way in, so neither takes the standard footer -- a Continue
+            single way out, so neither takes the standard footer -- a Continue
             beside "I'll fill it in myself" would be two buttons for one
-            decision. Connect still owes a way back. */}
+            decision. Connect is first now, so it owes a way out, not back. */}
         {current === "connect" && (
           <div className="mt-10">
-            <Button variant="ghost" onClick={() => go(prevStep(current))}>
-              Back
+            <Button variant="ghost" onClick={() => go(null)}>
+              Skip for now
             </Button>
           </div>
         )}
 
-        {current !== "welcome" && current !== "connect" && current !== "complete" && (
+        {current === "about-you" && (
           <div className="mt-10 flex items-center justify-between gap-3">
             <Button variant="ghost" onClick={() => go(prevStep(current))}>
               Back
@@ -250,7 +240,9 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
               <Button
                 variant="ghost"
                 onClick={() => {
-                  markStep(current, "skipped");
+                  // Both halves of the page, each stored under its own key.
+                  markStep("about-you", "skipped");
+                  markStep("how-you-like", "skipped");
                   go(nextStep(current));
                 }}
               >
@@ -258,7 +250,8 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
               </Button>
               <Button
                 onClick={() => {
-                  markStep(current, "done");
+                  markStep("about-you", "done");
+                  markStep("how-you-like", "done");
                   go(nextStep(current));
                 }}
               >

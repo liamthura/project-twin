@@ -260,7 +260,7 @@ describe("an invite-only instance", () => {
     const user = userEvent.setup();
     render(<WelcomeAuth onSuccess={() => {}} />);
 
-    await user.click(screen.getByRole("button", { name: "Create an account" }));
+    await user.click(await screen.findByRole("button", { name: "Use it" }));
 
     expect(await screen.findByLabelText(/invite code/i)).toBeInTheDocument();
     expect(screen.queryByLabelText("Confirm password")).toBeNull();
@@ -279,7 +279,7 @@ describe("an invite-only instance", () => {
     const user = userEvent.setup();
     render(<WelcomeAuth onSuccess={() => {}} />);
 
-    await user.click(screen.getByRole("button", { name: "Create an account" }));
+    await user.click(await screen.findByRole("button", { name: "Use it" }));
     await user.type(await screen.findByLabelText(/invite code/i), "7F2KQX91");
 
     expect(await screen.findByLabelText("Confirm password")).toBeInTheDocument();
@@ -290,7 +290,7 @@ describe("an invite-only instance", () => {
     const user = userEvent.setup();
     render(<WelcomeAuth onSuccess={() => {}} />);
 
-    await user.click(screen.getByRole("button", { name: "Create an account" }));
+    await user.click(await screen.findByRole("button", { name: "Use it" }));
     await user.type(await screen.findByLabelText(/invite code/i), "7F2KQX91");
 
     await user.type(await screen.findByLabelText("Username"), "sarah");
@@ -305,13 +305,24 @@ describe("an invite-only instance", () => {
     const user = userEvent.setup();
     render(<WelcomeAuth onSuccess={() => {}} />);
 
-    await user.click(screen.getByRole("button", { name: "Create an account" }));
+    await user.click(await screen.findByRole("button", { name: "Use it" }));
     await user.type(await screen.findByLabelText(/invite code/i), "7F2KQX91");
     await screen.findByLabelText("Confirm password");
 
     await user.click(screen.getByRole("button", { name: /change/i }));
 
     expect(await screen.findByLabelText(/invite code/i)).toBeInTheDocument();
+  });
+});
+
+describe("the sign-in footer while sign-up is invite-only", () => {
+  beforeEach(() => getInstance.mockResolvedValue({ invite_only: true }));
+
+  it("offers an invite code and the waitlist, not an account", async () => {
+    render(<WelcomeAuth onSuccess={() => {}} />);
+    expect(await screen.findByRole("button", { name: "Use it" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Join the waitlist" })).toHaveAttribute("href", "/");
+    expect(screen.queryByRole("button", { name: "Create an account" })).not.toBeInTheDocument();
   });
 });
 
@@ -495,7 +506,7 @@ describe("the card's heading is part of its state", () => {
     render(<WelcomeAuth onSuccess={() => {}} />);
 
     await waitForForm();
-    await user.click(screen.getByRole("button", { name: /create an account/i }));
+    await user.click(await screen.findByRole("button", { name: "Use it" }));
     await screen.findByLabelText(/invite code/i);
     expect(heading()).toMatch(/You need an invite/i);
   });

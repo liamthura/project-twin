@@ -73,13 +73,15 @@ describe("StepHowYouLike", () => {
     });
   });
 
-  it("offers response format as editable rows, one statement each", async () => {
-    const onChange = vi.fn();
-    const user = userEvent.setup();
-    render(<StepHowYouLike packs={packs} data={{}} onChange={onChange} />);
+  it("is a section of About you, not a page: an h2, and no response format", () => {
+    render(<StepHowYouLike packs={packs} data={{}} onChange={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: /how you like answers/i, level: 2 })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add response format/i })).not.toBeInTheDocument();
+  });
 
-    await user.click(screen.getByRole("button", { name: /add response format/i }));
-    expect(onChange).toHaveBeenCalledWith({ response_format: [""] });
+  it("renders nothing on a server without the node", () => {
+    const { container } = render(<StepHowYouLike packs={[]} data={{}} onChange={vi.fn()} />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("keeps preferences keys it never renders", async () => {
@@ -104,28 +106,12 @@ describe("StepHowYouLike", () => {
 describe.each([
   ["with the pack", packs],
   ["without it", []],
-])("the field steps offer the way out of typing (%s)", (_label, packsForCase) => {
+])("About you offers the way out of typing (%s)", (_label, packsForCase) => {
   it("offers it on About you", async () => {
     const onOfferAssistant = vi.fn();
     const user = userEvent.setup();
     render(
       <StepAboutYou
-        packs={packsForCase}
-        data={{}}
-        onChange={vi.fn()}
-        onOfferAssistant={onOfferAssistant}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: /let my assistant fill this in/i }));
-    expect(onOfferAssistant).toHaveBeenCalled();
-  });
-
-  it("offers it on How you like", async () => {
-    const onOfferAssistant = vi.fn();
-    const user = userEvent.setup();
-    render(
-      <StepHowYouLike
         packs={packsForCase}
         data={{}}
         onChange={vi.fn()}

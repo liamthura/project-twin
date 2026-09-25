@@ -16,7 +16,7 @@ import { nodeAt } from "./manifestNode";
 // missing.
 const PROFILE_ROOT = [];
 
-export function StepAboutYou({ packs, data, onChange, onOfferAssistant }) {
+export function StepAboutYou({ packs, data, onChange, onOfferAssistant, children }) {
   const node = nodeAt(packs, "profile", PROFILE_ROOT);
 
   if (!node) {
@@ -27,14 +27,14 @@ export function StepAboutYou({ packs, data, onChange, onOfferAssistant }) {
           This step is not available on this server. Carry on. You can fill this
           in from Profile whenever it is.
         </p>
-        {/* Welcome promised this and Connect delivered it, two screens ago. Someone
-            who starts typing and regrets it should not have to walk backwards to
-            find the offer again. A quiet link, not a button: it competes with
-            Continue, and Continue is the expected move here. */}
+        {children}
+        {/* Connect offered this one screen ago. Someone who starts typing and
+            regrets it should not have to walk back to find it. A quiet link,
+            not a button: Continue is the expected move here. */}
         {onOfferAssistant && (
           <button
             type="button"
-            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            className="tap-target text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
             onClick={onOfferAssistant}
           >
             Let my assistant fill this in instead
@@ -51,7 +51,7 @@ export function StepAboutYou({ packs, data, onChange, onOfferAssistant }) {
           <h1 className="text-2xl font-semibold tracking-tight">About you</h1>
           <p className="text-muted-foreground">
             Nothing here is required, and everything saves as you type. Fill in
-            what is useful and move on.
+            what is useful and move on; the rest is in the editor.
           </p>
         </div>
         {/* `value` is the whole section object and `onValue` gets the whole
@@ -65,14 +65,14 @@ export function StepAboutYou({ packs, data, onChange, onOfferAssistant }) {
           onValue={onChange}
           packKey="onboarding-profile"
         />
-        {/* Welcome promised this and Connect delivered it, two screens ago. Someone
-            who starts typing and regrets it should not have to walk backwards to
-            find the offer again. A quiet link, not a button: it competes with
-            Continue, and Continue is the expected move here. */}
+        {children}
+        {/* Connect offered this one screen ago. Someone who starts typing and
+            regrets it should not have to walk back to find it. A quiet link,
+            not a button: Continue is the expected move here. */}
         {onOfferAssistant && (
           <button
             type="button"
-            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            className="tap-target text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
             onClick={onOfferAssistant}
           >
             Let my assistant fill this in instead
