@@ -13,15 +13,15 @@ export function ConnectionsPanel() {
   return (
     <div className="space-y-8">
       <section aria-labelledby="connections-apps" className="space-y-3">
-        <h3 id="connections-apps" className="text-base font-semibold">
+        <h2 id="connections-apps" className="text-base font-semibold">
           Connected apps
-        </h3>
+        </h2>
         <AppsPanel isOpen />
       </section>
       <section aria-labelledby="connections-tokens" className="space-y-3 border-t pt-6">
-        <h3 id="connections-tokens" className="text-base font-semibold">
+        <h2 id="connections-tokens" className="text-base font-semibold">
           Tokens
-        </h3>
+        </h2>
         <TokenPanel isOpen />
       </section>
     </div>

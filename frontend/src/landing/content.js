@@ -81,7 +81,7 @@ export const STEPS = {
       // choices named here are the real ones, verbatim from Consent.jsx; OAuth
       // and scoped tokens still live in the FAQ, which is where the person who
       // wants them looks.
-      body: "Paste one URL into your assistant's settings. It asks what it may do — read your gist, suggest changes for your approval, or change it directly — and you choose.",
+      body: "Paste one URL into your assistant's settings. It asks what it may do: read your gist, suggest changes for your approval, or change it directly. You choose.",
     },
     {
       title: "It travels.",

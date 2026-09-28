@@ -46,6 +46,14 @@ describe("an account with a placeholder email", () => {
     expect(screen.queryByText(/mygist\.invalid/i)).not.toBeInTheDocument();
   });
 
+  it("opens the form straight away when the banner's Add email sent you", async () => {
+    render(<EmailSettings addEmailRequest={1} />);
+
+    const field = await screen.findByLabelText(/email address/i);
+    expect(field).toHaveFocus();
+    expect(screen.queryByRole("button", { name: /add email/i })).not.toBeInTheDocument();
+  });
+
   it("offers to add one rather than to change one", async () => {
     render(<EmailSettings />);
 

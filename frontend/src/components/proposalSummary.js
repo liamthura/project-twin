@@ -77,17 +77,20 @@ export function proposalSummary(row, packs) {
 export function entityPlace(entity, packs) {
   for (const pack of packs || []) {
     if (!pack?.entities?.[entity]) continue;
-    const node = bindingNode(pack.sections, entity);
-    return node?.title && node.title !== pack.title ? `${pack.title} › ${node.title}` : pack.title;
+    // Two nodes on one entity (sleep: weekdays and weekends) and the first
+    // would be wrong half the time, so the section alone.
+    const [node, other] = bindingNodes(pack.sections, entity);
+    return node?.title && !other && node.title !== pack.title
+      ? `${pack.title} › ${node.title}`
+      : pack.title;
   }
   return humanise(entity);
 }
 
-function bindingNode(nodes, entity) {
+function bindingNodes(nodes, entity, found = []) {
   for (const node of nodes || []) {
-    if (node?.element?.entity === entity) return node;
-    const inner = bindingNode(node?.sections, entity);
-    if (inner) return inner;
+    if (node?.element?.entity === entity) found.push(node);
+    bindingNodes(node?.sections, entity, found);
   }
-  return null;
+  return found;
 }

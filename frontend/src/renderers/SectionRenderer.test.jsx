@@ -1687,8 +1687,8 @@ describe("section headings and info placement", () => {
       expect(screen.getByText("early morning")).toBeInTheDocument();
       expect(screen.getByText("context switching")).toBeInTheDocument();
       // fields
-      expect(within(block("Sleep — weekdays")).getByLabelText("Bedtime")).toHaveValue("23:30");
-      expect(within(block("Sleep — weekends")).getByLabelText("Wakeup")).toHaveValue("09:30");
+      expect(within(block("Sleep on weekdays")).getByLabelText("Bedtime")).toHaveValue("23:30");
+      expect(within(block("Sleep at weekends")).getByLabelText("Wakeup")).toHaveValue("09:30");
     });
 
     it("renders a hobby's stored `paused` status, which the manifest now declares in full", async () => {
@@ -1751,7 +1751,7 @@ describe("section headings and info placement", () => {
     it("writes a sleep edit into one day only", async () => {
       const { user, latest } = renderSection({ pack: lifestylePack, initial: lifestyleData });
 
-      const bedtime = within(block("Sleep — weekdays")).getByLabelText("Bedtime");
+      const bedtime = within(block("Sleep on weekdays")).getByLabelText("Bedtime");
       await user.clear(bedtime);
       await user.type(bedtime, "22:45");
 
@@ -1762,7 +1762,7 @@ describe("section headings and info placement", () => {
     it("never stores `day_type`, which is a router and not a storage key", async () => {
       const { user, latest } = renderSection({ pack: lifestylePack, initial: lifestyleData });
 
-      const wakeup = within(block("Sleep — weekends")).getByLabelText("Wakeup");
+      const wakeup = within(block("Sleep at weekends")).getByLabelText("Wakeup");
       await user.clear(wakeup);
       await user.type(wakeup, "10:00");
 
@@ -1780,7 +1780,7 @@ describe("section headings and info placement", () => {
       };
       renderSection({ pack: lifestylePack, initial: odd });
 
-      const weekday = block("Sleep — weekdays");
+      const weekday = block("Sleep on weekdays");
       // Nothing validates these on write, so a picker would show the free-text
       // value as empty and persist that emptiness on the next edit.
       // shadcn's Input renders no `type` attribute at all when it is a plain
@@ -1803,7 +1803,7 @@ describe("section headings and info placement", () => {
       for (const heading of ["Personality Traits", "Values", "Energy Peaks", "Stress Triggers"]) {
         expect(within(block(heading)).getByRole("textbox")).toBeEnabled();
       }
-      expect(within(block("Sleep — weekdays")).getByLabelText("Bedtime")).toHaveValue("");
+      expect(within(block("Sleep on weekdays")).getByLabelText("Bedtime")).toHaveValue("");
     });
 
     it("adds the first value on an empty account at the right path", async () => {
@@ -2012,9 +2012,9 @@ describe("section headings and info placement", () => {
     it("gives a grouped child a lower-level heading than a top-level node", () => {
       renderSection({ pack, initial: data });
 
-      expect(screen.getByRole("heading", { name: "Code Style", level: 3 })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "Frameworks", level: 4 })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "Ungrouped", level: 3 })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Code Style", level: 2 })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Frameworks", level: 3 })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Ungrouped", level: 2 })).toBeInTheDocument();
     });
 
     it("renders nothing, and logs, for a group with no sections", () => {
@@ -2380,9 +2380,9 @@ describe("section headings and info placement", () => {
 
     // The page title already says "Circle"; the list's borrowed heading used
     // to say it again, 16px under the 24px one.
-    const cardTitle = screen.getByRole("heading", { name: "Circle", level: 3 });
+    const cardTitle = screen.getByRole("heading", { name: "Circle", level: 2 });
     expect(cardTitle).toHaveClass("sr-only");
-    expect(screen.getByRole("heading", { name: "Circle", level: 2 })).not.toHaveClass("sr-only");
+    expect(screen.getByRole("heading", { name: "Circle", level: 1 })).not.toHaveClass("sr-only");
   });
 
   it("labels a date on the collapsed row, but not text that says what it is", () => {
@@ -2465,7 +2465,7 @@ describe("the Add trigger and the entry count", () => {
   // NodeHeading lays its row out as {title + info} | {action}, so the row is
   // the heading's grandparent: <div row><div>{h}{i}</div>{action}</div>.
   const headingRowOf = (nodeEl) =>
-    nodeEl.querySelector("h3, h4").closest("div").parentElement;
+    nodeEl.querySelector("h2, h3").closest("div").parentElement;
 
   it("puts a titled list node's Add trigger in that node's own heading row, not in the list body", () => {
     renderSection({ pack: preferencesPack, initial: preferencesData });
@@ -2484,7 +2484,7 @@ describe("the Add trigger and the entry count", () => {
     // header is the heading that describes this list.
     renderSection({ pack: goalsPack, initial: goalsData });
 
-    const headerRow = screen.getByRole("heading", { level: 2 }).parentElement.parentElement;
+    const headerRow = screen.getByRole("heading", { level: 1 }).parentElement.parentElement;
     expect(headerRow).toContainElement(headerAdd());
     // The row is the header's, not the whole section's -- otherwise this would
     // pass with the button still sitting down in the list body.
@@ -2527,7 +2527,7 @@ describe("scroll-spy anchors", () => {
     // Asserted against outline() rather than a hand-written list: two
     // derivations of the same ids is the one thing this contract cannot afford.
     expect(ids).toEqual(outline(preferencesPack).map((b) => b.id));
-    expect(ids).toEqual(["code-style", "communication", "learning-style", "likes-dislikes"]);
+    expect(ids).toEqual(["communication", "learning-style", "likes-dislikes", "code-style"]);
   });
 
   it("clears the sticky header, so clicking a rail item does not hide the heading under it", () => {
@@ -2584,7 +2584,7 @@ describe("the section's structure", () => {
   it("puts the section's name and description in a title block, outside every card", () => {
     render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
 
-    const title = screen.getByRole("heading", { name: preferencesPack.title, level: 2 });
+    const title = screen.getByRole("heading", { name: preferencesPack.title, level: 1 });
     expect(title).toBeInTheDocument();
     // h2, and above the h3s: the old layout titled the Card h3 and every node
     // h3 as well, which read as a flat list of peers.
@@ -2607,13 +2607,13 @@ describe("the section's structure", () => {
   it("labels a group with an eyebrow band and puts its cards beneath it", () => {
     render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
 
-    expect(screen.getByRole("heading", { name: "Code Style", level: 3 }).className).toContain(
+    expect(screen.getByRole("heading", { name: "Code Style", level: 2 }).className).toContain(
       "text-lg"
     );
     const group = uiNode("Code Style");
     expect(group.querySelector("[data-eyebrow]")).not.toBeNull();
     expect(
-      within(group).getByRole("heading", { name: "Preferred Languages", level: 4 })
+      within(group).getByRole("heading", { name: "Preferred Languages", level: 3 })
     ).toBeInTheDocument();
   });
 
@@ -2641,8 +2641,8 @@ describe("the section's structure", () => {
     // levels; the screen shows the page title alone.
     renderSection({ pack: goalsPack, initial: goalsData });
 
-    expect(screen.getByRole("heading", { name: goalsPack.title, level: 2 })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: goalsPack.title, level: 3 })).toHaveClass("sr-only");
+    expect(screen.getByRole("heading", { name: goalsPack.title, level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: goalsPack.title, level: 2 })).toHaveClass("sr-only");
     expect(cards()).toHaveLength(1);
     expect(within(cards()[0]).queryByText("Add", { selector: "button" })).not.toBeInTheDocument();
   });
@@ -2652,7 +2652,7 @@ describe("the section's structure", () => {
     render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
 
     // h2 -> title block -> header row (title and actions) -> the column.
-    const column = screen.getByRole("heading", { level: 2 }).parentElement.parentElement.parentElement;
+    const column = screen.getByRole("heading", { level: 1 }).parentElement.parentElement.parentElement;
     expect(column.className).toContain("space-y-10");
     // profile: [Personal Information, Education, Work Experience], [Contact &
     // Links], [Languages] -- the group is its own run, and the leaf after it
@@ -2727,7 +2727,7 @@ describe("the section's structure", () => {
       expect(bands()).toHaveLength(1);
       const inner = uiNode("Inner");
       expect(inner.hasAttribute("data-subsection-card")).toBe(true);
-      expect(screen.getByRole("heading", { name: "Inner", level: 4 })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Inner", level: 3 })).toBeInTheDocument();
       expect(inner.querySelector("[data-eyebrow]")).toBeNull();
     });
 
@@ -2738,7 +2738,7 @@ describe("the section's structure", () => {
       // One card for the whole inner group -- its children are labelled rows in
       // it, not cards of their own.
       expect(inner.querySelectorAll("[data-subsection-card]")).toHaveLength(0);
-      expect(within(inner).getByRole("heading", { name: "Second", level: 5 })).toBeInTheDocument();
+      expect(within(inner).getByRole("heading", { name: "Second", level: 4 })).toBeInTheDocument();
       expect(within(inner).getByText("b")).toBeInTheDocument();
       expect(within(inner).getByText("c")).toBeInTheDocument();
     });
@@ -2779,8 +2779,8 @@ describe("the section's structure", () => {
       expect(bands()).toHaveLength(1);
       // The heading level keeps descending even though the tier does not, so a
       // screen reader still hears the nesting the manifest declares.
-      expect(screen.getByRole("heading", { name: "Deepest", level: 5 })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "Second", level: 6 })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Deepest", level: 4 })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Second", level: 5 })).toBeInTheDocument();
     });
   });
 });

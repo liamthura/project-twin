@@ -35,6 +35,7 @@ export function SettingsPage({
   packs = [],
   onTogglePack,
   onConnectionChange,
+  addEmailRequest = 0,
 }) {
   const active = resolveTab(tab);
   const [username, setUsername] = useState(null);
@@ -51,7 +52,7 @@ export function SettingsPage({
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">Settings</h2>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Settings</h1>
         <p className="text-sm text-muted-foreground">
           Your account, what is connected to it, which sections are on, and your data.
         </p>
@@ -78,6 +79,7 @@ export function SettingsPage({
             onAutosaveChange={onAutosaveChange}
             disabledSections={disabledSections}
             version={VERSION}
+            addEmailRequest={addEmailRequest}
             onSignedOut={() => onConnectionChange?.()}
           />
         )}

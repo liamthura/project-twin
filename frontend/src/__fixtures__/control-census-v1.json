@@ -132,11 +132,11 @@
    "notes": "longtext",
    "kind": "enum"
   },
-  "Wellness > Sleep — weekdays": {
+  "Wellness > Sleep on weekdays": {
    "bedtime": "time",
    "wakeup": "time"
   },
-  "Wellness > Sleep — weekends": {
+  "Wellness > Sleep at weekends": {
    "bedtime": "time",
    "wakeup": "time"
   }

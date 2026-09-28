@@ -37,9 +37,9 @@ export function SubsectionCard({
   ...rest
 }) {
   // The same depth rule the old NodeHeading used, so the visual tier cap does
-  // not flatten the document outline with it: page title h2, top-level node h3,
-  // grouped child h4.
-  const Heading = depth === 0 ? "h3" : "h4";
+  // not flatten the document outline with it: page title h1, top-level node h2,
+  // grouped child h3.
+  const Heading = depth === 0 ? "h2" : "h3";
   const hasRight = Boolean(tick || count || action);
 
   return (

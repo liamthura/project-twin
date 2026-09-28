@@ -336,7 +336,7 @@ export default function SectionRenderer({
           than in Settings. Passed in, because they need App's state. */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-1">
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">{pack.title}</h2>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{pack.title}</h1>
           {pack.description && (
             <p className="text-sm text-muted-foreground">{pack.description}</p>
           )}
@@ -375,11 +375,11 @@ export function toRuns(nodes) {
 }
 
 // A title past the card tier: the `headline-3` class (globals.css), in the
-// document outline at the level the manifest's nesting implies. h5 and h6
+// document outline at the level the manifest's nesting implies. h4 and h5
 // look alarming in a component and are correct here -- the visual tier is
 // capped at two, the outline is not.
 function NodeLabel({ title, depth, info }) {
-  const Heading = depth >= 3 ? "h6" : "h5";
+  const Heading = depth >= 3 ? "h5" : "h4";
   return (
     <div className="flex items-center gap-1.5">
       <Heading className="headline-3">{title}</Heading>

@@ -161,7 +161,7 @@ describe("App: where it opens", () => {
     window.history.replaceState(null, "", "/app/#/settings/tokens");
     mockApi({ packs: packsFixture });
     render(<App />);
-    expect(await screen.findByRole("heading", { name: "Settings", level: 2 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Settings", level: 1 })).toBeInTheDocument();
     await waitFor(() => expect(window.location.hash).toBe("#/settings/connections"));
     expect(screen.getByRole("tab", { name: "Connections" })).toHaveAttribute("aria-selected", "true");
   });
