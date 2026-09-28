@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Settings, RefreshCw, Loader2, History } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/toaster";
 import ProposalsPanel from "@/components/ProposalsPanel";
+import { SearchDialog } from "@/components/SearchDialog";
+import { FocusEntryContext } from "@/renderers/focusEntry";
 import { useToast } from "@/components/ui/use-toast";
 import {
   Dialog,
@@ -257,6 +259,33 @@ export default function App() {
     // already puts you -- only a band click owes a scroll.
     pendingBandRef.current = band ?? null;
   }, []);
+
+  // Search, from the header button or ⌘K / Ctrl+K anywhere in the shell. A
+  // modifier chord, so unlike a bare letter it cannot fire mid-sentence.
+  const [searchOpen, setSearchOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  // An entry to open once its section is on screen (search, the Stale tab).
+  // No band is owed a scroll: the list scrolls to the row itself.
+  const [focusEntryId, setFocusEntryId] = useState(null);
+  const focusEntry = useMemo(
+    () => (focusEntryId ? { id: focusEntryId, done: () => setFocusEntryId(null) } : null),
+    [focusEntryId],
+  );
+  const openEntry = useCallback((section, entityId) => {
+    setFocusEntryId(entityId);
+    navigate(section, null);
+  }, [navigate]);
+  const openResult = (r) => (r.entityId ? openEntry(r.section, r.entityId) : navigate(r.section, r.band));
 
   // Landed here from a federated sign-up. The provider redirect has no
   // onSuccess to carry `isNew` in, so WelcomeAuth asks to come back with this
@@ -778,6 +807,14 @@ export default function App() {
         accountName={packData.profile?.preferred_name || packData.profile?.name}
         onOpenSettings={() => openSettings()}
         onSaveNow={saveAll}
+        onSearch={() => setSearchOpen(true)}
+      />
+      <SearchDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        packs={dynamicPacks}
+        packData={packData}
+        onOpen={openResult}
       />
 
       <div className="mx-auto max-w-6xl px-4 py-8">
@@ -817,6 +854,7 @@ export default function App() {
             )}
 
             {activePack && (
+              <FocusEntryContext.Provider value={focusEntry}>
               <SectionRenderer
                 key={activePack.key}
                 pack={activePack}
@@ -833,6 +871,7 @@ export default function App() {
                   </Button>
                 }
               />
+              </FocusEntryContext.Provider>
             )}
 
             {activeSection === "settings" && (
@@ -854,7 +893,9 @@ export default function App() {
 
             {activeSection === "review" && (
               <ProposalsPanel
-                onViewSection={(section) => navigate(section, null)}
+                onViewSection={(section, entityId) =>
+                  entityId ? openEntry(section, entityId) : navigate(section, null)
+                }
                 onSectionChanged={refreshSection}
                 // The panel already fetches the count for its own tab badges,
                 // so it hands the total over rather than making us fetch the

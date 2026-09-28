@@ -1043,6 +1043,30 @@ async def sweep_status():
     return {"last_sweep": settings_store.get_settings().get("last_sweep")}
 
 
+@app.get("/api/search")
+async def search_persona(q: str = "", limit: int = 5):
+    """Entries related to `q` by meaning, for the app's search dialog.
+
+    The dialog finds word matches itself, over the persona it already holds;
+    this is only the half it cannot do. So it answers only when embeddings are
+    configured: keyword-only ("fts") results would just repeat the dialog's
+    own matches, less completely. Sections the user turned off are skipped, as
+    search_context skips them.
+    """
+    if len(q.strip()) < 2:
+        return {"results": []}
+    import search_index
+    out = search_index.search(
+        db.current_user_id.get(), q.strip(), None, max(1, min(limit, 20)),
+        exclude_sections=list(settings_store.get_disabled_sections()),
+    )
+    if out["mode"] != "hybrid":
+        return {"results": []}
+    return {"results": [
+        {k: r[k] for k in ("entity_id", "section", "title", "snippet")} for r in out["results"]
+    ]}
+
+
 @app.get("/api/history/{file_type}")
 async def list_history(file_type: str):
     """Previous versions of one section, newest first.

@@ -26,7 +26,7 @@
 // renderNode still resolves and passes it, and `AddEntryDialog` still receives
 // it from here unread, both purely for the existing call shape; see
 // renderNode.threading.test.jsx.
-import { useContext, useId, useState } from "react";
+import { useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Trash2, ChevronDown, Star, MoreHorizontal, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,7 @@ import { useListItems } from "./useListItems";
 import { AddEntryDialog } from "./AddEntryDialog";
 import { HeaderActionSlotContext, useHeaderActionSlot } from "./headerActionSlot";
 import { EntryOrigin, ProvenanceContext } from "./provenance";
+import { FocusEntryContext } from "./focusEntry";
 // Circular by construction: renderNode imports ListRenderer to dispatch a
 // "list" node, and ListRenderer imports renderNode to dispatch a row's block
 // fields (an array-valued field with a `label`) against one of its own items.
@@ -145,6 +146,33 @@ export default function ListRenderer({
   // the section's provenance record (SectionRenderer), keyed by entry id.
   const [staleOnly, setStaleOnly] = useState(false);
   const provenance = useContext(ProvenanceContext);
+
+  // Opened from search or the Stale tab: this list holds the entry, so open
+  // its row and bring it into view. Filters are cleared first, since a row a
+  // filter hides cannot be scrolled to.
+  const focusEntry = useContext(FocusEntryContext);
+  const listRef = useRef(null);
+  const [flashIdx, setFlashIdx] = useState(null);
+  useEffect(() => {
+    if (!focusEntry?.id) return;
+    const idx = items.findIndex((item) => item?.id === focusEntry.id);
+    if (idx < 0) return;
+    focusEntry.done();
+    setQuery("");
+    setFacetValues({});
+    setStaleOnly(false);
+    setExpanded((current) => ({ ...current, [idx]: true }));
+    setFlashIdx(idx);
+  }, [focusEntry, items]);
+  useEffect(() => {
+    if (flashIdx === null) return undefined;
+    const row = listRef.current?.querySelector(`[data-row-idx="${flashIdx}"]`);
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    row?.scrollIntoView?.({ block: "center", behavior: reduced ? "auto" : "smooth" });
+    row?.querySelector("button[aria-expanded]")?.focus({ preventScroll: true });
+    const t = setTimeout(() => setFlashIdx(null), 1600);
+    return () => clearTimeout(t);
+  }, [flashIdx]);
   const sortId = useId();
   const meta = buildFieldMeta(node);
   // Every position this node's fields occupy, in declaration order, from one
@@ -347,7 +375,7 @@ export default function ListRenderer({
   );
 
   return (
-    <div className="space-y-3">
+    <div ref={listRef} className="space-y-3">
       {/* The trigger renders in the header row that NAMES this list, which is
           a DOM node SectionRenderer owns -- so it gets there by portal rather
           than by moving the add logic up to meet it.
@@ -582,8 +610,10 @@ export default function ListRenderer({
             // on `item[titleField]` instead remounted the row (and its input
             // DOM node) on every keystroke of a title edit, since the key
             // changed along with the value being typed.
-            <div key={idx}
-              className="border-b border-border last:border-b-0">
+            <div key={idx} data-row-idx={idx}
+              className={`border-b border-border transition-colors duration-medium last:border-b-0 ${
+                idx === flashIdx ? "bg-primary/5" : ""
+              }`}>
               {/* items-start, not items-center: on a phone the title and the
                   badges are two stacked lines, and centring would float the
                   chevron and the buttons against the middle of a two-line

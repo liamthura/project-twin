@@ -338,7 +338,7 @@ describe("ProposalsPanel", () => {
     await user.click(screen.getByRole("tab", { name: /stale/i }));
     expect(await screen.findByText("Unchanged since 14 February 2026")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open in Goals" }));
-    expect(onViewSection).toHaveBeenCalledWith("goals");
+    expect(onViewSection).toHaveBeenCalledWith("goals", "goal_1");
 
     await user.click(screen.getByRole("button", { name: "Keep" }));
     await waitFor(() => expect(api.keepEntry).toHaveBeenCalledWith("goal_1"));

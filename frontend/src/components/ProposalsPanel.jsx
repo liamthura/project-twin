@@ -587,7 +587,7 @@ export default function ProposalsPanel({
               {...common}
               section={sectionTitles[row.section] || row.section}
               onKeep={() => act(row.id, "Kept. It won't show as stale for a while.", () => keepEntry(row.id))}
-              onOpen={() => onViewSection?.(row.section)}
+              onOpen={() => onViewSection?.(row.section, row.id)}
             />
           ) : row.kind === "entity" ? (
             <InboxRow
