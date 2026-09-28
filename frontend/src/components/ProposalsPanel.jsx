@@ -376,9 +376,9 @@ export default function ProposalsPanel({
               row={row}
               packs={packs}
               busy={busy === row.id}
-              onApprove={() =>
-                act(row.id, "Added to your persona", () =>
-                  approveProposal(row.id, undefined))
+              onApprove={(edited) =>
+                act(row.id, edited ? "Added to your persona, with your changes" : "Added to your persona", () =>
+                  approveProposal(row.id, edited))
               }
               onReject={() => rejectLater(row, "Rejected. It won't be suggested again.")}
             />
