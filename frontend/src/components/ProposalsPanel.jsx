@@ -1,5 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
+import { Keyboard } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { FOCUS_RING } from "@/components/controls";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -42,6 +49,21 @@ const QUEUE_POLL_MS = 15000;
 // request has not been sent yet.
 const UNDO_MS = 8000;
 
+// The row that has focus takes these. Only the row: a key typed into one of
+// its inputs is text, and nothing fires without a row focused, which is what
+// keeps single letters from misfiring for voice control (WCAG 2.1.4).
+const KEYS = [
+  ["j / ↓", "Next"],
+  ["k / ↑", "Previous"],
+  ["a", "Approve (Inbox)"],
+  ["r", "Reject (Inbox)"],
+  ["e", "Edit before approving (Inbox)"],
+  ["Enter", "Show details (Inbox)"],
+  ["x", "Select"],
+  ["?", "This list"],
+];
+const MOVES = { j: 1, ArrowDown: 1, k: -1, ArrowUp: -1 };
+
 export default function ProposalsPanel({
   onViewSection, onSectionChanged, onCounts, onOpenSettings, onConnect,
   sectionTitles = {}, packs = [],
@@ -54,6 +76,13 @@ export default function ProposalsPanel({
   const [counts, setCounts] = useState({ entity: 0, note: 0, total: 0 });
   const [connection, setConnection] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [showKeys, setShowKeys] = useState(false);
+  const listRef = useRef(null);
+  // { from, to }: after a key acts on `from`, focus goes to `to` once `from`
+  // has left the list -- so the queue can be worked down without the mouse.
+  const focusAfterRef = useRef(null);
   const { toast } = useToast();
   // id -> { kind, timer, dismiss } for each rejection not yet confirmed sent.
   const pendingRef = useRef(new Map());
@@ -105,6 +134,47 @@ export default function ProposalsPanel({
   }, []);
 
   useEffect(() => { refresh(kind); refreshCounts(); }, [kind, refresh, refreshCounts]);
+  useEffect(() => setSelected(new Set()), [kind]);
+
+  const rowEls = () => [...(listRef.current?.querySelectorAll("[data-review-row]") || [])];
+  useEffect(() => {
+    const next = focusAfterRef.current;
+    if (!next || rows.some((r) => r.id === next.from)) return;
+    focusAfterRef.current = null;
+    rowEls().find((el) => el.dataset.rowId === next.to)?.focus();
+  }, [rows]);
+
+  function advanceFrom(id) {
+    const els = rowEls();
+    const i = els.findIndex((el) => el.dataset.rowId === id);
+    focusAfterRef.current = { from: id, to: (els[i + 1] || els[i - 1])?.dataset.rowId };
+  }
+
+  const choose = useCallback((id, on) => setSelected((current) => {
+    if (current.has(id) === on) return current;
+    const next = new Set(current);
+    if (on) next.add(id); else next.delete(id);
+    return next;
+  }), []);
+
+  const chosen = rows.filter((r) => selected.has(r.id));
+
+  function onListKeyDown(e) {
+    const rowEl = e.target.closest?.("[data-review-row]");
+    if (!rowEl || e.target !== rowEl || e.metaKey || e.ctrlKey || e.altKey) return;
+    const id = rowEl.dataset.rowId;
+    if (MOVES[e.key]) {
+      const els = rowEls();
+      els[Math.max(0, Math.min(els.length - 1, els.indexOf(rowEl) + MOVES[e.key]))]?.focus();
+    } else if (e.key === "x") {
+      if (rowEl.dataset.selectable !== "false") choose(id, !selected.has(id));
+    } else if (e.key === "?") {
+      setShowKeys(true);
+    } else {
+      return;
+    }
+    e.preventDefault();
+  }
 
   // Leaving Review sends whatever is still waiting: the reader watched it go.
   useEffect(() => () => {
@@ -225,71 +295,110 @@ export default function ProposalsPanel({
    * The row leaves at once, as it does for Approve; Undo puts it back where it
    * was. A failed send puts it back too, and says so.
    */
-  function rejectLater(row, title) {
-    const at = rows.findIndex((r) => r.id === row.id);
+  function rejectLater(batch, title) {
+    const ids = new Set(batch.map((r) => r.id));
+    const kind = batch[0].kind;
+    // Where each sat, in order, so Undo puts them all back where they were.
+    const at = batch
+      .map((row) => [row, rows.findIndex((r) => r.id === row.id)])
+      .sort((a, b) => a[1] - b[1]);
     // The badges follow the queue on screen, not the server, for the 8s the
     // two disagree: "Inbox 3" over two rows read as a row gone missing.
     const bump = (delta) =>
       setCounts((c) => {
         const next = {
           ...c,
-          [row.kind]: Math.max(0, (c[row.kind] ?? 0) + delta),
+          [kind]: Math.max(0, (c[kind] ?? 0) + delta),
           total: Math.max(0, c.total + delta),
         };
         onCountsRef.current?.(next.total);
         return next;
       });
-    bump(-1);
-    const restore = () =>
+    bump(-batch.length);
+    const restore = (only = ids) =>
       setRows((current) => {
         const next = [...current];
-        next.splice(Math.max(0, Math.min(at, next.length)), 0, row);
+        for (const [row, i] of at) {
+          if (only.has(row.id)) next.splice(Math.max(0, Math.min(i, next.length)), 0, row);
+        }
         return next;
       });
-    setRows((current) => current.filter((r) => r.id !== row.id));
+    setRows((current) => current.filter((r) => !ids.has(r.id)));
 
     // Held until the server answers, so a poll landing mid-request neither
-    // lists the row again nor counts it.
+    // lists the rows again nor counts them.
     const send = async () => {
-      try {
-        await rejectProposal(row.id);
-        pendingRef.current.delete(row.id);
-        refreshCounts();
-      } catch {
-        pendingRef.current.delete(row.id);
-        restore();
-        bump(1);
+      const results = await Promise.allSettled(batch.map((r) => rejectProposal(r.id)));
+      for (const id of ids) pendingRef.current.delete(id);
+      const failed = new Set(batch.filter((_, i) => results[i].status === "rejected").map((r) => r.id));
+      refreshCounts();
+      if (failed.size) {
+        restore(failed);
         toast({
           title: "That did not go through",
-          description: "The item is back in the queue.",
+          description: failed.size === 1
+            ? "The item is back in the queue."
+            : `${failed.size} items are back in the queue.`,
           variant: "destructive",
         });
       }
     };
+    // One record for the batch, under each of its ids.
+    const pending = { kind, sent: false };
     const undo = () => {
-      const pending = pendingRef.current.get(row.id);
-      // `sent` once the timer has fired: the request is out, and there is
+      // `sent` once the timer has fired: the requests are out, and there is
       // nothing left to take back.
-      if (!pending || pending.sent) return;
+      if (pending.sent || !pendingRef.current.has(batch[0].id)) return;
       clearTimeout(pending.timer);
-      pendingRef.current.delete(row.id);
+      for (const id of ids) pendingRef.current.delete(id);
       restore();
-      bump(1);
+      bump(batch.length);
     };
     const shown = toast({
       title,
       duration: UNDO_MS,
       action: <ToastAction altText="Undo" onClick={undo}>Undo</ToastAction>,
     });
-    const fire = () => {
-      pendingRef.current.get(row.id).sent = true;
+    pending.dismiss = shown.dismiss;
+    pending.timer = setTimeout(() => {
+      pending.sent = true;
       send();
-    };
-    pendingRef.current.set(row.id, {
-      kind: row.kind,
-      timer: setTimeout(fire, UNDO_MS),
-      dismiss: shown.dismiss,
-    });
+    }, UNDO_MS);
+    for (const id of ids) pendingRef.current.set(id, pending);
+  }
+
+  /**
+   * Approve or Keep several, one request after another: two writes landing on
+   * the same section at once could lose one. Each row leaves as its own
+   * request succeeds; a failure stays, and the closing toast says how many.
+   */
+  async function resolveMany(batch, call, done) {
+    setBulkBusy(true);
+    const sections = new Set();
+    let failed = 0;
+    for (const row of batch) {
+      try {
+        const res = await call(row.id);
+        setRows((current) => current.filter((r) => r.id !== row.id));
+        if (res?.section) sections.add(res.section);
+      } catch {
+        failed += 1;
+      }
+    }
+    setBulkBusy(false);
+    setSelected(new Set());
+    refreshCounts();
+    sections.forEach((s) => onSectionChanged?.(s));
+    const ok = batch.length - failed;
+    toast(
+      failed
+        ? {
+            title: ok ? done(ok) : "That did not go through",
+            description: `${failed} didn't go through and ${failed === 1 ? "is" : "are"} still in the queue.`,
+            variant: "destructive",
+          }
+        : { title: done(ok), variant: "success" },
+    );
   }
 
   // Sections that can actually receive a note, in tab order.
@@ -342,6 +451,7 @@ export default function ProposalsPanel({
         onConfirm={confirmPromote}
       />
 
+      <div className="flex items-center justify-between gap-2">
       <Tabs value={kind} onValueChange={setKind}>
         <TabsList>
           {KINDS.map((k) => (
@@ -365,8 +475,50 @@ export default function ProposalsPanel({
           ))}
         </TabsList>
       </Tabs>
+      {/* Not on a touch screen, where there is no keyboard to use them. */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="hidden text-muted-foreground sm:inline-flex coarse:hidden"
+        onClick={() => setShowKeys(true)}
+      >
+        <Keyboard className="mr-1.5 h-4 w-4" aria-hidden="true" />
+        Keyboard shortcuts
+      </Button>
+      </div>
+
+      <Dialog open={showKeys} onOpenChange={setShowKeys}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Keyboard shortcuts</DialogTitle>
+            <DialogDescription>Click a row or Tab to it, then press:</DialogDescription>
+          </DialogHeader>
+          <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
+            {KEYS.map(([key, what]) => (
+              <Fragment key={key}>
+                <dt>
+                  <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">{key}</kbd>
+                </dt>
+                <dd>{what}</dd>
+              </Fragment>
+            ))}
+          </dl>
+        </DialogContent>
+      </Dialog>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {rows.length > 0 && (
+        <div className="flex items-center gap-2 px-3 text-sm text-muted-foreground">
+          <Checkbox
+            id="review-select-all"
+            className="tap-target"
+            checked={chosen.length === 0 ? false : chosen.length === rows.length ? true : "indeterminate"}
+            onCheckedChange={(v) => setSelected(v === true ? new Set(rows.map((r) => r.id)) : new Set())}
+          />
+          <Label htmlFor="review-select-all" className="font-normal">Select all</Label>
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <EmptyState className="space-y-2">
@@ -415,48 +567,130 @@ export default function ProposalsPanel({
           )}
         </EmptyState>
       ) : (
-        rows.map((row) =>
-          row.kind === "stale" ? (
+        <div ref={listRef} onKeyDown={onListKeyDown} className="space-y-4">
+        {rows.map((row, index) => {
+          const common = {
+            key: row.id,
+            row,
+            busy: busy === row.id || bulkBusy,
+            selected: selected.has(row.id),
+            onSelect: (on) => choose(row.id, on),
+            // Roving: Tab enters the list at its first row, and j/k move.
+            focusProps: {
+              tabIndex: index === 0 ? 0 : -1,
+              "data-review-row": "",
+              "data-row-id": row.id,
+            },
+          };
+          return row.kind === "stale" ? (
             <StaleRow
-              key={row.id}
-              row={row}
+              {...common}
               section={sectionTitles[row.section] || row.section}
-              busy={busy === row.id}
               onKeep={() => act(row.id, "Kept. It won't show as stale for a while.", () => keepEntry(row.id))}
               onOpen={() => onViewSection?.(row.section)}
             />
           ) : row.kind === "entity" ? (
             <InboxRow
-              key={row.id}
-              row={row}
+              {...common}
               packs={packs}
-              busy={busy === row.id}
+              onAdvance={() => advanceFrom(row.id)}
               onApprove={(edited) =>
                 act(row.id, edited ? "Added to your persona, with your changes" : "Added to your persona", () =>
                   approveProposal(row.id, edited))
               }
-              onReject={() => rejectLater(row, "Rejected. It won't be suggested again.")}
+              onReject={() => rejectLater([row], "Rejected. It won't be suggested again.")}
             />
           ) : (
             <ObservationCard
-              key={row.id}
-              row={row}
-              busy={busy === row.id}
+              {...common}
               canPromote={promotable.length > 0}
               onPromote={() => openPromote(row)}
-              onDelete={() => rejectLater(row, "Deleted. It won't be suggested again.")}
+              onDelete={() => rejectLater([row], "Deleted. It won't be suggested again.")}
             />
-          ),
-        )
+          );
+        })}
+        </div>
+      )}
+
+      {/* Sticky, so a long queue keeps its actions in reach. */}
+      {chosen.length > 0 && (
+        <div
+          role="region"
+          aria-label="Selected"
+          className="sticky bottom-4 z-10 flex flex-wrap items-center gap-2 rounded-lg border bg-background py-2 pl-3 pr-2 shadow-md"
+        >
+          <span className="text-sm font-medium">{chosen.length} selected</span>
+          <span className="ml-auto flex flex-wrap gap-1">
+            {kind === "entity" && (
+              <>
+                <Button
+                  size="sm" variant="ghost" disabled={bulkBusy}
+                  className="text-success hover:bg-success/10 hover:text-success"
+                  onClick={() => resolveMany(chosen, (id) => approveProposal(id), (n) => `Added ${n} to your persona`)}
+                >
+                  Approve {chosen.length}
+                </Button>
+                <Button
+                  size="sm" variant="ghost" disabled={bulkBusy}
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => {
+                    rejectLater(chosen, chosen.length === 1
+                      ? "Rejected. It won't be suggested again."
+                      : `Rejected ${chosen.length}. They won't be suggested again.`);
+                    setSelected(new Set());
+                  }}
+                >
+                  Reject {chosen.length}
+                </Button>
+              </>
+            )}
+            {kind === "note" && (
+              <Button
+                size="sm" variant="ghost" disabled={bulkBusy}
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => {
+                  rejectLater(chosen, chosen.length === 1
+                    ? "Deleted. It won't be suggested again."
+                    : `Deleted ${chosen.length}. They won't be suggested again.`);
+                  setSelected(new Set());
+                }}
+              >
+                Delete {chosen.length}
+              </Button>
+            )}
+            {kind === "stale" && (
+              <Button
+                size="sm" variant="ghost" disabled={bulkBusy}
+                onClick={() => resolveMany(chosen, keepEntry, (n) => `Kept ${n}. They won't show as stale for a while.`)}
+              >
+                Keep {chosen.length}
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+              Clear
+            </Button>
+          </span>
+        </div>
       )}
     </div>
   );
 }
 
 // One stale entry: where it lives, what it is, how long it has sat.
-function StaleRow({ row, section, busy, onKeep, onOpen }) {
+function StaleRow({ row, section, busy, onKeep, onOpen, selected, onSelect, focusProps }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border px-3 py-2.5 text-sm">
+    <div
+      {...focusProps}
+      role="group"
+      aria-label={`Stale: ${row.title}`}
+      className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border px-3 py-2.5 text-sm ${FOCUS_RING}`}
+    >
+      <Checkbox
+        checked={selected}
+        onCheckedChange={(v) => onSelect(v === true)}
+        aria-label={`Select ${row.title}`}
+        className="tap-target"
+      />
       <div className="min-w-0 flex-1 space-y-0.5">
         <p className="text-xs text-muted-foreground">{section}</p>
         <p className="break-words font-medium">{row.title}</p>
