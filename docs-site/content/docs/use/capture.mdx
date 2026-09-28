@@ -90,7 +90,9 @@ Two behaviours keep the queue usable over months.
 
 - **Rejected claims never come back.** Reject a proposal and it becomes a
   tombstone: no agent, in any client, can raise the same thing again. Without
-  this, every tool re-suggests what you already declined, forever.
+  this, every tool re-suggests what you already declined, forever. The web
+  app waits eight seconds before it sends a rejection, so **Undo** on the
+  confirmation puts the row back.
 - **The same claim from three tools is one row.** Repeat proposals increment a
   counter instead of stacking up, so you see "seen 3×".
 

@@ -134,7 +134,7 @@ export function AccountPanel({
     toast({
       variant: "destructive",
       title: `Could not link ${SSO_LABEL}`,
-      description: `Nothing was changed. The most likely reason is that this ${SSO_LABEL} account is already linked to a different MyGist account — check which one you signed in as, then try again. (${code})`,
+      description: `Nothing was changed. The most likely reason is that this ${SSO_LABEL} account is already linked to a different MyGist account. Check which one you signed in as, then try again. (${code})`,
     });
   }, []);
 
@@ -218,7 +218,8 @@ export function AccountPanel({
           <button
             type="button"
             onClick={() => setShowPasswordForm((v) => !v)}
-            className="flex w-full items-center justify-between text-sm font-medium"
+            // tap-target: the row draws 20px tall; a phone needs 44 to hit it.
+            className="tap-target flex w-full items-center justify-between text-sm font-medium"
           >
             Change password
             {showPasswordForm ? (

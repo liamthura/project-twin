@@ -115,7 +115,7 @@ export function HistoryPanel({ fixedSection = null, sectionTitle = null, onResto
     } catch (error) {
       toast({
         title: "Restore failed",
-        description: error.message,
+        description: "Nothing was changed. Try again in a moment.",
         variant: "destructive",
       });
     } finally {
@@ -183,10 +183,13 @@ export function HistoryPanel({ fixedSection = null, sectionTitle = null, onResto
                     : " · replaced from the web app"}
                 </p>
               </div>
-              {/* Destructive and labelled: it overwrites what is there now. */}
+              {/* Red, because it overwrites what is there now; outlined, like
+                  Revoke and Unlink, because it is the trigger and not a final
+                  confirm -- and it can itself be undone from this list. */}
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
+                className="shrink-0 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 disabled={reverting !== null}
                 onClick={() => handleRevert(version)}
               >

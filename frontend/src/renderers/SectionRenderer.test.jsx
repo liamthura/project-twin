@@ -555,7 +555,7 @@ describe("SectionRenderer", () => {
     it("labels the body timestamp so it reads as a field, not a stray string", async () => {
       const { user } = renderSection({ pack: learningLogPack, initial: learningLogData });
       await user.click(screen.getByText("React Server Components"));
-      expect(screen.getByText("timestamp")).toBeInTheDocument();
+      expect(screen.getByText("Timestamp")).toBeInTheDocument();
     });
 
     it("gives each key decision its own editable row", async () => {
@@ -1728,7 +1728,7 @@ describe("section headings and info placement", () => {
       // An edit-field label sits directly beside its control:
       // <div><Label>specifics</Label><ScalarField/></div>. That is one level
       // shallower than the section wrappers `block` walks.
-      const specifics = screen.getByText("specifics").parentElement;
+      const specifics = screen.getByText("Specifics").parentElement;
       await user.type(within(specifics).getByRole("textbox"), "crimps{Enter}");
 
       expect(latest().hobbies[0].specifics).toEqual(["overhangs", "slab", "crimps"]);
@@ -2192,7 +2192,7 @@ describe("section headings and info placement", () => {
       await user.click(screen.getByText("Northumbria University"));
       await user.click(within(uiNode("Coursework / Modules")).getByText("Compilers"));
 
-      const topics = screen.getByText("topics").parentElement;
+      const topics = screen.getByText("Topics").parentElement;
       await user.type(within(topics).getByRole("textbox"), "optimisation{Enter}");
 
       const cw = latest().education[0].coursework;
@@ -2347,7 +2347,7 @@ describe("section headings and info placement", () => {
       const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
       await user.click(screen.getByText("ada@example.invalid"));
 
-      const purpose = screen.getByText("purpose").parentElement;
+      const purpose = screen.getByText("Purpose").parentElement;
       await user.type(within(purpose).getByRole("textbox"), "!");
 
       expect(latest().contact.emails[0].purpose).toBe("primary!");
@@ -2383,6 +2383,33 @@ describe("section headings and info placement", () => {
     const cardTitle = screen.getByRole("heading", { name: "Circle", level: 3 });
     expect(cardTitle).toHaveClass("sr-only");
     expect(screen.getByRole("heading", { name: "Circle", level: 2 })).not.toHaveClass("sr-only");
+  });
+
+  it("labels a date on the collapsed row, but not text that says what it is", () => {
+    const { unmount } = renderSection({ pack: circlePack, initial: circleData });
+    const meta = screen.getByText("Mentor from the analytical engine days").closest("[data-row-meta]");
+    expect(meta.textContent).toBe("Mentor from the analytical engine days");
+    unmount();
+
+    renderSection({ pack: projectsPack, initial: projectsData });
+    expect(screen.getAllByText(/^Added date/)[0].closest("[data-row-meta]")).toHaveTextContent(
+      /Added date \d{4}-\d{2}-\d{2}/
+    );
+  });
+
+  it("opens and closes a list row from the keyboard", async () => {
+    // The row header was a div with onClick: no Tab stop, no role, so no entry
+    // could be edited without a mouse.
+    const { user } = renderSection({ pack: goalsPack, initial: goalsData });
+    const row = screen.getByRole("button", { name: /^Ship MyGist v3/, expanded: false });
+
+    row.focus();
+    await user.keyboard("{Enter}");
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByDisplayValue("Ship MyGist v3")).toBeInTheDocument();
+
+    await user.keyboard(" ");
+    expect(row).toHaveAttribute("aria-expanded", "false");
   });
 
   it("moves a lone untitled list's Add up beside History, and it still adds", async () => {

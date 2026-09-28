@@ -38,6 +38,10 @@
           },
           {
             "name": "relationship",
+            "show": [
+              "form",
+              "row"
+            ],
             "placeholder": "e.g. Friend, Colleague, Mentor"
           },
           {

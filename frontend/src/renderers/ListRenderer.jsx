@@ -98,28 +98,19 @@ function formatDisplay(value, format) {
   return format === "date" ? date : `${date} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// A field's label, and whether CSS may capitalise it.
+// A field's label: the manifest's declared `label` as authored, or the field
+// name in sentence case -- `added_date` -> "Added date", the same rule
+// FieldsRenderer's labelFor applies, so a list row and a form never disagree
+// ("Added date" on the row, "Added Date" once expanded).
 //
-// Two different kinds of string end up in a Label here, and only one of them
-// wants `text-transform: capitalize`:
-//
-//   - a DERIVED name, `detail_level` -> "detail level". Lowercase, because
-//     nothing title-cases it in JS, so without the CSS transform it renders as
-//     "detail level". This is the case the transform exists for.
-//   - a DECLARED `label` from the manifest, which is authored copy and already
-//     cased the way its author wanted it.
-//
-// Applying the transform to declared copy is not merely redundant, it corrupts
-// it: CSS `capitalize` breaks on punctuation, so learning_log's declared
-// "Follow-up Items" rendered as "Follow-Up Items". Nothing in the pack format
-// lets an author opt out, and nothing told them why their label changed.
-//
-// So the transform follows the fallback, never the declaration.
+// Cased in JS rather than by CSS `text-transform: capitalize`, which
+// title-cased every word and, applied to declared copy, broke on punctuation:
+// learning_log's "Follow-up Items" rendered as "Follow-Up Items".
 function fieldLabel(meta, f) {
   const declared = meta.field_labels?.[f];
-  return declared !== undefined
-    ? { text: declared, capitalize: "" }
-    : { text: f.replace(/_/g, " "), capitalize: " capitalize" };
+  if (declared !== undefined) return { text: declared };
+  const words = f.replace(/_/g, " ");
+  return { text: words.charAt(0).toUpperCase() + words.slice(1) };
 }
 
 // `entities` (the whole map) and `packKey` are passed straight back into
@@ -571,26 +562,42 @@ export default function ListRenderer({
                   everything lines up as before. */}
               <div className={`flex cursor-pointer ${hasMeta ? "items-start" : "items-center"} gap-2 px-3 py-2.5 hover:bg-muted/40 sm:items-center`}
                 onClick={() => setExpanded({ ...expanded, [idx]: !expanded[idx] })}>
+                {/* The row opens from anywhere on it with a mouse, but only a
+                    real button is reachable by Tab and announced as
+                    expandable. Its click bubbles to the row's handler, so
+                    Enter and Space toggle through the same path. Pin and
+                    "..." stay siblings: a button inside a button is invalid,
+                    and their own stopPropagation keeps them from toggling. */}
+                <button type="button" aria-expanded={!!expanded[idx]}
+                  className={`flex min-w-0 flex-1 ${hasMeta ? "items-start" : "items-center"} gap-2 rounded-sm text-left sm:items-center ${FOCUS_RING}`}>
                 <ChevronDown className={`${hasMeta ? "mt-0.5" : ""} h-4 w-4 shrink-0 text-muted-foreground transition-transform sm:mt-0 ${expanded[idx] ? "" : "-rotate-90"}`} />
                 {/* The badges used to sit beside the title in one row, and on a
                     375px screen a source chip plus a timestamp chip left the
                     title nothing to truncate into -- entries were unreadable,
                     which is the one thing a collapsed row has to do. `min-w-0`
                     is what lets `truncate` work at all inside a flex child. */}
-                <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
+                <span className="block min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
                 <span className="block truncate text-sm font-medium">{item[titleField]}</span>
                 <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 empty:hidden sm:mt-0 sm:flex-1 sm:flex-nowrap">
                   {/* Plain text with its label, not a mono pill: a bare
                       "2025-09-20" chip never said whether it was a start, an
                       end or a last edit. */}
+                  {/* Dates only: text says what it is ("Colleague at Northgate"),
+                      and "Relationship" in front of every person was noise. A
+                      text value truncates rather than pushing the row wide. */}
                   {displayFields
                     .filter((f) => f !== sortField && item[f] != null && item[f] !== "")
-                    .map((f) => (
-                      <span key={f} data-row-meta className={`whitespace-nowrap text-xs tabular-nums text-muted-foreground first-letter:uppercase`}>
-                        {fieldLabel(meta, f).text}{" "}
-                        <span className="text-foreground/80">{formatDisplay(item[f], formats[f])}</span>
-                      </span>
-                    ))}
+                    .map((f) => {
+                      // By format, or by value: `added_date` declares no
+                      // format and still holds a bare "2025-09-20".
+                      const dated = ["date", "datetime"].includes(formats[f]) || ISO_DATE.test(String(item[f]));
+                      return (
+                        <span key={f} data-row-meta className={`${dated ? "whitespace-nowrap" : "min-w-0 truncate"} text-xs tabular-nums text-muted-foreground first-letter:uppercase`}>
+                          {dated && <>{fieldLabel(meta, f).text}{" "}</>}
+                          <span className="text-foreground/80">{formatDisplay(item[f], formats[f])}</span>
+                        </span>
+                      );
+                    })}
                   {/* count_badges: opt-in "N <field>" chips for array-valued
                       storage keys, e.g. "3 references". Read-only, like
                       display_fields above -- no control renders for these in
@@ -630,7 +637,7 @@ export default function ListRenderer({
                     );
                   })}
                 </span>
-                </div>
+                </span>
                 {/* The field the list is ordered by sits against the right
                     edge, value only: a timeline reads down that column, and
                     the Sort control above already says what it is. */}
@@ -649,6 +656,7 @@ export default function ListRenderer({
                     })()}
                   </span>
                 )}
+                </button>
                 {pinnedField && (
                   <Button variant="ghost" size="icon"
                     className={`h-7 w-7 shrink-0 ${
@@ -705,9 +713,7 @@ export default function ListRenderer({
                   <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 pb-2 sm:px-9">
                     {bodyDisplayFields.map((f) => (
                       <div key={f}>
-                        {/* See fieldLabel: capitalize follows the derived name,
-                            not a declared label. */}
-                        <Label className={`text-xs${fieldLabel(meta, f).capitalize}`}>
+                        <Label className="text-xs">
                           {fieldLabel(meta, f).text}
                         </Label>
                         <p className="text-xs tabular-nums text-muted-foreground">
@@ -720,14 +726,7 @@ export default function ListRenderer({
                 <div className="grid gap-3 px-4 pb-3 sm:grid-cols-2 sm:px-9">
                   {bodyEditFields.map((f) => (
                     <div key={f} className={needsFullRow(f) ? "sm:col-span-2" : ""}>
-                      {/* capitalize stays here, but conditionally: unlike
-                          FieldsRenderer's labelFor, a DERIVED name comes from a
-                          raw `replace` with no JS title-casing, so the CSS
-                          transform is what capitalises it -- dropping it
-                          entirely would render e.g. "detail level". A DECLARED
-                          label is authored copy and must be left alone. See
-                          fieldLabel for what the transform corrupted. */}
-                      <Label className={`headline-3${fieldLabel(meta, f).capitalize}`}>
+                      <Label className="headline-3">
                         {fieldLabel(meta, f).text}
                       </Label>
                       <ScalarField

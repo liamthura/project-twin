@@ -63,7 +63,14 @@ export function AddEmailBanner({ onAddEmail }) {
     <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
       <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p>Add an email so you can reset your password if you lose it.</p>
+        {/* One line on a phone, where the sentence took three and pushed the
+            page's first field below the fold. */}
+        <p>
+          <span className="sm:hidden">No recovery email yet.</span>
+          <span className="hidden sm:inline">
+            Add an email so you can reset your password if you lose it.
+          </span>
+        </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <Button variant="outline" size="sm" onClick={onAddEmail}>

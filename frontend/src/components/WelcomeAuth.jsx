@@ -508,7 +508,7 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
               <Field
                 id="reset-email"
                 label="Email"
-                description="The address on your account. If you never added one, a reset cannot reach you — sign in and add one first."
+                description="The address on your account. If you never added one, a reset cannot reach you. Sign in and add one first."
                 error={shown("resetEmail")}
               >
                 {(control) => (

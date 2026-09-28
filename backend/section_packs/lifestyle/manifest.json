@@ -163,9 +163,9 @@
       "info": {
         "overview": "Things you're into, tagged as a passion (what you love doing or following) or a curiosity (what you want to explore). AI uses this to understand your motivations and tailor suggestions.",
         "tips": [
-          "Passion: something you care deeply about that drives you — sustainability, design, storytelling, education, technology.",
-          "Curiosity: something you want to explore or learn more about but haven't dived into yet — quantum computing, fermentation, urban planning, linguistics.",
-          "No pressure on curiosities—these can be fleeting interests or serious research areas."
+          "Passion: something you care deeply about that drives you, such as sustainability, design, storytelling, education, technology.",
+          "Curiosity: something you want to explore or learn more about but haven't dived into yet, such as quantum computing, fermentation, urban planning, linguistics.",
+          "No pressure on curiosities: these can be fleeting interests or serious research areas."
         ]
       },
       "element": {

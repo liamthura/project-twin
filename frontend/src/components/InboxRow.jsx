@@ -1,21 +1,22 @@
 import { useState, Fragment } from "react";
 import { Check, ChevronDown, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { proposalSummary, humanise, renderValue } from "./proposalSummary";
+import { proposalSummary, entityPlace, humanise, renderValue } from "./proposalSummary";
 
 const ACTION_VERB = { add: "Add", update: "Update", remove: "Remove" };
 
 /**
- * One inbox item, one line.
+ * One inbox item.
  *
  * Approving does not require expanding. The split from observations is by how
  * much thought an item needs, and a queue that makes a two-second decision
  * look like a considered one gets abandoned at the considered ones.
  *
- * `proposed_by` and `seen N×` live in the expanded detail because the line has
- * no room for them. On an observation they stay on the card face, where they
- * inform a decision the reader is about to make.
+ * So the face carries what the decision needs: where it goes, in the editor's
+ * words; the value, wrapped rather than cut off; who suggested it and why.
+ * Those last two were behind the chevron, and a reason with a quote is the
+ * whole case for approving at all. The quote and the field-by-field detail
+ * stay behind it.
  */
 export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
   const [open, setOpen] = useState(false);
@@ -23,30 +24,32 @@ export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
 
   return (
     <div className="rounded-lg border">
-      {/* Wraps on a phone: the summary takes the first line and the buttons
-          the second, rather than three fixed columns squeezing the value the
-          reader is deciding on down to nothing. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
-        <span className="flex min-w-0 basis-full items-center gap-3 sm:flex-1 sm:basis-auto">
-        <span className="w-16 shrink-0 font-medium">
-          {ACTION_VERB[row.action] || row.action}
-        </span>
-        <span className="w-32 shrink-0 truncate text-muted-foreground max-sm:w-auto max-sm:max-w-[40%]">
-          {humanise(row.entity)}
-        </span>
-        <span className="min-w-0 flex-1 truncate">
-          {lead}
-          {trail && (
-            <>
-              <span className="text-muted-foreground"> → </span>
-              {trail}
-            </>
-          )}
-          {extra > 0 && (
-            <span className="ml-2 text-xs text-muted-foreground">+{extra} more</span>
-          )}
-        </span>
-        </span>
+      {/* Wraps on a phone: the summary takes the full width and the buttons
+          the line below it. */}
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2 px-3 py-2.5 text-sm">
+        <div className="min-w-0 basis-full space-y-0.5 sm:flex-1 sm:basis-auto">
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {ACTION_VERB[row.action] || row.action}
+            </span>
+            {" · "}
+            {entityPlace(row.entity, packs)}
+            {row.proposed_by && <> · from {row.proposed_by}</>}
+          </p>
+          <p className="break-words font-medium">
+            {lead}
+            {trail && (
+              <>
+                <span className="font-normal text-muted-foreground"> → </span>
+                {trail}
+              </>
+            )}
+            {extra > 0 && (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">+{extra} more</span>
+            )}
+          </p>
+          {row.rationale && <p className="text-muted-foreground">{row.rationale}</p>}
+        </div>
 
         {/* Labelled, not bare icons: a tick and a cross in two colours were
             the only way to tell the two apart. The aria-label still carries
@@ -91,14 +94,9 @@ export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
 
       {open && (
         <div className="space-y-3 border-t px-3 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{row.proposed_by}</Badge>
-            {row.seen_count > 1 && (
-              <span className="text-xs text-muted-foreground">
-                seen {row.seen_count}×
-              </span>
-            )}
-          </div>
+          {row.seen_count > 1 && (
+            <p className="text-xs text-muted-foreground">seen {row.seen_count}×</p>
+          )}
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
             {Object.entries(row.data || {}).map(([field, value]) => (
               <Fragment key={field}>
@@ -107,7 +105,6 @@ export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
               </Fragment>
             ))}
           </dl>
-          <p className="text-sm text-muted-foreground">{row.rationale}</p>
           {row.evidence && (
             <blockquote className="border-l-2 pl-3 text-sm italic text-muted-foreground">
               “{row.evidence}”

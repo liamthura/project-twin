@@ -30,6 +30,6 @@ describe("ConnectedApps", () => {
 
   it("shows an empty state when nothing is connected", () => {
     render(<ConnectedApps grants={[]} onRevoke={vi.fn()} />);
-    expect(screen.getByText(/No applications/i)).toBeInTheDocument();
+    expect(screen.getByText(/No app has signed in/i)).toBeInTheDocument();
   });
 });

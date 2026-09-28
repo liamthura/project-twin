@@ -285,43 +285,46 @@ export function StepConnect({ onDelegate, onFillManually }) {
                 setShowPrompt(false);
               }}
             >
-              My client can't sign in. Use a key instead
+              My client can't sign in. Use a token instead
             </button>
           )}
 
           {(!recommendOauth || showKeyPath) && (
             <div className="space-y-4 rounded-lg border p-4">
               <div className="space-y-1">
-                <p className="text-sm font-medium">Connect with a key</p>
+                <p className="text-sm font-medium">Connect with a token</p>
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   {oauthAvailable
                     ? "For clients that only accept a server address and a token."
-                    : "This server does not offer sign-in for clients, so a key is how you connect."}
+                    : "This server does not offer sign-in for clients, so a token is how you connect."}
                 </p>
               </div>
 
               <Steps
                 items={[
-                  "Create a key below. It can read your persona and suggest changes, and cannot change anything without your approval.",
-                  "In your client, add an MCP server with the address shown.",
-                  "Paste the key in as the bearer token, or as the Authorization header.",
+                  // "Token" everywhere, as in Settings and the docs. This said
+                  // "key", then "bearer token" and "Authorization header" --
+                  // three names for one thing, two of them protocol words.
+                  "Create a token below. It can read your persona and suggest changes, but it cannot change anything without your approval.",
+                  "In your client, add a new MCP server with the address shown.",
+                  "Paste the token where the client asks for one. Some clients call it an API key.",
                 ]}
               />
 
               <Button
                 onClick={generate}
                 disabled={generating}
-                aria-label={generating ? "Creating a key" : undefined}
+                aria-label={generating ? "Creating a token" : undefined}
               >
                 {generating ? (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
-                  "Create a key"
+                  "Create a token"
                 )}
               </Button>
               {error && <p className="text-sm text-destructive">{error}</p>}
 
-              <DocsLink path="/use/clients/#using-a-token-instead">
+              <DocsLink path="/use/clients/#connecting-with-a-token">
                 Need help connecting?
               </DocsLink>
             </div>
@@ -339,15 +342,15 @@ export function StepConnect({ onDelegate, onFillManually }) {
           />
           <CopyRow
             id="onboarding-mcp-token"
-            label="Key"
+            label="Token"
             value={token}
-            hint="Shown once. Copy it into your client now, or make another later from Connection Settings."
+            hint="Shown once. Copy it into your client now, or make another later in Settings, under Connections."
           />
 
           {/* Repeated here rather than left behind in the block above: that
               block is gone by the time this one appears, and this is the moment
               someone actually needs to know where the key goes. */}
-          <DocsLink path="/use/clients/#using-a-token-instead">
+          <DocsLink path="/use/clients/#connecting-with-a-token">
             Need help connecting?
           </DocsLink>
         </div>
@@ -410,13 +413,16 @@ export function StepConnect({ onDelegate, onFillManually }) {
         ) : (
           <p className="rounded-lg border p-4 text-xs leading-relaxed text-muted-foreground">
             {connected
-              ? "Your connection can only read your persona, so it cannot suggest anything. Reconnect it with permission to suggest, from Connection Settings, to hand this over."
+              ? "Your connection can only read your persona, so it cannot suggest anything. Reconnect it with permission to suggest, in Settings under Connections, to hand this over."
               : "Connect an assistant above and you can hand this over to it instead of typing."}
           </p>
         )}
 
         <Button
-          variant={connection.canPropose ? "ghost" : "default"}
+          // Filled only when it is the one way on. With nothing connected,
+          // connecting is the primary action and this is the alternative;
+          // two filled buttons on one screen was two primaries.
+          variant={connection.canPropose ? "ghost" : connected ? "default" : "outline"}
           onClick={onFillManually}
         >
           I'll fill it in myself

@@ -202,7 +202,7 @@ describe("removeItem", () => {
     act(() => api.removeItem(1));
     expect(onItems).not.toHaveBeenCalled();
     expect(onShowConfirmation).toHaveBeenCalledWith(
-      "Remove second?", "This can't be undone.", expect.any(Function)
+      "Remove second?", "You can bring it back from History.", expect.any(Function)
     );
     act(() => onShowConfirmation.mock.calls[0][2]());
     expect(onItems.mock.calls[0][0]).toHaveLength(2);

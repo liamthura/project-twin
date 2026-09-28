@@ -1,6 +1,7 @@
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { FOCUS_RING } from "@/components/controls";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,7 +73,7 @@ export function SectionMenu({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex h-11 w-full items-center justify-between rounded-lg border bg-card px-3 text-sm font-medium"
+            className={`flex h-11 w-full items-center justify-between rounded-lg border bg-card px-3 text-sm font-medium ${FOCUS_RING}`}
           >
             <span className="truncate">{activeTitle}</span>
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />

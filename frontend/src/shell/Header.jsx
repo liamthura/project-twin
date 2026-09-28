@@ -77,7 +77,10 @@ export function Header({
 
         <div className="flex items-center gap-2 sm:gap-3">
           {/* One chip, three states. The status is a live region so a save that
-              completes without the user looking still reaches a screen reader. */}
+              completes without the user looking still reaches a screen reader.
+              Null hides it: "Saved" on Review or Settings described an editor
+              that was not on screen. */}
+          {saveState && (
           <div
             data-save-state={saveState}
             className="flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs"
@@ -101,6 +104,7 @@ export function Header({
               </Button>
             )}
           </div>
+          )}
 
           {!isConnected && (
             <Badge variant="destructive" className="gap-1.5">

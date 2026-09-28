@@ -65,7 +65,7 @@ export function AppsPanel({ isOpen }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
+      <p className="max-w-prose text-sm text-muted-foreground">
         Apps you&apos;ve allowed on a consent screen, such as Claude Desktop or any
         other client that signed in with your account.
       </p>

@@ -179,7 +179,7 @@ describe("ListRenderer", () => {
     expect(onShowConfirmation).toHaveBeenCalledTimes(1);
     expect(onShowConfirmation).toHaveBeenCalledWith(
       "Remove Scandinavian?",
-      "This can't be undone.",
+      "You can bring it back from History.",
       expect.any(Function)
     );
     // The deletion must wait on confirmation -- a renderer that deletes
@@ -470,7 +470,7 @@ describe("ListRenderer", () => {
 
     expect(onShowConfirmation).toHaveBeenCalledWith(
       "Remove Untitled entry?",
-      "This can't be undone.",
+      "You can bring it back from History.",
       expect.any(Function)
     );
   });
@@ -1197,16 +1197,15 @@ describe("a field's own `label` overrides the derived one", () => {
     expect(screen.getByText("Follow-up Items").className).not.toMatch(/capitalize/);
   });
 
-  it("still capitalises a derived name, which has no other source of case", async () => {
+  it("sentence-cases a derived name, as the form does", async () => {
     const node = listNode(["entries"], "topic", [{ name: "detail_level" }]);
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[{ topic: "RSC", detail_level: "x" }]} onItems={vi.fn()} />);
 
     await user.click(screen.getByText("RSC"));
 
-    // Lowercase in the DOM: the CSS transform is the only thing that cases it,
-    // which is exactly why it must stay for this branch.
-    expect(screen.getByText("detail level").className).toMatch(/capitalize/);
+    // Cased in JS, one capital: "Detail level", never CSS's "Detail Level".
+    expect(screen.getByText("Detail level").className).not.toMatch(/capitalize/);
   });
 
   // A block heading is ALWAYS a declared label -- `isBlockField` requires one --
@@ -1244,7 +1243,7 @@ describe("row overflow trigger naming", () => {
     await removeRow(user, "Ada");
     expect(onShowConfirmation).toHaveBeenCalledWith(
       "Remove Ada?",
-      "This can't be undone.",
+      "You can bring it back from History.",
       expect.any(Function)
     );
   });
@@ -1256,7 +1255,8 @@ describe("detail-grid column spans", () => {
 
   function cellFor(label) {
     // Each cell is the Label's parent div; the span class lives there.
-    return screen.getByText(label).parentElement;
+    // Field names in, sentence-cased labels on screen.
+    return screen.getByText(new RegExp(`^${label}$`, "i")).parentElement;
   }
 
   it("gives a four-option segmented enum the full row", async () => {

@@ -49,9 +49,13 @@ export function ArrayInput({ items = [], onChange, placeholder }) {
   return (
     <div className="space-y-2">
       {items.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        // Touch screens: each ✕ takes a 44px tap area, so chips grow to 30px
+        // and the gaps to 14px down and 16px across. At 8px, a pad reached
+        // into the next row and 4px into the next chip, where a tap on its
+        // first letter removed the chip before it.
+        <div className="flex flex-wrap gap-2 coarse:gap-x-4 coarse:gap-y-3.5">
           {items.map((item, index) => (
-            <Badge key={index} variant="secondary" className="gap-1 pr-1">
+            <Badge key={index} variant="secondary" className="gap-1 pr-1 coarse:py-1.5">
               {item}
               {/* `type="button"` because a Badge can sit inside a form, where a
                   bare <button> defaults to type="submit" and removing a chip

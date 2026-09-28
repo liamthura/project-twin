@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { proposalSummary } from "./proposalSummary";
+import { entityPlace, proposalSummary } from "./proposalSummary";
 import packs from "@/__fixtures__/packs.json";
 
 const PACKS = [
@@ -115,5 +115,21 @@ describe("proposalSummary against every shipped entity", () => {
     expect(reached).toContain("single-other");
     expect(reached).toContain("counted");
     expect(reached).toContain("identifier-only");
+  });
+});
+
+describe("entityPlace", () => {
+  it("names the section and the list, in the editor's words", () => {
+    expect(entityPlace("domain", packs)).toBe("Knowledge › Skills & Domains");
+    expect(entityPlace("response_format", packs)).toBe("Preferences › Response Format");
+  });
+
+  it("names the section alone when its one list has no title of its own", () => {
+    expect(entityPlace("goal", packs)).toBe("Goals");
+  });
+
+  it("falls back to the section for an entity no node binds, and to words for an unknown one", () => {
+    expect(entityPlace("hobby_reference", packs)).toBe("Lifestyle");
+    expect(entityPlace("old_thing", packs)).toBe("old thing");
   });
 });

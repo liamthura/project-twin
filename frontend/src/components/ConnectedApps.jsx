@@ -65,7 +65,7 @@ export default function ConnectedApps({ grants, onRevoke }) {
   if (grants.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No applications are connected to your account.
+        No app has signed in with your account yet.
       </p>
     );
   }

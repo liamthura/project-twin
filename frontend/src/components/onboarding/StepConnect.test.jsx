@@ -52,7 +52,7 @@ describe("StepConnect, where clients can sign in", () => {
     expect(screen.getByRole("button", { name: /cursor/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /raycast/i })).toBeInTheDocument();
     // The key path is reachable, but it is not what the screen leads with.
-    expect(screen.queryByRole("button", { name: /create a key/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /create a token/i })).not.toBeInTheDocument();
   });
 
   it("shows the command once a command client is picked", async () => {
@@ -89,7 +89,7 @@ describe("StepConnect, where clients can sign in", () => {
     renderStep();
 
     await user.click(await screen.findByRole("button", { name: /can't sign in/i }));
-    expect(screen.getByRole("button", { name: /create a key/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create a token/i })).toBeInTheDocument();
   });
 
   it("resets the fallback copy button to its label after the copied state times out", async () => {
@@ -188,7 +188,7 @@ describe("StepConnect, where clients can sign in", () => {
 
     await user.click(screen.getByRole("button", { name: /can't sign in/i }));
     expect(screen.queryByText(/open raycast settings/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /create a key/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create a token/i })).toBeInTheDocument();
   });
 
   it("stops offering a connection once one exists", async () => {
@@ -210,7 +210,7 @@ describe("StepConnect, where clients cannot sign in", () => {
     expect(
       await screen.findByText(/does not offer sign-in for clients/i),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /create a key/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create a token/i })).toBeInTheDocument();
     // No picker at all: every card on it tells someone to sign in, and this
     // instance mounts no discovery routes for them to sign in against.
     expect(screen.queryByRole("button", { name: /claude code/i })).not.toBeInTheDocument();
@@ -222,7 +222,7 @@ describe("StepConnect, where clients cannot sign in", () => {
     getInstanceMock.mockResolvedValue({ invite_only: false, mcp_oauth: false });
     renderStep();
 
-    await screen.findByRole("button", { name: /create a key/i });
+    await screen.findByRole("button", { name: /create a token/i });
     expect(screen.queryByRole("button", { name: /claude code/i })).not.toBeInTheDocument();
     // installPrompt() asserts OAuth unconditionally, which is only true inside
     // the mcp_oauth-gated block above. This pins the fallback itself to that
@@ -236,13 +236,13 @@ describe("StepConnect, where clients cannot sign in", () => {
 describe("StepConnect", () => {
   it("offers to create a key when nothing is connected", async () => {
     renderStep();
-    expect(await screen.findByRole("button", { name: /create a key/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /create a token/i })).toBeInTheDocument();
   });
 
   it("shows the server address and the key once one is created", async () => {
     const user = userEvent.setup();
     renderStep();
-    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+    await user.click(await screen.findByRole("button", { name: /create a token/i }));
 
     // The address is the gap this step exists to close: the app has never told
     // anyone where to point their client.
@@ -253,25 +253,25 @@ describe("StepConnect", () => {
   it("keeps each childless copy button's own name after copying, rather than a shared 'Copied'", async () => {
     // These buttons have no visible text of their own -- aria-label is their
     // entire accessible name. Tracking it to "Copied", the way a button WITH
-    // visible text should, would collapse "Copy server address" and "Copy key"
+    // visible text should, would collapse "Copy server address" and "Copy token"
     // into the same indistinguishable label.
     const user = userEvent.setup();
     renderStep();
-    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+    await user.click(await screen.findByRole("button", { name: /create a token/i }));
 
     const copyAddress = screen.getByRole("button", { name: /copy server address/i });
     await user.click(copyAddress);
     expect(copyAddress).toHaveAttribute("aria-label", "Copy server address");
 
-    const copyKey = screen.getByRole("button", { name: /copy key/i });
+    const copyKey = screen.getByRole("button", { name: /copy token/i });
     await user.click(copyKey);
-    expect(copyKey).toHaveAttribute("aria-label", "Copy key");
+    expect(copyKey).toHaveAttribute("aria-label", "Copy token");
   });
 
   it("asks for propose and not write on a first connection", async () => {
     const user = userEvent.setup();
     renderStep();
-    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+    await user.click(await screen.findByRole("button", { name: /create a token/i }));
 
     expect(createTokenMock).toHaveBeenCalledWith("my assistant", ["persona:propose"]);
   });
@@ -282,7 +282,7 @@ describe("StepConnect", () => {
     // discarded and would report zero calls for a copy that did happen.
     const user = userEvent.setup();
     renderStep();
-    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+    await user.click(await screen.findByRole("button", { name: /create a token/i }));
 
     await user.click(screen.getByRole("button", { name: /copy prompt/i }));
     await expect(navigator.clipboard.readText()).resolves.toBe(AUTOFILL_PROMPT);
@@ -307,7 +307,7 @@ describe("StepConnect", () => {
     renderStep();
 
     expect(await screen.findByText(/connected · Claude/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /create a key/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /create a token/i })).not.toBeInTheDocument();
   });
 
   it("takes the delegate branch", async () => {
@@ -347,9 +347,9 @@ describe("StepConnect", () => {
     const user = userEvent.setup();
     renderStep();
 
-    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+    await user.click(await screen.findByRole("button", { name: /create a token/i }));
     expect(
-      await screen.findByRole("button", { name: /creating a key/i }),
+      await screen.findByRole("button", { name: /creating a token/i }),
     ).toBeInTheDocument();
 
     resolveCreate({ id: "t1", label: "my assistant", token: "mg_secret_value" });
@@ -360,7 +360,7 @@ describe("StepConnect", () => {
     const user = userEvent.setup();
     renderStep();
 
-    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+    await user.click(await screen.findByRole("button", { name: /create a token/i }));
     expect(await screen.findByText(/token limit reached/i)).toBeInTheDocument();
   });
 });
@@ -383,7 +383,7 @@ describe("StepConnect, the documentation link", () => {
     const link = await screen.findByRole("link", { name: /need help connecting/i });
     expect(link).toHaveAttribute(
       "href",
-      `${window.location.origin}/docs/use/clients/#using-a-token-instead`,
+      `${window.location.origin}/docs/use/clients/#connecting-with-a-token`,
     );
   });
 
@@ -392,7 +392,7 @@ describe("StepConnect, the documentation link", () => {
     // someone needs to know where the key goes.
     const user = userEvent.setup();
     renderStep();
-    await user.click(await screen.findByRole("button", { name: /create a key/i }));
+    await user.click(await screen.findByRole("button", { name: /create a token/i }));
 
     expect(screen.getByText("mg_secret_value")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /need help connecting/i })).toBeInTheDocument();

@@ -117,7 +117,8 @@ describe("minting one", () => {
 
     await waitFor(() => expect(createToken).toHaveBeenCalled());
     const [label, scopes] = createToken.mock.calls[0];
-    expect(label).toBe("mcp");
+    // Nothing typed: a name that says so, not the protocol's.
+    expect(label).toBe("Unnamed token");
     expect(scopes).toEqual(["persona:read", "persona:propose"]);
   });
 
