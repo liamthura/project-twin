@@ -37,11 +37,13 @@ import { HeaderActionSlotContext } from "./headerActionSlot";
 import { EyebrowBand } from "./EyebrowBand";
 import { SubsectionCard } from "./SubsectionCard";
 import { fillSummary } from "./fillSummary";
+import { ProvenanceContext, useSectionProvenance } from "./provenance";
 
 export default function SectionRenderer({
   pack, data, onChange, onShowConfirmation, savedAt, headerActions = null,
 }) {
   const { sections } = normalizeUi(pack);
+  const provenance = useSectionProvenance(pack.key, savedAt);
 
   // The rail's scroll-spy anchors, keyed by the node's index among the section's
   // top-level children.
@@ -330,6 +332,7 @@ export default function SectionRenderer({
     // space-y-8 = 32 between runs, and between the title block and the first
     // one. An empty run returns null and contributes no element, so it cannot
     // leave a gap behind.
+    <ProvenanceContext.Provider value={provenance}>
     <div className="space-y-10">
       {/* The section's own actions (History, Hide) sit beside its title:
           they act on this section, so they belong next to its name rather
@@ -354,6 +357,7 @@ export default function SectionRenderer({
           : renderLeafRun(run.items)
       )}
     </div>
+    </ProvenanceContext.Provider>
   );
 }
 

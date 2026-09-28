@@ -1070,6 +1070,31 @@ async def revert_history(file_type: str, history_id: int):
     return {"status": "reverted", "section": file_type}
 
 
+@app.get("/api/provenance/{file_type}")
+async def section_provenance(file_type: str):
+    """Where each entry of one section came from, how old it is, and whether
+    it has gone stale. Kept apart from /api/files so none of it can round-trip
+    through the editor's save and be written back as persona data."""
+    if file_type not in VALID_FILES:
+        raise HTTPException(status_code=404, detail=f"{file_type} not found")
+    return persona_store.provenance(file_type)
+
+
+@app.get("/api/stale")
+async def stale_entries():
+    """Stale entries from every section that declares a window, oldest first."""
+    return {"stale": persona_store.stale_entries()}
+
+
+@app.post("/api/provenance/{entity_id}/keep")
+async def keep_entry(entity_id: str):
+    """The reader looked and it stands: restart the entry's stale window
+    without changing it. For the assistants' `stale` flag too."""
+    if not persona_store.keep(entity_id):
+        raise HTTPException(status_code=404, detail="no such entry")
+    return {"status": "kept"}
+
+
 @app.get("/api/proposals/for/{entity_id}")
 async def proposals_for_entity(entity_id: str):
     """Why is this in my persona?
@@ -1104,6 +1129,16 @@ def _written_entity_id() -> Optional[str]:
     return added[0] if len(added) == 1 else None
 
 
+def _as_review(proposal: dict, write, *args):
+    """Run a write as Review's, so the entry records the suggestion and the
+    assistant behind it rather than "you, in the editor"."""
+    token = db.current_proposal.set({"id": proposal["id"], "by": proposal["proposed_by"]})
+    try:
+        return write(*args)
+    finally:
+        db.current_proposal.reset(token)
+
+
 def _load_pending(proposal_id: str) -> dict:
     try:
         proposal = proposals_store.get(proposal_id)
@@ -1123,7 +1158,8 @@ async def approve_proposal(proposal_id: str, body: Optional[ResolveRequest] = No
         raise HTTPException(status_code=400, detail="notes are promoted, not approved")
 
     data = (body.data if body and body.data else proposal["data"]) or {}
-    result = server.execute_modify(proposal["action"], proposal["entity"], data)
+    result = _as_review(proposal, server.execute_modify,
+                        proposal["action"], proposal["entity"], data)
     if result.startswith("❌"):
         raise HTTPException(status_code=400, detail=result)
 
@@ -1175,7 +1211,7 @@ async def promote_proposal(proposal_id: str, body: ResolveRequest):
             tags.append("agent-observation")
         data["tags"] = tags
 
-    result = server.execute_modify("add", entity, data)
+    result = _as_review(proposal, server.execute_modify, "add", entity, data)
     if result.startswith("❌"):
         raise HTTPException(status_code=400, detail=result)
 

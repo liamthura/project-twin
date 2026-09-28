@@ -26,9 +26,9 @@
 // renderNode still resolves and passes it, and `AddEntryDialog` still receives
 // it from here unread, both purely for the existing call shape; see
 // renderNode.threading.test.jsx.
-import { useId, useState } from "react";
+import { useContext, useId, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Trash2, ChevronDown, Star, MoreHorizontal } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Star, MoreHorizontal, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,6 +52,7 @@ import { getAt } from "./paths";
 import { useListItems } from "./useListItems";
 import { AddEntryDialog } from "./AddEntryDialog";
 import { HeaderActionSlotContext, useHeaderActionSlot } from "./headerActionSlot";
+import { EntryOrigin, ProvenanceContext } from "./provenance";
 // Circular by construction: renderNode imports ListRenderer to dispatch a
 // "list" node, and ListRenderer imports renderNode to dispatch a row's block
 // fields (an array-valued field with a `label`) against one of its own items.
@@ -140,6 +141,10 @@ export default function ListRenderer({
   // Deliberately not persisted: it is display state, so it needs no storage
   // key and adds nothing to the storage-keys reference.
   const [sortDir, setSortDir] = useState(null);
+  // "N stale" in the header narrows the list to those rows. Stale comes from
+  // the section's provenance record (SectionRenderer), keyed by entry id.
+  const [staleOnly, setStaleOnly] = useState(false);
+  const provenance = useContext(ProvenanceContext);
   const sortId = useId();
   const meta = buildFieldMeta(node);
   // Every position this node's fields occupy, in declaration order, from one
@@ -270,8 +275,13 @@ export default function ListRenderer({
   // loader only accepts a facet naming a declared enum, so that is a guard
   // against a hand-built node rather than a shipped one.
   const facetOptions = (field) => meta.valid_values?.[field];
+  const isStale = (item) => Boolean(item?.id && provenance?.entries?.[item.id]?.stale);
+  const staleCount = items.filter(isStale).length;
+  // Off by itself once the last one is kept or edited, rather than stranding
+  // the reader on an empty list.
+  const showingStale = staleOnly && staleCount > 0;
   const visible = applyFacets(searched, items, node.facets, facetValues)
-    .filter((idx) => idx !== pinnedIdx);
+    .filter((idx) => idx !== pinnedIdx && (!showingStale || isStale(items[idx])));
   // Whether the header's "N of M" count needs to account for something
   // narrowing `visible` -- previously only the search query, now a selected
   // facet too. Reads the same facetValues map applyFacets already consumed;
@@ -319,6 +329,23 @@ export default function ListRenderer({
     />
   );
 
+  const headerActions = (
+    <>
+      {staleCount > 0 && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2 text-xs text-amber-800 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-300"
+          aria-pressed={showingStale}
+          onClick={() => setStaleOnly(!showingStale)}
+        >
+          {showingStale ? "Show all" : `${staleCount} stale`}
+        </Button>
+      )}
+      {addDialog}
+    </>
+  );
+
   return (
     <div className="space-y-3">
       {/* The trigger renders in the header row that NAMES this list, which is
@@ -329,9 +356,9 @@ export default function ListRenderer({
           child list gets no slot (its parent claimed the section header), and
           ListRenderer is rendered on its own throughout its test file. */}
       {headerSlot ? (
-        createPortal(addDialog, headerSlot)
+        createPortal(headerActions, headerSlot)
       ) : (
-        <div className="flex items-center justify-end">{addDialog}</div>
+        <div className="flex items-center justify-end gap-2">{headerActions}</div>
       )}
 
       {/* Six rows or fewer need no filter: the box is chrome with nothing to
@@ -533,7 +560,9 @@ export default function ListRenderer({
     // Anything under the title on a phone? Without it the row is one line
     // and centres like one.
     const present = (f) => item[f] != null && item[f] !== "";
+    const stale = isStale(item);
     const hasMeta =
+      stale ||
       displayFields.some((f) => f !== sortField && present(f)) ||
       countBadges.some((f) => Array.isArray(item[f]) && item[f].length > 0) ||
       badges.some((b) => item[b]);
@@ -579,6 +608,14 @@ export default function ListRenderer({
                 <span className="block min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
                 <span className="block truncate text-sm font-medium">{item[titleField]}</span>
                 <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 empty:hidden sm:mt-0 sm:flex-1 sm:flex-nowrap">
+                  {stale && (
+                    // Dashed and with a clock, so it never reads as the
+                    // amber Paused chip it can sit beside.
+                    <Badge variant="outline" className="gap-1 border-dashed border-amber-300 text-xs font-medium text-amber-800 dark:border-amber-800 dark:text-amber-300">
+                      <Clock className="h-2.5 w-2.5" aria-hidden="true" />
+                      Stale
+                    </Badge>
+                  )}
                   {/* Plain text with its label, not a mono pill: a bare
                       "2025-09-20" chip never said whether it was a start, an
                       end or a last edit. */}
@@ -816,6 +853,7 @@ export default function ListRenderer({
                   );
                 })}
                 </HeaderActionSlotContext.Provider>
+                <EntryOrigin id={item.id} />
                 </>
               )}
             </div>

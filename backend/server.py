@@ -16,7 +16,7 @@ import json
 import os
 import sys
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Literal, Union, List
 import uuid
 
@@ -562,8 +562,10 @@ def _stub_titles(data: dict) -> dict:
 def _mark_stale(data: dict) -> dict:
     """Flag entities that have sat unchanged past their section's window.
 
-    Reads persona_search.updated_at, the same per-entity timestamp the `days`
-    filter uses -- no new storage, and the threshold is manifest-owned
+    Counts from the later of persona_search.updated_at (the per-entity
+    timestamp the `days` filter uses) and the reader's last Keep in the editor,
+    so an entry they confirmed stops reading as stale here too. The threshold
+    is manifest-owned
     (`stale_after_days`), so a section that declares nothing never goes stale.
     That is the default: a name or a taste does not expire on a timer.
 
@@ -591,16 +593,14 @@ def _mark_stale(data: dict) -> dict:
     if not targets:
         return data
     try:
-        times = search_index.entity_update_times(
+        times = persona_store.checked_times(
             db.current_user_id.get(), [eid for _i, eid, _w in targets])
     except Exception:
         # Derived data. A marker that fails to compute must not fail the read.
         logger.warning("staleness lookup failed", exc_info=True)
         return data
-    today = datetime.now(timezone.utc).date()
     for item, entity_id, window in targets:
-        when = times.get(entity_id)
-        if when and (today - date.fromisoformat(when)).days > window:
+        if persona_store.is_stale(times.get(entity_id), window):
             item["stale"] = True
     return data
 

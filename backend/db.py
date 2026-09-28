@@ -49,6 +49,12 @@ current_user_id: ContextVar[str] = ContextVar("current_user_id")
 # not a client and should not be attributed to one.
 current_client: ContextVar[str] = ContextVar("current_client", default="")
 
+# Set by the approve and promote routes around their write: {"id", "by"}, the
+# suggestion and the assistant that made it. Read by persona_store.save() to
+# record the entry as added through Review rather than typed in the editor --
+# the request itself is the web UI's, so current_client is empty.
+current_proposal: ContextVar[dict] = ContextVar("current_proposal", default={})
+
 # What the last persona_store.save() did: {"added": [entity_id],
 # "changed": {entity_id: {field: previous_value}}}.
 #

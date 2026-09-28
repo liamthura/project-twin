@@ -8,7 +8,9 @@ callers already expect.
 import copy
 import json
 import logging
+import re
 import uuid
+from datetime import date, datetime, timezone
 
 import db
 import sections
@@ -625,8 +627,9 @@ def save(file_type: str, data: dict) -> bool:
             """,
             (user_id, file_type, json.dumps(data)),
         )
-    db.last_write.set(
-        _diff(file_type, previous["data"] if previous else {}, data))
+        diff = _diff(file_type, previous["data"] if previous else {}, data)
+        _record_provenance(conn, user_id, diff)
+    db.last_write.set(diff)
     try:
         import search_index
         search_index.sync_index(user_id, file_type, data)
@@ -635,6 +638,144 @@ def save(file_type: str, data: dict) -> bool:
             "search index sync failed for %s (persona write succeeded)", file_type
         )
     return True
+
+
+def _writer() -> tuple:
+    """(via, by, proposal_id) for the write in progress."""
+    proposal = db.current_proposal.get()
+    if proposal:
+        return "review", proposal.get("by") or "", proposal.get("id")
+    client = db.current_client.get()
+    if client:
+        # "Claude Desktop 0.9.2" -> "Claude Desktop": the version says nothing
+        # to the reader, and would make one app look like several.
+        name = re.sub(r"\s+v?\d[\w.+-]*$", "", client)
+        return "assistant", "" if name == "unknown" else name, None
+    return "editor", "", None
+
+
+def _record_provenance(conn, user_id: str, diff: dict) -> None:
+    """Who added and who last changed each entry this save touched.
+
+    An add for an id that already has a row -- a restore bringing back a
+    removed entry -- is recorded as a change, so the entry keeps its origin.
+    """
+    via, by, proposal_id = _writer()
+    with conn.cursor() as cur:
+        if diff["added"]:
+            cur.executemany(
+                "insert into persona_provenance"
+                " (user_id, entity_id, added_by, added_via, added_at, proposal_id)"
+                " values (%s, %s, %s, %s, now(), %s)"
+                " on conflict (user_id, entity_id) do update"
+                " set changed_by = excluded.added_by, changed_via = excluded.added_via,"
+                "     changed_at = now()",
+                [(user_id, eid, by, via, proposal_id) for eid in diff["added"]],
+            )
+        if diff["changed"]:
+            cur.executemany(
+                "insert into persona_provenance"
+                " (user_id, entity_id, changed_by, changed_via, changed_at)"
+                " values (%s, %s, %s, %s, now())"
+                " on conflict (user_id, entity_id) do update"
+                " set changed_by = excluded.changed_by, changed_via = excluded.changed_via,"
+                "     changed_at = now()",
+                [(user_id, eid, by, via) for eid in diff["changed"]],
+            )
+
+
+def is_stale(checked: str | None, window: int | None) -> bool:
+    """More than `window` days since `checked` (an ISO date). The one rule the
+    editor and the assistants' `stale` flag both use."""
+    if not checked or not window:
+        return False
+    return (datetime.now(timezone.utc).date() - date.fromisoformat(checked)).days > window
+
+
+def _entries(user_id: str, file_types: list[str], ids: list[str] | None = None) -> list[dict]:
+    """Indexed entries of these sections, with their provenance. `checked` is
+    the later of the last content change and the last Keep."""
+    with db.get_pool().connection() as conn:
+        rows = conn.execute(
+            "select s.file_type, s.entity_id, s.title, s.updated_at,"
+            "       greatest(s.updated_at, p.kept_at) as checked,"
+            "       p.added_by, p.added_via, p.added_at, p.proposal_id,"
+            "       p.changed_by, p.changed_via, p.changed_at, p.kept_at"
+            "  from persona_search s"
+            "  left join persona_provenance p"
+            "    on p.user_id = s.user_id and p.entity_id = s.entity_id"
+            " where s.user_id = %s and s.file_type = any(%s)"
+            "   and (%s::text[] is null or s.entity_id = any(%s))",
+            (user_id, file_types, ids, ids),
+        ).fetchall()
+    day = lambda t: t.date().isoformat() if t else None  # noqa: E731
+    return [
+        {
+            "section": r["file_type"],
+            "id": r["entity_id"],
+            "title": r["title"],
+            "updated_at": day(r["updated_at"]),
+            "checked": day(r["checked"]),
+            "kept_at": day(r["kept_at"]),
+            "added": {"by": r["added_by"], "via": r["added_via"], "at": day(r["added_at"]),
+                      "proposal_id": str(r["proposal_id"]) if r["proposal_id"] else None}
+            if r["added_via"] else None,
+            "changed": {"by": r["changed_by"], "via": r["changed_via"], "at": day(r["changed_at"])}
+            if r["changed_via"] else None,
+        }
+        for r in rows
+    ]
+
+
+def checked_times(user_id: str, entity_ids: list[str]) -> dict:
+    """{entity_id: ISO date} of each entry's last change or Keep, whichever is
+    later. What staleness counts from."""
+    ids = [i for i in entity_ids if i]
+    if not ids:
+        return {}
+    types = list(sections.SECTION_REGISTRY)
+    return {e["id"]: e["checked"] for e in _entries(user_id, types, ids)}
+
+
+def provenance(file_type: str) -> dict:
+    """Every indexed entry of one section: origin, dates and whether it is stale."""
+    window = sections.SECTION_REGISTRY[file_type].stale_after_days
+    entries = _entries(db.current_user_id.get(), [file_type])
+    return {
+        "stale_after_days": window,
+        "entries": {
+            e["id"]: {**e, "stale": is_stale(e["checked"], window)} for e in entries
+        },
+    }
+
+
+def stale_entries() -> list[dict]:
+    """Stale entries across every section that declares a window, oldest first."""
+    windows = {k: s.stale_after_days for k, s in sections.SECTION_REGISTRY.items()
+               if s.stale_after_days}
+    if not windows:
+        return []
+    entries = _entries(db.current_user_id.get(), list(windows))
+    stale = [
+        {"section": e["section"], "id": e["id"], "title": e["title"], "since": e["checked"]}
+        for e in entries if is_stale(e["checked"], windows[e["section"]])
+    ]
+    return sorted(stale, key=lambda e: e["since"])
+
+
+def keep(entity_id: str) -> bool:
+    """Record that the reader looked at an entry and it stands. False if they
+    have no such entry."""
+    user_id = db.current_user_id.get()
+    with db.get_pool().connection() as conn:
+        cur = conn.execute(
+            "insert into persona_provenance (user_id, entity_id, kept_at)"
+            " select user_id, entity_id, now() from persona_search"
+            "  where user_id = %s and entity_id = %s limit 1"
+            " on conflict (user_id, entity_id) do update set kept_at = now()",
+            (user_id, entity_id),
+        )
+        return cur.rowcount > 0
 
 
 def history(file_type: str) -> list[dict]:
