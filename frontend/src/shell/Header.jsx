@@ -1,4 +1,4 @@
-import { Check, LogOut, Monitor, Moon, Settings, Sun, User, WifiOff } from "lucide-react";
+import { Check, LogOut, Monitor, Moon, Search, Settings, Sun, User, WifiOff } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ export function Header({
   accountName,
   onOpenSettings,
   onSaveNow,
+  onSearch,
 }) {
 
   return (
@@ -79,6 +80,25 @@ export function Header({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* The shortcut is shown, not only bound: an unmarked shortcut is one
+              nobody finds. Icon-only on a phone, where the header has no room
+              for the word and there is no keyboard for the hint. */}
+          {onSearch && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSearch}
+              aria-label="Search"
+              aria-keyshortcuts="Meta+K Control+K"
+              className="tap-target gap-2 text-muted-foreground"
+            >
+              <Search className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Search</span>
+              <kbd className="hidden rounded border bg-muted px-1.5 font-mono text-xs sm:inline">
+                {/Mac|iPhone|iPad/.test(globalThis.navigator?.platform || "") ? "⌘K" : "Ctrl K"}
+              </kbd>
+            </Button>
+          )}
           {/* One chip, three states. The status is a live region so a save that
               completes without the user looking still reaches a screen reader.
               Null hides it: "Saved" on Review or Settings described an editor

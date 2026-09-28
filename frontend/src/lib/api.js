@@ -529,6 +529,13 @@ async function keepEntry(entityId) {
   return api(`/provenance/${encodeURIComponent(entityId)}/keep`, { method: "POST" });
 }
 
+// Entries related to `q` by meaning, from the server's index. Empty unless
+// embeddings are configured: word matches are the search dialog's own.
+async function searchMeaning(q) {
+  const data = await api(`/search?q=${encodeURIComponent(q)}`);
+  return data.results || [];
+}
+
 // The Review suggestions that produced one entry: who, why, and the quote.
 async function proposalsFor(entityId) {
   const data = await api(`/proposals/for/${encodeURIComponent(entityId)}`);
@@ -603,4 +610,5 @@ export {
   listStale,
   keepEntry,
   proposalsFor,
+  searchMeaning,
 };
