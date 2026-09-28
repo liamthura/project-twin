@@ -7,6 +7,102 @@ Versions here are the app version, shown in the sidebar under your account as
 `v2.1.0 (a1b2c3d)` with the commit it was built from. Releases before 2.1.0
 predate this page.
 
+## 2.2.0
+
+A security fix for password sign-in, the app moving to `/app/`, and a rebuilt
+web app: Review, History, search, and a record of where every entry came from.
+Assistants get a clearer contract and five new entry types. One database
+migration, which applies itself on start.
+
+<Callout type="warn">
+Upgrade promptly. In 2.1.0 and earlier, a write-scoped token (the kind that
+sits in an `.mcp.json`) could set an account's password without the current
+one, because the check read a column that accounts created through sign-up
+never fill. It now checks the password sign-in actually uses, and an account
+with no password can be given one only from a signed-in browser, never with a
+token. The old login route also stops accepting a password that a reset has
+replaced.
+</Callout>
+
+### The app lives at `/app/`
+
+`/` is the landing page, and the app, its sign-in and its consent screens are
+under `/app/`. The old sign-in and consent paths redirect there with the query
+intact, so an authorisation already under way still finishes. Bookmarks such
+as `/#/profile` and links in emails sent before the move are forwarded from
+the browser. Anything that launches the app at the root, such as an identity
+provider's launch URL, should now point at `/app/`.
+
+### Sign-in rate limits
+
+The auth container now runs in production mode, which is what switches Better
+Auth's rate limits on: sign-in, and the OAuth register, token and authorize
+routes, were all unlimited before. The limits count per visitor, so behind a
+reverse proxy set `FORWARDED_ALLOW_IPS`, and behind a CDN
+`AUTH_CLIENT_IP_HEADER` and `AUTH_CLIENT_IP_HEADER_FROM` as well. Without them
+every visitor looks like the proxy and shares one allowance of 3 sign-in
+requests per 10 seconds. See [Self-hosting](/run/self-hosting).
+
+### Review
+
+- **Edit before approving.** Open a suggestion to correct it, then approve
+  your version.
+- **Undo.** Reject and Delete wait 8 seconds with an Undo before they reach the
+  server.
+- **Several at once.** Tick rows, or Select all, to approve, reject or delete
+  them together. Rejecting several has one Undo.
+- **Keyboard.** On a focused row, `j` and `k` move, `a` approves, `r` rejects,
+  `e` edits and `x` selects. `?` lists them.
+- **Each row** says where the change goes, why the assistant suggested it, and
+  the words of yours it quoted.
+
+### Where entries came from, and stale entries
+
+Open an entry to see who added it and who last changed it, and when: you, an
+app writing directly, or a suggestion approved in Review. For those, **Why?**
+shows the reasoning and the quote. This is recorded from 2.2.0 on; older
+entries show when they last changed.
+
+Goals and Projects are marked stale after four months unchanged, and
+Knowledge after a year. **Keep** restarts an entry's clock without changing
+it. A list's header counts its stale entries and filters to them, and Review
+has a **Stale** tab across every section. The `stale` flag assistants see now
+counts from the later of the last change and the last Keep.
+
+### History and search
+
+**Restore this** first shows what restoring a version would bring back, remove
+and change, compared with now. Search, from the header or ⌘K (Ctrl+K), finds
+words in every section and opens a result at its entry. On an instance with an
+embeddings provider it adds entries related by meaning.
+
+### For assistants
+
+- `propose_update`'s description lists every entry type with its required
+  fields. Most suggestions that arrived as observations had a type the client
+  never looked up.
+- Preferences' Learning Style and Code Style lists are typed:
+  `learning_method`, `learning_dislike`, `preferred_language`, `framework` and
+  `dev_tool`, each `item`-identified and add or remove. `get_schema` returns 49
+  entities. The existing 44 are unchanged, and a client written against 2.1.0
+  keeps working.
+- Tokens created in the app propose by default. Writing directly is a switch
+  you turn on when creating one.
+
+### New web API routes
+
+`GET /api/provenance/{section}`, `GET /api/stale`,
+`POST /api/provenance/{entity_id}/keep`, `GET /api/history/{section}/{id}` and
+`GET /api/search?q=`. All are REST-only, like History: assistants reach none of
+them.
+
+### Upgrading
+
+Pull the image and restart. Migration `0011_persona_provenance` adds one table
+and runs on start with the rest (`alembic upgrade head` is the image's first
+step). There is no new required setting; behind a proxy, set the variables
+under [Sign-in rate limits](#sign-in-rate-limits).
+
 ## 2.1.0
 
 The write path an AI client uses is now one implementation driven by the
