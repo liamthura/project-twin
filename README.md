@@ -79,6 +79,12 @@ cd backend && docker compose up -d && python -m pytest -q
 - [ ] Better auto-triggering (waiting on MCP client improvements)
 - [ ] Conversation history for pattern detection
 - [ ] Data versioning
+- [ ] Route the observations that still arrive to a typed destination with a
+  classifier (TypeSafe's Jev: a choice question over the entry types, then a
+  typed Inbox suggestion or a pre-filled Promote). Parked 2026-09-28 on
+  billing, not feasibility: Python reaches it through Vercel AI Gateway and
+  Cloudflare Workers AI, but both refused on account balance. Measure how many
+  observations still come in now that `propose_update` lists every type first.
 
 ## License
 
