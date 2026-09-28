@@ -33,6 +33,13 @@ a row IS and which was in neither entity's `required` nor `optional`; and
 MCP write path at all. Nothing else in the schema moved -- the diff was checked
 entity by entity before this fixture was regenerated.
 
+Binding preferences' five bare-string lists added five entities and changed
+none: `learning_method`, `learning_dislike`, `preferred_language`, `framework`
+and `dev_tool`, each `item`-identified like `response_format`. Those lists had
+a UI node and no per-item MCP write path -- the generic `preference` entity can
+only replace a whole list -- so an agent could only file what it heard there as
+an observation. The fixture change is additions only.
+
 Before editing this fixture, diff `server.ENTITY_SCHEMA` against it and confirm
 every changed entity is one you meant to change. A refactor that quietly widens
 the diff is exactly what this file exists to catch.

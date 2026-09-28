@@ -258,8 +258,8 @@ selecting which fixed sub-object a client means.
 
 `entity` and `identifier` are required, there is no `fields`, and the whole
 `element` is optional. Without it the array is editable in the app and invisible
-to a client, which is the common case: preferences ships six `strings` nodes and
-only `response_format` is in the contract.
+to a client, so an assistant can only file what it hears there as an
+observation. All six of the `strings` nodes preferences ships declare one.
 
 `entity`, `description` and `parent` mean what they do above, `actions` defaults
 to `["add", "remove"]`, and one key belongs to this shape alone: `bulk`, a
