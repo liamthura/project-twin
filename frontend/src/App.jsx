@@ -888,6 +888,7 @@ export default function App() {
             <HistoryPanel
               fixedSection={historyFor}
               sectionTitle={sectionTitles[historyFor]}
+              pack={packs.find((p) => p.key === historyFor)}
               onRestored={refreshSection}
             />
           )}

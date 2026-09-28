@@ -1056,6 +1056,18 @@ async def list_history(file_type: str):
     return {"history": persona_store.history(file_type)}
 
 
+@app.get("/api/history/{file_type}/{history_id}")
+async def history_version(file_type: str, history_id: int):
+    """One previous version and the section as it is now, so the app can show
+    what restoring would change before it does. REST-only, like the list."""
+    if file_type not in VALID_FILES:
+        raise HTTPException(status_code=404, detail=f"{file_type} not found")
+    found = persona_store.version(file_type, history_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="no such version")
+    return found
+
+
 @app.post("/api/history/{file_type}/revert/{history_id}")
 async def revert_history(file_type: str, history_id: int):
     """Restore one section to a previous version.

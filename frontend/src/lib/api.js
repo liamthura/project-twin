@@ -500,6 +500,11 @@ async function listHistory(section) {
   return data.history || [];
 }
 
+// One previous version beside the section as it is now: {version, current}.
+async function getHistoryVersion(section, historyId) {
+  return api(`/history/${encodeURIComponent(section)}/${historyId}`);
+}
+
 // Restore a section to a previous version. Itself reversible: the revert goes
 // through the same write path, so the version it replaces is kept too.
 async function revertHistory(section, historyId) {
@@ -592,6 +597,7 @@ export {
   listConnectedApps,
   revokeConnectedApp,
   listHistory,
+  getHistoryVersion,
   revertHistory,
   getProvenance,
   listStale,

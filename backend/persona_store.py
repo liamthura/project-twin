@@ -800,6 +800,26 @@ def history(file_type: str) -> list[dict]:
     ]
 
 
+def version(file_type: str, history_id: int) -> dict | None:
+    """One previous version beside the section as it is now, for a preview of
+    what restoring it would change. None if there is no such version.
+
+    Both sides go through _normalize, as load() does, so a version saved in an
+    older shape does not show differences restoring it would not make.
+    """
+    if file_type not in VALID_FILES:
+        return None
+    with db.get_pool().connection() as conn:
+        row = conn.execute(
+            "select data from persona_history"
+            " where id = %s and user_id = %s and file_type = %s",
+            (history_id, db.current_user_id.get(), file_type),
+        ).fetchone()
+    if row is None:
+        return None
+    return {"version": _normalize(file_type, row["data"]), "current": load(file_type)}
+
+
 def revert(file_type: str, history_id: int) -> bool:
     """Restore one section to a previous version. False if there is no such row.
 
