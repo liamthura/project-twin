@@ -62,6 +62,16 @@ def test_propose_update_leads_with_the_trigger_phrases():
     assert "asked writes, inferred proposes" in desc.lower()
 
 
+def test_propose_update_carries_every_entity_type():
+    # The choice between a typed suggestion and a note is made reading this
+    # text. A type missing from it is one an agent can only file as a note.
+    desc = server.propose_update.description
+    assert server._entity_types() in desc
+    for entities in server.ENTITY_SCHEMA.values():
+        for name in entities:
+            assert f" {name}" in desc, name
+
+
 def test_propose_update_keeps_the_field_rules_and_does_not_defer_to_get_schema():
     desc = server.propose_update.description
     assert "ONLY what changes" in desc

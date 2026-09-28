@@ -3015,9 +3015,33 @@ def _validate_proposal(p: dict) -> tuple[dict | None, dict | None]:
     ), None
 
 
-@mcp.tool()
-def propose_update(proposals: list, client: str) -> str:
-    """Propose durable persona changes you inferred from the conversation.
+def _entity_types(indent: str = "        ") -> str:
+    """The entity vocabulary, one line per section, for propose_update's
+    description.
+
+    Rendered at import from ENTITY_SCHEMA, as get_context's section block is,
+    so a pack's types reach the one text that decides between a typed
+    suggestion and a note. Pointing at get_schema instead cost an extra call
+    most agents never made, and a proposal that could not name its type went
+    in as a note the user then had to re-file by hand.
+    """
+    width = max(len(section) for section in ENTITY_SCHEMA)
+    lines = []
+    for section, entities in ENTITY_SCHEMA.items():
+        parts = []
+        for name, spec in entities.items():
+            fields = ", ".join(spec.get("required") or [spec.get("identifier") or ""])
+            part = f"{name}: {fields}" if fields else name
+            if spec.get("parent"):
+                part += f" [{spec['parent']}]"
+            if "add" not in spec.get("actions", []):
+                part += " (update only)"
+            parts.append(part)
+        lines.append(f"{indent}{section.ljust(width)}  " + " | ".join(parts))
+    return "\n".join(lines)
+
+
+_PROPOSE_UPDATE_DESCRIPTION = """Propose durable persona changes you inferred from the conversation.
 
     PROPOSE WHEN YOU HEAR:
         "we've switched to X" / "I've started using X"      -> domain, work_skill
@@ -3052,14 +3076,21 @@ def propose_update(proposals: list, client: str) -> str:
             uses it to tell which of their tools proposed what.
 
     KINDS:
-        entity -- typed and schema-valid; you know where it belongs.
+        entity -- typed and schema-valid: one of the ENTITY TYPES below.
             {kind: "entity", action: "add"|"update"|"remove", entity: "domain",
              data: {...}, rationale: "...", evidence: "...", confidence: 0.7}
-            Call get_schema if unsure of the entity vocabulary.
+            get_schema(entity=...) has a type's optional fields and examples.
 
-        note -- durable but ambiguous; nothing in the schema holds it.
+        note -- durable, and NO type below can hold it. The last resort: the
+            user has to re-file a note by hand, so check the list first.
+            "Always lead with the recommendation" is a response_format, and
+            "I learn by breaking things" a learning_method -- not notes.
             {kind: "note", section_hint: "preferences", text: "...",
              rationale: "...", evidence: "...", confidence: 0.6}
+
+    ENTITY TYPES, by section (type: required fields; nested types name
+    their parent in brackets):
+@@ENTITY_TYPES@@
 
     REQUIRED ON EVERY PROPOSAL:
         rationale -- why this is durable, in your words. ONE SENTENCE. The user
@@ -3081,7 +3112,12 @@ def propose_update(proposals: list, client: str) -> str:
         stored | duplicate_pending | previously_rejected |
         conflicts_with_existing | invalid
         An invalid item never sinks the batch; the valid ones still land.
-    """
+    """.replace("@@ENTITY_TYPES@@", _entity_types())
+
+
+@mcp.tool(description=_PROPOSE_UPDATE_DESCRIPTION)
+def propose_update(proposals: list, client: str) -> str:
+    """Internal. Clients see _PROPOSE_UPDATE_DESCRIPTION above, not this."""
     if not str(client or "").strip():
         return json.dumps({
             "error": "'client' is required: name the product you run in, "

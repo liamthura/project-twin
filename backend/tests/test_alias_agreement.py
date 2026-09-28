@@ -98,8 +98,10 @@ def test_the_skip_list_is_exactly_the_expected_size():
     new unlisted entity is named in the diff rather than merely changing a
     number nobody reads closely."""
     # Computed by walking every shipped manifest (see `SKIPPED` above) and
-    # subtracting FIELD_ALIASES' 20 keys. 27 entities, none of which
-    # FIELD_ALIASES' table has ever heard of:
+    # subtracting FIELD_ALIASES' 20 keys. 32 entities, none of which
+    # FIELD_ALIASES' table has ever heard of. The five preferences lists
+    # (learning_method .. dev_tool) are `item`-identified like
+    # response_format, which needs no identifier alias either:
     expected = {
         "aesthetic", "basic_info", "club", "communication_default",
         "coursework", "education", "education_highlight", "energy_peak",
@@ -109,8 +111,10 @@ def test_the_skip_list_is_exactly_the_expected_size():
         "personality_trait", "project_highlight", "project_tag",
         "response_format", "sleep", "stress_trigger", "work_experience",
         "work_highlight", "work_skill",
+        "learning_method", "learning_dislike", "preferred_language",
+        "framework", "dev_tool",
     }
-    assert len(expected) == 27
+    assert len(expected) == 32
     assert SKIPPED == expected
 
 

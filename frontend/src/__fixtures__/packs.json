@@ -1058,6 +1058,30 @@
         "identifier": "item",
         "description": "One statement about how you want answers shaped. Bare strings, like lifestyle's energy_peaks."
       },
+      "learning_method": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "required": [
+          "item"
+        ],
+        "optional": [],
+        "identifier": "item",
+        "description": "One way you like to learn, e.g. worked examples before theory."
+      },
+      "learning_dislike": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "required": [
+          "item"
+        ],
+        "optional": [],
+        "identifier": "item",
+        "description": "One way of being taught that does not work for you."
+      },
       "like": {
         "actions": [
           "add",
@@ -1101,6 +1125,42 @@
           ]
         },
         "list": "likes_dislikes"
+      },
+      "preferred_language": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "required": [
+          "item"
+        ],
+        "optional": [],
+        "identifier": "item",
+        "description": "A programming language you prefer to work in."
+      },
+      "framework": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "required": [
+          "item"
+        ],
+        "optional": [],
+        "identifier": "item",
+        "description": "A framework or library you prefer."
+      },
+      "dev_tool": {
+        "actions": [
+          "add",
+          "remove"
+        ],
+        "required": [
+          "item"
+        ],
+        "optional": [],
+        "identifier": "item",
+        "description": "A development tool you use, e.g. an editor or a CLI."
       },
       "preference": {
         "actions": [
@@ -1219,7 +1279,12 @@
             ],
             "title": "Preferred Methods",
             "placeholder": "e.g. hands-on examples...",
-            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+            "$comment": "Bare strings, bound like response_format so an assistant can add or remove one item. The generic `preference` entity can only replace the whole list.",
+            "element": {
+              "entity": "learning_method",
+              "identifier": "item",
+              "description": "One way you like to learn, e.g. worked examples before theory."
+            }
           },
           {
             "kind": "strings",
@@ -1229,7 +1294,12 @@
             ],
             "title": "Things to Avoid",
             "placeholder": "e.g. walls of text...",
-            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+            "$comment": "Bare strings, bound like response_format so an assistant can add or remove one item. The generic `preference` entity can only replace the whole list.",
+            "element": {
+              "entity": "learning_dislike",
+              "identifier": "item",
+              "description": "One way of being taught that does not work for you."
+            }
           }
         ]
       },
@@ -1302,7 +1372,12 @@
             ],
             "title": "Preferred Languages",
             "placeholder": "e.g. Python, TypeScript...",
-            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+            "$comment": "Bare strings, bound like response_format so an assistant can add or remove one item. The generic `preference` entity can only replace the whole list.",
+            "element": {
+              "entity": "preferred_language",
+              "identifier": "item",
+              "description": "A programming language you prefer to work in."
+            }
           },
           {
             "kind": "strings",
@@ -1312,7 +1387,12 @@
             ],
             "title": "Frameworks",
             "placeholder": "e.g. FastAPI, Next.js...",
-            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+            "$comment": "Bare strings, bound like response_format so an assistant can add or remove one item. The generic `preference` entity can only replace the whole list.",
+            "element": {
+              "entity": "framework",
+              "identifier": "item",
+              "description": "A framework or library you prefer."
+            }
           },
           {
             "kind": "strings",
@@ -1322,7 +1402,12 @@
             ],
             "title": "Tools",
             "placeholder": "e.g. VS Code, Docker...",
-            "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+            "$comment": "Bare strings, bound like response_format so an assistant can add or remove one item. The generic `preference` entity can only replace the whole list.",
+            "element": {
+              "entity": "dev_tool",
+              "identifier": "item",
+              "description": "A development tool you use, e.g. an editor or a CLI."
+            }
           }
         ]
       }

@@ -937,6 +937,150 @@
    }
   }
  ],
+ "dev_tool": [
+  {
+   "action": "add",
+   "data": {},
+   "message": "❌ Dev tool requires 'item'",
+   "step": "add without required fields",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "dev_tool one"
+   },
+   "message": "✅ Added dev tool: dev_tool one",
+   "step": "add",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": [
+      "dev_tool one"
+     ]
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "dev_tool one"
+   },
+   "message": "ℹ️ Dev tool 'dev_tool one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": [
+      "dev_tool one"
+     ]
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "dev_tool one"
+   },
+   "message": "✅ Removed dev tool: dev_tool one",
+   "step": "remove",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "dev_tool one"
+   },
+   "message": "❌ Dev tool 'dev_tool one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  }
+ ],
  "dislike": [
   {
    "action": "add",
@@ -2112,6 +2256,150 @@
      },
      "stress_triggers": []
     }
+   }
+  }
+ ],
+ "framework": [
+  {
+   "action": "add",
+   "data": {},
+   "message": "❌ Framework requires 'item'",
+   "step": "add without required fields",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "framework one"
+   },
+   "message": "✅ Added framework: framework one",
+   "step": "add",
+   "stored": {
+    "code_style": {
+     "frameworks": [
+      "framework one"
+     ],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "framework one"
+   },
+   "message": "ℹ️ Framework 'framework one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "code_style": {
+     "frameworks": [
+      "framework one"
+     ],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "framework one"
+   },
+   "message": "✅ Removed framework: framework one",
+   "step": "remove",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "framework one"
+   },
+   "message": "❌ Framework 'framework one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
    }
   }
  ],
@@ -3667,6 +3955,150 @@
    }
   }
  ],
+ "learning_dislike": [
+  {
+   "action": "add",
+   "data": {},
+   "message": "❌ Learning dislike requires 'item'",
+   "step": "add without required fields",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "learning_dislike one"
+   },
+   "message": "✅ Added learning dislike: learning_dislike one",
+   "step": "add",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [
+      "learning_dislike one"
+     ],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "learning_dislike one"
+   },
+   "message": "ℹ️ Learning dislike 'learning_dislike one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [
+      "learning_dislike one"
+     ],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "learning_dislike one"
+   },
+   "message": "✅ Removed learning dislike: learning_dislike one",
+   "step": "remove",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "learning_dislike one"
+   },
+   "message": "❌ Learning dislike 'learning_dislike one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  }
+ ],
  "learning_entry": [
   {
    "action": "add",
@@ -3959,6 +4391,150 @@
       "topic": "new_topic two"
      }
     ]
+   }
+  }
+ ],
+ "learning_method": [
+  {
+   "action": "add",
+   "data": {},
+   "message": "❌ Learning method requires 'item'",
+   "step": "add without required fields",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "learning_method one"
+   },
+   "message": "✅ Added learning method: learning_method one",
+   "step": "add",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": [
+      "learning_method one"
+     ]
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "learning_method one"
+   },
+   "message": "ℹ️ Learning method 'learning_method one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": [
+      "learning_method one"
+     ]
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "learning_method one"
+   },
+   "message": "✅ Removed learning method: learning_method one",
+   "step": "remove",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "learning_method one"
+   },
+   "message": "❌ Learning method 'learning_method one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
    }
   }
  ],
@@ -5308,6 +5884,150 @@
    "step": "remove what is gone",
    "stored": {
     "category one": {},
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  }
+ ],
+ "preferred_language": [
+  {
+   "action": "add",
+   "data": {},
+   "message": "❌ Preferred language requires 'item'",
+   "step": "add without required fields",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "preferred_language one"
+   },
+   "message": "✅ Added preferred language: preferred_language one",
+   "step": "add",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [
+      "preferred_language one"
+     ],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "preferred_language one"
+   },
+   "message": "ℹ️ Preferred language 'preferred_language one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [
+      "preferred_language one"
+     ],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "preferred_language one"
+   },
+   "message": "✅ Removed preferred language: preferred_language one",
+   "step": "remove",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "preferred_language one"
+   },
+   "message": "❌ Preferred language 'preferred_language one' not found",
+   "step": "remove what is gone",
+   "stored": {
     "code_style": {
      "frameworks": [],
      "preferred_languages": [],
