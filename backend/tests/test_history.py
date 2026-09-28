@@ -123,3 +123,12 @@ def test_the_overwrite_note_covers_a_section_with_no_bespoke_branch(clean_databa
     out = server.persona_modify.fn(
         "update", "connection", {"name": "Sam", "relationship": "colleague"})
     assert "Replaced:" in out and "friend" in out
+
+
+def test_a_version_is_served_beside_the_current_section(clean_database, as_user):
+    server.execute_modify("add", "project", {"name": "Ledger", "description": "A dashboard"})
+    server.execute_modify("add", "project", {"name": "Twine", "description": "A parser"})
+    found = persona_store.version("projects", persona_store.history("projects")[0]["id"])
+    assert [p["name"] for p in found["version"]["projects"]] == ["Ledger"]
+    assert [p["name"] for p in found["current"]["projects"]] == ["Ledger", "Twine"]
+    assert persona_store.version("projects", 999999) is None

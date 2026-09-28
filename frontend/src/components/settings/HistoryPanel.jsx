@@ -6,10 +6,11 @@
  * overwrote a project's notes with something wrong destroyed the old value
  * outright.
  *
- * Deliberately read-and-revert only, with no diff view. The revision list gives
- * the date, the client that caused the write and how many entries the old
- * version held, and a revert is itself reversible -- so the cost of trying one
- * is a click, which is cheaper than a diff viewer is to build and read.
+ * Restore this opens a preview first: what restoring would bring back, remove
+ * and change, compared with now (historyDiff.js). The restore itself happens
+ * from the preview. It used to be one click with only the date, the writer and
+ * an entry count to go on -- reversible, but picking the right version meant
+ * restoring until one looked right.
  */
 import { useEffect, useState } from "react";
 import { History, Loader2, Undo2 } from "lucide-react";
@@ -25,7 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { api, listHistory, revertHistory } from "@/lib/api.js";
+import { api, getHistoryVersion, listHistory, revertHistory } from "@/lib/api.js";
+import { restoreChanges } from "./historyDiff";
 
 function whenText(iso) {
   const at = new Date(iso);
@@ -46,7 +48,7 @@ function whenText(iso) {
  * keeps showing the pre-restore data, and the next autosave writes it back
  * over the version that was just restored.
  */
-export function HistoryPanel({ fixedSection = null, sectionTitle = null, onRestored } = {}) {
+export function HistoryPanel({ fixedSection = null, sectionTitle = null, pack = null, onRestored } = {}) {
   const { toast } = useToast();
 
   const [packs, setPacks] = useState([]);
@@ -54,6 +56,8 @@ export function HistoryPanel({ fixedSection = null, sectionTitle = null, onResto
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [reverting, setReverting] = useState(null);
+  // { id, groups } once loaded; groups null when it could not be worked out.
+  const [preview, setPreview] = useState(null);
 
   useEffect(() => {
     if (fixedSection) return undefined;
@@ -99,6 +103,16 @@ export function HistoryPanel({ fixedSection = null, sectionTitle = null, onResto
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section]);
 
+  const openPreview = async (version) => {
+    setPreview({ id: version.id, loading: true });
+    try {
+      const { version: then, current } = await getHistoryVersion(section, version.id);
+      setPreview({ id: version.id, groups: pack ? restoreChanges(pack, current, then) : null });
+    } catch {
+      setPreview({ id: version.id, groups: null });
+    }
+  };
+
   const handleRevert = async (version) => {
     setReverting(version.id);
     try {
@@ -111,6 +125,7 @@ export function HistoryPanel({ fixedSection = null, sectionTitle = null, onResto
         variant: "success",
       });
       onRestored?.(section);
+      setPreview(null);
       await load(section);
     } catch (error) {
       toast({
@@ -167,10 +182,8 @@ export function HistoryPanel({ fixedSection = null, sectionTitle = null, onResto
       ) : (
         <div className="divide-y rounded-lg border">
           {versions.map((version) => (
-            <div
-              key={version.id}
-              className="flex items-center justify-between gap-3 p-3"
-            >
+            <div key={version.id}>
+            <div className="flex items-center justify-between gap-3 p-3">
               <div className="space-y-0.5">
                 <p className="text-sm font-medium">
                   {whenText(version.replaced_at)}
@@ -186,24 +199,111 @@ export function HistoryPanel({ fixedSection = null, sectionTitle = null, onResto
               {/* Red, because it overwrites what is there now; outlined, like
                   Revoke and Unlink, because it is the trigger and not a final
                   confirm -- and it can itself be undone from this list. */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                disabled={reverting !== null}
-                onClick={() => handleRevert(version)}
-              >
-                {reverting === version.id ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                ) : (
+              {preview?.id !== version.id && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  disabled={reverting !== null}
+                  onClick={() => openPreview(version)}
+                >
                   <Undo2 className="mr-1.5 h-3.5 w-3.5" />
-                )}
-                Restore this
-              </Button>
+                  Restore this
+                </Button>
+              )}
+            </div>
+            {preview?.id === version.id && (
+              <RestorePreview
+                preview={preview}
+                reverting={reverting === version.id}
+                onCancel={() => setPreview(null)}
+                onRestore={() => handleRevert(version)}
+              />
+            )}
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// What restoring one version would do, and the button that does it.
+function RestorePreview({ preview, reverting, onCancel, onRestore }) {
+  const { loading, groups } = preview;
+  const matches = Array.isArray(groups) && groups.length === 0;
+  return (
+    <div data-restore-preview className="space-y-3 border-t bg-muted/30 p-3 text-sm">
+      {loading ? (
+        <p className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          Working out what would change
+        </p>
+      ) : groups === null ? (
+        <p className="text-muted-foreground">
+          Couldn&apos;t show what would change. You can still restore it, and undo that
+          from this list.
+        </p>
+      ) : matches ? (
+        <p className="text-muted-foreground">This version matches what you have now.</p>
+      ) : (
+        <>
+          <p className="font-medium">Restoring this would:</p>
+          {groups.map((g) => (
+            <div key={g.title} className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">{g.title}</p>
+              <ul className="space-y-1">
+                {g.back.map((name) => (
+                  <li key={`b:${name}`}>
+                    <span className="font-medium text-success">Bring back</span> {name}
+                  </li>
+                ))}
+                {g.removed.map((name) => (
+                  <li key={`r:${name}`}>
+                    <span className="font-medium text-destructive">Remove</span> {name}{" "}
+                    <span className="text-muted-foreground">(added since)</span>
+                  </li>
+                ))}
+                {g.changed.map((c) => (
+                  <li key={`c:${c.name}`}>
+                    {c.name && (
+                      <>
+                        <span className="font-medium">Change</span> {c.name}
+                      </>
+                    )}
+                    <ul className={c.name ? "mt-0.5 pl-4" : ""}>
+                      {c.fields.map((f) => (
+                        <li key={f.field} className="break-words text-xs text-muted-foreground">
+                          {f.field}: {f.from} → {f.to}
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </>
+      )}
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          disabled={loading || matches || reverting}
+          onClick={onRestore}
+        >
+          {reverting ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Undo2 className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          Restore this
+        </Button>
+      </div>
     </div>
   );
 }
