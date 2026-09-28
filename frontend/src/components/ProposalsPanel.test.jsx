@@ -298,6 +298,26 @@ describe("ProposalsPanel", () => {
     }
   });
 
+  it("keeps a rejected row off the badge when the poll lands inside its Undo window", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      api.proposalCount.mockResolvedValue({ entity: 1, note: 1, total: 2 });
+      render(<ProposalsPanel />);
+      const reject = await screen.findByRole("button", { name: /^reject /i });
+      expect(screen.getByRole("tab", { name: /inbox/i })).toHaveTextContent("1");
+      await act(async () => { vi.advanceTimersByTime(10000); });
+      await user.click(reject);
+      // The 15s poll lands 5s in. The server still counts the row, and lists it.
+      await act(async () => { vi.advanceTimersByTime(6000); });
+      expect(api.proposalCount.mock.calls.length).toBeGreaterThan(1);
+      expect(screen.getByRole("tab", { name: /inbox/i })).not.toHaveTextContent("1");
+      expect(screen.queryByRole("button", { name: /^reject /i })).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("sends a waiting rejection straight away when Review is left", async () => {
     const user = userEvent.setup();
     const { unmount } = render(<ProposalsPanel />);

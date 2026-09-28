@@ -128,6 +128,10 @@ describe("entityPlace", () => {
     expect(entityPlace("goal", packs)).toBe("Goals");
   });
 
+  it("names the section alone when two nodes share the entity", () => {
+    expect(entityPlace("sleep", packs)).toBe("Lifestyle");
+  });
+
   it("falls back to the section for an entity no node binds, and to words for an unknown one", () => {
     expect(entityPlace("hobby_reference", packs)).toBe("Lifestyle");
     expect(entityPlace("old_thing", packs)).toBe("old thing");

@@ -154,11 +154,11 @@
     ],
     "Personality Traits": [],
     "Values": [],
-    "Wellness > Sleep — weekdays": [
+    "Wellness > Sleep on weekdays": [
       "bedtime",
       "wakeup"
     ],
-    "Wellness > Sleep — weekends": [
+    "Wellness > Sleep at weekends": [
       "bedtime",
       "wakeup"
     ],

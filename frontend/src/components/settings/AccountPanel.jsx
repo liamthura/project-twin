@@ -66,6 +66,7 @@ export function AccountPanel({
   disabledSections = [],
   onSignedOut = () => {},
   version = null,
+  addEmailRequest = 0,
 }) {
   const { toast } = useToast();
 
@@ -209,7 +210,7 @@ export function AccountPanel({
         </Button>
       </div>
 
-      <EmailSettings />
+      <EmailSettings addEmailRequest={addEmailRequest} />
 
       <LinkedAccounts accounts={accounts} sso={sso} onChanged={loadAccounts} />
 
@@ -280,7 +281,7 @@ export function AccountPanel({
       )}
 
       <div className="space-y-3 border-t pt-4">
-        <h3 className="text-base font-semibold">Preferences</h3>
+        <h2 className="text-base font-semibold">Preferences</h2>
 
         {/* One bordered list, as Sections and Data are: two cards with a gap
             between them read as two unrelated things. */}

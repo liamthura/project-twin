@@ -145,6 +145,12 @@ export default function App() {
   // is never redirected, and neither is anyone who has already moved.
   const coldOpenRef = useRef(!readRoute());
   const [historyFor, setHistoryFor] = useState(null);
+  // Bumped by the banner's Add email, which opens the form itself. Cleared on
+  // leaving Settings, so a later visit shows the account as it is.
+  const [addEmailRequest, setAddEmailRequest] = useState(0);
+  useEffect(() => {
+    if (activeSection !== "settings") setAddEmailRequest(0);
+  }, [activeSection]);
 
   // A band we owe a scroll to, and have not delivered yet.
   //
@@ -781,7 +787,12 @@ export default function App() {
             email cannot be recovered, which is worth a line of the page until
             it is fixed or dismissed. */}
         <div className="mb-4 empty:mb-0">
-          <AddEmailBanner onAddEmail={() => openSettings("account")} />
+          <AddEmailBanner
+            onAddEmail={() => {
+              setAddEmailRequest((n) => n + 1);
+              openSettings("account");
+            }}
+          />
         </div>
 
         <SectionMenu {...shellProps} />
@@ -833,6 +844,7 @@ export default function App() {
                 disabledSections={disabledSections}
                 packs={packs}
                 onTogglePack={togglePack}
+                addEmailRequest={addEmailRequest}
                 onConnectionChange={() => {
                   loadAllData();
                   loadSettings();

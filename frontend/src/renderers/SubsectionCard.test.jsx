@@ -12,10 +12,10 @@ describe("SubsectionCard", () => {
     // a grouped child h4. Keeping it means the restructure changes the visual
     // tiers without flattening the document outline.
     const { unmount } = render(<SubsectionCard title="Education" depth={0}>rows</SubsectionCard>);
-    expect(screen.getByRole("heading", { name: "Education", level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Education", level: 2 })).toBeInTheDocument();
     unmount();
     render(<SubsectionCard title="Frameworks" depth={1}>chips</SubsectionCard>);
-    expect(screen.getByRole("heading", { name: "Frameworks", level: 4 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Frameworks", level: 3 })).toBeInTheDocument();
   });
 
   it("sets the title at headline-2, which is smaller than the page title above it", () => {

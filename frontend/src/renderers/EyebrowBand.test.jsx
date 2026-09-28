@@ -9,7 +9,7 @@ describe("EyebrowBand", () => {
     // outline -- not decorative text. Level 3 keeps the tree the depth rule
     // already implies: page title h2, top-level node h3.
     render(<EyebrowBand title="Code Style" />);
-    expect(screen.getByRole("heading", { name: "Code Style", level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Code Style", level: 2 })).toBeInTheDocument();
   });
 
   it("is a real heading, one step above the subsection titles, not an eyebrow", () => {

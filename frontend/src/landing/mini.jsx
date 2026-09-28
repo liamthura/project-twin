@@ -63,7 +63,7 @@ export function ScopePayload() {
       </p>
       <Surface>
         <div className="divide-y divide-border">
-          <Row title="Preferences" sub="Communication style, code style, likes and dislikes" />
+          <Row title="Preferences" sub="How you like answers, how you learn, what you like, and how you code" />
           <Row title="Code Style" sub="Your preferred programming languages, frameworks, and tools" />
           <Row title="Preferred Languages" sub="Python · TypeScript · SQL" />
           <Row title="Projects" sub="What you are working on right now" />
@@ -439,8 +439,8 @@ export function AssistantMock() {
       </div>
 
       <p className="mt-auto border-t border-border pt-2 text-[10px] text-muted-foreground sm:text-[11px]">
-        Short, British spelling, no exclamation marks — from your Preferences,
-        which every scope returns.
+        Short, British spelling, no exclamation marks. That comes from your
+        Preferences, which every scope returns.
       </p>
     </div>
   );

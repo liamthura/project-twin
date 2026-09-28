@@ -2,7 +2,7 @@
   "$schema": "../meta_schema.json",
   "key": "preferences",
   "title": "Preferences",
-  "description": "Communication style, code style, likes and dislikes",
+  "description": "How you like answers, how you learn, what you like, and how you code",
   "core": true,
   "position": 30,
   "defaults": {
@@ -33,43 +33,6 @@
   ],
   "scope_contributions": {},
   "sections": [
-    {
-      "kind": "group",
-      "title": "Code Style",
-      "description": "Your preferred programming languages, frameworks, and tools",
-      "sections": [
-        {
-          "kind": "strings",
-          "path": [
-            "code_style",
-            "preferred_languages"
-          ],
-          "title": "Preferred Languages",
-          "placeholder": "e.g. Python, TypeScript...",
-          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
-        },
-        {
-          "kind": "strings",
-          "path": [
-            "code_style",
-            "frameworks"
-          ],
-          "title": "Frameworks",
-          "placeholder": "e.g. FastAPI, Next.js...",
-          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
-        },
-        {
-          "kind": "strings",
-          "path": [
-            "code_style",
-            "tools"
-          ],
-          "title": "Tools",
-          "placeholder": "e.g. VS Code, Docker...",
-          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
-        }
-      ]
-    },
     {
       "kind": "group",
       "title": "Communication",
@@ -238,6 +201,43 @@
         ]
       },
       "$comment": "One list shared by the `like` and `dislike` entities, discriminated by `stance`. `stance` used to be in NEITHER entity's required nor optional -- invisible to get_schema though it is the key that decides which entity a row IS -- and was declared here via fields_outside_entity instead. Wave 7 put it on both entities, where it belongs, so that declaration is gone and the node's `stance` binding is now checked against the vocabulary like any other field. See reference doc 2.3 and wave 5 follow-up 4."
+    },
+    {
+      "kind": "group",
+      "title": "Code Style",
+      "description": "Your preferred programming languages, frameworks, and tools",
+      "sections": [
+        {
+          "kind": "strings",
+          "path": [
+            "code_style",
+            "preferred_languages"
+          ],
+          "title": "Preferred Languages",
+          "placeholder": "e.g. Python, TypeScript...",
+          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+        },
+        {
+          "kind": "strings",
+          "path": [
+            "code_style",
+            "frameworks"
+          ],
+          "title": "Frameworks",
+          "placeholder": "e.g. FastAPI, Next.js...",
+          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+        },
+        {
+          "kind": "strings",
+          "path": [
+            "code_style",
+            "tools"
+          ],
+          "title": "Tools",
+          "placeholder": "e.g. VS Code, Docker...",
+          "$comment": "Bare strings with NO usable MCP write path. The generic `preference` entity writes preferences[category][key] = value where value is a SCALAR string (server.write_entity), so it cannot produce an array -- reaching this key through it would overwrite the list with a string. The UI is the only writer. See reference doc 2.4 and follow-up 3."
+        }
+      ]
     }
   ],
   "mcp_entities": {

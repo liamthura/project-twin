@@ -72,7 +72,10 @@ export function Header({
               strokeLinecap="round"
             />
           </svg>
-          <h1 className="text-lg font-semibold">MyGist</h1>
+          {/* Not a heading: every page names itself with its own h1, and a
+              logo that was the only one left Review, Settings and every
+              section without a title in the outline. */}
+          <span className="text-lg font-semibold">MyGist</span>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">

@@ -91,9 +91,9 @@ describe("Rail", () => {
   it("moves the marker by whole rows, so it slides rather than cuts", () => {
     // One element translated between rows. Two markers, one per row, could not
     // animate between each other at all -- CSS has nothing to interpolate.
-    renderRail({ activeBand: "communication" });
+    renderRail({ activeBand: "learning-style" });
     const marker = document.querySelector("[data-spy-marker]");
-    // Communication is index 1 of Preferences' four bands.
+    // Learning Style is index 1 of Preferences' four bands.
     expect(marker.style.transform).toBe("translateY(32px)");
     expect(marker.className).toContain("duration-medium");
     expect(marker.className).toContain("ease-standard");

@@ -24,7 +24,9 @@ import {
   isPlaceholderEmail,
 } from "@/lib/session.js";
 
-export function EmailSettings() {
+// `addEmailRequest` counts clicks on the banner's Add email. Arriving from one
+// opens the form, rather than showing a second Add email to click.
+export function EmailSettings({ addEmailRequest = 0 }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -46,6 +48,10 @@ export function EmailSettings() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (addEmailRequest) setEditing(true);
+  }, [addEmailRequest]);
 
   if (loading) {
     return (
@@ -162,6 +168,7 @@ export function EmailSettings() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="you@example.com"
+            autoFocus={addEmailRequest > 0}
           />
           <div className="flex gap-2">
             <Button type="submit" size="sm" disabled={pending}>

@@ -243,7 +243,7 @@
             "sleep",
             "weekday"
           ],
-          "title": "Sleep — weekdays",
+          "title": "Sleep on weekdays",
           "element": {
             "entity": "sleep",
             "identifier": "day_type",
@@ -277,7 +277,7 @@
             "sleep",
             "weekend"
           ],
-          "title": "Sleep — weekends",
+          "title": "Sleep at weekends",
           "element": {
             "entity": "sleep",
             "identifier": "day_type",

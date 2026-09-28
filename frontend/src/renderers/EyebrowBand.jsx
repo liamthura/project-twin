@@ -10,8 +10,8 @@ export function EyebrowBand({ title, info, description }) {
   return (
     <div data-eyebrow className="space-y-1">
       <div className="flex items-center gap-1.5">
-        {/* h3: page title h2, group h3, its subsections h4. */}
-        <h3 className="text-lg font-semibold tracking-tight text-foreground">{title}</h3>
+        {/* h2: page title h1, group h2, its subsections h3. */}
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
         <InfoButton info={info} title={title} />
       </div>
       {description && <p className="text-sm text-muted-foreground">{description}</p>}

@@ -50,7 +50,7 @@ export default function ProposalsPanel({
   const [connection, setConnection] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const { toast } = useToast();
-  // id -> { timer, dismiss } for each rejection still inside its Undo window.
+  // id -> { kind, timer, dismiss } for each rejection not yet confirmed sent.
   const pendingRef = useRef(new Map());
 
   // Held in a ref so refreshCounts never changes identity. It is a dependency
@@ -64,7 +64,13 @@ export default function ProposalsPanel({
   // the count endpoint is the only read that does not mark rows seen.
   const refreshCounts = useCallback(async () => {
     try {
-      const next = await proposalCount();
+      const next = { ...(await proposalCount()) };
+      // A rejection inside its Undo window is still counted by the server, and
+      // the poll would otherwise put it back on the badge the row left.
+      for (const { kind } of pendingRef.current.values()) {
+        next[kind] = Math.max(0, (next[kind] ?? 0) - 1);
+        next.total = Math.max(0, next.total - 1);
+      }
       setCounts(next);
       onCountsRef.current?.(next.total);
     } catch {
@@ -92,6 +98,7 @@ export default function ProposalsPanel({
   // Leaving Review sends whatever is still waiting: the reader watched it go.
   useEffect(() => () => {
     for (const [id, pending] of pendingRef.current) {
+      if (pending.sent) continue;
       clearTimeout(pending.timer);
       pending.dismiss();
       rejectProposal(id).catch(() => {});
@@ -230,12 +237,15 @@ export default function ProposalsPanel({
       });
     setRows((current) => current.filter((r) => r.id !== row.id));
 
+    // Held until the server answers, so a poll landing mid-request neither
+    // lists the row again nor counts it.
     const send = async () => {
-      pendingRef.current.delete(row.id);
       try {
         await rejectProposal(row.id);
+        pendingRef.current.delete(row.id);
         refreshCounts();
       } catch {
+        pendingRef.current.delete(row.id);
         restore();
         bump(1);
         toast({
@@ -247,7 +257,9 @@ export default function ProposalsPanel({
     };
     const undo = () => {
       const pending = pendingRef.current.get(row.id);
-      if (!pending) return;
+      // `sent` once the timer has fired: the request is out, and there is
+      // nothing left to take back.
+      if (!pending || pending.sent) return;
       clearTimeout(pending.timer);
       pendingRef.current.delete(row.id);
       restore();
@@ -258,7 +270,15 @@ export default function ProposalsPanel({
       duration: UNDO_MS,
       action: <ToastAction altText="Undo" onClick={undo}>Undo</ToastAction>,
     });
-    pendingRef.current.set(row.id, { timer: setTimeout(send, UNDO_MS), dismiss: shown.dismiss });
+    const fire = () => {
+      pendingRef.current.get(row.id).sent = true;
+      send();
+    };
+    pendingRef.current.set(row.id, {
+      kind: row.kind,
+      timer: setTimeout(fire, UNDO_MS),
+      dismiss: shown.dismiss,
+    });
   }
 
   // Sections that can actually receive a note, in tab order.
@@ -293,6 +313,15 @@ export default function ProposalsPanel({
 
   return (
     <div className="space-y-4">
+      {/* Titled as Settings and every section are, so the page says where you
+          are and a screen reader has an h1 to land on. */}
+      <div className="space-y-1 pb-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Review</h1>
+        <p className="text-sm text-muted-foreground">
+          What your assistants suggested. Nothing here reaches your persona until you say so.
+        </p>
+      </div>
+
       <PromoteDialog
         promoting={promoting}
         promotable={promotable}

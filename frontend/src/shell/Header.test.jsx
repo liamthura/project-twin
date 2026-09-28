@@ -7,9 +7,10 @@ import { Header } from "./Header";
 const renderHeader = (props = {}) => render(<Header {...props} />);
 
 describe("Header", () => {
-  it("names the app", () => {
+  it("names the app, without taking the page's h1", () => {
     renderHeader();
-    expect(screen.getByRole("heading", { name: "MyGist" })).toBeInTheDocument();
+    expect(screen.getByText("MyGist")).toBeInTheDocument();
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
   });
 
   describe("the save-state chip", () => {
