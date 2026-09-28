@@ -508,6 +508,28 @@ async function revertHistory(section, historyId) {
   });
 }
 
+// Where each entry of one section came from, how old it is, whether it is
+// stale. Its own request, so none of it can ride back on a section save.
+async function getProvenance(section) {
+  return api(`/provenance/${encodeURIComponent(section)}`);
+}
+
+async function listStale() {
+  const data = await api("/stale");
+  return data.stale || [];
+}
+
+// "Keep": restarts a stale entry's window without changing it.
+async function keepEntry(entityId) {
+  return api(`/provenance/${encodeURIComponent(entityId)}/keep`, { method: "POST" });
+}
+
+// The Review suggestions that produced one entry: who, why, and the quote.
+async function proposalsFor(entityId) {
+  const data = await api(`/proposals/for/${encodeURIComponent(entityId)}`);
+  return data.proposals || [];
+}
+
 async function listProposals(kind) {
   const data = await api(`/proposals?kind=${encodeURIComponent(kind)}`);
   return data.proposals || [];
@@ -571,4 +593,8 @@ export {
   revokeConnectedApp,
   listHistory,
   revertHistory,
+  getProvenance,
+  listStale,
+  keepEntry,
+  proposalsFor,
 };

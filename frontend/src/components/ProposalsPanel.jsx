@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   listProposals, proposalCount, approveProposal, rejectProposal, promoteProposal,
-  listConnectedApps, listTokens,
+  listConnectedApps, listTokens, listStale, keepEntry,
 } from "@/lib/api";
+import { formatDateLabel } from "@/renderers/isoDate";
 import { connectionStatus } from "./onboarding/connectionStatus";
 import InboxRow from "./InboxRow";
 import ObservationCard from "./ObservationCard";
@@ -16,6 +17,10 @@ import PromoteDialog, { promotionTargets } from "./PromoteDialog";
 const KINDS = [
   { key: "entity", label: "Inbox" },
   { key: "note", label: "Observations" },
+  // Not suggestions: entries of yours that have sat unchanged past their
+  // section's window. Here so everything waiting on the reader is in one place,
+  // but left off the rail's count, which is for what assistants sent.
+  { key: "stale", label: "Stale" },
 ];
 
 /**
@@ -64,7 +69,11 @@ export default function ProposalsPanel({
   // the count endpoint is the only read that does not mark rows seen.
   const refreshCounts = useCallback(async () => {
     try {
-      const next = { ...(await proposalCount()) };
+      const [counted, stale] = await Promise.all([
+        proposalCount(),
+        listStale().catch(() => []),
+      ]);
+      const next = { ...counted, stale: stale.length };
       // A rejection inside its Undo window is still counted by the server, and
       // the poll would otherwise put it back on the badge the row left.
       for (const { kind } of pendingRef.current.values()) {
@@ -82,7 +91,9 @@ export default function ProposalsPanel({
     try {
       // A row waiting out its Undo is still on the server, and the 15s poll
       // would otherwise bring it back.
-      const fresh = await listProposals(which);
+      const fresh = which === "stale"
+        ? (await listStale()).map((r) => ({ ...r, kind: "stale" }))
+        : await listProposals(which);
       setRows(fresh.filter((r) => !pendingRef.current.has(r.id)));
       setError(null);
     } catch {
@@ -318,7 +329,8 @@ export default function ProposalsPanel({
       <div className="space-y-1 pb-2">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Review</h1>
         <p className="text-sm text-muted-foreground">
-          What your assistants suggested. Nothing here reaches your persona until you say so.
+          What your assistants suggested, and entries that may be out of date. Nothing
+          suggested reaches your persona until you say so.
         </p>
       </div>
 
@@ -360,7 +372,12 @@ export default function ProposalsPanel({
         <EmptyState className="space-y-2">
           {/* Each tab says what it holds. Observations used to repeat the
               Inbox line, so nothing anywhere said what an observation is. */}
-          {kind === "note" ? (
+          {kind === "stale" ? (
+            <p>
+              Nothing stale. An entry shows up here when it has gone a long time
+              without changing, so you can keep it or update it.
+            </p>
+          ) : kind === "note" ? (
             <p>
               No observations. These are things an assistant noticed that don&apos;t
               belong to one section yet. Promote one into a section, or delete it.
@@ -368,7 +385,7 @@ export default function ProposalsPanel({
           ) : (
             <p>Nothing waiting. Assistants suggest changes here as they notice them.</p>
           )}
-          {connection?.state === "none" && (
+          {kind !== "stale" && connection?.state === "none" && (
             <p>
               Nothing is connected yet.{" "}
               <Button variant="link" className="h-auto p-0" onClick={onConnect}>
@@ -376,13 +393,13 @@ export default function ProposalsPanel({
               </Button>
             </p>
           )}
-          {connection?.state === "waiting" && (
+          {kind !== "stale" && connection?.state === "waiting" && (
             <p>
               {connection.name || "Your token"} is set up but hasn&apos;t been used yet.
               Suggestions arrive once your client makes its first call.
             </p>
           )}
-          {connection?.state === "connected" && !connection.canPropose && (
+          {kind !== "stale" && connection?.state === "connected" && !connection.canPropose && (
             <p>
               {connection.total === 1
                 ? `${connection.name || "Your connection"} can read your persona but not suggest changes to it.`
@@ -399,7 +416,16 @@ export default function ProposalsPanel({
         </EmptyState>
       ) : (
         rows.map((row) =>
-          row.kind === "entity" ? (
+          row.kind === "stale" ? (
+            <StaleRow
+              key={row.id}
+              row={row}
+              section={sectionTitles[row.section] || row.section}
+              busy={busy === row.id}
+              onKeep={() => act(row.id, "Kept. It won't show as stale for a while.", () => keepEntry(row.id))}
+              onOpen={() => onViewSection?.(row.section)}
+            />
+          ) : row.kind === "entity" ? (
             <InboxRow
               key={row.id}
               row={row}
@@ -423,6 +449,27 @@ export default function ProposalsPanel({
           ),
         )
       )}
+    </div>
+  );
+}
+
+// One stale entry: where it lives, what it is, how long it has sat.
+function StaleRow({ row, section, busy, onKeep, onOpen }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border px-3 py-2.5 text-sm">
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <p className="text-xs text-muted-foreground">{section}</p>
+        <p className="break-words font-medium">{row.title}</p>
+        <p className="text-xs text-muted-foreground">Unchanged since {formatDateLabel(row.since)}</p>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <Button size="sm" variant="outline" disabled={busy} onClick={onKeep}>
+          Keep
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onOpen}>
+          Open in {section}
+        </Button>
+      </div>
     </div>
   );
 }

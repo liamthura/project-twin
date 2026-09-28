@@ -30,6 +30,8 @@ vi.mock("@/lib/api", () => ({
   approveProposal: vi.fn(() => Promise.resolve({ status: "approved", section: "knowledge" })),
   rejectProposal: vi.fn(() => Promise.resolve({ status: "rejected", section: null })),
   promoteProposal: vi.fn(() => Promise.resolve({ status: "promoted", section: "lifestyle" })),
+  listStale: vi.fn(() => Promise.resolve([])),
+  keepEntry: vi.fn(() => Promise.resolve({ status: "kept" })),
 }));
 
 // Returns a handle, as the real one does: a pending reject keeps it to dismiss.
@@ -316,6 +318,32 @@ describe("ProposalsPanel", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("lists stale entries in their own tab, with Keep and a way to the section", async () => {
+    const user = userEvent.setup();
+    const onViewSection = vi.fn();
+    api.listStale.mockResolvedValue([
+      { section: "goals", id: "goal_1", title: "Run a half marathon", since: "2026-02-14" },
+    ]);
+    api.proposalCount.mockResolvedValue({ entity: 1, note: 1, total: 2 });
+    const onCounts = vi.fn();
+    render(
+      <ProposalsPanel onViewSection={onViewSection} onCounts={onCounts} sectionTitles={{ goals: "Goals" }} />,
+    );
+    // Counted on its tab, but never handed up to the rail with the suggestions.
+    expect(await screen.findByRole("tab", { name: /stale 1/i })).toBeInTheDocument();
+    expect(onCounts).toHaveBeenLastCalledWith(2);
+
+    await user.click(screen.getByRole("tab", { name: /stale/i }));
+    expect(await screen.findByText("Unchanged since 14 February 2026")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open in Goals" }));
+    expect(onViewSection).toHaveBeenCalledWith("goals");
+
+    await user.click(screen.getByRole("button", { name: "Keep" }));
+    await waitFor(() => expect(api.keepEntry).toHaveBeenCalledWith("goal_1"));
+    await waitFor(() => expect(screen.queryByText("Run a half marathon")).not.toBeInTheDocument());
+    api.listStale.mockResolvedValue([]);
   });
 
   it("sends a waiting rejection straight away when Review is left", async () => {

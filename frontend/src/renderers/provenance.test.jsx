@@ -1,0 +1,77 @@
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+
+vi.mock("@/lib/api.js", () => ({
+  getProvenance: vi.fn(),
+  keepEntry: vi.fn(),
+  proposalsFor: vi.fn(() =>
+    Promise.resolve([{ rationale: "Mentioned training twice.", evidence: "I signed up for the Great North Run" }]),
+  ),
+}));
+
+import * as api from "@/lib/api.js";
+import ListRenderer from "./ListRenderer";
+import { ProvenanceContext } from "./provenance";
+
+const node = {
+  kind: "list",
+  path: ["goals"],
+  element: { entity: "goal", identifier: "title", fields: [{ name: "title", role: "title" }] },
+};
+const items = [
+  { id: "goal_1", title: "Run a half marathon" },
+  { id: "goal_2", title: "Ship MyGist v3" },
+];
+const entries = {
+  goal_1: {
+    stale: true, checked: "2026-02-14", updated_at: "2026-02-14",
+    added: { by: "Cursor", via: "review", at: "2026-01-03" },
+    changed: { by: "", via: "editor", at: "2026-02-14" },
+  },
+  goal_2: { stale: false, updated_at: "2026-09-01", added: null, changed: null },
+};
+
+function renderList(keep = vi.fn(() => Promise.resolve())) {
+  render(
+    <ProvenanceContext.Provider value={{ entries, keep }}>
+      <ListRenderer node={node} items={items} onItems={() => {}} />
+    </ProvenanceContext.Provider>,
+  );
+  return keep;
+}
+
+describe("provenance in the editor", () => {
+  it("marks a stale row and narrows the list to stale rows from its header", async () => {
+    const user = userEvent.setup();
+    renderList();
+    expect(screen.getAllByText("Stale")).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "1 stale" }));
+    expect(screen.queryByText("Ship MyGist v3")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show all" }));
+    expect(screen.getByText("Ship MyGist v3")).toBeInTheDocument();
+  });
+
+  it("says who added and changed an opened entry, why, and offers Keep when stale", async () => {
+    const user = userEvent.setup();
+    const keep = renderList();
+    await user.click(screen.getByRole("button", { name: /^Run a half marathon/ }));
+    expect(screen.getByText(/^Added by Cursor via Review, 3 January 2026 · changed by you, 14 February 2026/)).toBeInTheDocument();
+    expect(screen.getByText("Unchanged since 14 February 2026.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Why?" }));
+    expect(await screen.findByText(/I signed up for the Great North Run/)).toBeInTheDocument();
+    expect(api.proposalsFor).toHaveBeenCalledWith("goal_1");
+
+    await user.click(screen.getByRole("button", { name: "Keep" }));
+    expect(keep).toHaveBeenCalledWith("goal_1");
+  });
+
+  it("falls back to the last change for an entry older than the record", async () => {
+    const user = userEvent.setup();
+    renderList();
+    await user.click(screen.getByRole("button", { name: /^Ship MyGist v3/ }));
+    expect(screen.getByText("Last changed 1 September 2026")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Keep" })).not.toBeInTheDocument();
+  });
+});
