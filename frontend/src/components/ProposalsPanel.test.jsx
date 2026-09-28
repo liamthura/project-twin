@@ -164,10 +164,10 @@ describe("ProposalsPanel", () => {
     expect(await screen.findByText(/bouldering/)).toBeInTheDocument();
     expect(screen.getByText(/twice a week/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^approve bouldering$/i })).toBeInTheDocument();
-    // The reason is on the face: it is the case for approving. The quote
-    // stays behind the chevron.
+    // The reason and the reader's own words are on the face: together they
+    // are the case for approving.
     expect(screen.getByText(/Runs the on-call dashboards/)).toBeInTheDocument();
-    expect(screen.queryByText(/rebuilt the whole alerting/)).not.toBeInTheDocument();
+    expect(screen.getByText(/rebuilt the whole alerting/)).toHaveClass("line-clamp-3");
   });
 
   it("counts the fields it cannot fit rather than truncating them away", async () => {
@@ -344,6 +344,91 @@ describe("ProposalsPanel", () => {
     await waitFor(() => expect(api.keepEntry).toHaveBeenCalledWith("goal_1"));
     await waitFor(() => expect(screen.queryByText("Run a half marathon")).not.toBeInTheDocument());
     api.listStale.mockResolvedValue([]);
+  });
+
+  describe("several at once, and from the keyboard", () => {
+    const three = ["Datadog", "Grafana", "Sentry"].map((name, i) => ({
+      ...ENTITY, id: `p${i + 10}`, data: { name, level: "advanced" },
+    }));
+    beforeEach(() => {
+      api.listProposals.mockImplementation((kind) => Promise.resolve(kind === "entity" ? three : []));
+    });
+    const names = () =>
+      screen.getAllByRole("button", { name: /^approve /i }).map((b) => b.getAttribute("aria-label"));
+
+    it("rejects a selection with one Undo that brings them all back, in order", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        render(<ProposalsPanel />);
+        await user.click(await screen.findByRole("checkbox", { name: "Select Datadog" }));
+        await user.click(screen.getByRole("checkbox", { name: "Select Sentry" }));
+        await user.click(screen.getByRole("button", { name: "Reject 2" }));
+        expect(names()).toEqual(["Approve Grafana"]);
+
+        const { title, action } = toast.mock.calls.at(-1)[0];
+        expect(title).toBe("Rejected 2. They won't be suggested again.");
+        act(() => action.props.onClick());
+        expect(names()).toEqual(["Approve Datadog", "Approve Grafana", "Approve Sentry"]);
+        await act(async () => { vi.advanceTimersByTime(8000); });
+        expect(api.rejectProposal).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("approves a selection one at a time, and keeps whichever failed", async () => {
+      const user = userEvent.setup();
+      api.approveProposal.mockImplementation((id) =>
+        id === "p11" ? Promise.reject(new Error("no")) : Promise.resolve({ status: "approved" }));
+      render(<ProposalsPanel />);
+      await user.click(await screen.findByRole("checkbox", { name: /select all/i }));
+      await user.click(screen.getByRole("button", { name: "Approve 3" }));
+
+      await waitFor(() => expect(names()).toEqual(["Approve Grafana"]));
+      expect(api.approveProposal.mock.calls.map((c) => c[0])).toEqual(["p10", "p11", "p12"]);
+      expect(toast.mock.calls.at(-1)[0]).toMatchObject({
+        title: "Added 2 to your persona",
+        description: "1 didn't go through and is still in the queue.",
+      });
+      api.approveProposal.mockImplementation(() => Promise.resolve({ status: "approved", section: "knowledge" }));
+    });
+
+    it("drops a row from the selection once you start editing it", async () => {
+      const user = userEvent.setup();
+      render(<ProposalsPanel />);
+      const box = await screen.findByRole("checkbox", { name: "Select Datadog" });
+      await user.click(box);
+      await user.click(screen.getByRole("button", { name: "Details for Datadog" }));
+      await user.click(screen.getByRole("button", { name: "Edit before approving" }));
+      expect(box).not.toBeChecked();
+      expect(box).toBeDisabled();
+      expect(screen.queryByRole("region", { name: "Selected" })).not.toBeInTheDocument();
+    });
+
+    it("moves with j and approves with a, then lands on the next row", async () => {
+      const user = userEvent.setup();
+      render(<ProposalsPanel />);
+      const rows = await screen.findAllByRole("group", { name: /^update /i });
+      rows[0].focus();
+      await user.keyboard("j");
+      expect(rows[1]).toHaveFocus();
+      await user.keyboard("a");
+      await waitFor(() => expect(api.approveProposal).toHaveBeenCalledWith("p11", undefined));
+      await waitFor(() => expect(screen.getByRole("group", { name: "Update Sentry" })).toHaveFocus());
+    });
+
+    it("leaves letters typed into an edit field alone", async () => {
+      const user = userEvent.setup();
+      render(<ProposalsPanel />);
+      const [row] = await screen.findAllByRole("group", { name: /^update /i });
+      row.focus();
+      await user.keyboard("e");
+      await user.type(screen.getByLabelText("Level"), "ar");
+      expect(api.approveProposal).not.toHaveBeenCalled();
+      expect(api.rejectProposal).not.toHaveBeenCalled();
+      expect(screen.getByLabelText("Level")).toHaveValue("advancedar");
+    });
   });
 
   it("sends a waiting rejection straight away when Review is left", async () => {

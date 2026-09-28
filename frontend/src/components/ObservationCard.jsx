@@ -1,6 +1,8 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { FOCUS_RING } from "@/components/controls";
 import { humanise } from "./proposalSummary";
 
 /**
@@ -11,10 +13,25 @@ import { humanise } from "./proposalSummary";
  * noticed, the agent's reasoning and the user's own words. The inbox row next
  * door is a two-second approve, and it is one line for the same reason.
  */
-export default function ObservationCard({ row, busy, canPromote, onPromote, onDelete }) {
+export default function ObservationCard({
+  row, busy, canPromote, onPromote, onDelete, selected = false, onSelect, focusProps,
+}) {
   return (
-    <Card className="space-y-3 p-4">
+    <Card
+      {...focusProps}
+      role="group"
+      aria-label={`Observation: ${row.note}`}
+      className={`space-y-3 p-4 ${FOCUS_RING}`}
+    >
       <div className="flex flex-wrap items-center gap-2">
+        {onSelect && (
+          <Checkbox
+            checked={selected}
+            onCheckedChange={(v) => onSelect(v === true)}
+            aria-label={`Select ${row.note}`}
+            className="tap-target"
+          />
+        )}
         <Badge variant="outline">{row.proposed_by}</Badge>
         {row.seen_count > 1 && (
           <span className="text-xs text-muted-foreground">seen {row.seen_count}×</span>

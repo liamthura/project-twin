@@ -1,6 +1,8 @@
-import { useState, Fragment } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { Check, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { FOCUS_RING } from "@/components/controls";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { proposalSummary, entityPlace, humanise, renderValue } from "./proposalSummary";
@@ -15,10 +17,13 @@ const ACTION_VERB = { add: "Add", update: "Update", remove: "Remove" };
  * look like a considered one gets abandoned at the considered ones.
  *
  * So the face carries what the decision needs: where it goes, in the editor's
- * words; the value, wrapped rather than cut off; who suggested it and why.
- * Those last two were behind the chevron, and a reason with a quote is the
- * whole case for approving at all. The quote and the field-by-field detail
- * stay behind it.
+ * words; the value, wrapped rather than cut off; who suggested it, why, and
+ * the reader's own words it quoted. A reason with a quote is the whole case
+ * for approving at all. The field-by-field detail stays behind the chevron.
+ *
+ * The row itself takes focus (the panel gives the first one tabIndex 0 and
+ * moves between them on j/k), and while it has focus a, r, e and Enter act on
+ * it. Only the row: a key typed into one of its inputs is text.
  */
 // Text and numbers are edited as text, a list of strings as one comma-separated
 // line. Anything else (an object, a boolean) is shown, not edited: agents rarely
@@ -51,7 +56,9 @@ function fromDraft(data, draft) {
   );
 }
 
-export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
+export default function InboxRow({
+  row, packs, busy, onApprove, onReject, selected = false, onSelect, onAdvance, focusProps,
+}) {
   const [open, setOpen] = useState(false);
   // null while not editing. Agents get a detail slightly wrong often enough
   // that correcting it beats rejecting a mostly-right suggestion; the server
@@ -60,13 +67,56 @@ export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
   const data = row.data || {};
   const approve = () => onApprove(draft ? fromDraft(data, draft) : undefined);
   const { lead, trail, extra } = proposalSummary(row, packs);
+  const startEdit = () =>
+    setDraft(
+      Object.fromEntries(
+        Object.entries(data).filter(([, v]) => isEditable(v)).map(([f, v]) => [f, toText(v)]),
+      ),
+    );
+
+  // A row being edited is never part of a bulk approve, which would send it
+  // as suggested and drop the edits.
+  useEffect(() => {
+    if (draft && selected) onSelect?.(false);
+  }, [draft, selected, onSelect]);
+
+  const onKeyDown = (e) => {
+    if (e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return;
+    const run = {
+      a: () => !busy && (onAdvance?.(), approve()),
+      r: () => !busy && (onAdvance?.(), onReject()),
+      e: () => { setOpen(true); if (!draft) startEdit(); },
+      Enter: () => setOpen((v) => !v),
+    }[e.key];
+    if (run) {
+      e.preventDefault();
+      run();
+    }
+  };
 
   return (
-    <div className="rounded-lg border">
+    <div
+      {...focusProps}
+      role="group"
+      aria-label={`${ACTION_VERB[row.action] || row.action} ${lead}`}
+      data-selectable={!draft}
+      onKeyDown={onKeyDown}
+      className={`rounded-lg border ${FOCUS_RING}`}
+    >
       {/* Wraps on a phone: the summary takes the full width and the buttons
           the line below it. */}
       <div className="flex flex-wrap items-start gap-x-3 gap-y-2 px-3 py-2.5 text-sm">
-        <div className="min-w-0 basis-full space-y-0.5 sm:flex-1 sm:basis-auto">
+        <div className="flex min-w-0 basis-full items-start gap-3 sm:flex-1 sm:basis-auto">
+        {onSelect && (
+          <Checkbox
+            checked={selected}
+            disabled={!!draft}
+            onCheckedChange={(v) => onSelect(v === true)}
+            aria-label={`Select ${lead}`}
+            className="tap-target mt-0.5"
+          />
+        )}
+        <div className="min-w-0 flex-1 space-y-0.5">
           <p className="text-xs text-muted-foreground">
             <span className="font-medium text-foreground">
               {ACTION_VERB[row.action] || row.action}
@@ -88,6 +138,14 @@ export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
             )}
           </p>
           {row.rationale && <p className="text-muted-foreground">{row.rationale}</p>}
+          {/* Three lines while closed, so one long quote cannot push the
+              queue off the screen. */}
+          {row.evidence && (
+            <p className={`break-words italic text-muted-foreground ${open ? "" : "line-clamp-3"}`}>
+              “{row.evidence}”
+            </p>
+          )}
+        </div>
         </div>
 
         {/* Labelled, not bare icons: a tick and a cross in two colours were
@@ -166,11 +224,6 @@ export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
               ))}
             </dl>
           )}
-          {row.evidence && (
-            <blockquote className="border-l-2 pl-3 text-sm italic text-muted-foreground">
-              “{row.evidence}”
-            </blockquote>
-          )}
           <div className="flex flex-wrap gap-2">
             {draft ? (
               <>
@@ -182,17 +235,7 @@ export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
                 </Button>
               </>
             ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  setDraft(
-                    Object.fromEntries(
-                      Object.entries(data).filter(([, v]) => isEditable(v)).map(([f, v]) => [f, toText(v)]),
-                    ),
-                  )
-                }
-              >
+              <Button size="sm" variant="outline" onClick={startEdit}>
                 Edit before approving
               </Button>
             )}
