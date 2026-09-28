@@ -56,6 +56,9 @@ function toast(props) {
       },
     },
   ]);
+  // A handle, as shadcn's toast() returns: Review's Reject closes its own
+  // Undo toast when the reader leaves before the 8s are up.
+  return { id, dismiss: () => dismiss(id) };
 }
 
 function useToast() {

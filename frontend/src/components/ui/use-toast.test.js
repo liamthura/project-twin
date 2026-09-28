@@ -62,4 +62,17 @@ describe("the toast store", () => {
     expect(t.toasts()).toHaveLength(1);
     expect(t.toasts()[0]).toMatchObject({ title: "Second", open: true });
   });
+
+  it("hands back a dismiss for the toast it raised, and only that toast", () => {
+    const { toasts, wait } = setup();
+    let first;
+    act(() => { first = toast({ title: "one" }); });
+    act(() => toast({ title: "two" }));
+    // "one" was replaced; dismissing it must not close "two".
+    act(() => first.dismiss());
+    expect(toasts()).toHaveLength(1);
+    expect(toasts()[0]).toMatchObject({ title: "two", open: true });
+    wait(3000);
+    expect(toasts()[0]).toMatchObject({ title: "two" });
+  });
 });
