@@ -82,6 +82,11 @@
               "paused",
               "dropped"
             ],
+            "default": "active",
+            "off_contract": [
+              "default"
+            ],
+            "$comment": "A goal with no status given is active -- the write path has always done this, in code, where no pack could see it. Declared here with `off_contract` so the server keeps applying it while the published contract stays byte-identical, which is how lifestyle's status and kind already say the same thing.",
             "show": [
               "badge"
             ]

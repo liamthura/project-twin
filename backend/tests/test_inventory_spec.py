@@ -1,10 +1,11 @@
-"""The one branch the inventory pack could not be declarative about.
+"""A nested entity end to end: inventory's specs, which hang off an item.
 
-`_generic_entity_spec` (server.py:996) returns None for any entity carrying a
-`parent`, so every nested entity needs a hand-written branch and this is
-inventory's. tests/test_stored_key_audit.py already drives `add` and `update`
-against it generically; `remove`, the duplicate guard and the not-found paths
-are only covered here.
+Nested entities used to need a hand-written branch each, because the generic
+write path refused any entity carrying a `parent`; this file was inventory's
+coverage of its own. The path handles them now, so these cases read as what
+they always were -- `remove`, the duplicate guard and the not-found paths for
+a child row, which tests/test_stored_key_audit.py's generic `add`/`update`
+probing does not reach.
 """
 import server
 import persona_store as store

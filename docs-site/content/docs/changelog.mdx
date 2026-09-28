@@ -1,0 +1,97 @@
+---
+title: Changelog
+description: What changed in each release, and what you have to do about it.
+---
+
+Versions here are the app version, shown in the sidebar under your account as
+`v2.1.0 (a1b2c3d)` with the commit it was built from. Releases before 2.1.0
+predate this page.
+
+## 2.1.0
+
+The write path an AI client uses is now one implementation driven by the
+section packs, rather than one hand-written block per entity. Most of what
+follows is the consistency that came with it.
+
+### Write confirmations
+
+Every write answers in the same shape, whichever entity it touched:
+
+```
+✅ Added trait: Curious
+ℹ️ Trait 'Curious' already exists
+❌ Trait 'Curious' not found
+✅ Added spec 'RAM' to thuradev-main
+❌ Goal requires 'title'
+```
+
+Before, each entity phrased its own, so adding a club said `ℹ️ 'Chess' already
+in clubs` where adding a connection said `ℹ️ Connection 'Chess' already
+exists`. 137 of the 235 recorded write results changed wording. Nothing about
+which writes succeed changed with them.
+
+### Duplicate rows
+
+Adding a reference, a coursework entry or a work experience that already
+exists is refused with `ℹ️ ... already exists`. Four entities used to append a
+second copy of it, which left a row you could see twice and remove once.
+
+### Row timestamps
+
+Editing a row's children now touches that row's `last_updated`, so a hobby
+whose references changed reads as touched today. Search results report their
+age from this date, and three of the five child entities were not updating it.
+
+### List matching
+
+A list of plain strings matches case-insensitively when you add to it, which
+is how removing from one already worked. `Tight deadlines` alongside `tight
+deadlines` left one of the pair unremovable.
+
+### New rows
+
+A new row carries every field its section declares, empty, instead of only the
+fields you sent. The editor drew them as empty either way; now the stored JSON
+says so too.
+
+### Custom enum labels
+
+A field that accepts a value outside its list keeps yours under
+`custom_<field>`, and says so in the confirmation:
+`✅ Added goal: Serve community (type 'volunteering' stored as
+other/custom_type)`. You can also correct the label on its own, without
+re-sending the value it belongs to.
+
+### References taking their parent's name
+
+Fixed: a reference sent as `{"domain_name": "Rust", "title": "The Book"}` was
+stored named "Rust", the domain's name rather than the reference's, and one
+sent with the parent selector alone created a reference named after the domain
+it sat under. `title`, `reference_name` and `reference` are documented
+spellings for a reference's own name and now resolve to it. Rows already
+written this way keep the wrong name until you rename them.
+
+### Section packs
+
+A nested element works from a manifest alone. `derive_write_targets` records
+where its rows live and the write path reads that, so `add`, `update` and
+`remove` on a child row need no Python. This was the one shape a contributed
+pack could not ship; [Section packs](/run/section-packs) covers what a
+manifest now has to say.
+
+The published entity contract is unchanged. `get_schema` returns the same 44
+entities with the same fields, and a client written against 2.0.0 keeps
+working.
+
+### Upgrading
+
+Pull the image and restart. There is no schema migration and no new
+environment variable, and existing rows are left as they are.
+
+<Callout type="warn">
+The one-shot data migrations are gone from this release: `migrate_json_to_postgres`,
+`migrate_goals` and `migrate_consolidation`. They each ran once against a
+database that predates Postgres storage, the goals section, or the interests
+consolidation. If yours has not had all three, run them from an earlier tag
+before upgrading.
+</Callout>

@@ -1,0 +1,7111 @@
+{
+ "aesthetic": [
+  {
+   "action": "add",
+   "data": {
+    "domain": "ui",
+    "notes": "notes one",
+    "primary": true,
+    "references": [
+     "references-one",
+     "references-two"
+    ],
+    "stance": "love"
+   },
+   "message": "❌ Aesthetic requires 'name'",
+   "step": "add without required fields",
+   "stored": {
+    "styles": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "domain": "ui",
+    "name": "aesthetic one",
+    "notes": "notes one",
+    "primary": true,
+    "references": [
+     "references-one",
+     "references-two"
+    ],
+    "stance": "love"
+   },
+   "message": "✅ Added aesthetic: aesthetic one",
+   "step": "add",
+   "stored": {
+    "styles": [
+     {
+      "domain": "ui",
+      "id": "<volatile>",
+      "name": "aesthetic one",
+      "notes": "notes one",
+      "primary": true,
+      "references": [
+       "references-one",
+       "references-two"
+      ],
+      "stance": "love"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "domain": "ui",
+    "name": "aesthetic one",
+    "notes": "notes one",
+    "primary": true,
+    "references": [
+     "references-one",
+     "references-two"
+    ],
+    "stance": "love"
+   },
+   "message": "ℹ️ Aesthetic 'aesthetic one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "styles": [
+     {
+      "domain": "ui",
+      "id": "<volatile>",
+      "name": "aesthetic one",
+      "notes": "notes one",
+      "primary": true,
+      "references": [
+       "references-one",
+       "references-two"
+      ],
+      "stance": "love"
+     }
+    ]
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "domain": "graphic",
+    "name": "aesthetic one",
+    "notes": "notes two",
+    "primary": false,
+    "references": [
+     "references-three"
+    ],
+    "stance": "like"
+   },
+   "message": "✅ Updated aesthetic: aesthetic one",
+   "step": "update",
+   "stored": {
+    "styles": [
+     {
+      "domain": "graphic",
+      "id": "<volatile>",
+      "name": "aesthetic one",
+      "notes": "notes two",
+      "primary": false,
+      "references": [
+       "references-three"
+      ],
+      "stance": "like"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "domain": "ui",
+    "name": "aesthetic one",
+    "notes": "notes one",
+    "primary": true,
+    "references": [
+     "references-one",
+     "references-two"
+    ],
+    "stance": "love"
+   },
+   "message": "✅ Removed aesthetic: aesthetic one",
+   "step": "remove",
+   "stored": {
+    "styles": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "domain": "ui",
+    "name": "aesthetic one",
+    "notes": "notes one",
+    "primary": true,
+    "references": [
+     "references-one",
+     "references-two"
+    ],
+    "stance": "love"
+   },
+   "message": "❌ Aesthetic 'aesthetic one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "styles": []
+   }
+  }
+ ],
+ "basic_info": [
+  {
+   "action": "update",
+   "data": {
+    "bio": "bio two",
+    "current_role": "current_role two",
+    "location": "location two",
+    "name": "name two",
+    "nationality": "nationality two",
+    "organisation": "organisation two",
+    "preferred_name": "preferred_name two"
+   },
+   "message": "✅ Updated profile: name=name two, preferred_name=preferred_name two, current_role=current_role two, organisation=organisation two, location=location two, nationality=nationality two, bio=bio two",
+   "step": "update",
+   "stored": {
+    "bio": "bio two",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "current_role two",
+    "education": [],
+    "languages_spoken": [],
+    "location": "location two",
+    "name": "name two",
+    "nationality": "nationality two",
+    "organisation": "organisation two",
+    "preferred_name": "preferred_name two",
+    "work_experience": []
+   }
+  }
+ ],
+ "club": [
+  {
+   "action": "add",
+   "data": {
+    "activities_involved": [
+     "activities_involved-one",
+     "activities_involved-two"
+    ],
+    "institution": "Parent Row"
+   },
+   "message": "❌ Club requires 'name'",
+   "step": "add without required fields",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "activities_involved": [
+     "activities_involved-one",
+     "activities_involved-two"
+    ],
+    "institution": "Parent Row",
+    "name": "club one"
+   },
+   "message": "✅ Added club 'club one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "clubs": [
+       {
+        "activities_involved": [
+         "activities_involved-one",
+         "activities_involved-two"
+        ],
+        "name": "club one"
+       }
+      ],
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "activities_involved": [
+     "activities_involved-one",
+     "activities_involved-two"
+    ],
+    "institution": "Parent Row",
+    "name": "club one"
+   },
+   "message": "ℹ️ Club 'club one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "clubs": [
+       {
+        "activities_involved": [
+         "activities_involved-one",
+         "activities_involved-two"
+        ],
+        "name": "club one"
+       }
+      ],
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "activities_involved": [
+     "activities_involved-one",
+     "activities_involved-two"
+    ],
+    "institution": "Parent Row",
+    "name": "club one"
+   },
+   "message": "✅ Removed club 'club one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "clubs": [],
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "activities_involved": [
+     "activities_involved-one",
+     "activities_involved-two"
+    ],
+    "institution": "Parent Row",
+    "name": "club one"
+   },
+   "message": "❌ Club 'club one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "clubs": [],
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  }
+ ],
+ "communication_default": [
+  {
+   "action": "update",
+   "data": {
+    "detail_level": "detail_level two",
+    "locale": "locale two",
+    "tone": "tone two"
+   },
+   "message": "✅ Updated communication default: detail_level, locale, tone",
+   "step": "update",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "detail_level two",
+      "locale": "locale two",
+      "tone": "tone two"
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  }
+ ],
+ "connection": [
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "relationship": "relationship one",
+    "traits": [
+     "traits-one",
+     "traits-two"
+    ]
+   },
+   "message": "❌ Connection requires 'name'",
+   "step": "add without required fields",
+   "stored": {
+    "connections": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "name": "connection one",
+    "notes": "notes one",
+    "relationship": "relationship one",
+    "traits": [
+     "traits-one",
+     "traits-two"
+    ]
+   },
+   "message": "✅ Added connection: connection one",
+   "step": "add",
+   "stored": {
+    "connections": [
+     {
+      "id": "<volatile>",
+      "name": "connection one",
+      "notes": "notes one",
+      "relationship": "relationship one",
+      "traits": [
+       "traits-one",
+       "traits-two"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "name": "connection one",
+    "notes": "notes one",
+    "relationship": "relationship one",
+    "traits": [
+     "traits-one",
+     "traits-two"
+    ]
+   },
+   "message": "ℹ️ Connection 'connection one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "connections": [
+     {
+      "id": "<volatile>",
+      "name": "connection one",
+      "notes": "notes one",
+      "relationship": "relationship one",
+      "traits": [
+       "traits-one",
+       "traits-two"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "name": "connection one",
+    "notes": "notes two",
+    "relationship": "relationship two",
+    "traits": [
+     "traits-three"
+    ]
+   },
+   "message": "✅ Updated connection: connection one",
+   "step": "update",
+   "stored": {
+    "connections": [
+     {
+      "id": "<volatile>",
+      "name": "connection one",
+      "notes": "notes two",
+      "relationship": "relationship two",
+      "traits": [
+       "traits-three"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "name": "connection one",
+    "notes": "notes one",
+    "relationship": "relationship one",
+    "traits": [
+     "traits-one",
+     "traits-two"
+    ]
+   },
+   "message": "✅ Removed connection: connection one",
+   "step": "remove",
+   "stored": {
+    "connections": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "name": "connection one",
+    "notes": "notes one",
+    "relationship": "relationship one",
+    "traits": [
+     "traits-one",
+     "traits-two"
+    ]
+   },
+   "message": "❌ Connection 'connection one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "connections": []
+   }
+  }
+ ],
+ "coursework": [
+  {
+   "action": "add",
+   "data": {
+    "institution": "Parent Row",
+    "topics": [
+     "topics-one",
+     "topics-two"
+    ]
+   },
+   "message": "❌ Coursework requires 'course'",
+   "step": "add without required fields",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "course": "coursework one",
+    "institution": "Parent Row",
+    "topics": [
+     "topics-one",
+     "topics-two"
+    ]
+   },
+   "message": "✅ Added coursework 'coursework one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "coursework": [
+       {
+        "name": "coursework one",
+        "topics": [
+         "topics-one",
+         "topics-two"
+        ]
+       }
+      ],
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "course": "coursework one",
+    "institution": "Parent Row",
+    "topics": [
+     "topics-one",
+     "topics-two"
+    ]
+   },
+   "message": "ℹ️ Coursework 'coursework one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "coursework": [
+       {
+        "name": "coursework one",
+        "topics": [
+         "topics-one",
+         "topics-two"
+        ]
+       }
+      ],
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "course": "coursework one",
+    "institution": "Parent Row",
+    "topics": [
+     "topics-one",
+     "topics-two"
+    ]
+   },
+   "message": "✅ Removed coursework 'coursework one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "coursework": [],
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "course": "coursework one",
+    "institution": "Parent Row",
+    "topics": [
+     "topics-one",
+     "topics-two"
+    ]
+   },
+   "message": "❌ Coursework 'coursework one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "coursework": [],
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  }
+ ],
+ "coursework_topic": [
+  {
+   "action": "add",
+   "data": {
+    "institution": "Parent Row",
+    "topics": [
+     "topics-one",
+     "topics-two"
+    ]
+   },
+   "message": "❌ Coursework topic requires 'course'",
+   "step": "add without required fields",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "course": "coursework_topic one",
+    "institution": "Parent Row",
+    "topics": [
+     "topics-one",
+     "topics-two"
+    ]
+   },
+   "message": "✅ Added coursework topic 'coursework_topic one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "coursework": [
+       {
+        "name": "coursework_topic one",
+        "topics": [
+         "topics-one",
+         "topics-two"
+        ]
+       }
+      ],
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "course": "coursework_topic one",
+    "institution": "Parent Row",
+    "topics": [
+     "topics-one",
+     "topics-two"
+    ]
+   },
+   "message": "ℹ️ Coursework topic 'coursework_topic one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "coursework": [
+       {
+        "name": "coursework_topic one",
+        "topics": [
+         "topics-one",
+         "topics-two"
+        ]
+       }
+      ],
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "course": "coursework_topic one",
+    "institution": "Parent Row",
+    "topics": [
+     "topics-one",
+     "topics-two"
+    ]
+   },
+   "message": "✅ Removed coursework topic 'coursework_topic one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "coursework": [],
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "course": "coursework_topic one",
+    "institution": "Parent Row",
+    "topics": [
+     "topics-one",
+     "topics-two"
+    ]
+   },
+   "message": "❌ Coursework topic 'coursework_topic one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "coursework": [],
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  }
+ ],
+ "dislike": [
+  {
+   "action": "add",
+   "data": {
+    "stance": "like"
+   },
+   "message": "❌ dislike requires 'item'",
+   "step": "add without required fields",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "dislike one",
+    "stance": "like"
+   },
+   "message": "✅ Added like: dislike one",
+   "step": "add",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": [
+     {
+      "id": "<volatile>",
+      "item": "dislike one",
+      "stance": "like"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "dislike one",
+    "stance": "like"
+   },
+   "message": "ℹ️ 'dislike one' already recorded as a like",
+   "step": "add the same again",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": [
+     {
+      "id": "<volatile>",
+      "item": "dislike one",
+      "stance": "like"
+     }
+    ]
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "item": "dislike one",
+    "stance": "dislike"
+   },
+   "message": "✅ Updated dislike: dislike one",
+   "step": "update",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": [
+     {
+      "id": "<volatile>",
+      "item": "dislike one",
+      "stance": "dislike"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "dislike one",
+    "stance": "like"
+   },
+   "message": "✅ Removed: dislike one",
+   "step": "remove",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "dislike one",
+    "stance": "like"
+   },
+   "message": "❌ 'dislike one' not found in likes_dislikes",
+   "step": "remove what is gone",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  }
+ ],
+ "domain": [
+  {
+   "action": "add",
+   "data": {
+    "level": "beginner",
+    "notes": "notes one",
+    "references": []
+   },
+   "message": "❌ Domain requires 'name'",
+   "step": "add without required fields",
+   "stored": {
+    "domains": [],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "level": "beginner",
+    "name": "domain one",
+    "notes": "notes one",
+    "references": []
+   },
+   "message": "✅ Added domain: domain one",
+   "step": "add",
+   "stored": {
+    "domains": [
+     {
+      "id": "<volatile>",
+      "level": "beginner",
+      "name": "domain one",
+      "notes": "notes one",
+      "references": []
+     }
+    ],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "level": "beginner",
+    "name": "domain one",
+    "notes": "notes one",
+    "references": []
+   },
+   "message": "ℹ️ Domain 'domain one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "domains": [
+     {
+      "id": "<volatile>",
+      "level": "beginner",
+      "name": "domain one",
+      "notes": "notes one",
+      "references": []
+     }
+    ],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "level": "learning",
+    "name": "domain one",
+    "notes": "notes two",
+    "references": []
+   },
+   "message": "✅ Updated domain: domain one",
+   "step": "update",
+   "stored": {
+    "domains": [
+     {
+      "id": "<volatile>",
+      "level": "learning",
+      "name": "domain one",
+      "notes": "notes two",
+      "references": []
+     }
+    ],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "level": "beginner",
+    "name": "domain one",
+    "notes": "notes one",
+    "references": []
+   },
+   "message": "✅ Removed domain: domain one",
+   "step": "remove",
+   "stored": {
+    "domains": [],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "level": "beginner",
+    "name": "domain one",
+    "notes": "notes one",
+    "references": []
+   },
+   "message": "❌ Domain 'domain one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "domains": [],
+    "mental_tabs": []
+   }
+  }
+ ],
+ "domain_reference": [
+  {
+   "action": "add",
+   "data": {
+    "domain_name": "Parent Row",
+    "notes": "notes one",
+    "url": "url one"
+   },
+   "message": "❌ Domain reference requires 'ref_name'",
+   "step": "add without required fields",
+   "stored": {
+    "domains": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "references": []
+     }
+    ],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "domain_name": "Parent Row",
+    "notes": "notes one",
+    "ref_name": "domain_reference one",
+    "url": "url one"
+   },
+   "message": "✅ Added domain reference 'domain_reference one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "domains": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "references": [
+       {
+        "name": "domain_reference one",
+        "notes": "notes one",
+        "url": "url one"
+       }
+      ]
+     }
+    ],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "domain_name": "Parent Row",
+    "notes": "notes one",
+    "ref_name": "domain_reference one",
+    "url": "url one"
+   },
+   "message": "ℹ️ Domain reference 'domain_reference one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "domains": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "references": [
+       {
+        "name": "domain_reference one",
+        "notes": "notes one",
+        "url": "url one"
+       }
+      ]
+     }
+    ],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "domain_name": "Parent Row",
+    "notes": "notes two",
+    "ref_name": "domain_reference one",
+    "url": "url two"
+   },
+   "message": "✅ Updated domain reference 'domain_reference one' on Parent Row",
+   "step": "update",
+   "stored": {
+    "domains": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "references": [
+       {
+        "name": "domain_reference one",
+        "notes": "notes two",
+        "url": "url two"
+       }
+      ]
+     }
+    ],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "domain_name": "Parent Row",
+    "notes": "notes one",
+    "ref_name": "domain_reference one",
+    "url": "url one"
+   },
+   "message": "✅ Removed domain reference 'domain_reference one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "domains": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "references": []
+     }
+    ],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "domain_name": "Parent Row",
+    "notes": "notes one",
+    "ref_name": "domain_reference one",
+    "url": "url one"
+   },
+   "message": "❌ Domain reference 'domain_reference one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "domains": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "references": []
+     }
+    ],
+    "mental_tabs": []
+   }
+  }
+ ],
+ "education": [
+  {
+   "action": "add",
+   "data": {
+    "clubs": [],
+    "coursework": [],
+    "degree_level": "degree_level one",
+    "end_year": "end_year one",
+    "field_of_study": "field_of_study one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "start_year": "start_year one",
+    "status": "current"
+   },
+   "message": "❌ Education requires 'institution'",
+   "step": "add without required fields",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "clubs": [],
+    "coursework": [],
+    "degree_level": "degree_level one",
+    "end_year": "end_year one",
+    "field_of_study": "field_of_study one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "institution": "education one",
+    "start_year": "start_year one",
+    "status": "current"
+   },
+   "message": "✅ Added education: education one",
+   "step": "add",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "clubs": [],
+      "coursework": [],
+      "degree_level": "degree_level one",
+      "end_year": "end_year one",
+      "field_of_study": "field_of_study one",
+      "highlights": [
+       "highlights-one",
+       "highlights-two"
+      ],
+      "id": "<volatile>",
+      "institution": "education one",
+      "start_year": "start_year one",
+      "status": "current"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "clubs": [],
+    "coursework": [],
+    "degree_level": "degree_level one",
+    "end_year": "end_year one",
+    "field_of_study": "field_of_study one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "institution": "education one",
+    "start_year": "start_year one",
+    "status": "current"
+   },
+   "message": "ℹ️ Education 'education one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "clubs": [],
+      "coursework": [],
+      "degree_level": "degree_level one",
+      "end_year": "end_year one",
+      "field_of_study": "field_of_study one",
+      "highlights": [
+       "highlights-one",
+       "highlights-two"
+      ],
+      "id": "<volatile>",
+      "institution": "education one",
+      "start_year": "start_year one",
+      "status": "current"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "clubs": [],
+    "coursework": [],
+    "degree_level": "degree_level two",
+    "end_year": "end_year two",
+    "field_of_study": "field_of_study two",
+    "highlights": [
+     "highlights-three"
+    ],
+    "institution": "education one",
+    "start_year": "start_year two",
+    "status": "completed"
+   },
+   "message": "✅ Updated education: education one",
+   "step": "update",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "clubs": [],
+      "coursework": [],
+      "degree_level": "degree_level two",
+      "end_year": "end_year two",
+      "field_of_study": "field_of_study two",
+      "highlights": [
+       "highlights-three"
+      ],
+      "id": "<volatile>",
+      "institution": "education one",
+      "start_year": "start_year two",
+      "status": "completed"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "clubs": [],
+    "coursework": [],
+    "degree_level": "degree_level one",
+    "end_year": "end_year one",
+    "field_of_study": "field_of_study one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "institution": "education one",
+    "start_year": "start_year one",
+    "status": "current"
+   },
+   "message": "✅ Removed education: education one",
+   "step": "remove",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "clubs": [],
+    "coursework": [],
+    "degree_level": "degree_level one",
+    "end_year": "end_year one",
+    "field_of_study": "field_of_study one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "institution": "education one",
+    "start_year": "start_year one",
+    "status": "current"
+   },
+   "message": "❌ Education 'education one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  }
+ ],
+ "education_highlight": [
+  {
+   "action": "add",
+   "data": {
+    "institution": "Parent Row"
+   },
+   "message": "❌ Education highlight requires 'highlight'",
+   "step": "add without required fields",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "highlight": "education_highlight one",
+    "institution": "Parent Row"
+   },
+   "message": "✅ Added education highlight 'education_highlight one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "highlights": [
+       "education_highlight one"
+      ],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "highlight": "education_highlight one",
+    "institution": "Parent Row"
+   },
+   "message": "ℹ️ Education highlight 'education_highlight one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "highlights": [
+       "education_highlight one"
+      ],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "highlight": "education_highlight one",
+    "institution": "Parent Row"
+   },
+   "message": "✅ Removed education highlight 'education_highlight one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "highlight": "education_highlight one",
+    "institution": "Parent Row"
+   },
+   "message": "❌ Education highlight 'education_highlight one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "institution": "Parent Row"
+     }
+    ],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  }
+ ],
+ "email": [
+  {
+   "action": "add",
+   "data": {},
+   "message": "❌ Email requires 'address', 'purpose'",
+   "step": "add without required fields",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "address": "email one",
+    "purpose": "purpose one"
+   },
+   "message": "✅ Added email: email one",
+   "step": "add",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [
+      {
+       "address": "email one",
+       "purpose": "purpose one"
+      }
+     ],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "address": "email one",
+    "purpose": "purpose one"
+   },
+   "message": "ℹ️ Email 'email one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [
+      {
+       "address": "email one",
+       "purpose": "purpose one"
+      }
+     ],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "address": "email one",
+    "purpose": "purpose two"
+   },
+   "message": "✅ Updated email: email one",
+   "step": "update",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [
+      {
+       "address": "email one",
+       "purpose": "purpose two"
+      }
+     ],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "address": "email one",
+    "purpose": "purpose one"
+   },
+   "message": "✅ Removed email: email one",
+   "step": "remove",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "address": "email one",
+    "purpose": "purpose one"
+   },
+   "message": "❌ Email 'email one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  }
+ ],
+ "energy_peak": [
+  {
+   "action": "add",
+   "data": {},
+   "message": "❌ Energy peak requires 'peak'",
+   "step": "add without required fields",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "peak": "energy_peak one"
+   },
+   "message": "✅ Added energy peak: energy_peak one",
+   "step": "add",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [
+      "energy_peak one"
+     ],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "peak": "energy_peak one"
+   },
+   "message": "ℹ️ Energy peak 'energy_peak one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [
+      "energy_peak one"
+     ],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "peak": "energy_peak one"
+   },
+   "message": "✅ Removed energy peak: energy_peak one",
+   "step": "remove",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "peak": "energy_peak one"
+   },
+   "message": "❌ Energy peak 'energy_peak one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  }
+ ],
+ "goal": [
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "status": "active",
+    "target_date": "2026-03-01",
+    "type": "career",
+    "why": "why one"
+   },
+   "message": "❌ Goal requires 'title'",
+   "step": "add without required fields",
+   "stored": {
+    "goals": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "status": "active",
+    "target_date": "2026-03-01",
+    "title": "goal one",
+    "type": "career",
+    "why": "why one"
+   },
+   "message": "✅ Added goal: goal one",
+   "step": "add",
+   "stored": {
+    "goals": [
+     {
+      "id": "<volatile>",
+      "notes": "notes one",
+      "status": "active",
+      "target_date": "2026-03-01",
+      "title": "goal one",
+      "type": "career",
+      "why": "why one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "status": "active",
+    "target_date": "2026-03-01",
+    "title": "goal one",
+    "type": "career",
+    "why": "why one"
+   },
+   "message": "ℹ️ Goal 'goal one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "goals": [
+     {
+      "id": "<volatile>",
+      "notes": "notes one",
+      "status": "active",
+      "target_date": "2026-03-01",
+      "title": "goal one",
+      "type": "career",
+      "why": "why one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "notes": "notes two",
+    "status": "achieved",
+    "target_date": "2026-09-30",
+    "title": "goal one",
+    "type": "learning",
+    "why": "why two"
+   },
+   "message": "✅ Updated goal: goal one",
+   "step": "update",
+   "stored": {
+    "goals": [
+     {
+      "id": "<volatile>",
+      "notes": "notes two",
+      "status": "achieved",
+      "target_date": "2026-09-30",
+      "title": "goal one",
+      "type": "learning",
+      "why": "why two"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "notes": "notes one",
+    "status": "active",
+    "target_date": "2026-03-01",
+    "title": "goal one",
+    "type": "career",
+    "why": "why one"
+   },
+   "message": "✅ Removed goal: goal one",
+   "step": "remove",
+   "stored": {
+    "goals": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "notes": "notes one",
+    "status": "active",
+    "target_date": "2026-03-01",
+    "title": "goal one",
+    "type": "career",
+    "why": "why one"
+   },
+   "message": "❌ Goal 'goal one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "goals": []
+   }
+  }
+ ],
+ "hobby": [
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "references": [],
+    "skill_level": "beginner",
+    "specifics": [
+     "specifics-one",
+     "specifics-two"
+    ],
+    "status": "active"
+   },
+   "message": "❌ Hobby requires a name",
+   "step": "add without required fields",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "name": "hobby one",
+    "notes": "notes one",
+    "references": [],
+    "skill_level": "beginner",
+    "specifics": [
+     "specifics-one",
+     "specifics-two"
+    ],
+    "status": "active"
+   },
+   "message": "✅ Added hobby: hobby one (status: active)",
+   "step": "add",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "name": "hobby one",
+      "notes": "notes one",
+      "references": [],
+      "skill_level": "beginner",
+      "specifics": [
+       "specifics-one",
+       "specifics-two"
+      ],
+      "status": "active"
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "name": "hobby one",
+    "notes": "notes one",
+    "references": [],
+    "skill_level": "beginner",
+    "specifics": [
+     "specifics-one",
+     "specifics-two"
+    ],
+    "status": "active"
+   },
+   "message": "ℹ️ Hobby 'hobby one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "name": "hobby one",
+      "notes": "notes one",
+      "references": [],
+      "skill_level": "beginner",
+      "specifics": [
+       "specifics-one",
+       "specifics-two"
+      ],
+      "status": "active"
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "name": "hobby one",
+    "notes": "notes two",
+    "references": [],
+    "skill_level": "learning",
+    "specifics": [
+     "specifics-three"
+    ],
+    "status": "inactive"
+   },
+   "message": "✅ Updated hobby: hobby one",
+   "step": "update",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "hobby one",
+      "notes": "notes two",
+      "references": [],
+      "skill_level": "learning",
+      "specifics": [
+       "specifics-three"
+      ],
+      "status": "inactive"
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "name": "hobby one",
+    "notes": "notes one",
+    "references": [],
+    "skill_level": "beginner",
+    "specifics": [
+     "specifics-one",
+     "specifics-two"
+    ],
+    "status": "active"
+   },
+   "message": "✅ Removed hobby: hobby one",
+   "step": "remove",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "name": "hobby one",
+    "notes": "notes one",
+    "references": [],
+    "skill_level": "beginner",
+    "specifics": [
+     "specifics-one",
+     "specifics-two"
+    ],
+    "status": "active"
+   },
+   "message": "❌ Hobby 'hobby one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  }
+ ],
+ "hobby_reference": [
+  {
+   "action": "add",
+   "data": {
+    "hobby_name": "Parent Row",
+    "notes": "notes one",
+    "url": "url one"
+   },
+   "message": "❌ Hobby reference requires 'ref_name'",
+   "step": "add without required fields",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row"
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "hobby_name": "Parent Row",
+    "notes": "notes one",
+    "ref_name": "hobby_reference one",
+    "url": "url one"
+   },
+   "message": "✅ Added hobby reference 'hobby_reference one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "references": [
+       {
+        "name": "hobby_reference one",
+        "notes": "notes one",
+        "url": "url one"
+       }
+      ]
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "hobby_name": "Parent Row",
+    "notes": "notes one",
+    "ref_name": "hobby_reference one",
+    "url": "url one"
+   },
+   "message": "ℹ️ Hobby reference 'hobby_reference one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "references": [
+       {
+        "name": "hobby_reference one",
+        "notes": "notes one",
+        "url": "url one"
+       }
+      ]
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "hobby_name": "Parent Row",
+    "notes": "notes two",
+    "ref_name": "hobby_reference one",
+    "url": "url two"
+   },
+   "message": "✅ Updated hobby reference 'hobby_reference one' on Parent Row",
+   "step": "update",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "references": [
+       {
+        "name": "hobby_reference one",
+        "notes": "notes two",
+        "url": "url two"
+       }
+      ]
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "hobby_name": "Parent Row",
+    "notes": "notes one",
+    "ref_name": "hobby_reference one",
+    "url": "url one"
+   },
+   "message": "✅ Removed hobby reference 'hobby_reference one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "references": []
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "hobby_name": "Parent Row",
+    "notes": "notes one",
+    "ref_name": "hobby_reference one",
+    "url": "url one"
+   },
+   "message": "❌ Hobby reference 'hobby_reference one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "references": []
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  }
+ ],
+ "hobby_specific": [
+  {
+   "action": "add",
+   "data": {
+    "hobby_name": "Parent Row"
+   },
+   "message": "❌ Hobby specific requires 'specific'",
+   "step": "add without required fields",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row"
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "hobby_name": "Parent Row",
+    "specific": "hobby_specific one"
+   },
+   "message": "✅ Added hobby specific 'hobby_specific one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "specifics": [
+       "hobby_specific one"
+      ]
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "hobby_name": "Parent Row",
+    "specific": "hobby_specific one"
+   },
+   "message": "ℹ️ Hobby specific 'hobby_specific one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "specifics": [
+       "hobby_specific one"
+      ]
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "hobby_name": "Parent Row",
+    "specific": "hobby_specific one"
+   },
+   "message": "✅ Removed hobby specific 'hobby_specific one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "specifics": []
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "hobby_name": "Parent Row",
+    "specific": "hobby_specific one"
+   },
+   "message": "❌ Hobby specific 'hobby_specific one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "hobbies": [
+     {
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "specifics": []
+     }
+    ],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  }
+ ],
+ "interest": [
+  {
+   "action": "add",
+   "data": {
+    "kind": "passion",
+    "notes": "notes one"
+   },
+   "message": "❌ Interest requires 'name'",
+   "step": "add without required fields",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "kind": "passion",
+    "name": "interest one",
+    "notes": "notes one"
+   },
+   "message": "✅ Added interest: interest one",
+   "step": "add",
+   "stored": {
+    "hobbies": [],
+    "interests": [
+     {
+      "id": "<volatile>",
+      "kind": "passion",
+      "name": "interest one",
+      "notes": "notes one"
+     }
+    ],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "kind": "passion",
+    "name": "interest one",
+    "notes": "notes one"
+   },
+   "message": "ℹ️ Interest 'interest one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "hobbies": [],
+    "interests": [
+     {
+      "id": "<volatile>",
+      "kind": "passion",
+      "name": "interest one",
+      "notes": "notes one"
+     }
+    ],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "kind": "curiosity",
+    "name": "interest one",
+    "notes": "notes two"
+   },
+   "message": "✅ Updated interest: interest one",
+   "step": "update",
+   "stored": {
+    "hobbies": [],
+    "interests": [
+     {
+      "id": "<volatile>",
+      "kind": "curiosity",
+      "name": "interest one",
+      "notes": "notes two"
+     }
+    ],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "kind": "passion",
+    "name": "interest one",
+    "notes": "notes one"
+   },
+   "message": "✅ Removed interest: interest one",
+   "step": "remove",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "kind": "passion",
+    "name": "interest one",
+    "notes": "notes one"
+   },
+   "message": "❌ Interest 'interest one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  }
+ ],
+ "inventory_item": [
+  {
+   "action": "add",
+   "data": {
+    "category": "computer",
+    "notes": "notes one",
+    "specs": [],
+    "status": "in_use"
+   },
+   "message": "❌ Inventory item requires 'name'",
+   "step": "add without required fields",
+   "stored": {
+    "items": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "category": "computer",
+    "name": "inventory_item one",
+    "notes": "notes one",
+    "specs": [],
+    "status": "in_use"
+   },
+   "message": "✅ Added inventory item: inventory_item one",
+   "step": "add",
+   "stored": {
+    "items": [
+     {
+      "category": "computer",
+      "id": "<volatile>",
+      "name": "inventory_item one",
+      "notes": "notes one",
+      "specs": [],
+      "status": "in_use"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "category": "computer",
+    "name": "inventory_item one",
+    "notes": "notes one",
+    "specs": [],
+    "status": "in_use"
+   },
+   "message": "ℹ️ Inventory item 'inventory_item one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "items": [
+     {
+      "category": "computer",
+      "id": "<volatile>",
+      "name": "inventory_item one",
+      "notes": "notes one",
+      "specs": [],
+      "status": "in_use"
+     }
+    ]
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "category": "phone",
+    "name": "inventory_item one",
+    "notes": "notes two",
+    "specs": [],
+    "status": "spare"
+   },
+   "message": "✅ Updated inventory item: inventory_item one",
+   "step": "update",
+   "stored": {
+    "items": [
+     {
+      "category": "phone",
+      "id": "<volatile>",
+      "name": "inventory_item one",
+      "notes": "notes two",
+      "specs": [],
+      "status": "spare"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "category": "computer",
+    "name": "inventory_item one",
+    "notes": "notes one",
+    "specs": [],
+    "status": "in_use"
+   },
+   "message": "✅ Removed inventory item: inventory_item one",
+   "step": "remove",
+   "stored": {
+    "items": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "category": "computer",
+    "name": "inventory_item one",
+    "notes": "notes one",
+    "specs": [],
+    "status": "in_use"
+   },
+   "message": "❌ Inventory item 'inventory_item one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "items": []
+   }
+  }
+ ],
+ "inventory_spec": [
+  {
+   "action": "add",
+   "data": {
+    "inventory_item_name": "Parent Row"
+   },
+   "message": "❌ Inventory spec requires 'name', 'value'",
+   "step": "add without required fields",
+   "stored": {
+    "items": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "inventory_item_name": "Parent Row",
+    "name": "inventory_spec one",
+    "value": "value one"
+   },
+   "message": "✅ Added inventory spec 'inventory_spec one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "items": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "specs": [
+       {
+        "name": "inventory_spec one",
+        "value": "value one"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "inventory_item_name": "Parent Row",
+    "name": "inventory_spec one",
+    "value": "value one"
+   },
+   "message": "ℹ️ Inventory spec 'inventory_spec one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "items": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "specs": [
+       {
+        "name": "inventory_spec one",
+        "value": "value one"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "inventory_item_name": "Parent Row",
+    "name": "inventory_spec one",
+    "value": "value two"
+   },
+   "message": "✅ Updated inventory spec 'inventory_spec one' on Parent Row",
+   "step": "update",
+   "stored": {
+    "items": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "specs": [
+       {
+        "name": "inventory_spec one",
+        "value": "value two"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "inventory_item_name": "Parent Row",
+    "name": "inventory_spec one",
+    "value": "value one"
+   },
+   "message": "✅ Removed inventory spec 'inventory_spec one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "items": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "specs": []
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "inventory_item_name": "Parent Row",
+    "name": "inventory_spec one",
+    "value": "value one"
+   },
+   "message": "❌ Inventory spec 'inventory_spec one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "items": [
+     {
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "specs": []
+     }
+    ]
+   }
+  }
+ ],
+ "knowledge": [
+  {
+   "action": "add",
+   "data": {
+    "category": "category one",
+    "level": "level one",
+    "notes": "notes one",
+    "references": "references one"
+   },
+   "message": "❌ Knowledge requires 'name' or 'topic'",
+   "step": "add without required fields",
+   "stored": {
+    "domains": [],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "category": "category one",
+    "level": "level one",
+    "name": "knowledge one",
+    "notes": "notes one",
+    "references": "references one"
+   },
+   "message": "✅ Added knowledge one to category one",
+   "step": "add",
+   "stored": {
+    "category one": [
+     {
+      "added_date": "<volatile>",
+      "level": "level one",
+      "name": "knowledge one",
+      "notes": "notes one",
+      "references": "references one"
+     }
+    ],
+    "domains": [],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "category": "category one",
+    "level": "level one",
+    "name": "knowledge one",
+    "notes": "notes one",
+    "references": "references one"
+   },
+   "message": "ℹ️ 'knowledge one' already exists in category one",
+   "step": "add the same again",
+   "stored": {
+    "category one": [
+     {
+      "added_date": "<volatile>",
+      "level": "level one",
+      "name": "knowledge one",
+      "notes": "notes one",
+      "references": "references one"
+     }
+    ],
+    "domains": [],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "category": "category one",
+    "level": "level two",
+    "name": "knowledge one",
+    "notes": "notes two",
+    "references": "references two"
+   },
+   "message": "✅ Updated knowledge one in category one",
+   "step": "update",
+   "stored": {
+    "category one": [
+     {
+      "added_date": "<volatile>",
+      "last_updated": "<volatile>",
+      "level": "level two",
+      "name": "knowledge one",
+      "notes": "notes two",
+      "references": "references one"
+     }
+    ],
+    "domains": [],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "category": "category one",
+    "level": "level one",
+    "name": "knowledge one",
+    "notes": "notes one",
+    "references": "references one"
+   },
+   "message": "✅ Removed knowledge one from category one",
+   "step": "remove",
+   "stored": {
+    "category one": [],
+    "domains": [],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "category": "category one",
+    "level": "level one",
+    "name": "knowledge one",
+    "notes": "notes one",
+    "references": "references one"
+   },
+   "message": "❌ 'knowledge one' not found in category one",
+   "step": "remove what is gone",
+   "stored": {
+    "category one": [],
+    "domains": [],
+    "mental_tabs": []
+   }
+  }
+ ],
+ "language": [
+  {
+   "action": "add",
+   "data": {},
+   "message": "❌ Language requires 'name', 'fluency'",
+   "step": "add without required fields",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "fluency": "native",
+    "name": "language one"
+   },
+   "message": "✅ Added language: language one",
+   "step": "add",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [
+     {
+      "fluency": "native",
+      "id": "<volatile>",
+      "name": "language one"
+     }
+    ],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "fluency": "native",
+    "name": "language one"
+   },
+   "message": "ℹ️ Language 'language one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [
+     {
+      "fluency": "native",
+      "id": "<volatile>",
+      "name": "language one"
+     }
+    ],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "fluency": "fluent",
+    "name": "language one"
+   },
+   "message": "✅ Updated language: language one",
+   "step": "update",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [
+     {
+      "fluency": "fluent",
+      "id": "<volatile>",
+      "name": "language one"
+     }
+    ],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "fluency": "native",
+    "name": "language one"
+   },
+   "message": "✅ Removed language: language one",
+   "step": "remove",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "fluency": "native",
+    "name": "language one"
+   },
+   "message": "❌ Language 'language one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  }
+ ],
+ "learning_entry": [
+  {
+   "action": "add",
+   "data": {
+    "conversation_metadata": "conversation_metadata one",
+    "followup_items": [
+     "followup_items-one",
+     "followup_items-two"
+    ],
+    "key_decisions": [
+     "key_decisions-one",
+     "key_decisions-two"
+    ],
+    "new_topic": "new_topic one",
+    "source": "source one",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ]
+   },
+   "message": "❌ Learning entry requires 'topic' and 'details'",
+   "step": "add without required fields",
+   "stored": {
+    "entries": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "conversation_metadata": "conversation_metadata one",
+    "details": "details one",
+    "followup_items": [
+     "followup_items-one",
+     "followup_items-two"
+    ],
+    "key_decisions": [
+     "key_decisions-one",
+     "key_decisions-two"
+    ],
+    "new_topic": "new_topic one",
+    "source": "source one",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "topic": "learning_entry one"
+   },
+   "message": "✅ Logged learning: learning_entry one (id: <id>)",
+   "step": "add",
+   "stored": {
+    "entries": [
+     {
+      "conversation_metadata": "conversation_metadata one",
+      "details": "details one",
+      "followup_items": [
+       "followup_items-one",
+       "followup_items-two"
+      ],
+      "id": "<volatile>",
+      "key_decisions": [
+       "key_decisions-one",
+       "key_decisions-two"
+      ],
+      "source": "source one",
+      "tags": [
+       "tags-one",
+       "tags-two"
+      ],
+      "timestamp": "<volatile>",
+      "topic": "learning_entry one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "conversation_metadata": "conversation_metadata one",
+    "details": "details one",
+    "followup_items": [
+     "followup_items-one",
+     "followup_items-two"
+    ],
+    "key_decisions": [
+     "key_decisions-one",
+     "key_decisions-two"
+    ],
+    "new_topic": "new_topic one",
+    "source": "source one",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "topic": "learning_entry one"
+   },
+   "message": "✅ Logged learning: learning_entry one (id: <id>)",
+   "step": "add the same again",
+   "stored": {
+    "entries": [
+     {
+      "conversation_metadata": "conversation_metadata one",
+      "details": "details one",
+      "followup_items": [
+       "followup_items-one",
+       "followup_items-two"
+      ],
+      "id": "<volatile>",
+      "key_decisions": [
+       "key_decisions-one",
+       "key_decisions-two"
+      ],
+      "source": "source one",
+      "tags": [
+       "tags-one",
+       "tags-two"
+      ],
+      "timestamp": "<volatile>",
+      "topic": "learning_entry one"
+     },
+     {
+      "conversation_metadata": "conversation_metadata one",
+      "details": "details one",
+      "followup_items": [
+       "followup_items-one",
+       "followup_items-two"
+      ],
+      "id": "<volatile>",
+      "key_decisions": [
+       "key_decisions-one",
+       "key_decisions-two"
+      ],
+      "source": "source one",
+      "tags": [
+       "tags-one",
+       "tags-two"
+      ],
+      "timestamp": "<volatile>",
+      "topic": "learning_entry one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "conversation_metadata": "conversation_metadata two",
+    "details": "details two",
+    "followup_items": [
+     "followup_items-three"
+    ],
+    "key_decisions": [
+     "key_decisions-three"
+    ],
+    "new_topic": "new_topic two",
+    "source": "source two",
+    "tags": [
+     "tags-three"
+    ],
+    "topic": "learning_entry one"
+   },
+   "message": "✅ Updated learning entry: new_topic two (details, source, tags, key_decisions, followup_items, conversation_metadata, topic)",
+   "step": "update",
+   "stored": {
+    "entries": [
+     {
+      "conversation_metadata": "conversation_metadata one",
+      "details": "details one",
+      "followup_items": [
+       "followup_items-one",
+       "followup_items-two"
+      ],
+      "id": "<volatile>",
+      "key_decisions": [
+       "key_decisions-one",
+       "key_decisions-two"
+      ],
+      "source": "source one",
+      "tags": [
+       "tags-one",
+       "tags-two"
+      ],
+      "timestamp": "<volatile>",
+      "topic": "learning_entry one"
+     },
+     {
+      "conversation_metadata": "conversation_metadata two",
+      "details": "details two",
+      "followup_items": [
+       "followup_items-three"
+      ],
+      "id": "<volatile>",
+      "key_decisions": [
+       "key_decisions-three"
+      ],
+      "source": "source two",
+      "tags": [
+       "tags-three"
+      ],
+      "timestamp": "<volatile>",
+      "topic": "new_topic two"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "conversation_metadata": "conversation_metadata one",
+    "details": "details one",
+    "followup_items": [
+     "followup_items-one",
+     "followup_items-two"
+    ],
+    "key_decisions": [
+     "key_decisions-one",
+     "key_decisions-two"
+    ],
+    "new_topic": "new_topic one",
+    "source": "source one",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "topic": "learning_entry one"
+   },
+   "message": "✅ Removed learning entry: learning_entry one",
+   "step": "remove",
+   "stored": {
+    "entries": [
+     {
+      "conversation_metadata": "conversation_metadata two",
+      "details": "details two",
+      "followup_items": [
+       "followup_items-three"
+      ],
+      "id": "<volatile>",
+      "key_decisions": [
+       "key_decisions-three"
+      ],
+      "source": "source two",
+      "tags": [
+       "tags-three"
+      ],
+      "timestamp": "<volatile>",
+      "topic": "new_topic two"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "conversation_metadata": "conversation_metadata one",
+    "details": "details one",
+    "followup_items": [
+     "followup_items-one",
+     "followup_items-two"
+    ],
+    "key_decisions": [
+     "key_decisions-one",
+     "key_decisions-two"
+    ],
+    "new_topic": "new_topic one",
+    "source": "source one",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "topic": "learning_entry one"
+   },
+   "message": "❌ Learning entry not found: learning_entry one",
+   "step": "remove what is gone",
+   "stored": {
+    "entries": [
+     {
+      "conversation_metadata": "conversation_metadata two",
+      "details": "details two",
+      "followup_items": [
+       "followup_items-three"
+      ],
+      "id": "<volatile>",
+      "key_decisions": [
+       "key_decisions-three"
+      ],
+      "source": "source two",
+      "tags": [
+       "tags-three"
+      ],
+      "timestamp": "<volatile>",
+      "topic": "new_topic two"
+     }
+    ]
+   }
+  }
+ ],
+ "like": [
+  {
+   "action": "add",
+   "data": {
+    "stance": "like"
+   },
+   "message": "❌ like requires 'item'",
+   "step": "add without required fields",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "like one",
+    "stance": "like"
+   },
+   "message": "✅ Added like: like one",
+   "step": "add",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": [
+     {
+      "id": "<volatile>",
+      "item": "like one",
+      "stance": "like"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "like one",
+    "stance": "like"
+   },
+   "message": "ℹ️ 'like one' already recorded as a like",
+   "step": "add the same again",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": [
+     {
+      "id": "<volatile>",
+      "item": "like one",
+      "stance": "like"
+     }
+    ]
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "item": "like one",
+    "stance": "dislike"
+   },
+   "message": "✅ Updated dislike: like one",
+   "step": "update",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": [
+     {
+      "id": "<volatile>",
+      "item": "like one",
+      "stance": "dislike"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "like one",
+    "stance": "like"
+   },
+   "message": "✅ Removed: like one",
+   "step": "remove",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "like one",
+    "stance": "like"
+   },
+   "message": "❌ 'like one' not found in likes_dislikes",
+   "step": "remove what is gone",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  }
+ ],
+ "link": [
+  {
+   "action": "add",
+   "data": {
+    "new_label": "new_label one"
+   },
+   "message": "❌ Link requires 'label', 'url'",
+   "step": "add without required fields",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "label": "link one",
+    "new_label": "new_label one",
+    "url": "url one"
+   },
+   "message": "✅ Added link: link one",
+   "step": "add",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": [
+      {
+       "label": "link one",
+       "url": "url one"
+      }
+     ]
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "label": "link one",
+    "new_label": "new_label one",
+    "url": "url one"
+   },
+   "message": "ℹ️ Link 'link one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": [
+      {
+       "label": "link one",
+       "url": "url one"
+      }
+     ]
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "label": "link one",
+    "new_label": "new_label two",
+    "url": "url two"
+   },
+   "message": "✅ Updated link: new_label two",
+   "step": "update",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": [
+      {
+       "label": "new_label two",
+       "url": "url two"
+      }
+     ]
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "label": "link one",
+    "new_label": "new_label one",
+    "url": "url one"
+   },
+   "message": "❌ Link 'link one' not found",
+   "step": "remove",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": [
+      {
+       "label": "new_label two",
+       "url": "url two"
+      }
+     ]
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "label": "link one",
+    "new_label": "new_label one",
+    "url": "url one"
+   },
+   "message": "❌ Link 'link one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": [
+      {
+       "label": "new_label two",
+       "url": "url two"
+      }
+     ]
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  }
+ ],
+ "media_item": [
+  {
+   "action": "add",
+   "data": {
+    "kind": "book",
+    "notes": "notes one",
+    "reaction": "loved",
+    "status": "want",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "url": "url one"
+   },
+   "message": "❌ Media item requires 'title'",
+   "step": "add without required fields",
+   "stored": {
+    "items": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "kind": "book",
+    "notes": "notes one",
+    "reaction": "loved",
+    "status": "want",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "title": "media_item one",
+    "url": "url one"
+   },
+   "message": "✅ Added media item: media_item one",
+   "step": "add",
+   "stored": {
+    "items": [
+     {
+      "id": "<volatile>",
+      "kind": "book",
+      "notes": "notes one",
+      "reaction": "loved",
+      "status": "want",
+      "tags": [
+       "tags-one",
+       "tags-two"
+      ],
+      "title": "media_item one",
+      "url": "url one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "kind": "book",
+    "notes": "notes one",
+    "reaction": "loved",
+    "status": "want",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "title": "media_item one",
+    "url": "url one"
+   },
+   "message": "ℹ️ Media item 'media_item one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "items": [
+     {
+      "id": "<volatile>",
+      "kind": "book",
+      "notes": "notes one",
+      "reaction": "loved",
+      "status": "want",
+      "tags": [
+       "tags-one",
+       "tags-two"
+      ],
+      "title": "media_item one",
+      "url": "url one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "kind": "article",
+    "notes": "notes two",
+    "reaction": "liked",
+    "status": "in_progress",
+    "tags": [
+     "tags-three"
+    ],
+    "title": "media_item one",
+    "url": "url two"
+   },
+   "message": "✅ Updated media item: media_item one",
+   "step": "update",
+   "stored": {
+    "items": [
+     {
+      "id": "<volatile>",
+      "kind": "article",
+      "notes": "notes two",
+      "reaction": "liked",
+      "status": "in_progress",
+      "tags": [
+       "tags-three"
+      ],
+      "title": "media_item one",
+      "url": "url two"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "kind": "book",
+    "notes": "notes one",
+    "reaction": "loved",
+    "status": "want",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "title": "media_item one",
+    "url": "url one"
+   },
+   "message": "✅ Removed media item: media_item one",
+   "step": "remove",
+   "stored": {
+    "items": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "kind": "book",
+    "notes": "notes one",
+    "reaction": "loved",
+    "status": "want",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "title": "media_item one",
+    "url": "url one"
+   },
+   "message": "❌ Media item 'media_item one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "items": []
+   }
+  }
+ ],
+ "mental_tab": [
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "references": [],
+    "status": "open",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ]
+   },
+   "message": "❌ Mental tab requires 'title'",
+   "step": "add without required fields",
+   "stored": {
+    "domains": [],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "references": [],
+    "status": "open",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "title": "mental_tab one"
+   },
+   "message": "✅ Added mental tab: mental_tab one",
+   "step": "add",
+   "stored": {
+    "domains": [],
+    "mental_tabs": [
+     {
+      "created_at": "<volatile>",
+      "id": "<volatile>",
+      "notes": "notes one",
+      "references": [],
+      "status": "open",
+      "tags": [
+       "tags-one",
+       "tags-two"
+      ],
+      "title": "mental_tab one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "references": [],
+    "status": "open",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "title": "mental_tab one"
+   },
+   "message": "ℹ️ Mental tab 'mental_tab one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "domains": [],
+    "mental_tabs": [
+     {
+      "created_at": "<volatile>",
+      "id": "<volatile>",
+      "notes": "notes one",
+      "references": [],
+      "status": "open",
+      "tags": [
+       "tags-one",
+       "tags-two"
+      ],
+      "title": "mental_tab one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "notes": "notes two",
+    "references": [],
+    "status": "closed",
+    "tags": [
+     "tags-three"
+    ],
+    "title": "mental_tab one"
+   },
+   "message": "✅ Updated mental tab: mental_tab one",
+   "step": "update",
+   "stored": {
+    "domains": [],
+    "mental_tabs": [
+     {
+      "created_at": "<volatile>",
+      "id": "<volatile>",
+      "notes": "notes two",
+      "references": [],
+      "status": "closed",
+      "tags": [
+       "tags-three"
+      ],
+      "title": "mental_tab one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "notes": "notes one",
+    "references": [],
+    "status": "open",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "title": "mental_tab one"
+   },
+   "message": "✅ Removed mental tab: mental_tab one",
+   "step": "remove",
+   "stored": {
+    "domains": [],
+    "mental_tabs": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "notes": "notes one",
+    "references": [],
+    "status": "open",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ],
+    "title": "mental_tab one"
+   },
+   "message": "❌ Mental tab 'mental_tab one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "domains": [],
+    "mental_tabs": []
+   }
+  }
+ ],
+ "mental_tab_reference": [
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "title": "Parent Row",
+    "url": "url one"
+   },
+   "message": "❌ Mental tab reference requires 'ref_name'",
+   "step": "add without required fields",
+   "stored": {
+    "domains": [],
+    "mental_tabs": [
+     {
+      "id": "<volatile>",
+      "references": [],
+      "title": "Parent Row"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "ref_name": "mental_tab_reference one",
+    "title": "Parent Row",
+    "url": "url one"
+   },
+   "message": "✅ Added mental tab reference 'mental_tab_reference one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "domains": [],
+    "mental_tabs": [
+     {
+      "id": "<volatile>",
+      "references": [
+       {
+        "name": "mental_tab_reference one",
+        "notes": "notes one",
+        "url": "url one"
+       }
+      ],
+      "title": "Parent Row"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "ref_name": "mental_tab_reference one",
+    "title": "Parent Row",
+    "url": "url one"
+   },
+   "message": "ℹ️ Mental tab reference 'mental_tab_reference one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "domains": [],
+    "mental_tabs": [
+     {
+      "id": "<volatile>",
+      "references": [
+       {
+        "name": "mental_tab_reference one",
+        "notes": "notes one",
+        "url": "url one"
+       }
+      ],
+      "title": "Parent Row"
+     }
+    ]
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "notes": "notes two",
+    "ref_name": "mental_tab_reference one",
+    "title": "Parent Row",
+    "url": "url two"
+   },
+   "message": "✅ Updated mental tab reference 'mental_tab_reference one' on Parent Row",
+   "step": "update",
+   "stored": {
+    "domains": [],
+    "mental_tabs": [
+     {
+      "id": "<volatile>",
+      "references": [
+       {
+        "name": "mental_tab_reference one",
+        "notes": "notes two",
+        "url": "url two"
+       }
+      ],
+      "title": "Parent Row"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "notes": "notes one",
+    "ref_name": "mental_tab_reference one",
+    "title": "Parent Row",
+    "url": "url one"
+   },
+   "message": "✅ Removed mental tab reference 'mental_tab_reference one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "domains": [],
+    "mental_tabs": [
+     {
+      "id": "<volatile>",
+      "references": [],
+      "title": "Parent Row"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "notes": "notes one",
+    "ref_name": "mental_tab_reference one",
+    "title": "Parent Row",
+    "url": "url one"
+   },
+   "message": "❌ Mental tab reference 'mental_tab_reference one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "domains": [],
+    "mental_tabs": [
+     {
+      "id": "<volatile>",
+      "references": [],
+      "title": "Parent Row"
+     }
+    ]
+   }
+  }
+ ],
+ "mood_override": [
+  {
+   "action": "add",
+   "data": {
+    "detail_level": "detail_level one",
+    "tone": "tone one"
+   },
+   "message": "❌ Mood override requires 'mood'",
+   "step": "add without required fields",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "detail_level": "detail_level one",
+    "mood": "mood_override one",
+    "tone": "tone one"
+   },
+   "message": "✅ Added mood override: mood_override one",
+   "step": "add",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": [
+      {
+       "detail_level": "detail_level one",
+       "mood": "mood_override one",
+       "tone": "tone one"
+      }
+     ]
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "detail_level": "detail_level one",
+    "mood": "mood_override one",
+    "tone": "tone one"
+   },
+   "message": "ℹ️ Mood override 'mood_override one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": [
+      {
+       "detail_level": "detail_level one",
+       "mood": "mood_override one",
+       "tone": "tone one"
+      }
+     ]
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "detail_level": "detail_level two",
+    "mood": "mood_override one",
+    "tone": "tone two"
+   },
+   "message": "✅ Updated mood override: mood_override one",
+   "step": "update",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": [
+      {
+       "detail_level": "detail_level two",
+       "mood": "mood_override one",
+       "tone": "tone two"
+      }
+     ]
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "detail_level": "detail_level one",
+    "mood": "mood_override one",
+    "tone": "tone one"
+   },
+   "message": "✅ Removed mood override: mood_override one",
+   "step": "remove",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "detail_level": "detail_level one",
+    "mood": "mood_override one",
+    "tone": "tone one"
+   },
+   "message": "❌ Mood override 'mood_override one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  }
+ ],
+ "personality_trait": [
+  {
+   "action": "add",
+   "data": {},
+   "message": "❌ Personality trait requires 'trait'",
+   "step": "add without required fields",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "trait": "personality_trait one"
+   },
+   "message": "✅ Added personality trait: personality_trait one",
+   "step": "add",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [
+     "personality_trait one"
+    ],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "trait": "personality_trait one"
+   },
+   "message": "ℹ️ Personality trait 'personality_trait one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [
+     "personality_trait one"
+    ],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "trait": "personality_trait one"
+   },
+   "message": "✅ Removed personality trait: personality_trait one",
+   "step": "remove",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "trait": "personality_trait one"
+   },
+   "message": "❌ Personality trait 'personality_trait one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  }
+ ],
+ "preference": [
+  {
+   "action": "add",
+   "data": {
+    "category": "category one",
+    "value": "value one"
+   },
+   "message": "❌ Preference requires 'key'",
+   "step": "add without required fields",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "category": "category one",
+    "key": "preference one",
+    "value": "value one"
+   },
+   "message": "✅ Set category one.preference one",
+   "step": "add",
+   "stored": {
+    "category one": {
+     "preference one": "value one"
+    },
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "category": "category one",
+    "key": "preference one",
+    "value": "value one"
+   },
+   "message": "✅ Set category one.preference one",
+   "step": "add the same again",
+   "stored": {
+    "category one": {
+     "preference one": "value one"
+    },
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "category": "category one",
+    "key": "preference one",
+    "value": "value two"
+   },
+   "message": "✅ Set category one.preference one",
+   "step": "update",
+   "stored": {
+    "category one": {
+     "preference one": "value two"
+    },
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "category": "category one",
+    "key": "preference one",
+    "value": "value one"
+   },
+   "message": "✅ Removed category one.preference one",
+   "step": "remove",
+   "stored": {
+    "category one": {},
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "category": "category one",
+    "key": "preference one",
+    "value": "value one"
+   },
+   "message": "❌ Preference 'preference one' not found in category one",
+   "step": "remove what is gone",
+   "stored": {
+    "category one": {},
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  }
+ ],
+ "project": [
+  {
+   "action": "add",
+   "data": {
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "notes": "notes one",
+    "references": [],
+    "status": "active",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ]
+   },
+   "message": "❌ Project requires 'name' and 'description'",
+   "step": "add without required fields",
+   "stored": {
+    "projects": [],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "description": "description one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "name": "project one",
+    "notes": "notes one",
+    "references": [],
+    "status": "active",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ]
+   },
+   "message": "✅ Added project: project one",
+   "step": "add",
+   "stored": {
+    "projects": [
+     {
+      "added_date": "<volatile>",
+      "description": "description one",
+      "highlights": [
+       "highlights-one",
+       "highlights-two"
+      ],
+      "id": "<volatile>",
+      "name": "project one",
+      "notes": "notes one",
+      "references": [],
+      "status": "active",
+      "tags": [
+       "tags-one",
+       "tags-two"
+      ]
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "description": "description one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "name": "project one",
+    "notes": "notes one",
+    "references": [],
+    "status": "active",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ]
+   },
+   "message": "ℹ️ Project 'project one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "projects": [
+     {
+      "added_date": "<volatile>",
+      "description": "description one",
+      "highlights": [
+       "highlights-one",
+       "highlights-two"
+      ],
+      "id": "<volatile>",
+      "name": "project one",
+      "notes": "notes one",
+      "references": [],
+      "status": "active",
+      "tags": [
+       "tags-one",
+       "tags-two"
+      ]
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "description": "description two",
+    "highlights": [
+     "highlights-three"
+    ],
+    "name": "project one",
+    "notes": "notes two",
+    "references": [],
+    "status": "paused",
+    "tags": [
+     "tags-three"
+    ]
+   },
+   "message": "✅ Updated project: project one",
+   "step": "update",
+   "stored": {
+    "projects": [
+     {
+      "added_date": "<volatile>",
+      "description": "description two",
+      "highlights": [
+       "highlights-three"
+      ],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "project one",
+      "notes": "notes two",
+      "references": [],
+      "status": "paused",
+      "tags": [
+       "tags-three"
+      ]
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "description": "description one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "name": "project one",
+    "notes": "notes one",
+    "references": [],
+    "status": "active",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ]
+   },
+   "message": "✅ Removed project: project one",
+   "step": "remove",
+   "stored": {
+    "projects": [],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "description": "description one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "name": "project one",
+    "notes": "notes one",
+    "references": [],
+    "status": "active",
+    "tags": [
+     "tags-one",
+     "tags-two"
+    ]
+   },
+   "message": "❌ Project 'project one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "projects": [],
+    "top_of_mind": []
+   }
+  }
+ ],
+ "project_highlight": [
+  {
+   "action": "add",
+   "data": {
+    "project_name": "Parent Row"
+   },
+   "message": "❌ Project highlight requires 'highlight'",
+   "step": "add without required fields",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "highlight": "project_highlight one",
+    "project_name": "Parent Row"
+   },
+   "message": "✅ Added project highlight 'project_highlight one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [
+       "project_highlight one"
+      ],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "highlight": "project_highlight one",
+    "project_name": "Parent Row"
+   },
+   "message": "ℹ️ Project highlight 'project_highlight one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [
+       "project_highlight one"
+      ],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "highlight": "project_highlight one",
+    "project_name": "Parent Row"
+   },
+   "message": "✅ Removed project highlight 'project_highlight one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "highlight": "project_highlight one",
+    "project_name": "Parent Row"
+   },
+   "message": "❌ Project highlight 'project_highlight one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  }
+ ],
+ "project_reference": [
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "project_name": "Parent Row",
+    "url": "url one"
+   },
+   "message": "❌ Project reference requires 'ref_name'",
+   "step": "add without required fields",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "project_name": "Parent Row",
+    "ref_name": "project_reference one",
+    "url": "url one"
+   },
+   "message": "✅ Added project reference 'project_reference one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [
+       {
+        "name": "project_reference one",
+        "notes": "notes one",
+        "url": "url one"
+       }
+      ],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "notes": "notes one",
+    "project_name": "Parent Row",
+    "ref_name": "project_reference one",
+    "url": "url one"
+   },
+   "message": "ℹ️ Project reference 'project_reference one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [
+       {
+        "name": "project_reference one",
+        "notes": "notes one",
+        "url": "url one"
+       }
+      ],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "notes": "notes two",
+    "project_name": "Parent Row",
+    "ref_name": "project_reference one",
+    "url": "url two"
+   },
+   "message": "✅ Updated project reference 'project_reference one' on Parent Row",
+   "step": "update",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [
+       {
+        "name": "project_reference one",
+        "notes": "notes two",
+        "url": "url two"
+       }
+      ],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "notes": "notes one",
+    "project_name": "Parent Row",
+    "ref_name": "project_reference one",
+    "url": "url one"
+   },
+   "message": "✅ Removed project reference 'project_reference one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "notes": "notes one",
+    "project_name": "Parent Row",
+    "ref_name": "project_reference one",
+    "url": "url one"
+   },
+   "message": "❌ Project reference 'project_reference one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  }
+ ],
+ "project_tag": [
+  {
+   "action": "add",
+   "data": {
+    "project_name": "Parent Row"
+   },
+   "message": "❌ Project tag requires 'tag'",
+   "step": "add without required fields",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "project_name": "Parent Row",
+    "tag": "project_tag one"
+   },
+   "message": "✅ Added project tag 'project_tag one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": [
+       "project_tag one"
+      ]
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "project_name": "Parent Row",
+    "tag": "project_tag one"
+   },
+   "message": "ℹ️ Project tag 'project_tag one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": [
+       "project_tag one"
+      ]
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "project_name": "Parent Row",
+    "tag": "project_tag one"
+   },
+   "message": "✅ Removed project tag 'project_tag one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "project_name": "Parent Row",
+    "tag": "project_tag one"
+   },
+   "message": "❌ Project tag 'project_tag one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "projects": [
+     {
+      "highlights": [],
+      "id": "<volatile>",
+      "last_updated": "<volatile>",
+      "name": "Parent Row",
+      "notes": "",
+      "references": [],
+      "tags": []
+     }
+    ],
+    "top_of_mind": []
+   }
+  }
+ ],
+ "response_format": [
+  {
+   "action": "add",
+   "data": {},
+   "message": "❌ Response format requires 'item'",
+   "step": "add without required fields",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "response_format one"
+   },
+   "message": "✅ Added response format: response_format one",
+   "step": "add",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": [],
+    "response_format": [
+     "response_format one"
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "response_format one"
+   },
+   "message": "ℹ️ Response format 'response_format one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": [],
+    "response_format": [
+     "response_format one"
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "response_format one"
+   },
+   "message": "✅ Removed response format: response_format one",
+   "step": "remove",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": [],
+    "response_format": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "response_format one"
+   },
+   "message": "❌ Response format 'response_format one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "code_style": {
+     "frameworks": [],
+     "preferred_languages": [],
+     "tools": []
+    },
+    "communication": {
+     "default": {
+      "detail_level": "",
+      "locale": "British English",
+      "tone": ""
+     },
+     "mood_overrides": []
+    },
+    "learning_style": {
+     "avoid": [],
+     "preferred": []
+    },
+    "likes_dislikes": [],
+    "response_format": []
+   }
+  }
+ ],
+ "sleep": [
+  {
+   "action": "update",
+   "data": {
+    "bedtime": "23:15",
+    "day_type": "weekday",
+    "wakeup": "23:15"
+   },
+   "message": "✅ Updated weekday sleep: bedtime=23:15, wakeup=23:15",
+   "step": "update",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "23:15",
+       "wakeup": "23:15"
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  }
+ ],
+ "stress_trigger": [
+  {
+   "action": "add",
+   "data": {},
+   "message": "❌ Stress trigger requires 'trigger'",
+   "step": "add without required fields",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "trigger": "stress_trigger one"
+   },
+   "message": "✅ Added stress trigger: stress_trigger one",
+   "step": "add",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": [
+      "stress_trigger one"
+     ]
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "trigger": "stress_trigger one"
+   },
+   "message": "ℹ️ Stress trigger 'stress_trigger one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": [
+      "stress_trigger one"
+     ]
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "trigger": "stress_trigger one"
+   },
+   "message": "✅ Removed stress trigger: stress_trigger one",
+   "step": "remove",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "trigger": "stress_trigger one"
+   },
+   "message": "❌ Stress trigger 'stress_trigger one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  }
+ ],
+ "top_of_mind": [
+  {
+   "action": "add",
+   "data": {
+    "note": "note one"
+   },
+   "message": "❌ Top of mind requires 'item'",
+   "step": "add without required fields",
+   "stored": {
+    "projects": [],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "top_of_mind one",
+    "note": "note one"
+   },
+   "message": "✅ Added top of mind: top_of_mind one",
+   "step": "add",
+   "stored": {
+    "projects": [],
+    "top_of_mind": [
+     {
+      "id": "<volatile>",
+      "idea": "top_of_mind one",
+      "note": "note one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "item": "top_of_mind one",
+    "note": "note one"
+   },
+   "message": "ℹ️ Top of mind 'top_of_mind one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "projects": [],
+    "top_of_mind": [
+     {
+      "id": "<volatile>",
+      "idea": "top_of_mind one",
+      "note": "note one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "top_of_mind one",
+    "note": "note one"
+   },
+   "message": "✅ Removed top of mind: top_of_mind one",
+   "step": "remove",
+   "stored": {
+    "projects": [],
+    "top_of_mind": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "item": "top_of_mind one",
+    "note": "note one"
+   },
+   "message": "❌ Top of mind 'top_of_mind one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "projects": [],
+    "top_of_mind": []
+   }
+  }
+ ],
+ "value": [
+  {
+   "action": "add",
+   "data": {},
+   "message": "❌ Value requires 'value'",
+   "step": "add without required fields",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "value": "value one"
+   },
+   "message": "✅ Added value: value one",
+   "step": "add",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [
+     "value one"
+    ],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "value": "value one"
+   },
+   "message": "ℹ️ Value 'value one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [
+     "value one"
+    ],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "value": "value one"
+   },
+   "message": "✅ Removed value: value one",
+   "step": "remove",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "value": "value one"
+   },
+   "message": "❌ Value 'value one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "hobbies": [],
+    "interests": [],
+    "personality_traits": [],
+    "values": [],
+    "wellness": {
+     "energy_peaks": [],
+     "sleep": {
+      "weekday": {
+       "bedtime": "",
+       "wakeup": ""
+      },
+      "weekend": {
+       "bedtime": "",
+       "wakeup": ""
+      }
+     },
+     "stress_triggers": []
+    }
+   }
+  }
+ ],
+ "work_experience": [
+  {
+   "action": "add",
+   "data": {
+    "description": "description one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "location": "location one",
+    "skills": [
+     "skills-one",
+     "skills-two"
+    ]
+   },
+   "message": "❌ Work experience requires 'company', 'role', 'type', 'period'",
+   "step": "add without required fields",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "company": "work_experience one",
+    "description": "description one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "location": "location one",
+    "period": "period one",
+    "role": "role one",
+    "skills": [
+     "skills-one",
+     "skills-two"
+    ],
+    "type": "type one"
+   },
+   "message": "✅ Added work experience: work_experience one",
+   "step": "add",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "work_experience one",
+      "description": "description one",
+      "highlights": [
+       "highlights-one",
+       "highlights-two"
+      ],
+      "id": "<volatile>",
+      "location": "location one",
+      "period": "period one",
+      "role": "role one",
+      "skills": [
+       "skills-one",
+       "skills-two"
+      ],
+      "type": "type one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "company": "work_experience one",
+    "description": "description one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "location": "location one",
+    "period": "period one",
+    "role": "role one",
+    "skills": [
+     "skills-one",
+     "skills-two"
+    ],
+    "type": "type one"
+   },
+   "message": "ℹ️ Work experience 'work_experience one' already exists",
+   "step": "add the same again",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "work_experience one",
+      "description": "description one",
+      "highlights": [
+       "highlights-one",
+       "highlights-two"
+      ],
+      "id": "<volatile>",
+      "location": "location one",
+      "period": "period one",
+      "role": "role one",
+      "skills": [
+       "skills-one",
+       "skills-two"
+      ],
+      "type": "type one"
+     }
+    ]
+   }
+  },
+  {
+   "action": "update",
+   "data": {
+    "company": "work_experience one",
+    "description": "description two",
+    "highlights": [
+     "highlights-three"
+    ],
+    "location": "location two",
+    "period": "period two",
+    "role": "role two",
+    "skills": [
+     "skills-three"
+    ],
+    "type": "type two"
+   },
+   "message": "✅ Updated work experience: work_experience one",
+   "step": "update",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "work_experience one",
+      "description": "description two",
+      "highlights": [
+       "highlights-three"
+      ],
+      "id": "<volatile>",
+      "location": "location two",
+      "period": "period two",
+      "role": "role two",
+      "skills": [
+       "skills-three"
+      ],
+      "type": "type two"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "company": "work_experience one",
+    "description": "description one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "location": "location one",
+    "period": "period one",
+    "role": "role one",
+    "skills": [
+     "skills-one",
+     "skills-two"
+    ],
+    "type": "type one"
+   },
+   "message": "✅ Removed work experience: work_experience one",
+   "step": "remove",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "company": "work_experience one",
+    "description": "description one",
+    "highlights": [
+     "highlights-one",
+     "highlights-two"
+    ],
+    "location": "location one",
+    "period": "period one",
+    "role": "role one",
+    "skills": [
+     "skills-one",
+     "skills-two"
+    ],
+    "type": "type one"
+   },
+   "message": "❌ Work experience 'work_experience one' not found",
+   "step": "remove what is gone",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": []
+   }
+  }
+ ],
+ "work_highlight": [
+  {
+   "action": "add",
+   "data": {
+    "company": "Parent Row"
+   },
+   "message": "❌ Work highlight requires 'highlight'",
+   "step": "add without required fields",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "Parent Row",
+      "id": "<volatile>"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "company": "Parent Row",
+    "highlight": "work_highlight one"
+   },
+   "message": "✅ Added work highlight 'work_highlight one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "Parent Row",
+      "highlights": [
+       "work_highlight one"
+      ],
+      "id": "<volatile>"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "company": "Parent Row",
+    "highlight": "work_highlight one"
+   },
+   "message": "ℹ️ Work highlight 'work_highlight one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "Parent Row",
+      "highlights": [
+       "work_highlight one"
+      ],
+      "id": "<volatile>"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "company": "Parent Row",
+    "highlight": "work_highlight one"
+   },
+   "message": "✅ Removed work highlight 'work_highlight one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "Parent Row",
+      "highlights": [],
+      "id": "<volatile>"
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "company": "Parent Row",
+    "highlight": "work_highlight one"
+   },
+   "message": "❌ Work highlight 'work_highlight one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "Parent Row",
+      "highlights": [],
+      "id": "<volatile>"
+     }
+    ]
+   }
+  }
+ ],
+ "work_skill": [
+  {
+   "action": "add",
+   "data": {
+    "company": "Parent Row"
+   },
+   "message": "❌ Work skill requires 'skill'",
+   "step": "add without required fields",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "Parent Row",
+      "id": "<volatile>"
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "company": "Parent Row",
+    "skill": "work_skill one"
+   },
+   "message": "✅ Added work skill 'work_skill one' to Parent Row",
+   "step": "add",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "Parent Row",
+      "id": "<volatile>",
+      "skills": [
+       "work_skill one"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "company": "Parent Row",
+    "skill": "work_skill one"
+   },
+   "message": "ℹ️ Work skill 'work_skill one' already exists on Parent Row",
+   "step": "add the same again",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "Parent Row",
+      "id": "<volatile>",
+      "skills": [
+       "work_skill one"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "action": "add",
+   "data": {
+    "company": "Parent Row",
+    "skills": [
+     "work_skill bulk one",
+     "work_skill bulk two"
+    ]
+   },
+   "message": "✅ Added 2 work skills to Parent Row",
+   "step": "add in bulk",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "Parent Row",
+      "id": "<volatile>",
+      "skills": [
+       "work_skill one",
+       "work_skill bulk one",
+       "work_skill bulk two"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "company": "Parent Row",
+    "skill": "work_skill one"
+   },
+   "message": "✅ Removed work skill 'work_skill one' from Parent Row",
+   "step": "remove",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "Parent Row",
+      "id": "<volatile>",
+      "skills": [
+       "work_skill bulk one",
+       "work_skill bulk two"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "action": "remove",
+   "data": {
+    "company": "Parent Row",
+    "skill": "work_skill one"
+   },
+   "message": "❌ Work skill 'work_skill one' not found on Parent Row",
+   "step": "remove what is gone",
+   "stored": {
+    "bio": "",
+    "contact": {
+     "emails": [],
+     "links": []
+    },
+    "current_role": "",
+    "education": [],
+    "languages_spoken": [],
+    "location": "",
+    "name": "",
+    "nationality": "",
+    "organisation": "",
+    "preferred_name": "",
+    "work_experience": [
+     {
+      "company": "Parent Row",
+      "id": "<volatile>",
+      "skills": [
+       "work_skill bulk one",
+       "work_skill bulk two"
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}
