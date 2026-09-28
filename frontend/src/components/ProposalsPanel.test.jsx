@@ -83,10 +83,10 @@ describe("ProposalsPanel", () => {
     // No packs here, so the place falls back to the storage name.
     expect(screen.getByText(/domain/)).toBeInTheDocument();
     await expandRow(user);
-    expect(screen.getByText("name")).toBeInTheDocument();
+    expect(screen.getByText("Name")).toBeInTheDocument();
     // Twice over once expanded: the row's own line and the field list.
     expect(screen.getAllByText("Datadog").length).toBeGreaterThan(0);
-    expect(screen.getByText("level")).toBeInTheDocument();
+    expect(screen.getByText("Level")).toBeInTheDocument();
     expect(screen.getByText("advanced")).toBeInTheDocument();
     expect(screen.queryByText(/[{}"]/)).not.toBeInTheDocument();
   });
@@ -101,7 +101,7 @@ describe("ProposalsPanel", () => {
     render(<ProposalsPanel />);
     expect(await screen.findByText(/work experience/)).toBeInTheDocument();
     await expandRow(user);
-    expect(screen.getByText("start date")).toBeInTheDocument();
+    expect(screen.getByText("Start date")).toBeInTheDocument();
   });
 
   it("names the tool that proposed it, and where the change goes, without being expanded", async () => {
@@ -210,6 +210,55 @@ describe("ProposalsPanel", () => {
     await waitFor(() =>
       expect(screen.queryByText(/Runs the on-call dashboards/)).not.toBeInTheDocument(),
     );
+  });
+
+  it("approves with the reader's corrections when a row is edited first", async () => {
+    const user = userEvent.setup();
+    render(<ProposalsPanel />);
+    await expandRow(user);
+    await user.click(screen.getByRole("button", { name: "Edit before approving" }));
+    const level = screen.getByLabelText("Level");
+    await user.clear(level);
+    await user.type(level, "expert");
+    await user.click(screen.getByRole("button", { name: "Approve with changes" }));
+
+    await waitFor(() =>
+      expect(api.approveProposal).toHaveBeenCalledWith("p1", { name: "Datadog", level: "expert" }),
+    );
+    expect(toast.mock.calls.at(-1)[0].title).toMatch(/with your changes/);
+  });
+
+  it("edits a list as one comma-separated line, and sends it back as a list", async () => {
+    api.listProposals.mockImplementation((kind) =>
+      Promise.resolve(kind === "entity"
+        ? [{ ...ENTITY, entity: "mental_tab", data: { title: "Cafes", tags: ["food", "newcastle"] } }]
+        : []),
+    );
+    const user = userEvent.setup();
+    render(<ProposalsPanel packs={PACKS} />);
+    await expandRow(user);
+    await user.click(screen.getByRole("button", { name: "Edit before approving" }));
+    const tags = screen.getByLabelText("Tags");
+    expect(tags).toHaveValue("food, newcastle");
+    await user.clear(tags);
+    await user.type(tags, "food,  coffee ,, ");
+    await user.click(screen.getByRole("button", { name: "Approve with changes" }));
+
+    await waitFor(() =>
+      expect(api.approveProposal).toHaveBeenCalledWith("p1", { title: "Cafes", tags: ["food", "coffee"] }),
+    );
+  });
+
+  it("approves as proposed when the edit is discarded", async () => {
+    const user = userEvent.setup();
+    render(<ProposalsPanel />);
+    await expandRow(user);
+    await user.click(screen.getByRole("button", { name: "Edit before approving" }));
+    await user.type(screen.getByLabelText("Level"), "!!");
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    await user.click(screen.getByRole("button", { name: /^approve /i }));
+
+    await waitFor(() => expect(api.approveProposal).toHaveBeenCalledWith("p1", undefined));
   });
 
   it("rejects without writing anything, once the Undo window has passed", async () => {

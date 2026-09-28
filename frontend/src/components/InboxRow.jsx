@@ -1,6 +1,8 @@
 import { useState, Fragment } from "react";
 import { Check, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { proposalSummary, entityPlace, humanise, renderValue } from "./proposalSummary";
 
 const ACTION_VERB = { add: "Add", update: "Update", remove: "Remove" };
@@ -18,8 +20,45 @@ const ACTION_VERB = { add: "Add", update: "Update", remove: "Remove" };
  * whole case for approving at all. The quote and the field-by-field detail
  * stay behind it.
  */
+// Text and numbers are edited as text, a list of strings as one comma-separated
+// line. Anything else (an object, a boolean) is shown, not edited: agents rarely
+// propose one, and the server validates whatever is sent either way.
+const isEditable = (value) =>
+  typeof value === "string" ||
+  typeof value === "number" ||
+  (Array.isArray(value) && value.every((v) => typeof v === "string"));
+
+// Sentence case, as every other label in the app: "Start date", not "start date".
+const fieldName = (field) => {
+  const words = humanise(field);
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+const toText = (value) => (Array.isArray(value) ? value.join(", ") : String(value ?? ""));
+
+// The draft back into the shapes the proposal arrived in.
+function fromDraft(data, draft) {
+  return Object.fromEntries(
+    Object.entries(data).map(([field, value]) => {
+      if (!(field in draft)) return [field, value];
+      const text = draft[field];
+      if (Array.isArray(value)) return [field, text.split(",").map((t) => t.trim()).filter(Boolean)];
+      if (typeof value === "number" && text.trim() !== "" && !Number.isNaN(Number(text))) {
+        return [field, Number(text)];
+      }
+      return [field, text];
+    }),
+  );
+}
+
 export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
   const [open, setOpen] = useState(false);
+  // null while not editing. Agents get a detail slightly wrong often enough
+  // that correcting it beats rejecting a mostly-right suggestion; the server
+  // writes the corrected values through the same checks as the original.
+  const [draft, setDraft] = useState(null);
+  const data = row.data || {};
+  const approve = () => onApprove(draft ? fromDraft(data, draft) : undefined);
   const { lead, trail, extra } = proposalSummary(row, packs);
 
   return (
@@ -64,7 +103,7 @@ export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
             either: a queue of filled buttons out-shouts its own rows. */}
         <span className="ml-auto flex shrink-0 items-center gap-1">
         <Button
-          size="sm" variant="ghost" disabled={busy} onClick={onApprove}
+          size="sm" variant="ghost" disabled={busy} onClick={approve}
           className="text-success hover:bg-success/10 hover:text-success"
           aria-label={`Approve ${lead}`}
         >
@@ -97,19 +136,67 @@ export default function InboxRow({ row, packs, busy, onApprove, onReject }) {
           {row.seen_count > 1 && (
             <p className="text-xs text-muted-foreground">seen {row.seen_count}×</p>
           )}
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
-            {Object.entries(row.data || {}).map(([field, value]) => (
-              <Fragment key={field}>
-                <dt className="text-muted-foreground">{humanise(field)}</dt>
-                <dd className="min-w-0 break-words">{renderValue(value)}</dd>
-              </Fragment>
-            ))}
-          </dl>
+          {draft ? (
+            <div className="space-y-3">
+              {Object.entries(data).map(([field, value]) =>
+                isEditable(value) ? (
+                  <div key={field} className="space-y-1.5">
+                    <Label htmlFor={`edit-${row.id}-${field}`}>{fieldName(field)}</Label>
+                    <Input
+                      id={`edit-${row.id}-${field}`}
+                      value={draft[field]}
+                      onChange={(e) => setDraft({ ...draft, [field]: e.target.value })}
+                    />
+                  </div>
+                ) : (
+                  <p key={field} className="text-sm">
+                    <span className="text-muted-foreground">{fieldName(field)}</span>{" "}
+                    {renderValue(value)}
+                  </p>
+                ),
+              )}
+            </div>
+          ) : (
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
+              {Object.entries(data).map(([field, value]) => (
+                <Fragment key={field}>
+                  <dt className="text-muted-foreground">{fieldName(field)}</dt>
+                  <dd className="min-w-0 break-words">{renderValue(value)}</dd>
+                </Fragment>
+              ))}
+            </dl>
+          )}
           {row.evidence && (
             <blockquote className="border-l-2 pl-3 text-sm italic text-muted-foreground">
               “{row.evidence}”
             </blockquote>
           )}
+          <div className="flex flex-wrap gap-2">
+            {draft ? (
+              <>
+                <Button size="sm" disabled={busy} onClick={approve}>
+                  Approve with changes
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>
+                  Discard changes
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setDraft(
+                    Object.fromEntries(
+                      Object.entries(data).filter(([, v]) => isEditable(v)).map(([f, v]) => [f, toText(v)]),
+                    ),
+                  )
+                }
+              >
+                Edit before approving
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </div>
