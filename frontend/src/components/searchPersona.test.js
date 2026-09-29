@@ -28,6 +28,14 @@ describe("searchPersona", () => {
     expect(manchester).toMatchObject({ place: "Profile › Personal Information", title: "Location: Manchester, UK", band: "personal-information" });
   });
 
+  it("shows the match in a snippet when a long field's title is cut before it", () => {
+    const bio = "Marketing assistant at a small design studio in Manchester. I write most of the monthly newsletter.";
+    const [hit] = searchPersona(pick("profile"), { profile: { bio } }, "newsletter").results;
+    expect(hit.title).toMatch(/…$/);
+    expect(hit.title).not.toMatch(/newsletter/);
+    expect(hit.snippet).toMatch(/monthly newsletter/);
+  });
+
   it("stays quiet under two characters, and caps what it returns", () => {
     expect(searchPersona(packs, data, "c").results).toEqual([]);
     const many = { goals: { goals: Array.from({ length: 40 }, (_, i) => ({ id: `g${i}`, title: `Goal ${i}` })) } };

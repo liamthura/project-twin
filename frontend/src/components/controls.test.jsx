@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { EnumControl, SEGMENTED_MAX } from "./controls";
 
 // jsdom has no layout engine: it reports every width as 0, so an overflow
@@ -74,6 +75,18 @@ describe("SelectControl trigger content", () => {
     // The important flag is what settles the cascade against `>span`.
     // A non-important display utility loses and the stacking returns.
     expect(valueSpan.className).toContain("!flex");
+  });
+
+  it("offers Clear under a set value, unless the options already hold the way back", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<EnumControl options={many} value="book" onChange={() => {}} />);
+    await user.click(screen.getByRole("combobox"));
+    expect(screen.getByRole("option", { name: "Clear" })).toBeInTheDocument();
+    unmount();
+    // A filter: "All" is the reset, and a Clear beside it did the same thing.
+    render(<EnumControl options={["All", ...many]} value="All" clearable={false} onChange={() => {}} />);
+    await user.click(screen.getByRole("combobox"));
+    expect(screen.queryByRole("option", { name: "Clear" })).not.toBeInTheDocument();
   });
 
   it("keeps the icon from being squashed and lets a long label truncate", () => {

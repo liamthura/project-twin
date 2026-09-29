@@ -81,6 +81,14 @@ describe("Header", () => {
       expect(onOpenSettings).toHaveBeenCalledTimes(1);
     });
 
+    it("links to the docs from the menu, in a new tab", async () => {
+      renderHeader({ accountName: "Liam" });
+      await userEvent.click(screen.getByRole("button", { name: "Liam" }));
+      const help = await screen.findByRole("menuitem", { name: "Help and docs" });
+      expect(help).toHaveAttribute("href", expect.stringMatching(/\/docs\/$/));
+      expect(help).toHaveAttribute("target", "_blank");
+    });
+
     it("offers each theme by name, marks the current one, and sets the one chosen", async () => {
       // The old control was a lone icon that cycled on click: it said neither
       // what it was nor what the next click would do.

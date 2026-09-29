@@ -3,6 +3,7 @@ import { act, render, screen, waitFor, within, fireEvent } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import ProposalsPanel from "./ProposalsPanel";
 import { promotionTargets } from "./PromoteDialog";
+import realPacks from "@/__fixtures__/packs.json";
 
 const PACKS = [
   {
@@ -54,6 +55,14 @@ const NOTE = {
   evidence: "just tell me which one you'd pick",
   proposed_by: "Claude Desktop", seen_count: 1,
 };
+
+// Approve, Reject and Delete are sent when the toast carrying their Undo
+// goes. In the app Radix closes it after its duration; here this closes the
+// latest one waiting to be told.
+const closeToast = () => act(async () => {
+  toast.mock.calls.map(([props]) => props).filter((p) => p.onClose).at(-1)?.onClose();
+});
+const withToast = (fn) => async () => fn({ user: userEvent.setup(), pass: closeToast });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -170,6 +179,25 @@ describe("ProposalsPanel", () => {
     expect(screen.getByText(/rebuilt the whole alerting/)).toHaveClass("line-clamp-3");
   });
 
+  it("shows what an update replaces, rather than an arrow that reads like a rename", async () => {
+    api.listProposals.mockImplementation((kind) =>
+      Promise.resolve(kind === "entity"
+        ? [{ ...ENTITY, entity: "goal", data: { title: "Speak French", notes: "Weekly tutor." } }]
+        : []),
+    );
+    const user = userEvent.setup();
+    const packData = { goals: { goals: [{ id: "g1", title: "Speak French", notes: "Paused for now." }] } };
+    render(<ProposalsPanel packs={realPacks} packData={packData} />);
+    const line = (await screen.findByText("Paused for now.")).closest("p");
+    expect(line).toHaveTextContent("Notes: Paused for now. → becomes Weekly tutor.");
+    expect(screen.getByText("Speak French")).toHaveTextContent(/^Speak French$/);
+    // Opened, the field list says the same, and editing shows what is there now.
+    await expandRow(user);
+    expect(screen.getAllByText("Paused for now.")).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Edit before approving" }));
+    expect(screen.getByText("Now: Paused for now.")).toBeInTheDocument();
+  });
+
   it("counts the fields it cannot fit rather than truncating them away", async () => {
     api.listProposals.mockImplementation((kind) =>
       Promise.resolve(kind === "entity"
@@ -185,8 +213,9 @@ describe("ProposalsPanel", () => {
     // A red reject beside a neutral approve pulls the eye down the reject
     // column, which is the wrong emphasis for the action taken most.
     render(<ProposalsPanel />);
+    // The darker green: --success measured 3.5:1 as text on the page.
     expect(await screen.findByRole("button", { name: /^approve /i }))
-      .toHaveClass("text-success");
+      .toHaveClass("text-emerald-700");
     expect(screen.getByRole("button", { name: /^reject /i }))
       .toHaveClass("text-destructive");
   });
@@ -204,18 +233,60 @@ describe("ProposalsPanel", () => {
     expect(reject.className).not.toContain("hover:text-accent-foreground");
   });
 
-  it("approves and drops the row", async () => {
-    const user = userEvent.setup();
+  it("approves and drops the row, once the Undo window has passed", withToast(async ({ user, pass }) => {
     render(<ProposalsPanel />);
     await user.click(await screen.findByRole("button", { name: /^approve /i }));
-    await waitFor(() => expect(api.approveProposal).toHaveBeenCalledWith("p1", undefined));
-    await waitFor(() =>
-      expect(screen.queryByText(/Runs the on-call dashboards/)).not.toBeInTheDocument(),
-    );
+    // Gone from the queue at once, but not yet written.
+    expect(screen.queryByText(/Runs the on-call dashboards/)).not.toBeInTheDocument();
+    expect(api.approveProposal).not.toHaveBeenCalled();
+    await pass();
+    expect(api.approveProposal).toHaveBeenCalledWith("p1", undefined);
+  }));
+
+  it("keeps Undo working for as long as its toast stands", async () => {
+    // Radix pauses a toast while the pointer is on it. A timer of the panel's
+    // own used to send the decision at 8s regardless, leaving an Undo that did
+    // nothing. Nothing is sent until the toast goes.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<ProposalsPanel />);
+      await user.click(await screen.findByRole("button", { name: /^approve /i }));
+      expect(toast.mock.calls.at(-1)[0].duration).toBe(8000);
+      await act(async () => { vi.advanceTimersByTime(20000); });
+      expect(api.approveProposal).not.toHaveBeenCalled();
+      act(() => toast.mock.calls.at(-1)[0].action.props.onClick());
+      expect(screen.getByRole("button", { name: /^approve /i })).toBeInTheDocument();
+      await closeToast();
+      expect(api.approveProposal).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it("approves with the reader's corrections when a row is edited first", async () => {
+  it("puts an approved row back on Undo, and never writes it", withToast(async ({ user, pass }) => {
+    render(<ProposalsPanel />);
+    await user.click(await screen.findByRole("button", { name: /^approve /i }));
+    const { action } = toast.mock.calls.at(-1)[0];
+    expect(action.props.altText).toBe("Undo");
+    act(() => action.props.onClick());
+    expect(screen.getByRole("button", { name: /^approve /i })).toBeInTheDocument();
+    await pass();
+    expect(api.approveProposal).not.toHaveBeenCalled();
+  }));
+
+  it("sends a waiting approval straight away when Review is left, and refreshes its section", async () => {
     const user = userEvent.setup();
+    const onSectionChanged = vi.fn();
+    const { unmount } = render(<ProposalsPanel onSectionChanged={onSectionChanged} />);
+    await user.click(await screen.findByRole("button", { name: /^approve /i }));
+    expect(api.approveProposal).not.toHaveBeenCalled();
+    unmount();
+    expect(api.approveProposal).toHaveBeenCalledWith("p1", undefined);
+    await waitFor(() => expect(onSectionChanged).toHaveBeenCalledWith("knowledge"));
+  });
+
+  it("approves with the reader's corrections when a row is edited first", withToast(async ({ user, pass }) => {
     render(<ProposalsPanel />);
     await expandRow(user);
     await user.click(screen.getByRole("button", { name: "Edit before approving" }));
@@ -223,20 +294,18 @@ describe("ProposalsPanel", () => {
     await user.clear(level);
     await user.type(level, "expert");
     await user.click(screen.getByRole("button", { name: "Approve with changes" }));
-
-    await waitFor(() =>
-      expect(api.approveProposal).toHaveBeenCalledWith("p1", { name: "Datadog", level: "expert" }),
-    );
     expect(toast.mock.calls.at(-1)[0].title).toMatch(/with your changes/);
-  });
 
-  it("edits a list as one comma-separated line, and sends it back as a list", async () => {
+    await pass();
+    expect(api.approveProposal).toHaveBeenCalledWith("p1", { name: "Datadog", level: "expert" });
+  }));
+
+  it("edits a list as one comma-separated line, and sends it back as a list", withToast(async ({ user, pass }) => {
     api.listProposals.mockImplementation((kind) =>
       Promise.resolve(kind === "entity"
         ? [{ ...ENTITY, entity: "mental_tab", data: { title: "Cafes", tags: ["food", "newcastle"] } }]
         : []),
     );
-    const user = userEvent.setup();
     render(<ProposalsPanel packs={PACKS} />);
     await expandRow(user);
     await user.click(screen.getByRole("button", { name: "Edit before approving" }));
@@ -246,13 +315,11 @@ describe("ProposalsPanel", () => {
     await user.type(tags, "food,  coffee ,, ");
     await user.click(screen.getByRole("button", { name: "Approve with changes" }));
 
-    await waitFor(() =>
-      expect(api.approveProposal).toHaveBeenCalledWith("p1", { title: "Cafes", tags: ["food", "coffee"] }),
-    );
-  });
+    await pass();
+    expect(api.approveProposal).toHaveBeenCalledWith("p1", { title: "Cafes", tags: ["food", "coffee"] });
+  }));
 
-  it("approves as proposed when the edit is discarded", async () => {
-    const user = userEvent.setup();
+  it("approves as proposed when the edit is discarded", withToast(async ({ user, pass }) => {
     render(<ProposalsPanel />);
     await expandRow(user);
     await user.click(screen.getByRole("button", { name: "Edit before approving" }));
@@ -260,8 +327,9 @@ describe("ProposalsPanel", () => {
     await user.click(screen.getByRole("button", { name: "Discard changes" }));
     await user.click(screen.getByRole("button", { name: /^approve /i }));
 
-    await waitFor(() => expect(api.approveProposal).toHaveBeenCalledWith("p1", undefined));
-  });
+    await pass();
+    expect(api.approveProposal).toHaveBeenCalledWith("p1", undefined);
+  }));
 
   it("rejects without writing anything, once the Undo window has passed", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -272,7 +340,7 @@ describe("ProposalsPanel", () => {
       // Gone from the queue at once, but not yet sent.
       expect(screen.queryByRole("button", { name: /^reject /i })).not.toBeInTheDocument();
       expect(api.rejectProposal).not.toHaveBeenCalled();
-      await act(async () => { vi.advanceTimersByTime(8000); });
+      await closeToast();
       expect(api.rejectProposal).toHaveBeenCalledWith("p1");
       expect(api.approveProposal).not.toHaveBeenCalled();
     } finally {
@@ -293,7 +361,7 @@ describe("ProposalsPanel", () => {
       act(() => action.props.onClick());
       expect(screen.getByRole("button", { name: /^reject /i })).toBeInTheDocument();
       expect(screen.getByRole("tab", { name: /inbox/i })).toHaveTextContent("1");
-      await act(async () => { vi.advanceTimersByTime(8000); });
+      await closeToast();
       expect(api.rejectProposal).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -370,29 +438,32 @@ describe("ProposalsPanel", () => {
         expect(title).toBe("Rejected 2. They won't be suggested again.");
         act(() => action.props.onClick());
         expect(names()).toEqual(["Approve Datadog", "Approve Grafana", "Approve Sentry"]);
-        await act(async () => { vi.advanceTimersByTime(8000); });
+        await closeToast();
         expect(api.rejectProposal).not.toHaveBeenCalled();
       } finally {
         vi.useRealTimers();
       }
     });
 
-    it("approves a selection one at a time, and keeps whichever failed", async () => {
-      const user = userEvent.setup();
+    it("approves a selection one at a time, after one Undo, and brings back whichever failed", withToast(async ({ user, pass }) => {
       api.approveProposal.mockImplementation((id) =>
         id === "p11" ? Promise.reject(new Error("no")) : Promise.resolve({ status: "approved" }));
       render(<ProposalsPanel />);
       await user.click(await screen.findByRole("checkbox", { name: /select all/i }));
       await user.click(screen.getByRole("button", { name: "Approve 3" }));
+      expect(screen.queryAllByRole("button", { name: /^approve /i })).toEqual([]);
+      expect(toast.mock.calls.at(-1)[0].title).toBe("Added 3 to your persona");
 
+      await pass();
       await waitFor(() => expect(names()).toEqual(["Approve Grafana"]));
       expect(api.approveProposal.mock.calls.map((c) => c[0])).toEqual(["p10", "p11", "p12"]);
       expect(toast.mock.calls.at(-1)[0]).toMatchObject({
-        title: "Added 2 to your persona",
-        description: "1 didn't go through and is still in the queue.",
+        title: "That did not go through",
+        description: "The item is back in the queue.",
+        variant: "destructive",
       });
       api.approveProposal.mockImplementation(() => Promise.resolve({ status: "approved", section: "knowledge" }));
-    });
+    }));
 
     it("drops a row from the selection once you start editing it", async () => {
       const user = userEvent.setup();
@@ -406,17 +477,18 @@ describe("ProposalsPanel", () => {
       expect(screen.queryByRole("region", { name: "Selected" })).not.toBeInTheDocument();
     });
 
-    it("moves with j and approves with a, then lands on the next row", async () => {
-      const user = userEvent.setup();
+    it("moves with j and approves with a, then lands on the next row", withToast(async ({ user, pass }) => {
       render(<ProposalsPanel />);
       const rows = await screen.findAllByRole("group", { name: /^update /i });
+      expect(rows[0]).toHaveAccessibleDescription(/a to approve, r to reject/);
       rows[0].focus();
       await user.keyboard("j");
       expect(rows[1]).toHaveFocus();
       await user.keyboard("a");
-      await waitFor(() => expect(api.approveProposal).toHaveBeenCalledWith("p11", undefined));
       await waitFor(() => expect(screen.getByRole("group", { name: "Update Sentry" })).toHaveFocus());
-    });
+      await pass();
+      expect(api.approveProposal).toHaveBeenCalledWith("p11", undefined);
+    }));
 
     it("leaves letters typed into an edit field alone", async () => {
       const user = userEvent.setup();
@@ -444,30 +516,30 @@ describe("ProposalsPanel", () => {
     const user = userEvent.setup();
     render(<ProposalsPanel />);
     await user.click(screen.getByRole("tab", { name: /observations/i }));
-    expect(await screen.findByRole("button", { name: /^promote$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
+    // Named with the note, as approve and reject are with the value.
+    expect(await screen.findByRole("button", { name: "Promote Wants the recommendation first." })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Wants the recommendation first." })).toBeInTheDocument();
+    expect(screen.getByText("Observation").closest("p"))
+      .toHaveTextContent("Observation · suggested for preferences · from Claude Desktop");
     expect(screen.queryByRole("button", { name: /^approve /i })).not.toBeInTheDocument();
   });
 
-  it("confirms every action with a toast", async () => {
-    const user = userEvent.setup();
-    render(<ProposalsPanel />);
-    await user.click(await screen.findByRole("button", { name: /^approve /i }));
-    await waitFor(() => expect(toast).toHaveBeenCalled());
-    expect(toast.mock.calls[0][0]).toMatchObject({ variant: "success" });
-  });
-
-  it("offers a way to see what changed, on the actions that change something", async () => {
+  it("offers a way to see what changed beside the Undo, naming where it went", async () => {
     const user = userEvent.setup();
     const onViewSection = vi.fn();
-    render(<ProposalsPanel onViewSection={onViewSection} sectionTitles={{ knowledge: "Knowledge" }} />);
+    // The section comes from the pack that declares the entity, since the
+    // toast shows before the server has said anything.
+    const packs = [{ key: "knowledge", title: "Knowledge", entities: { domain: { identifier: "name" } } }];
+    render(
+      <ProposalsPanel packs={packs} onViewSection={onViewSection} sectionTitles={{ knowledge: "Knowledge" }} />,
+    );
     await user.click(await screen.findByRole("button", { name: /^approve /i }));
-    await waitFor(() => expect(toast).toHaveBeenCalled());
-    const { action } = toast.mock.calls[0][0];
-    expect(action).toBeTruthy();
+    const { title, action, duration } = toast.mock.calls[0][0];
+    expect(title).toBe("Updated in Knowledge");
     // A link nobody has time to click is not a link. The default is 5s.
-    expect(toast.mock.calls[0][0].duration).toBeGreaterThan(5000);
+    expect(duration).toBeGreaterThan(5000);
     render(action);
+    expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /view in knowledge/i }));
     expect(onViewSection).toHaveBeenCalledWith("knowledge");
   });
@@ -476,7 +548,7 @@ describe("ProposalsPanel", () => {
     async function openPromoteDialog(user, props = {}) {
       render(<ProposalsPanel packs={PACKS} sectionTitles={{ lifestyle: "Lifestyle" }} {...props} />);
       await user.click(screen.getByRole("tab", { name: /observations/i }));
-      await user.click(await screen.findByRole("button", { name: /^promote$/i }));
+      await user.click(await screen.findByRole("button", { name: /^promote /i }));
       return screen.findByRole("dialog");
     }
 
@@ -544,13 +616,13 @@ describe("ProposalsPanel", () => {
     });
   });
 
-  it("tells the app which section to refetch, so the link does not land on stale data", async () => {
-    const user = userEvent.setup();
+  it("tells the app which section to refetch, so the link does not land on stale data", withToast(async ({ user, pass }) => {
     const onSectionChanged = vi.fn();
     render(<ProposalsPanel onSectionChanged={onSectionChanged} />);
     await user.click(await screen.findByRole("button", { name: /^approve /i }));
+    await pass();
     await waitFor(() => expect(onSectionChanged).toHaveBeenCalledWith("knowledge"));
-  });
+  }));
 
   it("does not ask for a refetch when nothing changed", async () => {
     const user = userEvent.setup();
@@ -582,16 +654,21 @@ describe("ProposalsPanel", () => {
     expect(toast.mock.calls[0][0].action.props.altText).toBe("Undo");
   });
 
-  it("says so when an action fails, and keeps the row", async () => {
-    const user = userEvent.setup();
+  it("says so when an approval fails, and puts the row back", withToast(async ({ user, pass }) => {
     api.approveProposal.mockRejectedValueOnce(new Error("boom"));
     render(<ProposalsPanel />);
     await user.click(await screen.findByRole("button", { name: /^approve /i }));
-    await waitFor(() => expect(toast).toHaveBeenCalled());
-    expect(toast.mock.calls[0][0]).toMatchObject({ variant: "destructive" });
-    // The row is still there to try again. Asserted on the collapsed line,
-    // since the rationale it used to check now sits behind the chevron.
+    await pass();
+    await waitFor(() => expect(toast.mock.calls.at(-1)[0]).toMatchObject({ variant: "destructive" }));
+    // The row is back to try again.
     expect(screen.getByRole("button", { name: /^approve /i })).toBeInTheDocument();
+  }));
+
+  it("offers no keyboard shortcuts over an empty tab", async () => {
+    api.listProposals.mockResolvedValue([]);
+    render(<ProposalsPanel />);
+    expect(await screen.findByText(/Nothing waiting/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /keyboard shortcuts/i })).not.toBeInTheDocument();
   });
 
   it("says the queue is empty rather than showing nothing", async () => {

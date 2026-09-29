@@ -1,4 +1,4 @@
-import { Check, LogOut, Monitor, Moon, Search, Settings, Sun, User, WifiOff } from "lucide-react";
+import { BookOpen, Check, LogOut, Monitor, Moon, Search, Settings, Sun, User, WifiOff } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { docsUrl } from "@/lib/api.js";
 
 const THEMES = [
   { id: "light", label: "Light", Icon: Sun },
@@ -104,9 +105,13 @@ export function Header({
               Null hides it: "Saved" on Review or Settings described an editor
               that was not on screen. */}
           {saveState && (
+          // Boxed only while it holds a button: a bordered "Saved" with
+          // nothing to press read as a control.
           <div
             data-save-state={saveState}
-            className="flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs"
+            className={`flex items-center gap-2 px-2.5 py-1.5 text-xs ${
+              saveState === "unsaved" ? "rounded-lg border bg-background" : ""
+            }`}
           >
             <span
               role="status"
@@ -137,7 +142,7 @@ export function Header({
           )}
 
           {/* One menu for everything about you rather than the app: Settings,
-              theme and sign-out. The theme used to be a lone icon that cycled
+              help, theme and sign-out. The theme used to be a lone icon that cycled
               on click, which said neither what it was nor what it would do. */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -153,6 +158,14 @@ export function Header({
               <DropdownMenuItem onSelect={() => onOpenSettings?.()}>
                 <Settings className="h-4 w-4" aria-hidden="true" />
                 Settings
+              </DropdownMenuItem>
+              {/* The app's only way to the docs. Help was otherwise empty
+                  states and four info icons. */}
+              <DropdownMenuItem asChild>
+                <a href={docsUrl()} target="_blank" rel="noreferrer">
+                  <BookOpen className="h-4 w-4" aria-hidden="true" />
+                  Help and docs
+                </a>
               </DropdownMenuItem>
               <div className="my-1 h-px bg-border" role="separator" />
               <p className="px-2 pb-1 pt-1.5 text-xs text-muted-foreground">Theme</p>

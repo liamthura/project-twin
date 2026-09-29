@@ -41,24 +41,51 @@ function dismiss(id) {
   setTimeout(() => publish(toasts.filter((t) => t.id !== id)), REMOVE_DELAY);
 }
 
+// `onClose` for each standing toast, kept out of the toast objects because the
+// Toaster spreads those onto Radix's Root.
+const closers = new Map();
+
+function closed(id) {
+  const onClose = closers.get(id);
+  closers.delete(id);
+  onClose?.();
+}
+
 // A new toast replaces the standing one rather than queueing behind it: this
 // app raises them for the result of an action the user just took, and the
 // latest result is the one worth reading.
-function toast(props) {
+//
+// `onClose` runs once, however the toast goes: its duration, its close
+// button, a dismiss, or a newer toast replacing it. Review sends a decision
+// then rather than on a timer of its own, because Radix pauses a toast's
+// duration while the pointer is on it: a separate 8s timer sent the decision
+// while the toast still stood there offering an Undo that no longer worked.
+function toast({ onClose, ...props }) {
   const id = String(++seq);
+  for (const standing of [...closers.keys()]) closed(standing);
+  if (onClose) closers.set(id, onClose);
   publish([
     {
       ...props,
       id,
       open: true,
       onOpenChange: (open) => {
-        if (!open) dismiss(id);
+        if (!open) {
+          closed(id);
+          dismiss(id);
+        }
       },
     },
   ]);
-  // A handle, as shadcn's toast() returns: Review's Reject closes its own
-  // Undo toast when the reader leaves before the 8s are up.
-  return { id, dismiss: () => dismiss(id) };
+  // A handle, as shadcn's toast() returns: Review closes its own Undo toast
+  // when the reader leaves before it has gone.
+  return {
+    id,
+    dismiss: () => {
+      closed(id);
+      dismiss(id);
+    },
+  };
 }
 
 function useToast() {

@@ -67,6 +67,15 @@ different amounts of thought.
 Typed, schema-valid changes: a skill level that moved, a project that finished,
 a person worth remembering. **Approve**, **edit then approve**, or **reject**.
 
+An update says what it would replace, as "Notes: Paused for now → Weekly
+tutor on Thursdays", so you see the value on record before you overwrite it. A
+row that would change nothing says so.
+
+Approve, Reject and Delete each show a confirmation with **Undo**, and nothing
+is sent until it goes, which is about eight seconds, longer while the pointer
+is on it. Leaving Review sends anything still waiting. An approval's
+confirmation also links to the section it went into.
+
 Approving writes through exactly the same path `persona_modify` uses, so every
 duplicate check and validation applies. Editing first is expected, because
 agents get details slightly wrong often enough that correcting before approving
@@ -75,8 +84,8 @@ tags, is edited as one comma-separated line.
 
 To deal with several at once, tick their boxes, or **Select all**, and use the
 bar that appears: **Approve**, **Reject**, or **Delete** on Observations.
-Rejecting several has one **Undo** for the lot. A row you are editing is left
-out, so a bulk approve never drops your changes.
+Approving or rejecting several has one **Undo** for the lot. A row you are
+editing is left out, so a bulk approve never drops your changes.
 
 On a keyboard, click a row or Tab to it, then press `j` and `k` to move, `a` to
 approve, `r` to reject, `e` to edit and `x` to select. `?` lists them all.
@@ -108,8 +117,8 @@ Two behaviours keep the queue usable over months.
 - **Rejected claims never come back.** Reject a proposal and it becomes a
   tombstone: no agent, in any client, can raise the same thing again. Without
   this, every tool re-suggests what you already declined, forever. The web
-  app waits eight seconds before it sends a rejection, so **Undo** on the
-  confirmation puts the row back.
+  app sends a rejection only once its confirmation has gone, so **Undo** on
+  it puts the row back.
 - **The same claim from three tools is one row.** Repeat proposals increment a
   counter instead of stacking up, so you see "seen 3×".
 

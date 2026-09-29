@@ -75,4 +75,28 @@ describe("the toast store", () => {
     wait(3000);
     expect(toasts()[0]).toMatchObject({ title: "two" });
   });
+
+  it("tells a toast's owner once when it goes, however it goes", () => {
+    const t = setup();
+    const byTime = vi.fn();
+    t.raise({ title: "one", onClose: byTime });
+    t.close();
+    t.close();
+    expect(byTime).toHaveBeenCalledTimes(1);
+
+    // Replaced by a newer toast, which is how an Undo button disappears too.
+    const replaced = vi.fn();
+    t.raise({ title: "two", onClose: replaced });
+    t.raise({ title: "three" });
+    expect(replaced).toHaveBeenCalledTimes(1);
+
+    const dismissed = vi.fn();
+    let handle;
+    act(() => { handle = toast({ title: "four", onClose: dismissed }); });
+    act(() => handle.dismiss());
+    act(() => handle.dismiss());
+    expect(dismissed).toHaveBeenCalledTimes(1);
+    // Not passed on to the element: the Toaster spreads a toast onto Radix.
+    expect(t.toasts().every((x) => !("onClose" in x))).toBe(true);
+  });
 });

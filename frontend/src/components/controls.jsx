@@ -130,7 +130,9 @@ export function SegmentedControl({ options, value, onChange }) {
 // Sentinel for the dropdown's Clear item — Radix Select forbids "" values.
 const CLEAR_SENTINEL = "__clear__";
 
-export function SelectControl({ options, value, onChange }) {
+// `clearable={false}` for a control whose options already hold the way back,
+// such as a filter's "All": a Clear under it did the same thing twice.
+export function SelectControl({ options, value, onChange, clearable = true }) {
   const isLegacy = Boolean(value) && !options.includes(value);
   const tone = value && !isLegacy ? VALUE_META[value]?.tone : undefined;
   return (
@@ -171,7 +173,7 @@ export function SelectControl({ options, value, onChange }) {
             </span>
           </SelectItem>
         ))}
-        {value && (
+        {value && clearable && (
           <>
             <SelectSeparator />
             <SelectItem value={CLEAR_SENTINEL}>
@@ -186,7 +188,7 @@ export function SelectControl({ options, value, onChange }) {
 
 // Convenience wrapper: picks segmented-vs-chips based on option count so
 // call sites don't have to.
-export function EnumControl({ options, value, onChange }) {
+export function EnumControl({ options, value, onChange, clearable = true }) {
   // On a phone a four-value segmented control with word labels ("in progress")
   // eats the whole width and wraps to three lines, which is most of why a
   // status field looked broken there. Narrow screens get the dropdown the
@@ -196,7 +198,7 @@ export function EnumControl({ options, value, onChange }) {
   const wide = useMediaQuery(SM_UP);
   if (options.length > SEGMENTED_MAX || !wide) {
     // Large enums: compact dropdown (legacy values render dashed in-trigger).
-    return <SelectControl options={options} value={value} onChange={onChange} />;
+    return <SelectControl options={options} value={value} onChange={onChange} clearable={clearable} />;
   }
   const isLegacy = value && !options.includes(value);
   return (

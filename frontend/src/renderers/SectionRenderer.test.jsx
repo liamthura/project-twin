@@ -23,6 +23,7 @@ import { normalizeUi, outline } from "@/renderers/paths";
 // pass while the screen showed something else, which is the whole failure mode
 // it exists to catch.
 import { elementShape, blockNode } from "@/renderers/elementShape";
+import { formatDateLabel } from "@/renderers/isoDate";
 import { buildFieldMeta } from "@/renderers/fieldMeta";
 
 // Every hand-built pack below declares its nodes as a top-level `sections`
@@ -549,7 +550,7 @@ describe("SectionRenderer", () => {
       const { user } = renderSection({ pack: learningLogPack, initial: learningLogData });
       await user.click(screen.getByText("React Server Components"));
       // TZ is pinned to America/New_York for the suite, so 09:30Z is 04:30.
-      expect(screen.getAllByText("2026-01-15 04:30").length).toBeGreaterThan(1);
+      expect(screen.getAllByText("15 January 2026, 04:30").length).toBeGreaterThan(1);
     });
 
     it("labels the body timestamp so it reads as a field, not a stray string", async () => {
@@ -624,7 +625,7 @@ describe("SectionRenderer", () => {
         const d = new Date(entry.timestamp);
         const p = (n) => String(n).padStart(2, "0");
         const shown =
-          `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+          `${d.getDate()} ${d.toLocaleString("en-GB", { month: "long" })} ${d.getFullYear()}, ` +
           `${p(d.getHours())}:${p(d.getMinutes())}`;
         expect(screen.getByText(shown)).toBeInTheDocument();
       }
@@ -865,16 +866,16 @@ describe("SectionRenderer", () => {
     // `new Date(...)` and reads local-time getters: a date-only string parses
     // as UTC midnight, so in any negative-offset zone (verified:
     // TZ=America/New_York renders "2026-01-12" as "2026-01-11") the badge
-    // would show the wrong day. Raw passthrough produces the identical
-    // yyyy-mm-dd string with no offset to get wrong.
+    // would show the wrong day. The calendar-date path formats the stored
+    // string's own parts, with no offset to get wrong.
     //
     // This assertion is only half a guard on its own -- it cannot fail in a
     // UTC or positive-offset zone, which is where this suite runs -- so the
     // manifest's own omission is asserted alongside it.
-    it("shows `added_date` verbatim, with no timezone-shifting format applied", () => {
+    it("shows `added_date` as its calendar date, with no timezone-shifting format applied", () => {
       renderSection({ pack: projectsPack, initial: projectsData });
       for (const project of projectsData.projects) {
-        expect(screen.getByText(project.added_date)).toBeInTheDocument();
+        expect(screen.getByText(formatDateLabel(project.added_date))).toBeInTheDocument();
       }
       const node = normalizeUi(projectsPack).sections.find(
         (s) => s.path[0] === "projects"
@@ -1169,10 +1170,10 @@ describe("SectionRenderer", () => {
 
     // ---- collapsed-row read-only chips ----
 
-    it("shows the domain dates verbatim, with no timezone-shifting format applied", () => {
+    it("shows the domain dates on their calendar day, with no timezone-shifting format applied", () => {
       renderSection({ pack: knowledgePack, initial: knowledgeData });
-      expect(screen.getByText("2026-01-12")).toBeInTheDocument();
-      expect(screen.getByText("2026-07-20")).toBeInTheDocument();
+      expect(screen.getByText("12 January 2026")).toBeInTheDocument();
+      expect(screen.getByText("20 July 2026")).toBeInTheDocument();
       // Both are plain yyyy-mm-dd calendar dates, not instants. formatDisplay
       // exempts that shape from `new Date()` + local getters, but only because
       // wave 4 Task 5 fixed it -- declaring a format here would still be
@@ -2393,7 +2394,7 @@ describe("section headings and info placement", () => {
 
     renderSection({ pack: projectsPack, initial: projectsData });
     expect(screen.getAllByText(/^Added date/)[0].closest("[data-row-meta]")).toHaveTextContent(
-      /Added date \d{4}-\d{2}-\d{2}/
+      /Added date \d{1,2} [A-Z][a-z]+ \d{4}/
     );
   });
 
@@ -3046,7 +3047,7 @@ describe("learning log rows", () => {
     const row = screen.getByText("React Server Components").closest(".cursor-pointer");
     const stamp = row.querySelector("[data-row-sort-value]");
     expect(stamp).not.toBeNull();
-    expect(stamp.textContent).toMatch(/^\d{4}-\d{2}-\d{2}/);
+    expect(stamp.textContent).toMatch(/^\d{1,2} [A-Z][a-z]+ \d{4}/);
     expect(within(row).queryByText(/timestamp/i)).not.toBeInTheDocument();
     // Straight after the title block, so it sits on the right.
     expect(stamp.previousElementSibling).toContainElement(screen.getByText("React Server Components"));

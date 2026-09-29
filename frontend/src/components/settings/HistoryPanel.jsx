@@ -255,7 +255,7 @@ function RestorePreview({ preview, reverting, onCancel, onRestore }) {
               <ul className="space-y-1">
                 {g.back.map((name) => (
                   <li key={`b:${name}`}>
-                    <span className="font-medium text-success">Bring back</span> {name}
+                    <span className="font-medium text-emerald-700 dark:text-emerald-300">Bring back</span> {name}
                   </li>
                 ))}
                 {g.removed.map((name) => (

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { entityPlace, proposalSummary } from "./proposalSummary";
+import { entityPlace, proposalSummary, updateChanges } from "./proposalSummary";
 import packs from "@/__fixtures__/packs.json";
 
 const PACKS = [
@@ -135,5 +135,26 @@ describe("entityPlace", () => {
   it("falls back to the section for an entity no node binds, and to words for an unknown one", () => {
     expect(entityPlace("hobby_reference", packs)).toBe("Lifestyle");
     expect(entityPlace("old_thing", packs)).toBe("old thing");
+  });
+});
+
+describe("updateChanges", () => {
+  const goals = { goals: [{ id: "g1", title: "Speak French", notes: "Paused for now.", status: "active" }] };
+  const update = (data) => ({ action: "update", entity: "goal", data });
+
+  it("says what each proposed field replaces, matching the entry case-insensitively", () => {
+    const row = update({ title: "speak french", notes: "Weekly tutor.", status: "active" });
+    // status is proposed as it already is, so it is not a change.
+    expect(updateChanges(row, packs, { goals })).toEqual([
+      { field: "notes", from: "Paused for now.", to: "Weekly tutor." },
+    ]);
+  });
+
+  it("is empty when the update matches what is there, and null when it cannot tell", () => {
+    expect(updateChanges(update({ title: "Speak French", notes: "Paused for now." }), packs, { goals })).toEqual([]);
+    // No such goal, an add, and a child row with a parent: nothing to compare.
+    expect(updateChanges(update({ title: "Run a marathon", notes: "x" }), packs, { goals })).toBeNull();
+    expect(updateChanges({ ...update({ title: "Speak French" }), action: "add" }, packs, { goals })).toBeNull();
+    expect(updateChanges({ action: "update", entity: "hobby_specific", data: { hobby_name: "a", specific: "b" } }, packs, {})).toBeNull();
   });
 });

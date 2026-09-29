@@ -188,6 +188,23 @@ def test_promotion_records_provenance_even_without_a_tags_field(clean_database):
     assert [p["id"] for p in found] == [pid]
 
 
+def test_approving_an_update_links_it_to_the_entry_it_changed(clean_database):
+    # An update adds nothing, so the link used to come back empty and the
+    # changed entry had no "why". It is the one entry the write changed.
+    client, auth = _client_and_auth()
+    _as_that_user(client, auth)
+    client.post(f"/api/proposals/{_seed_entity()}/approve", headers=auth)
+    [domain] = server.load_json("knowledge.json")["domains"]
+    pid = ps.create(
+        "entity", client="Claude", rationale="r", evidence="e",
+        action="update", entity="domain", identifier="Datadog",
+        data={"name": "Datadog", "level": "expert"},
+    )["id"]
+    assert client.post(f"/api/proposals/{pid}/approve", headers=auth).status_code == 200
+    assert ps.get(pid)["promoted_to"] == domain["id"]
+    assert pid in [p["id"] for p in ps.for_entity(domain["id"])]
+
+
 def test_promoting_clears_it_from_the_queue(clean_database):
     client, auth = _client_and_auth()
     _as_that_user(client, auth)

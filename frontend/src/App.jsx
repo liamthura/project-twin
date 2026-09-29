@@ -906,6 +906,7 @@ export default function App() {
                 onConnect={() => navigate("onboarding", "connect")}
                 sectionTitles={sectionTitles}
                 packs={packs}
+                packData={packData}
               />
             )}
 
