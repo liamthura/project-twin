@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { VALUE_META, FOCUS_RING, ValueIcon, EnumControl } from "@/components/controls";
+import { VALUE_META, FOCUS_RING, ValueIcon, SelectControl } from "@/components/controls";
 import { ScalarField, ISO_DATE } from "./ScalarField";
 import { buildFieldMeta, needsFullRow as fieldNeedsFullRow } from "./fieldMeta";
 import { elementShape, blockNode } from "./elementShape";
@@ -116,7 +116,7 @@ function formatDisplay(value, format) {
 //
 // Cased in JS rather than by CSS `text-transform: capitalize`, which
 // title-cased every word and, applied to declared copy, broke on punctuation:
-// learning_log's "Follow-up Items" rendered as "Follow-Up Items".
+// learning_log's "Follow-up items" rendered as "Follow-Up Items".
 function fieldLabel(meta, f) {
   const declared = meta.field_labels?.[f];
   if (declared !== undefined) return { text: declared };
@@ -232,7 +232,7 @@ export default function ListRenderer({
   // heading only; the header button said a bare "Add", which reads fine beside
   // a populated list and says nothing on an empty screen where it is the only
   // thing to act on.
-  const addLabel = (node.element?.entity ?? node.title ?? "item").replace(/_/g, " ");
+  const addLabel = (node.element?.noun ?? node.element?.entity ?? node.title ?? "item").replace(/_/g, " ");
   // Opens the dialog from outside Radix's trigger, for the empty-state panel
   // below. AddEntryDialog seeds its own draft from `fieldDefaults` off the
   // `open` prop -- deliberately, because a change made here is invisible to
@@ -441,12 +441,13 @@ export default function ListRenderer({
             in node.facets names an enum storage key; `facetOptions` above
             resolves that field's option set. A field with no resolvable
             options is skipped -- a control with zero real values to pick would
-            only ever be able to show "All". Every EnumControl here is fed an
-            extra leading "All" pseudo-option so the reset affordance is always
-            visible rather than relying on the click-the-active-value-again
-            toggle EnumControl uses elsewhere; the mapping back to `undefined`
-            (== no filter on this field) happens in the onChange below, never
-            stored, never threaded through onItems. */}
+            only ever be able to show "All". Always a dropdown: by option count
+            a filter was buttons in one list and a dropdown in the next, so
+            the same kind of control looked like two. Each is fed an extra
+            leading "All" pseudo-option so the reset affordance is always
+            visible; the mapping back to `undefined` (== no filter on this
+            field) happens in the onChange below, never stored, never threaded
+            through onItems. */}
         {facetFields.length > 0 && (
           <div role="group" aria-label="Filters" className="flex flex-wrap gap-x-4 gap-y-2">
             {facetFields.map((f) => {
@@ -458,10 +459,10 @@ export default function ListRenderer({
                   aria-label={`Filter by ${f.replace(/_/g, " ")}`}
                   className="flex items-center gap-1.5"
                 >
-                  <span className="text-xs font-medium capitalize text-muted-foreground">
-                    {f.replace(/_/g, " ")}
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {fieldLabel(meta, f).text}
                   </span>
-                  <EnumControl
+                  <SelectControl
                     options={["All", ...options]}
                     value={facetValues[f] ?? "All"}
                     clearable={false}
@@ -573,7 +574,7 @@ export default function ListRenderer({
                   : "Nothing here yet."}
               </p>
               <Button size="sm" onClick={openAdd}>
-                <Plus className="mr-1 h-4 w-4" />
+                <Plus className="h-4 w-4" />
                 Add {addLabel}
               </Button>
             </div>
@@ -607,9 +608,11 @@ export default function ListRenderer({
     // Only what the row above does not already show in full: a date on the
     // row is never cut, so "Added date" once there and again here was the
     // same line twice. A text value truncates on the row, and the ordering
-    // date drops its time on a phone, so those stay.
+    // date drops its time on a phone, so those stay -- unless the body has
+    // an input for it, which shows it whole: an opened person read
+    // "Relationship" on the row, in the body, and in its own box.
     const bodyDisplayFields = displayFields.filter((f) => {
-      if (item[f] == null || item[f] === "") return false;
+      if (item[f] == null || item[f] === "" || bodyEditFields.includes(f)) return false;
       const dated = ["date", "datetime"].includes(formats[f]) || ISO_DATE.test(String(item[f]));
       if (!dated) return true;
       return f === sortField && Boolean(displayParts(item[f], formats[f]).time);
@@ -654,7 +657,10 @@ export default function ListRenderer({
                     which is the one thing a collapsed row has to do. `min-w-0`
                     is what lets `truncate` work at all inside a flex child. */}
                 <span className="block min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
-                <span className="block truncate text-sm font-medium">{item[titleField]}</span>
+                {/* Whole on a phone, wrapping: cut to one line there, "Hold a
+                    conversation in French…" was all a goal ever said, and the
+                    row had no other way to read it short of opening it. */}
+                <span className="block break-words text-sm font-medium sm:truncate">{item[titleField]}</span>
                 <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 empty:hidden sm:mt-0 sm:flex-1 sm:flex-nowrap">
                   {stale && (
                     // Dashed and with a clock, so it never reads as the
@@ -889,7 +895,7 @@ export default function ListRenderer({
                           field's `label`, and `isBlockField` requires a label to
                           be a block at all -- so this string is ALWAYS authored
                           copy and never a derived name. This is the site that
-                          actually rendered learning_log's "Follow-up Items" as
+                          actually rendered learning_log's "Follow-up items" as
                           "Follow-Up Items"; see fieldLabel. */}
                       {child.title && (
                         <div className="flex items-center gap-1.5">

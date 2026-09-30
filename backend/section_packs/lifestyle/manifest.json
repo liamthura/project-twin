@@ -50,7 +50,7 @@
       "path": [
         "hobbies"
       ],
-      "title": "Hobbies & Activities",
+      "title": "Hobbies & activities",
       "description": "What you do outside work",
       "search": true,
       "facets": [
@@ -208,7 +208,7 @@
       "path": [
         "personality_traits"
       ],
-      "title": "Personality Traits",
+      "title": "Personality traits",
       "description": "How you think, work and deal with people",
       "placeholder": "e.g. Creative, Analytical...",
       "element": {
@@ -310,7 +310,7 @@
             "wellness",
             "energy_peaks"
           ],
-          "title": "Energy Peaks",
+          "title": "Energy peaks",
           "description": "Times of day when you feel most focused and productive",
           "placeholder": "e.g. Early morning (6-9am), Late night (10pm-1am)...",
           "element": {
@@ -325,7 +325,7 @@
             "wellness",
             "stress_triggers"
           ],
-          "title": "Stress Triggers",
+          "title": "Stress triggers",
           "description": "Situations or patterns that tend to increase your stress",
           "placeholder": "e.g. Tight deadlines, Open-plan noise...",
           "element": {

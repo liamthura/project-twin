@@ -44,7 +44,7 @@
             "communication",
             "default"
           ],
-          "title": "Default Communication Style",
+          "title": "Default communication style",
           "description": "Always active. How you prefer AI responses to be written.",
           "element": {
             "entity": "communication_default",
@@ -107,7 +107,7 @@
           "path": [
             "response_format"
           ],
-          "title": "Response Format",
+          "title": "Response format",
           "description": "How you want answers shaped",
           "placeholder": "e.g. code blocks for anything over three lines",
           "element": {
@@ -121,7 +121,7 @@
     },
     {
       "kind": "group",
-      "title": "Learning Style",
+      "title": "Learning style",
       "description": "How you learn best, and how you like work approached",
       "sections": [
         {
@@ -130,7 +130,7 @@
             "learning_style",
             "preferred"
           ],
-          "title": "Preferred Methods",
+          "title": "Preferred methods",
           "placeholder": "e.g. hands-on examples...",
           "$comment": "Bare strings, bound like response_format so an assistant can add or remove one item. The generic `preference` entity can only replace the whole list.",
           "element": {
@@ -145,7 +145,7 @@
             "learning_style",
             "avoid"
           ],
-          "title": "Things to Avoid",
+          "title": "Things to avoid",
           "placeholder": "e.g. walls of text...",
           "$comment": "Bare strings, bound like response_format so an assistant can add or remove one item. The generic `preference` entity can only replace the whole list.",
           "element": {
@@ -161,7 +161,7 @@
       "path": [
         "likes_dislikes"
       ],
-      "title": "Likes & Dislikes",
+      "title": "Likes & dislikes",
       "description": "Things you want every AI to know you like or avoid",
       "info": {
         "overview": "Standing likes and dislikes every AI should know about, whatever the topic.",
@@ -214,7 +214,7 @@
     },
     {
       "kind": "group",
-      "title": "Code Style",
+      "title": "Code style",
       "description": "Your preferred programming languages, frameworks, and tools",
       "sections": [
         {
@@ -223,7 +223,7 @@
             "code_style",
             "preferred_languages"
           ],
-          "title": "Preferred Languages",
+          "title": "Preferred languages",
           "placeholder": "e.g. Python, TypeScript...",
           "$comment": "Bare strings, bound like response_format so an assistant can add or remove one item. The generic `preference` entity can only replace the whole list.",
           "element": {

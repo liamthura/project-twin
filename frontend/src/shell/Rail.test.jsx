@@ -59,7 +59,7 @@ describe("Rail", () => {
     }
     // Profile is not active, so its bands must not be on screen -- the
     // prototype is explicit that switching collapses the previous section.
-    expect(screen.queryByRole("button", { name: "Work Experience" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Work experience" })).not.toBeInTheDocument();
   });
 
   it("expands nothing for a section whose children are all untitled", () => {
@@ -70,7 +70,7 @@ describe("Rail", () => {
 
   it("expands nothing for Review and Sections, which are not packs", () => {
     renderRail({ activeSection: "review" });
-    expect(screen.queryByRole("button", { name: "Code Style" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Code style" })).not.toBeInTheDocument();
   });
 
   it("shows the marker only once a band is current", () => {
@@ -93,7 +93,7 @@ describe("Rail", () => {
     // animate between each other at all -- CSS has nothing to interpolate.
     renderRail({ activeBand: "learning-style" });
     const marker = document.querySelector("[data-spy-marker]");
-    // Learning Style is index 1 of Preferences' four bands.
+    // Learning style is index 1 of Preferences' four bands.
     expect(marker.style.transform).toBe("translateY(32px)");
     expect(marker.className).toContain("duration-medium");
     expect(marker.className).toContain("ease-standard");
@@ -105,7 +105,7 @@ describe("Rail", () => {
       "aria-current",
       "true"
     );
-    expect(screen.getByRole("button", { name: "Code Style" })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("button", { name: "Code style" })).not.toHaveAttribute("aria-current");
   });
 
   it("reports a section click with a null band", async () => {
@@ -118,7 +118,7 @@ describe("Rail", () => {
   it("reports a band click with the section and the band id", async () => {
     const onNavigate = vi.fn();
     renderRail({ onNavigate });
-    await userEvent.click(screen.getByRole("button", { name: "Likes & Dislikes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Likes & dislikes" }));
     expect(onNavigate).toHaveBeenCalledWith("preferences", "likes-dislikes");
   });
 
@@ -171,7 +171,7 @@ describe("the disclosure caret", () => {
     // would get wrong.
     renderRail();
     expect(outline(learningLog)).toEqual([]);
-    const learning = item("Learning Log");
+    const learning = item("Learning log");
     expect(learning.querySelector(".lucide-chevron-down")).toBeNull();
     expect(learning.querySelector(".lucide-chevron-right")).toBeNull();
   });

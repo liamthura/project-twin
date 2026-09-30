@@ -7,6 +7,9 @@
  * dialog with an Account tab and that inventing one early would prejudge it.
  * This is that tab.
  *
+ * Deleting the account is the last group, and the only destructive thing here
+ * (DeleteAccount.jsx).
+ *
  * Neither preference is destructive. Auto-save changes when a write happens, not
  * whether one does, and restoring the getting-started card brings back a card
  * rather than data.
@@ -24,6 +27,7 @@ import { listAccounts, signOut, SSO_LABEL } from "@/lib/session.js";
 import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
 import { EmailSettings } from "@/components/EmailSettings";
 import { LinkedAccounts } from "@/components/LinkedAccounts";
+import { DeleteAccount } from "./DeleteAccount";
 
 // Matches MIN_PASSWORD_LENGTH in backend/main.py and Better Auth's own minimum.
 // Checked here so the failure arrives before a round trip, not instead of the
@@ -205,7 +209,7 @@ export function AccountPanel({
           onClick={handleSignOut}
           className="text-muted-foreground hover:text-foreground"
         >
-          <LogOut className="mr-1.5 h-3.5 w-3.5" />
+          <LogOut className="h-3.5 w-3.5" />
           Sign out
         </Button>
       </div>
@@ -333,6 +337,8 @@ export function AccountPanel({
           )}
         </div>
       </div>
+
+      <DeleteAccount username={username} />
 
       {version && (
         <p className="border-t pt-3 font-mono text-xs text-muted-foreground">{version}</p>

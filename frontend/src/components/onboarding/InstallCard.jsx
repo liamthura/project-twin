@@ -122,7 +122,7 @@ export function InstallCard({ client, url }) {
           <Button asChild>
             <a href={payload}>
               Add to {client.name}
-              <ExternalLink className="ml-1.5 h-3.5 w-3.5" aria-hidden="true" />
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
             </a>
           </Button>
           {/* Some browsers refuse to hand a custom scheme to an application

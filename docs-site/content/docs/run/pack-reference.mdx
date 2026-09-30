@@ -113,7 +113,7 @@ root. A group is a visual container, not a data scope.
 ```json title="section_packs/profile/manifest.json"
 {
   "kind": "group",
-  "title": "Contact & Links",
+  "title": "Contact & links",
   "description": "How to reach you and your online presence",
   "sections": [
     { "kind": "list", "path": ["contact", "emails"], "title": "Emails",
@@ -137,7 +137,7 @@ Seven keys: `kind`, `path`, `element`, and the optional `title`, `description`,
 {
   "kind": "fields",
   "path": ["communication", "default"],
-  "title": "Default Communication Style",
+  "title": "Default communication style",
   "description": "Always active. How you prefer AI responses to be written.",
   "element": {
     "entity": "communication_default",
@@ -200,7 +200,7 @@ otherwise mean retyping the line.
 {
   "kind": "strings",
   "path": ["wellness", "energy_peaks"],
-  "title": "Energy Peaks",
+  "title": "Energy peaks",
   "description": "Times of day when you feel most focused and productive",
   "placeholder": "e.g. Early morning (6-9am), Late night (10pm-1am)...",
   "element": { "entity": "energy_peak", "identifier": "peak" }
@@ -225,6 +225,7 @@ an array-typed field.
 | `fields` | array | One or more [field descriptors](#the-field-descriptor). |
 | `actions` | array | Any of `add`, `update`, `remove`. Default all three. |
 | `description` | string | MCP-facing: what this record is, for a client choosing an entity. Distinct from a node's `description`, which is on-screen helper text. |
+| `noun` | string | What one entry is called on screen, as in "Add person". Defaults to the entity name. |
 | `variants` | array | Extra entity names over this same stored array. |
 | `parent` | string | Nested arrays only. The MCP parameter naming the enclosing row. |
 | `list` | string | The stored array's own name as the contract reports it today. |

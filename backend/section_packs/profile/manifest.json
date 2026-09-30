@@ -73,7 +73,7 @@
     {
       "kind": "fields",
       "path": [],
-      "title": "Personal Information",
+      "title": "Personal information",
       "description": "Your basic identity and current status",
       "element": {
         "entity": "basic_info",
@@ -186,7 +186,7 @@
             "show": [
               "count"
             ],
-            "label": "Coursework / Modules",
+            "label": "Coursework / modules",
             "element": {
               "entity": "coursework",
               "identifier": "name",
@@ -229,7 +229,7 @@
             "name": "clubs",
             "type": "list",
             "show": [],
-            "label": "Clubs & Societies",
+            "label": "Clubs & societies",
             "element": {
               "entity": "club",
               "identifier": "name",
@@ -268,7 +268,7 @@
       "path": [
         "work_experience"
       ],
-      "title": "Work Experience",
+      "title": "Work experience",
       "description": "Your professional experience",
       "search": true,
       "element": {
@@ -348,7 +348,7 @@
     },
     {
       "kind": "group",
-      "title": "Contact & Links",
+      "title": "Contact & links",
       "description": "How to reach you and your online presence",
       "sections": [
         {

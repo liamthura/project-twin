@@ -106,7 +106,7 @@ export function DataPanel({ advanced = null, advancedOpen = false, onAdvancedOpe
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <>
-                <Download className="mr-2 h-4 w-4" />
+                <Download className="h-4 w-4" />
                 Export
               </>
             )}
@@ -190,7 +190,7 @@ export function DataPanel({ advanced = null, advancedOpen = false, onAdvancedOpe
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  <Upload className="mr-2 h-4 w-4" />
+                  <Upload className="h-4 w-4" />
                   Choose file
                 </>
               )}

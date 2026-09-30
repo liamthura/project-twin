@@ -132,6 +132,11 @@ export default {
           "0%,100%": { opacity: "0.25" },
           "50%": { opacity: "0.6" },
         },
+        // What is left of an Undo toast's time. Its duration is set per toast.
+        "toast-time": {
+          from: { transform: "scaleX(1)" },
+          to: { transform: "scaleX(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -140,6 +145,7 @@ export default {
         // Linear, because a flow that eases is a flow that visibly restarts.
         "dash-flow": "dash-flow 1.4s linear infinite",
         "hub-pulse": "hub-pulse 2.8s ease-in-out infinite",
+        "toast-time": "toast-time linear forwards",
       },
       // Motion, as `duration-medium` / `ease-standard` classes. Pointed at the
       // custom properties rather than literal values so the reduced-motion

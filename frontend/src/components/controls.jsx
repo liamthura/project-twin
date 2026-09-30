@@ -9,10 +9,12 @@ import {
 import { useMediaQuery, SM_UP } from "@/lib/useMediaQuery";
 
 // Enums with this many values or fewer render as a segmented control;
-// larger sets render as a compact dropdown selector to save space.
+// larger sets render as a compact dropdown selector to save space. Five, so
+// every status in the packs is buttons: at four, a project's five statuses
+// were a dropdown and a goal's four were buttons, one field looking like two.
 // Both allow clearing (all generic enum fields are optional): segmented
 // clears on active-click, the dropdown has an explicit Clear item.
-export const SEGMENTED_MAX = 4;
+export const SEGMENTED_MAX = 5;
 
 // Semantic icon + color pairing for well-known enum values, so state reads
 // at a glance. Accessibility rule: color is never the only signal — every
@@ -23,23 +25,22 @@ export const SEGMENTED_MAX = 4;
 // are intentionally NOT given entries here — "learning" collides with the
 // goal TYPE value, and levels are progressions rather than statuses, so
 // they stay plain (no icon, default active styling).
+//
+// Taste (love, like, avoid, dislike) carries its icon and no colour. Rose on
+// "loved" read as Reject's red, and amber on "dislike" as the "paused" beside
+// it: colour here says where something stands, not how you feel about it.
 export const VALUE_META = {
   // aesthetics stance
-  love: { icon: Heart, tone: "text-rose-600 dark:text-rose-400",
-          chip: "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300" },
+  love: { icon: Heart },
   like: { icon: ThumbsUp },
-  avoid: { icon: Ban, tone: "text-amber-700 dark:text-amber-400",
-           chip: "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
+  avoid: { icon: Ban },
   // media reaction (taste signal, mirrors stance semantics)
-  loved: { icon: Heart, tone: "text-rose-600 dark:text-rose-400",
-           chip: "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300" },
+  loved: { icon: Heart },
   liked: { icon: ThumbsUp },
-  disliked: { icon: ThumbsDown, tone: "text-amber-700 dark:text-amber-400",
-              chip: "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
+  disliked: { icon: ThumbsDown },
   // likes/dislikes stance (preferences) — "like" reuses the aesthetics
   // stance entry above (same neutral thumbs-up semantics)
-  dislike: { icon: ThumbsDown, tone: "text-amber-700 dark:text-amber-400",
-             chip: "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
+  dislike: { icon: ThumbsDown },
   // interest kind (lifestyle)
   passion: { icon: Heart },
   curiosity: { icon: Compass },

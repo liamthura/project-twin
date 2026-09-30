@@ -34,11 +34,11 @@ describe("restoreChanges", () => {
         { name: null, fields: [{ field: "Bedtime", from: "23:00", to: "22:30" }] },
       ] },
     ]);
-    // Personal Information sits at the root, beside every list in the section.
+    // Personal information sits at the root, beside every list in the section.
     const profileNow = { name: "Maya", education: [{ id: "e1", institution: "Leeds" }] };
     const profileThen = { name: "Maya Ellis", education: [{ id: "e1", institution: "Leeds" }] };
     expect(restoreChanges(pack("profile"), profileNow, profileThen)).toEqual([
-      { title: "Personal Information", back: [], removed: [], changed: [
+      { title: "Personal information", back: [], removed: [], changed: [
         { name: null, fields: [{ field: "Name", from: "Maya", to: "Maya Ellis" }] },
       ] },
     ]);

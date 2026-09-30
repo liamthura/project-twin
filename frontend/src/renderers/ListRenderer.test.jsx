@@ -1194,18 +1194,18 @@ describe("a field's own `label` overrides the derived one", () => {
   // the CLASS rather than the rendered glyphs because jsdom applies no
   // stylesheet: `text-transform` is invisible to it, and the class is the only
   // observable difference. The bug being pinned is real and shipped --
-  // learning_log declares "Follow-up Items", and CSS `capitalize` breaks on the
+  // learning_log declares "Follow-up items", and CSS `capitalize` breaks on the
   // hyphen, so it rendered as "Follow-Up Items".
   it("does not offer a declared label to CSS capitalize", async () => {
     const node = listNode(["entries"], "topic", [
-      { name: "source", label: "Follow-up Items" },
+      { name: "source", label: "Follow-up items" },
     ]);
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[{ topic: "RSC", source: "x" }]} onItems={vi.fn()} />);
 
     await user.click(screen.getByText("RSC"));
 
-    expect(screen.getByText("Follow-up Items").className).not.toMatch(/capitalize/);
+    expect(screen.getByText("Follow-up items").className).not.toMatch(/capitalize/);
   });
 
   it("sentence-cases a derived name, as the form does", async () => {
@@ -1223,14 +1223,14 @@ describe("a field's own `label` overrides the derived one", () => {
   // so this site needs no conditional, and had no business capitalising.
   it("does not offer a block heading to CSS capitalize either", async () => {
     const node = listNode(["entries"], "topic", [
-      { name: "followup_items", type: "strings", label: "Follow-up Items" },
+      { name: "followup_items", type: "strings", label: "Follow-up items" },
     ]);
     const user = userEvent.setup();
     render(<ListRenderer node={node} items={[{ topic: "RSC", followup_items: [] }]} onItems={vi.fn()} />);
 
     await user.click(screen.getByText("RSC"));
 
-    expect(screen.getByText("Follow-up Items").className).not.toMatch(/capitalize/);
+    expect(screen.getByText("Follow-up items").className).not.toMatch(/capitalize/);
   });
 });
 
@@ -1759,12 +1759,20 @@ describe("facets", () => {
     return screen.getByRole("group", { name: "Filter by status" });
   }
 
-  it("renders one option per declared value plus an All, ignoring the entity's valid_values", () => {
+  // A filter is always a dropdown, whatever its option count. The listbox is
+  // portalled, so the option is found through `screen`.
+  async function chooseFacet(user, name) {
+    await user.click(within(facetGroup()).getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name }));
+  }
+
+  it("renders one option per declared value plus an All, ignoring the entity's valid_values", async () => {
+    const user = userEvent.setup();
     render(
       <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
     );
-    const buttons = within(facetGroup()).getAllByRole("button");
-    expect(buttons.map((b) => b.textContent)).toEqual([
+    await user.click(within(facetGroup()).getByRole("combobox"));
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
       "All", "active", "paused", "completed",
     ]);
     // The entity's (wrong) options must not have leaked in anywhere.
@@ -1778,7 +1786,7 @@ describe("facets", () => {
       <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
     );
 
-    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+    await chooseFacet(user, "active");
 
     expect(screen.getByText("Alpha")).toBeInTheDocument();
     expect(screen.getByText("Charlie")).toBeInTheDocument();
@@ -1812,7 +1820,7 @@ describe("facets", () => {
     expect(screen.queryByText("Charlie")).not.toBeInTheDocument();
 
     // Facet "active" then drops Bravo (paused) from that search result too.
-    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+    await chooseFacet(user, "active");
 
     expect(screen.getByText("Alpha")).toBeInTheDocument();
     expect(screen.queryByText("Bravo")).not.toBeInTheDocument();
@@ -1825,10 +1833,10 @@ describe("facets", () => {
       <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
     );
 
-    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+    await chooseFacet(user, "active");
     expect(screen.queryByText("Bravo")).not.toBeInTheDocument();
 
-    await user.click(within(facetGroup()).getByRole("button", { name: "All" }));
+    await chooseFacet(user, "All");
 
     expect(screen.getByText("Alpha")).toBeInTheDocument();
     expect(screen.getByText("Bravo")).toBeInTheDocument();
@@ -1853,8 +1861,8 @@ describe("facets", () => {
     const user = userEvent.setup();
     render(<ListRenderer node={facetNode} entity={entity} items={items} onItems={onItems} />);
 
-    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
-    await user.click(within(facetGroup()).getByRole("button", { name: "All" }));
+    await chooseFacet(user, "active");
+    await chooseFacet(user, "All");
 
     expect(onItems).not.toHaveBeenCalled();
   });
@@ -1877,7 +1885,7 @@ describe("facets", () => {
       <ListRenderer node={sortedNode} entity={entity} items={stored} onItems={onItems} />
     );
 
-    await user.click(within(facetGroup()).getByRole("button", { name: "active" }));
+    await chooseFacet(user, "active");
     expect(screen.queryByText("Bravo")).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Alpha"));

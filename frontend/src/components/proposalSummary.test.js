@@ -120,8 +120,8 @@ describe("proposalSummary against every shipped entity", () => {
 
 describe("entityPlace", () => {
   it("names the section and the list, in the editor's words", () => {
-    expect(entityPlace("domain", packs)).toBe("Knowledge › Skills & Domains");
-    expect(entityPlace("response_format", packs)).toBe("Preferences › Response Format");
+    expect(entityPlace("domain", packs)).toBe("Knowledge › Skills & domains");
+    expect(entityPlace("response_format", packs)).toBe("Preferences › Response format");
   });
 
   it("names the section alone when its one list has no title of its own", () => {

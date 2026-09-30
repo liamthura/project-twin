@@ -63,4 +63,21 @@ describe("the Toaster's clock", () => {
     act(() => vi.advanceTimersByTime(20000));
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("draws the time left on a toast with an action, and pauses it with the clock", () => {
+    const { container } = render(<Toaster />);
+    act(() => {
+      toast({ title: "Hana added to Circle", duration: 8000, action: <button type="button">Undo</button> });
+    });
+    const bar = container.ownerDocument.querySelector("[data-toast-time]");
+    expect(bar).toHaveStyle({ animationDuration: "8000ms", animationPlayState: "running" });
+    fireEvent.pointerEnter(item("Hana added to Circle"));
+    expect(bar).toHaveStyle({ animationPlayState: "paused" });
+  });
+
+  it("draws no time on a toast with nothing to act on", () => {
+    render(<Toaster />);
+    act(() => { toast({ title: "Saved" }); });
+    expect(document.querySelector("[data-toast-time]")).toBeNull();
+  });
 });

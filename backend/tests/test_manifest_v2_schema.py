@@ -248,7 +248,7 @@ def test_strings_with_an_empty_path_is_rejected():
 
 def test_fields_node_with_an_empty_path_is_accepted():
     # The one kind for which `path: []` is meaningful: it addresses the section
-    # root, which is how profile's Personal Information binds its scalars.
+    # root, which is how profile's Personal information binds its scalars.
     manifest = _with_sections(
         {"kind": "fields", "path": [], "element": {"entity": "basic_info", "fields": [{"name": "name"}]}}
     )
@@ -341,7 +341,7 @@ def test_nested_list_field_is_accepted():
         "name": "coursework",
         "type": "list",
         "show": ["count"],
-        "label": "Coursework / Modules",
+        "label": "Coursework / modules",
         "element": {
             "entity": "coursework",
             "identifier": "name",
@@ -453,7 +453,7 @@ def test_strings_node_with_a_writer_is_accepted():
         {
             "kind": "strings",
             "path": ["personality_traits"],
-            "title": "Personality Traits",
+            "title": "Personality traits",
             "element": {"entity": "personality_trait", "identifier": "trait"},
         }
     )
@@ -464,7 +464,7 @@ def test_strings_node_without_a_writer_is_accepted():
     # The common case, and why `element` is optional here: preferences ships six
     # `strings` nodes and only `response_format` is in the MCP contract.
     pack_loader.validate_manifest(
-        _with_sections({"kind": "strings", "path": ["key_decisions"], "title": "Key Decisions"})
+        _with_sections({"kind": "strings", "path": ["key_decisions"], "title": "Key decisions"})
     )
 
 

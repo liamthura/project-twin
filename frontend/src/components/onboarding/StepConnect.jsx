@@ -252,9 +252,9 @@ export function StepConnect({ onDelegate, onFillManually }) {
                 }}
               >
                 {installCopied ? (
-                  <Check className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                  <Check className="h-4 w-4" aria-hidden="true" />
                 ) : (
-                  <Copy className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                  <Copy className="h-4 w-4" aria-hidden="true" />
                 )}
                 {installCopied ? "Copied" : "Copy prompt for my client"}
               </Button>
@@ -387,25 +387,31 @@ export function StepConnect({ onDelegate, onFillManually }) {
                 </p>
               </div>
             </div>
-            <p className="rounded-md border bg-muted/50 p-3 text-xs leading-relaxed">
+            {/* Tinted, not boxed: a bordered box inside this bordered card
+                was a card in a card. */}
+            <p className="rounded-md bg-muted p-3 text-xs leading-relaxed">
               {AUTOFILL_PROMPT}
             </p>
+            {/* One filled button, and it moves: Copy first, then Done once
+                the prompt is on the clipboard. Four quiet buttons of equal
+                weight left the one thing to do next unmarked, at the moment
+                a new account most wants to be told. */}
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
-                variant="outline"
+                variant={promptCopied ? "outline" : "default"}
                 onClick={() => {
                   navigator.clipboard?.writeText(AUTOFILL_PROMPT);
                   setPromptCopied(true);
                 }}
               >
                 {promptCopied ? (
-                  <Check className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                  <Check className="h-4 w-4" aria-hidden="true" />
                 ) : (
-                  <Copy className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                  <Copy className="h-4 w-4" aria-hidden="true" />
                 )}
                 {promptCopied ? "Copied" : "Copy prompt"}
               </Button>
-              <Button variant="ghost" onClick={onDelegate}>
+              <Button variant={promptCopied ? "default" : "ghost"} onClick={onDelegate}>
                 Done, my assistant will fill it in
               </Button>
             </div>

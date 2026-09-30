@@ -186,12 +186,12 @@ export function ServerPanel({ isSignedIn, onConnectionChange, onClose }) {
         <Button variant="outline" onClick={handleTest} disabled={testing}>
           {testing ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
               Testing...
             </>
           ) : (
             <>
-              <Wifi className="mr-2 h-4 w-4" />
+              <Wifi className="h-4 w-4" />
               Test connection
             </>
           )}

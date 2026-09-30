@@ -57,7 +57,7 @@ describe("StringsRenderer", () => {
   });
 
   it("derives a placeholder for a multi-word title", () => {
-    const bare = { kind: "strings", path: ["t"], title: "Personality Traits" };
+    const bare = { kind: "strings", path: ["t"], title: "Personality traits" };
     render(<StringsRenderer node={bare} items={[]} onItems={() => {}} />);
     expect(screen.getByPlaceholderText("Add personality trait...")).toBeInTheDocument();
   });

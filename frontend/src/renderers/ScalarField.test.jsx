@@ -82,13 +82,13 @@ describe("ScalarField", () => {
       expect(screen.getByRole("button", { name: "dislike", pressed: false })).toBeInTheDocument();
     });
 
-    it("renders a combobox reflecting the current value when more than four options exist", () => {
+    it("renders a combobox reflecting the current value when more than five options exist", () => {
       render(
         <ScalarField
           field="kind"
           value="podcast"
           meta={{
-            valid_values: { kind: ["book", "article", "podcast", "show", "film"] },
+            valid_values: { kind: ["book", "article", "podcast", "show", "film", "game"] },
           }}
           onChange={() => {}}
         />

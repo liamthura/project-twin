@@ -137,7 +137,7 @@ describe("buildFieldMeta", () => {
 // What replaced it is `frontend/src/__fixtures__/control-census-v1.json`, which
 // freezes the CONTROL each field renders rather than its name, and which records
 // all ten of those fields as "longtext": goals.why, goals.notes, Hobbies &
-// Activities.notes, Hobbies & Activities > References & URLs.notes,
+// Activities.notes, Hobbies & activities > References & URLs.notes,
 // Interests.notes, media items.notes, aesthetics Styles.notes, knowledge's two
 // References.notes and Projects > References.notes. `controlCensus.test.js`
 // compares the real packs against it on every run, so a textarea that quietly

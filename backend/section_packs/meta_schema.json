@@ -395,6 +395,11 @@
         "description": {
           "$ref": "#/$defs/mcpDescription"
         },
+        "noun": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What one entry is called on screen, in the editor's Add button and dialog (\"Add person\"). Optional; defaults to the entity name. For an entity name that reads wrong to a person: circle's `connection` said \"Add connection\" one click from Settings › Connections, which are apps."
+        },
         "variants": {
           "$ref": "#/$defs/variants"
         },

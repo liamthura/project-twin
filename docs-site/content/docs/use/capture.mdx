@@ -71,10 +71,12 @@ An update says what it would replace, as "Notes: Paused for now → Weekly
 tutor on Thursdays", so you see the value on record before you overwrite it. A
 row that would change nothing says so.
 
-Approve, Reject and Delete each show a confirmation with **Undo**, and nothing
-is sent until it goes, which is about eight seconds, longer while the pointer
-is on it. Leaving Review sends anything still waiting. An approval's
-confirmation also links to the section it went into.
+Approve, Reject and Delete each show a confirmation that names the entry, such
+as "Hana added to Circle", with **Undo**. Nothing is sent until it goes: a bar
+along its foot shows the eight seconds running out, and it waits while the
+pointer or focus is on it. Leaving Review sends anything still waiting, and so
+does deciding the next row, which takes the place of the confirmation before
+it. An approval's confirmation also links to the section it went into.
 
 Approving writes through exactly the same path `persona_modify` uses, so every
 duplicate check and validation applies. Editing first is expected, because
@@ -84,11 +86,13 @@ tags, is edited as one comma-separated line.
 
 To deal with several at once, tick their boxes, or **Select all**, and use the
 bar that appears: **Approve**, **Reject**, or **Delete** on Observations.
-Approving or rejecting several has one **Undo** for the lot. A row you are
-editing is left out, so a bulk approve never drops your changes.
+Approving or rejecting several has one **Undo** for the lot, and the
+confirmation counts what each did, as "Approved 4: 2 added, 2 updated". A row
+you are editing is left out, so a bulk approve never drops your changes.
 
-On a keyboard, click a row or Tab to it, then press `j` and `k` to move, `a` to
-approve, `r` to reject, `e` to edit and `x` to select. `?` lists them all.
+On a keyboard, press `j` to reach the first row, then `j` and `k` to move, `a`
+to approve, `r` to reject, `e` to edit and `x` to select. `?` lists them all,
+from anywhere on the page.
 
 ### Observations
 
@@ -98,6 +102,11 @@ recommendation first, then the reasoning" is real, and there is no field for it.
 Two actions: **promote** it into a typed entry wherever you think it belongs, or
 **delete** it. Observations are a staging area. They feed no scope, so no agent
 reads them until you have promoted them into real data.
+
+Promoting asks for a section and a type, named as the editor names them ("When
+I'm feeling..."), and lets you reword the text first. The section starts on the
+one the assistant suggested; the type starts unchosen whenever there is more
+than one, so nothing is filed under a guess.
 
 If the same kind of observation keeps appearing and nothing fits, that is a
 signal to add a section for it. See

@@ -184,9 +184,9 @@ export function GettingStartedCard({
                   }}
                 >
                   {copied ? (
-                    <Check className="mr-1.5 h-3.5 w-3.5" />
+                    <Check className="h-3.5 w-3.5" />
                   ) : (
-                    <Copy className="mr-1.5 h-3.5 w-3.5" />
+                    <Copy className="h-3.5 w-3.5" />
                   )}
                   {copied ? "Copied" : "Copy prompt"}
                 </Button>

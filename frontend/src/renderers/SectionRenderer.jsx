@@ -91,7 +91,7 @@ export default function SectionRenderer({
   // -- a `strings` or `fields` node would otherwise contribute an empty div to
   // every card header it renders.
   const wantsSlot = (node) => node.kind === "list";
-  // A section that is one untitled list (Goals, Circle, Learning Log). Its
+  // A section that is one untitled list (Goals, Circle, Learning log). Its
   // heading is not drawn, so its Add moves up beside History: left in the card
   // header it sat alone on a row of its own, above the list's own controls.
   const loneList = sections?.length === 1 && !sections[0].title && wantsSlot(sections[0]);
@@ -287,7 +287,7 @@ export default function SectionRenderer({
     //
     // The rejected alternative was "grid always, and a `fields` card spans the
     // row": it reproduces Communication's fields card but then pairs
-    // `When I'm feeling...` with `Response Format`, which the file stacks.
+    // `When I'm feeling...` with `Response format`, which the file stacks.
     //
     // lg and not md: at md the rail already takes 240 of 768px, which would
     // leave two cards about 230px wide.
@@ -313,7 +313,7 @@ export default function SectionRenderer({
 
   // A stretch of ungrouped leaves, stacked. Never gridded: the prototype shows
   // every ungrouped card full width, and these are the section's heaviest nodes
-  // (profile's Personal Information holds seven fields).
+  // (profile's Personal information holds seven fields).
   function renderLeafRun(items) {
     const cards = items
       .map(({ node, index }) => renderSectionNode(node, `${index}`, 0))

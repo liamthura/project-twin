@@ -69,3 +69,19 @@ export function formatDateLabel(value) {
     year: "numeric",
   }).format(date);
 }
+
+/**
+ * A moment from the server (`2026-07-28T08:14:03Z`) as a person reads it where
+ * they are: "28 July 2026", or "28 July 2026, 09:14" with the time. Local,
+ * because an instant is not a calendar date, and slicing its ISO string gives
+ * the UTC day -- the one-day-out fault above, which the token list had.
+ */
+export function formatInstant(value, { time = false } = {}) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  const date = formatDateLabel(formatIsoDate(d));
+  if (!time) return date;
+  const p = (n) => String(n).padStart(2, "0");
+  return `${date}, ${p(d.getHours())}:${p(d.getMinutes())}`;
+}

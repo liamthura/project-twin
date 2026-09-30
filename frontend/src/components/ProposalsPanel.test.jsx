@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import ProposalsPanel from "./ProposalsPanel";
+import ProposalsPanel, { approvedMany } from "./ProposalsPanel";
 import { promotionTargets } from "./PromoteDialog";
 import realPacks from "@/__fixtures__/packs.json";
 
@@ -452,7 +452,7 @@ describe("ProposalsPanel", () => {
       await user.click(await screen.findByRole("checkbox", { name: /select all/i }));
       await user.click(screen.getByRole("button", { name: "Approve 3" }));
       expect(screen.queryAllByRole("button", { name: /^approve /i })).toEqual([]);
-      expect(toast.mock.calls.at(-1)[0].title).toBe("Added 3 to your persona");
+      expect(toast.mock.calls.at(-1)[0].title).toBe("Updated 3 in your persona");
 
       await pass();
       await waitFor(() => expect(names()).toEqual(["Approve Grafana"]));
@@ -490,6 +490,20 @@ describe("ProposalsPanel", () => {
       expect(api.approveProposal).toHaveBeenCalledWith("p11", undefined);
     }));
 
+    it("answers ? and j before any row has focus, and leaves the arrow keys to the page", async () => {
+      const user = userEvent.setup();
+      render(<ProposalsPanel />);
+      const rows = await screen.findAllByRole("group", { name: /^update /i });
+      expect(document.body).toHaveFocus();
+      await user.keyboard("{ArrowDown}");
+      expect(document.body).toHaveFocus();
+      await user.keyboard("j");
+      expect(rows[0]).toHaveFocus();
+      rows[0].blur();
+      await user.keyboard("?");
+      expect(await screen.findByRole("dialog", { name: /keyboard shortcuts/i })).toBeInTheDocument();
+    });
+
     it("leaves letters typed into an edit field alone", async () => {
       const user = userEvent.setup();
       render(<ProposalsPanel />);
@@ -524,6 +538,26 @@ describe("ProposalsPanel", () => {
     expect(screen.queryByRole("button", { name: /^approve /i })).not.toBeInTheDocument();
   });
 
+  it("names what it rejected or deleted, quoting a note", async () => {
+    const user = userEvent.setup();
+    const packs = [{ key: "knowledge", title: "Knowledge", entities: { domain: { identifier: "name" } } }];
+    render(<ProposalsPanel packs={packs} />);
+    await user.click(await screen.findByRole("button", { name: /^reject /i }));
+    expect(toast.mock.calls.at(-1)[0].title).toBe("Rejected Datadog. It won't be suggested again.");
+
+    await user.click(screen.getByRole("tab", { name: /observations/i }));
+    await user.click(await screen.findByRole("button", { name: /^delete /i }));
+    expect(toast.mock.calls.at(-1)[0].title)
+      .toBe("Deleted “Wants the recommendation first”. It won't be suggested again.");
+  });
+
+  it("counts a bulk approval by what each does", () => {
+    const rows = (...actions) => actions.map((action) => ({ action }));
+    expect(approvedMany(rows("add", "add"))).toBe("Added 2 to your persona");
+    expect(approvedMany(rows("update", "update", "update"))).toBe("Updated 3 in your persona");
+    expect(approvedMany(rows("add", "update", "update", "add"))).toBe("Approved 4: 2 added, 2 updated");
+  });
+
   it("offers a way to see what changed beside the Undo, naming where it went", async () => {
     const user = userEvent.setup();
     const onViewSection = vi.fn();
@@ -535,7 +569,7 @@ describe("ProposalsPanel", () => {
     );
     await user.click(await screen.findByRole("button", { name: /^approve /i }));
     const { title, action, duration } = toast.mock.calls[0][0];
-    expect(title).toBe("Updated in Knowledge");
+    expect(title).toBe("Datadog updated in Knowledge");
     // A link nobody has time to click is not a link. The default is 5s.
     expect(duration).toBeGreaterThan(5000);
     render(action);
@@ -586,7 +620,7 @@ describe("ProposalsPanel", () => {
       const user = userEvent.setup();
       const dialog = await openPromoteDialog(user);
       await pick(user, dialog, /section/i, "Lifestyle");
-      await pick(user, dialog, /^type$/i, "value");
+      await pick(user, dialog, /^type$/i, "Value");
       await user.click(within(dialog).getByRole("button", { name: /^promote$/i }));
       await waitFor(() =>
         expect(api.promoteProposal).toHaveBeenCalledWith(

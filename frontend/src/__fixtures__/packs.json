@@ -210,7 +210,7 @@
       {
         "kind": "fields",
         "path": [],
-        "title": "Personal Information",
+        "title": "Personal information",
         "description": "Your basic identity and current status",
         "element": {
           "entity": "basic_info",
@@ -323,7 +323,7 @@
               "show": [
                 "count"
               ],
-              "label": "Coursework / Modules",
+              "label": "Coursework / modules",
               "element": {
                 "entity": "coursework",
                 "identifier": "name",
@@ -366,7 +366,7 @@
               "name": "clubs",
               "type": "list",
               "show": [],
-              "label": "Clubs & Societies",
+              "label": "Clubs & societies",
               "element": {
                 "entity": "club",
                 "identifier": "name",
@@ -405,7 +405,7 @@
         "path": [
           "work_experience"
         ],
-        "title": "Work Experience",
+        "title": "Work experience",
         "description": "Your professional experience",
         "search": true,
         "element": {
@@ -485,7 +485,7 @@
       },
       {
         "kind": "group",
-        "title": "Contact & Links",
+        "title": "Contact & links",
         "description": "How to reach you and your online presence",
         "sections": [
           {
@@ -818,7 +818,7 @@
         "path": [
           "domains"
         ],
-        "title": "Skills & Domains",
+        "title": "Skills & domains",
         "description": "What you know, how well, and where you used it",
         "search": true,
         "facets": [
@@ -889,6 +889,7 @@
             },
             {
               "name": "added_date",
+              "label": "Added",
               "show": [
                 "row"
               ],
@@ -910,17 +911,17 @@
         "path": [
           "mental_tabs"
         ],
-        "title": "Mental Tabs",
+        "title": "Mental tabs",
         "description": "Things worth remembering that are not skills: lists, recommendations, notes",
         "info": {
-          "overview": "Mental Tabs are your personal knowledge snippets: random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
+          "overview": "Mental tabs are your personal knowledge snippets: random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
           "tips": [
             "Title: A short, memorable name for the tab.",
             "Status: Open (still live), Closed (dealt with), Archived (kept for reference).",
             "Notes: A brief description or context explaining what this tab is about.",
             "Tags: Keywords to help you (and AI) find this tab later.",
             "References: Add items with a name, optional URL, and notes.",
-            "Use Mental Tabs for: favourite restaurants, book recommendations, gift ideas, recipes, travel tips, etc.",
+            "Use Mental tabs for: favourite restaurants, book recommendations, gift ideas, recipes, travel tips, etc.",
             "Think of it as your personal wiki that AI can reference when helping you."
           ]
         },
@@ -1191,7 +1192,7 @@
               "communication",
               "default"
             ],
-            "title": "Default Communication Style",
+            "title": "Default communication style",
             "description": "Always active. How you prefer AI responses to be written.",
             "element": {
               "entity": "communication_default",
@@ -1254,7 +1255,7 @@
             "path": [
               "response_format"
             ],
-            "title": "Response Format",
+            "title": "Response format",
             "description": "How you want answers shaped",
             "placeholder": "e.g. code blocks for anything over three lines",
             "element": {
@@ -1268,7 +1269,7 @@
       },
       {
         "kind": "group",
-        "title": "Learning Style",
+        "title": "Learning style",
         "description": "How you learn best, and how you like work approached",
         "sections": [
           {
@@ -1277,7 +1278,7 @@
               "learning_style",
               "preferred"
             ],
-            "title": "Preferred Methods",
+            "title": "Preferred methods",
             "placeholder": "e.g. hands-on examples...",
             "$comment": "Bare strings, bound like response_format so an assistant can add or remove one item. The generic `preference` entity can only replace the whole list.",
             "element": {
@@ -1292,7 +1293,7 @@
               "learning_style",
               "avoid"
             ],
-            "title": "Things to Avoid",
+            "title": "Things to avoid",
             "placeholder": "e.g. walls of text...",
             "$comment": "Bare strings, bound like response_format so an assistant can add or remove one item. The generic `preference` entity can only replace the whole list.",
             "element": {
@@ -1308,7 +1309,7 @@
         "path": [
           "likes_dislikes"
         ],
-        "title": "Likes & Dislikes",
+        "title": "Likes & dislikes",
         "description": "Things you want every AI to know you like or avoid",
         "info": {
           "overview": "Standing likes and dislikes every AI should know about, whatever the topic.",
@@ -1361,7 +1362,7 @@
       },
       {
         "kind": "group",
-        "title": "Code Style",
+        "title": "Code style",
         "description": "Your preferred programming languages, frameworks, and tools",
         "sections": [
           {
@@ -1370,7 +1371,7 @@
               "code_style",
               "preferred_languages"
             ],
-            "title": "Preferred Languages",
+            "title": "Preferred languages",
             "placeholder": "e.g. Python, TypeScript...",
             "$comment": "Bare strings, bound like response_format so an assistant can add or remove one item. The generic `preference` entity can only replace the whole list.",
             "element": {
@@ -1513,7 +1514,7 @@
         "path": [
           "top_of_mind"
         ],
-        "title": "Top of Mind",
+        "title": "Top of mind",
         "description": "Ideas and questions that are not a project yet",
         "info": {
           "overview": "Capture quick ideas, thoughts, or things you want to explore. Think of it as a scratchpad for inspiration before it becomes a full project.",
@@ -1659,6 +1660,7 @@
             },
             {
               "name": "added_date",
+              "label": "Added",
               "show": [
                 "row"
               ],
@@ -1834,7 +1836,7 @@
         "path": [
           "hobbies"
         ],
-        "title": "Hobbies & Activities",
+        "title": "Hobbies & activities",
         "description": "What you do outside work",
         "search": true,
         "facets": [
@@ -1992,7 +1994,7 @@
         "path": [
           "personality_traits"
         ],
-        "title": "Personality Traits",
+        "title": "Personality traits",
         "description": "How you think, work and deal with people",
         "placeholder": "e.g. Creative, Analytical...",
         "element": {
@@ -2094,7 +2096,7 @@
               "wellness",
               "energy_peaks"
             ],
-            "title": "Energy Peaks",
+            "title": "Energy peaks",
             "description": "Times of day when you feel most focused and productive",
             "placeholder": "e.g. Early morning (6-9am), Late night (10pm-1am)...",
             "element": {
@@ -2109,7 +2111,7 @@
               "wellness",
               "stress_triggers"
             ],
-            "title": "Stress Triggers",
+            "title": "Stress triggers",
             "description": "Situations or patterns that tend to increase your stress",
             "placeholder": "e.g. Tight deadlines, Open-plan noise...",
             "element": {
@@ -2578,6 +2580,7 @@
         "search": true,
         "element": {
           "entity": "connection",
+          "noun": "person",
           "identifier": "name",
           "fields": [
             {
@@ -2612,7 +2615,7 @@
   },
   {
     "key": "learning_log",
-    "title": "Learning Log",
+    "title": "Learning log",
     "description": "What you learn, decide, and reflect on",
     "core": true,
     "default_enabled": true,
@@ -2687,7 +2690,7 @@
               "name": "key_decisions",
               "type": "strings",
               "show": [],
-              "label": "Key Decisions",
+              "label": "Key decisions",
               "placeholder": "e.g. Chose Postgres over SQLite for the vector index",
               "control": "input",
               "$comment": "Bare strings on the parent row (server.py learning entry update). `control: \"input\"` for the same reason profile's work `highlights` uses it: these are SENTENCES, and a chip control makes fixing a typo mean deleting and retyping the whole line. They were chips until wave 12."
@@ -2696,7 +2699,7 @@
               "name": "followup_items",
               "type": "strings",
               "show": [],
-              "label": "Follow-up Items",
+              "label": "Follow-up items",
               "placeholder": "e.g. Read the migration guide before the next sprint",
               "control": "input",
               "$comment": "See the key_decisions node above -- same shape, same reasoning."

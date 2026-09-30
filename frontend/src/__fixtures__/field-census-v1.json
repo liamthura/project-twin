@@ -1,6 +1,6 @@
 {
   "profile": {
-    "Personal Information": [
+    "Personal information": [
       "name",
       "preferred_name",
       "current_role",
@@ -20,15 +20,15 @@
       "highlights"
     ],
     "Education > Highlights": [],
-    "Education > Coursework / Modules": [
+    "Education > Coursework / modules": [
       "name",
       "topics"
     ],
-    "Education > Clubs & Societies": [
+    "Education > Clubs & societies": [
       "name",
       "activities_involved"
     ],
-    "Work Experience": [
+    "Work experience": [
       "company",
       "role",
       "type",
@@ -38,13 +38,13 @@
       "skills",
       "highlights"
     ],
-    "Work Experience > Skills": [],
-    "Work Experience > Highlights": [],
-    "Contact & Links > Emails": [
+    "Work experience > Skills": [],
+    "Work experience > Highlights": [],
+    "Contact & links > Emails": [
       "address",
       "purpose"
     ],
-    "Contact & Links > Links": [
+    "Contact & links > Links": [
       "label",
       "url"
     ],
@@ -64,7 +64,7 @@
     ]
   },
   "knowledge": {
-    "Skills & Domains": [
+    "Skills & domains": [
       "name",
       "level",
       "notes",
@@ -72,29 +72,29 @@
       "last_updated",
       "references"
     ],
-    "Skills & Domains > References": [
+    "Skills & domains > References": [
       "name",
       "url",
       "notes"
     ],
-    "Mental Tabs": [
+    "Mental tabs": [
       "title",
       "notes",
       "tags",
       "status",
       "references"
     ],
-    "Mental Tabs > References": [
+    "Mental tabs > References": [
       "name",
       "url",
       "notes"
     ]
   },
   "preferences": {
-    "Code Style > Preferred Languages": [],
-    "Code Style > Frameworks": [],
-    "Code Style > Tools": [],
-    "Communication > Default Communication Style": [
+    "Code style > Preferred languages": [],
+    "Code style > Frameworks": [],
+    "Code style > Tools": [],
+    "Communication > Default communication style": [
       "tone",
       "locale",
       "detail_level"
@@ -104,16 +104,16 @@
       "tone",
       "detail_level"
     ],
-    "Communication > Response Format": [],
-    "Learning Style > Preferred Methods": [],
-    "Learning Style > Things to Avoid": [],
-    "Likes & Dislikes": [
+    "Communication > Response format": [],
+    "Learning style > Preferred methods": [],
+    "Learning style > Things to avoid": [],
+    "Likes & dislikes": [
       "item",
       "stance"
     ]
   },
   "projects": {
-    "Top of Mind": [
+    "Top of mind": [
       "idea",
       "note"
     ],
@@ -134,7 +134,7 @@
     ]
   },
   "lifestyle": {
-    "Hobbies & Activities": [
+    "Hobbies & activities": [
       "name",
       "notes",
       "specifics",
@@ -142,7 +142,7 @@
       "status",
       "references"
     ],
-    "Hobbies & Activities > References & URLs": [
+    "Hobbies & activities > References & URLs": [
       "name",
       "url",
       "notes"
@@ -152,7 +152,7 @@
       "notes",
       "kind"
     ],
-    "Personality Traits": [],
+    "Personality traits": [],
     "Values": [],
     "Wellness > Sleep on weekdays": [
       "bedtime",
@@ -162,8 +162,8 @@
       "bedtime",
       "wakeup"
     ],
-    "Wellness > Energy Peaks": [],
-    "Wellness > Stress Triggers": []
+    "Wellness > Energy peaks": [],
+    "Wellness > Stress triggers": []
   },
   "media": {
     "items": [
@@ -201,8 +201,8 @@
       "tags",
       "timestamp"
     ],
-    "entries > Key Decisions": [],
-    "entries > Follow-up Items": []
+    "entries > Key decisions": [],
+    "entries > Follow-up items": []
   },
   "inventory": {
     "items": [

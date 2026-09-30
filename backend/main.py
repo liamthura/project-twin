@@ -130,7 +130,7 @@ app = FastAPI(
 db.ensure_vector_schema()
 
 # Endpoints that manage the account rather than the persona in it.
-_ACCOUNT_PATHS = frozenset({"/api/auth/set-password", "/api/auth/tokens"})
+_ACCOUNT_PATHS = frozenset({"/api/auth/set-password", "/api/auth/tokens", "/api/account/delete"})
 
 
 def _resource_metadata_url() -> str:
@@ -497,6 +497,10 @@ class SetPasswordRequest(BaseModel):
     current_password: Optional[str] = None
 
 
+class DeleteAccountRequest(BaseModel):
+    confirm: str
+
+
 class CreateTokenRequest(BaseModel):
     label: str = "token"
     # Optional scope choice for the minted token, matching the consent
@@ -740,6 +744,26 @@ async def set_password(body: SetPasswordRequest, request: Request):
             detail="sign in to MyGist in a browser to set a first password",
         )
     return {"status": "ok"}
+
+
+@app.post("/api/account/delete")
+async def delete_account(body: DeleteAccountRequest, request: Request):
+    """Delete the signed-in account and everything it owns. There is no undo.
+
+    A browser sign-in only. No token and no connected app may do this, whatever
+    its scope: an assistant holding a write token must never be able to end
+    the account it writes to. Typing the username back is the check that this
+    is meant, and is compared exactly.
+    """
+    if getattr(request.state, "credential_kind", None) != "session":
+        raise HTTPException(
+            status_code=403,
+            detail="sign in to MyGist in a browser to delete your account",
+        )
+    if body.confirm != request.state.username:
+        raise HTTPException(status_code=400, detail="type your username exactly to confirm")
+    db.delete_account(db.current_user_id.get())
+    return {"status": "deleted"}
 
 
 @app.get("/api/auth/tokens")

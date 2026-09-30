@@ -23,13 +23,10 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { listTokens, createToken, revokeToken } from "@/lib/api.js";
 import { READ, PROPOSE, WRITE, summariseScopes } from "@/lib/scopes.js";
+import { formatInstant } from "@/renderers/isoDate";
 
-function formatDate(iso) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
-}
+// "28 July 2026", as every other date in the app.
+const formatDate = (iso) => formatInstant(iso) || null;
 
 export function TokenPanel({ isOpen }) {
   const { toast } = useToast();
@@ -156,12 +153,12 @@ export function TokenPanel({ isOpen }) {
           <Button variant="outline" size="sm" className="w-full" onClick={handleCopy}>
             {copied ? (
               <>
-                <Check className="mr-2 h-4 w-4" />
+                <Check className="h-4 w-4" />
                 Copied
               </>
             ) : (
               <>
-                <Copy className="mr-2 h-4 w-4" />
+                <Copy className="h-4 w-4" />
                 Copy token
               </>
             )}
@@ -195,7 +192,7 @@ export function TokenPanel({ isOpen }) {
       ) : error ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : tokens.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="max-w-prose text-sm text-muted-foreground">
           No tokens yet. Generate one below to connect an AI client.
         </p>
       ) : (
@@ -209,8 +206,8 @@ export function TokenPanel({ isOpen }) {
                 </p>
                 {/* Not mono. This reads as a sentence, not a scope string. */}
                 <p className="text-xs text-muted-foreground">
-                  Created {formatDate(t.created_at) || "unknown"} &middot; last used{" "}
-                  {formatDate(t.last_used_at) || "never"}
+                  Created {formatDate(t.created_at) || "unknown"} &middot;{" "}
+                  {t.last_used_at ? `last used ${formatDate(t.last_used_at)}` : "not used yet"}
                   {formatDate(t.expires_at) && (
                     <> &middot; expires {formatDate(t.expires_at)}</>
                   )}

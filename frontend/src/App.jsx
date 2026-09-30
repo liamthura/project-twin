@@ -866,7 +866,7 @@ export default function App() {
                 savedAt={lastSaved}
                 headerActions={
                   <Button variant="outline" size="sm" onClick={() => setHistoryFor(activePack.key)}>
-                    <History className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                    <History className="h-3.5 w-3.5" aria-hidden="true" />
                     History
                   </Button>
                 }

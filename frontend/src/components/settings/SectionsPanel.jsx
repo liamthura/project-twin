@@ -15,7 +15,7 @@ export function SectionsPanel({ packs = [], onTogglePack }) {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">
+      <p className="max-w-prose text-sm text-muted-foreground">
         A section that is off leaves the editor, and AI clients can no longer read
         or change it. Nothing in it is deleted: switch it back on and it returns
         exactly as it was.
