@@ -282,7 +282,9 @@ describe("ProposalsPanel", () => {
     await user.click(await screen.findByRole("button", { name: /^approve /i }));
     expect(api.approveProposal).not.toHaveBeenCalled();
     unmount();
-    expect(api.approveProposal).toHaveBeenCalledWith("p1", undefined);
+    // Behind any decision already going out, so on the next tick, not in the
+    // unmount itself.
+    await waitFor(() => expect(api.approveProposal).toHaveBeenCalledWith("p1", undefined));
     await waitFor(() => expect(onSectionChanged).toHaveBeenCalledWith("knowledge"));
   });
 
@@ -523,7 +525,32 @@ describe("ProposalsPanel", () => {
     await user.click(await screen.findByRole("button", { name: /^reject /i }));
     expect(api.rejectProposal).not.toHaveBeenCalled();
     unmount();
-    expect(api.rejectProposal).toHaveBeenCalledWith("p1");
+    await waitFor(() => expect(api.rejectProposal).toHaveBeenCalledWith("p1"));
+  });
+
+  it("sends stacked decisions one after another, never two at once", async () => {
+    // Each keeps its own toast, so two can go at the same moment; two writes
+    // to one section landing together could lose one.
+    let finish = () => {};
+    api.approveProposal.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    api.listProposals.mockImplementation((kind) => Promise.resolve(kind === "entity"
+      ? [ENTITY, { ...ENTITY, id: "p9", data: { name: "Sentry", level: "expert" } }]
+      : [NOTE]));
+    const user = userEvent.setup();
+    render(<ProposalsPanel />);
+    await user.click(await screen.findByRole("button", { name: /^approve datadog/i }));
+    await user.click(await screen.findByRole("button", { name: /^approve sentry/i }));
+    await act(async () => {
+      for (const [props] of toast.mock.calls) props.onClose?.();
+    });
+    try {
+      await waitFor(() => expect(api.approveProposal).toHaveBeenCalledTimes(1));
+    } finally {
+      // The queue is module-wide: left hanging, it would hold up every later
+      // test's decisions too.
+      await act(async () => finish({ status: "approved", section: "knowledge" }));
+    }
+    await waitFor(() => expect(api.approveProposal).toHaveBeenCalledTimes(2));
   });
 
   it("offers promote and delete on observations, never approve", async () => {

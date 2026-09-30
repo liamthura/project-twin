@@ -26,9 +26,9 @@
 // renderNode still resolves and passes it, and `AddEntryDialog` still receives
 // it from here unread, both purely for the existing call shape; see
 // renderNode.threading.test.jsx.
-import { useContext, useEffect, useId, useRef, useState } from "react";
+import { Fragment, useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Trash2, ChevronDown, Star, MoreHorizontal, Clock } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Star, MoreHorizontal, Clock, ListFilter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,11 +39,15 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { VALUE_META, FOCUS_RING, ValueIcon, SelectControl } from "@/components/controls";
+import { VALUE_META, FOCUS_RING, ValueIcon } from "@/components/controls";
 import { ScalarField, ISO_DATE } from "./ScalarField";
 import { buildFieldMeta, needsFullRow as fieldNeedsFullRow } from "./fieldMeta";
 import { elementShape, blockNode } from "./elementShape";
@@ -324,7 +328,8 @@ export default function ListRenderer({
   // facet too. Reads the same facetValues map applyFacets already consumed;
   // an entry present but `undefined` is a field left on "All" and does not
   // count as active.
-  const facetsActive = (node.facets || []).some((f) => facetValues[f] !== undefined);
+  const activeFacets = (node.facets || []).filter((f) => facetValues[f] !== undefined).length;
+  const facetsActive = activeFacets > 0;
   // The facets that will actually draw a control. Resolved here rather than
   // inside the render map because two things need the answer: the row below
   // decides whether it has any left-hand content at all, and a node whose
@@ -411,10 +416,11 @@ export default function ListRenderer({
           on an empty state that tells them to "clear the search" with nothing
           left to clear it with. The threshold makes that reachable a second
           way: delete a seventh row while a query is live. */}
-      {/* Search and the filters share a row, three parts to two, so the
-          ways of narrowing the list sit together. Stacked on a phone, where
-          two fifths would not hold a filter's label and its dropdown. */}
-      <div className={`${showSearch || hasRowControls ? "flex" : "hidden"} flex-col gap-2 sm:flex-row sm:items-center sm:gap-4`}>
+      {/* Search takes the row; the filters are one icon at its end, whose
+          menu holds every facet. A dropdown per facet took two fifths of the
+          row to say "All". The icon is tinted, and dotted, while any filter
+          is on, so a narrowed list never looks like the whole one. */}
+      <div className={`${showSearch || hasRowControls ? "flex" : "hidden"} items-center gap-2`}>
       {showSearch && (
         <Input
           type="search"
@@ -422,53 +428,68 @@ export default function ListRenderer({
           placeholder="Search…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="h-9 sm:min-w-0 sm:flex-[3]"
+          className="h-9 min-w-0 flex-1"
         />
       )}
 
       {hasRowControls && (
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:min-w-0 sm:flex-[2]">
-        {/* Facets: display-only row filters, drawn above the list. Each entry
-            in node.facets names an enum storage key; `facetOptions` above
-            resolves that field's option set. A field with no resolvable
-            options is skipped -- a control with zero real values to pick would
-            only ever be able to show "All". Always a dropdown: by option count
-            a filter was buttons in one list and a dropdown in the next, so
-            the same kind of control looked like two. Each is fed an extra
-            leading "All" pseudo-option so the reset affordance is always
-            visible; the mapping back to `undefined` (== no filter on this
-            field) happens in the onChange below, never stored, never threaded
-            through onItems. */}
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        {/* Facets: display-only row filters. Each entry in node.facets names
+            an enum storage key; `facetOptions` above resolves that field's
+            option set, and a field with no resolvable options is skipped --
+            a group with zero real values would only ever offer "All". "All"
+            leads every group so the way back is always there; the mapping
+            back to `undefined` (== no filter on this field) happens in
+            onValueChange, never stored, never threaded through onItems. */}
         {facetFields.length > 0 && (
-          <div role="group" aria-label="Filters" className="flex min-w-0 flex-1 flex-wrap gap-x-4 gap-y-2">
-            {facetFields.map((f) => {
-              const options = facetOptions(f);
-              return (
-                <div
-                  key={f}
-                  role="group"
-                  aria-label={`Filter by ${f.replace(/_/g, " ")}`}
-                  className="flex min-w-0 flex-1 items-center gap-1.5"
-                >
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {fieldLabel(meta, f).text}
-                  </span>
-                  <SelectControl
-                    options={["All", ...options]}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                title="Filter"
+                aria-label={facetsActive ? `Filter, ${activeFacets} on` : "Filter"}
+                className={`relative h-9 w-9 shrink-0 ${
+                  facetsActive
+                    ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <ListFilter className="h-4 w-4" />
+                {facetsActive && (
+                  <span aria-hidden="true" className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {facetFields.map((f, i) => (
+                <Fragment key={f}>
+                  {i > 0 && <DropdownMenuSeparator />}
+                  <DropdownMenuLabel>{fieldLabel(meta, f).text}</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    aria-label={`Filter by ${f.replace(/_/g, " ")}`}
                     value={facetValues[f] ?? "All"}
-                    clearable={false}
-                    className="flex-1"
-                    onChange={(v) =>
-                      setFacetValues((prev) => ({
-                        ...prev,
-                        [f]: v === "All" || v === undefined ? undefined : v,
-                      }))
+                    onValueChange={(v) =>
+                      setFacetValues((prev) => ({ ...prev, [f]: v === "All" ? undefined : v }))
                     }
-                  />
-                </div>
-              );
-            })}
-          </div>
+                  >
+                    {["All", ...facetOptions(f)].map((v) => (
+                      <DropdownMenuRadioItem key={v} value={v} className="capitalize">
+                        <ValueIcon value={v} className="h-3.5 w-3.5" />
+                        {v.replace(/_/g, " ")}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </Fragment>
+              ))}
+              {facetsActive && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setFacetValues({})}>Clear filters</DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
 
         {/* Order, beside the filters and the count they all feed. Two options
@@ -498,7 +519,7 @@ export default function ListRenderer({
       </div>
 
       {/* Feedback on what the search and filters did ("2 of 7"), under them
-          and against the right edge, where the number used to answer from.
+          and against the right edge, beneath the filter icon.
           Only while something is filtering: unfiltered, the rows themselves
           say how long the list is, and "3 entries" over every list was the
           most repeated line in the editor. */}

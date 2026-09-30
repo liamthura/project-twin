@@ -894,15 +894,16 @@ describe("SectionRenderer", () => {
 
     // ---- facet ----
 
-    it("renders a status filter whose options resolve from the entity's valid_values", () => {
-      renderSection({ pack: projectsPack, initial: projectsData });
+    it("renders a status filter whose options resolve from the entity's valid_values", async () => {
+      const { user } = renderSection({ pack: projectsPack, initial: projectsData });
       // ListRenderer skips a facet field whose options do not resolve, so the
       // group's presence is what proves `facets: ["status"]` names a real
       // enum key -- a typo such as "state" renders nothing here.
-      const group = screen.getByRole("group", { name: "Filter by status" });
-      // Five statuses plus the leading "All" exceed SEGMENTED_MAX, so this is
-      // the dropdown branch; unfiltered, it reads "All".
-      expect(within(group).getByRole("combobox").textContent).toBe("All");
+      await user.click(screen.getByRole("button", { name: "Filter" }));
+      const group = await screen.findByRole("group", { name: "Filter by status" });
+      // All plus the five statuses; unfiltered, All is the one chosen.
+      expect(within(group).getAllByRole("menuitemradio")).toHaveLength(6);
+      expect(within(group).getByRole("menuitemradio", { name: "All" })).toHaveAttribute("aria-checked", "true");
     });
 
     // ---- info dialogs ----
@@ -1204,15 +1205,19 @@ describe("SectionRenderer", () => {
 
     // ---- facets ----
 
-    it("renders a level filter and a status filter, both resolving from entity valid_values", () => {
-      renderSection({ pack: knowledgePack, initial: knowledgeData });
+    it("renders a level filter and a status filter, both resolving from entity valid_values", async () => {
+      const { user } = renderSection({ pack: knowledgePack, initial: knowledgeData });
       // ListRenderer skips a facet whose options do not resolve, so each
       // group's presence is what proves the field name is a real enum key.
-      const level = screen.getByRole("group", { name: "Filter by level" });
-      // A filter is a dropdown whatever its option count, so the two match.
-      expect(within(level).getByRole("combobox").textContent).toBe("All");
-      const status = screen.getByRole("group", { name: "Filter by status" });
-      expect(within(status).getByRole("combobox").textContent).toBe("All");
+      // Each list has its own filter menu: the domains one, then the tabs one.
+      const [domains, tabs] = screen.getAllByRole("button", { name: "Filter" });
+      await user.click(domains);
+      const level = await screen.findByRole("group", { name: "Filter by level" });
+      expect(within(level).getByRole("menuitemradio", { name: "All" })).toHaveAttribute("aria-checked", "true");
+      await user.keyboard("{Escape}");
+      await user.click(tabs);
+      const status = await screen.findByRole("group", { name: "Filter by status" });
+      expect(within(status).getByRole("menuitemradio", { name: "All" })).toHaveAttribute("aria-checked", "true");
     });
 
     // ---- the references children ----

@@ -65,10 +65,15 @@ const KINDS = [
 const QUEUE_POLL_MS = 15000;
 
 // How long the toast carrying an Approve, Reject or Delete's Undo stands. The
-// decision is sent when that toast goes, not on a timer of its own: Radix
-// pauses the toast while the pointer or focus is on it, and nothing on the
-// server takes a decision back, so Undo is only real while nothing is sent.
+// decision is sent when that toast goes, not on a timer of its own: the toast
+// pauses while the stack is hovered or focused, and nothing on the server
+// takes a decision back, so Undo is only real while nothing is sent.
 const UNDO_MS = 8000;
+
+// Decisions go out one after another, across every toast in the stack: two
+// writes landing on one section at once could lose one. Module scope, so a
+// send that leaving Review sets off still waits its turn.
+let sending = Promise.resolve();
 
 // The row that has focus takes these. Only the row: a key typed into one of
 // its inputs is text, and nothing fires without a row focused, which is what
@@ -401,13 +406,14 @@ export default function ProposalsPanel({
       }
     };
     // One record for the batch, under each of its ids. `fire` sends it once,
-    // when the toast goes however it goes (its time, its close button, a newer
-    // toast replacing it, leaving Review), and never after Undo.
+    // when the toast goes however it goes (its time, its close button, a
+    // swipe, leaving Review), and never after Undo. Toasts stack, so each
+    // decision keeps its own Undo until its own toast goes.
     const pending = { kind, sent: false, undone: false };
     pending.fire = () => {
       if (pending.sent || pending.undone) return;
       pending.sent = true;
-      send();
+      sending = sending.then(send, send);
     };
     const undo = () => {
       if (pending.sent || pending.undone) return;
