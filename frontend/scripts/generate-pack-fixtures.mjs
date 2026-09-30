@@ -16,13 +16,16 @@ const outFile = join(here, "..", "src", "__fixtures__", "packs.json");
 // rather than reimplemented in JS. A second implementation would be a second
 // answer to "what may an MCP client send", which is the duplication format v2
 // exists to remove; it would also drift silently, because nothing compares them.
-const derivedEntities = JSON.parse(
+const derive = (fn) => JSON.parse(
   execFileSync(
     "python3",
-    ["-c", "import json, pack_loader; print(json.dumps({k: pack_loader.derive_entities(m) for k, m in pack_loader.manifests().items()}))"],
+    ["-c", `import json, pack_loader; print(json.dumps({k: pack_loader.${fn}(m) for k, m in pack_loader.manifests().items()}))`],
     { cwd: backendDir, env: { ...process.env, PYTHONPATH: "." }, encoding: "utf8" }
   )
 );
+const derivedEntities = derive("derive_entities");
+// The Promote dialog's types, by the same token: one rule, pack_loader's.
+const promotionTargets = derive("derive_promotion_targets");
 
 // This fixture represents the all-enabled state: `enabled` is hardcoded to
 // true for every pack. A later task that needs a disabled-pack case must
@@ -59,6 +62,7 @@ const packs = readdirSync(packsDir, { withFileTypes: true })
     // Mirrors backend/sections.py's PACK_META, which is what /api/settings
     // serves: the nodes as declared, and the entities derived from them.
     entities: derivedEntities[m.key],
+    promotable: promotionTargets[m.key],
     sections: m.sections,
     __position: m.position ?? 999,
   }))

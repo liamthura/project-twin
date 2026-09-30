@@ -99,6 +99,8 @@ docker run -d --name "$NAME" --network "$NETWORK" \
   -e DATABASE_URL="$DB_URL" \
   -e EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER:-voyage}" \
   -e VOYAGE_API_KEY="${VOYAGE_API_KEY:-}" \
+  -e TYPESAFE_API_KEY="${TYPESAFE_API_KEY:-}" \
+  -e TYPESAFE_MODEL="${TYPESAFE_MODEL:-}" \
   `# Without this, auth_proxy.register() returns False and every /auth/* route` \
   `# 404s -- indistinguishable from a dead backend. The auth service is not` \
   `# published to the host on purpose, so this container reaching it over the` \

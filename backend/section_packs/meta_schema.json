@@ -395,6 +395,9 @@
         "description": {
           "$ref": "#/$defs/mcpDescription"
         },
+        "about": {
+          "$ref": "#/$defs/about"
+        },
         "noun": {
           "type": "string",
           "minLength": 1,
@@ -441,6 +444,9 @@
         },
         "description": {
           "$ref": "#/$defs/mcpDescription"
+        },
+        "about": {
+          "$ref": "#/$defs/about"
         },
         "parent": {
           "$comment": "The MCP parameter that names the ENCLOSING row, for a nested array only. Not derivable from the parent's identifier and not equal to it: `domain`'s identifier is the stored key `name`, while a reference under it is addressed as `domain_name`. Copied verbatim from today's contract.",
@@ -531,7 +537,7 @@
       "description": "MCP-facing: what this record is, for a client choosing an entity. Distinct from a node's `description`, which is on-screen helper text."
     },
     "variant": {
-      "$comment": "Deliberately only two keys. A variant may differ from its parent in its MCP name and its MCP-facing description, and in nothing else -- same stored array, same fields, same identifier, same actions. Anything more and it is a second element shape, not a variant of this one.",
+      "$comment": "Deliberately only three keys. A variant may differ from its parent in its MCP name, its MCP-facing description and what it means to a person (`about`: `dislike` is not `like`), and in nothing else -- same stored array, same fields, same identifier, same actions. Anything more and it is a second element shape, not a variant of this one.",
       "type": "object",
       "required": [
         "entity"
@@ -544,6 +550,9 @@
         "description": {
           "type": "string",
           "minLength": 1
+        },
+        "about": {
+          "$ref": "#/$defs/about"
         }
       }
     },
@@ -939,6 +948,35 @@
           "type": "string",
           "minLength": 1,
           "description": "What the slot is called in a control's accessible name, e.g. \"primary\" -> \"Make Brutalist primary\"."
+        }
+      }
+    },
+    "about": {
+      "$comment": "The one description of an entry type written for a person rather than for the MCP contract (`description`). What reads it: the Promote dialog shows `what` under the chosen type, and suggesting where an observation belongs (routing.py) sends all three to Jev as that type's criterion, so the dialog's help text and the model's criterion cannot drift apart. `not_for` is what the type is most often mistaken for; the examples are short and must not be copied from real data. Optional, but tests/test_promotion_targets.py requires it on every type a shipped pack lets an observation be promoted to.",
+      "type": "object",
+      "required": [
+        "what"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "what": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What one entry is, in the second person: \"Something you do outside work\"."
+        },
+        "not_for": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What it is not, where it is easily confused: \"subjects you only follow or are curious about\"."
+        },
+        "examples": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     }

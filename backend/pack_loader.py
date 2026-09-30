@@ -689,6 +689,74 @@ def derive_entities(manifest: dict) -> dict:
     return out
 
 
+def _sentence(key: str) -> str:
+    words = key.replace("_", " ")
+    return words[:1].upper() + words[1:]
+
+
+def derive_promotion_targets(manifest: dict) -> list[dict]:
+    """The entry types an observation can be promoted to, as the editor names them.
+
+    An observation is one sentence, so it can only become an entity whose sole
+    required field is its own identifier -- `hobby_specific` also needs its
+    hobby, and would make a proposal that cannot execute -- and one a section
+    draws, or it would be filed where the editor never shows it (preferences'
+    generic `preference`). The Promote dialog offers exactly these, and routing
+    asks Jev to choose among exactly these, so the rule lives here once rather
+    than in both.
+
+    Each carries the editor's words for it -- the subsection's title, the
+    identifier field's label and hint -- and the manifest's `about`, which is
+    both the dialog's help text and Jev's criterion. Pure, like derive_entities.
+    """
+    entities = derive_entities(manifest)
+    drawn: dict[str, list] = {}
+
+    def visit(nodes):
+        for node in nodes or []:
+            element = node.get("element") or {}
+            if element.get("entity"):
+                drawn.setdefault(element["entity"], []).append((node, None))
+                for variant in element.get("variants") or []:
+                    drawn.setdefault(variant["entity"], []).append((node, variant))
+            visit(node.get("sections"))
+
+    visit(manifest["sections"])
+    out = []
+    for entity, spec in entities.items():
+        required = spec.get("required") or []
+        identifier = spec.get("identifier")
+        if not ("add" in (spec.get("actions") or []) and identifier and not spec.get("parent")
+                and required == [identifier] and entity in drawn):
+            continue
+        # Two nodes on one entity (sleep on weekdays and at weekends) have no
+        # single title, so it goes by its own name.
+        (node, variant), *others = drawn[entity]
+        element = node.get("element") or {}
+        if others:
+            title = _sentence(entity)
+        else:
+            title = node.get("title") or _sentence(element.get("noun") or entity)
+            # Two entities over one list (like and dislike) are told apart.
+            if element.get("variants"):
+                title = f"{title}: {entity.replace('_', ' ')}"
+        # The label is the STORED field's; `identifier` above is its MCP
+        # spelling (top_of_mind stores `idea` and clients say `item`), which is
+        # what a promote sends.
+        stored = element.get("identifier") or identifier
+        field = next((f for f in element.get("fields") or [] if f["name"] == stored), None)
+        out.append({
+            "entity": entity,
+            "title": title,
+            "field": identifier,
+            # A list of plain strings has no field of its own to name.
+            "label": (field or {}).get("label") or ("Text" if field is None and not element.get("fields") else _sentence(stored)),
+            "placeholder": (field or {}).get("placeholder") or node.get("placeholder"),
+            "about": (variant or {}).get("about") or element.get("about"),
+        })
+    return out
+
+
 def build_write_targets(packs: dict[str, dict]) -> dict[str, dict]:
     """{section_key: {entity_name: target}} -- server.WRITE_TARGETS' shape."""
     return {key: derive_write_targets(m) for key, m in packs.items()}

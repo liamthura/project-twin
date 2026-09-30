@@ -43,6 +43,7 @@ import jwt_auth
 import mcp_activity
 import persona_store
 import proposals_store
+import routing
 import scopes
 import sections
 import settings_store
@@ -845,6 +846,7 @@ async def get_settings():
                 "default_enabled": meta["default_enabled"],
                 "sections": meta["sections"],
                 "entities": meta["entities"],
+                "promotable": meta["promotable"],
                 "enabled": key in enabled,
             }
             for key, meta in sections.PACK_META.items()
@@ -1285,6 +1287,28 @@ async def promote_proposal(proposal_id: str, body: ResolveRequest):
     proposals_store.resolve(proposal_id, "promoted",
                             promoted_to=_written_entity_id() or entity)
     return {"status": "promoted", "result": result, "section": section}
+
+
+@app.post("/api/proposals/{proposal_id}/suggest")
+async def suggest_destination(proposal_id: str):
+    """Where a pending observation might belong, for the Promote dialog.
+
+    Asks Jev when the instance has TYPESAFE_API_KEY (routing.py), over the
+    types the reader's enabled sections offer. `enabled: false` without one,
+    and no suggestions when Jev fails: the dialog then works as it did. A POST
+    because it sends the observation to a third party, which no prefetch or
+    cache should do on the reader's behalf.
+    """
+    proposal = _load_pending(proposal_id)
+    if proposal["kind"] != "note":
+        raise HTTPException(status_code=400, detail="only notes are promoted")
+    enabled = settings_store.enabled_sections()
+    packs = [
+        {"key": key, "title": meta["title"], "promotable": meta["promotable"]}
+        for key, meta in sections.PACK_META.items()
+        if key in enabled
+    ]
+    return await routing.suggest(proposal, packs)
 
 
 # ============================================================================

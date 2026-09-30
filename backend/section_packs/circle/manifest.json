@@ -29,6 +29,14 @@
       "element": {
         "entity": "connection",
         "noun": "person",
+        "about": {
+          "what": "A person in your life, and your relationship with them",
+          "not_for": "a habit or decision that only involves someone",
+          "examples": [
+            "Priya, designer at Northgate",
+            "Dan, my manager"
+          ]
+        },
         "identifier": "name",
         "fields": [
           {

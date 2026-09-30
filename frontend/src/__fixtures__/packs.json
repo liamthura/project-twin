@@ -206,6 +206,22 @@
         }
       }
     },
+    "promotable": [
+      {
+        "entity": "education",
+        "title": "Education",
+        "field": "institution",
+        "label": "Institution",
+        "placeholder": "School, college, or university",
+        "about": {
+          "what": "A school, college, university or course you studied at",
+          "not_for": "skills you have or ways you like to learn",
+          "examples": [
+            "Studied English and Media at Leeds"
+          ]
+        }
+      }
+    ],
     "sections": [
       {
         "kind": "fields",
@@ -260,6 +276,13 @@
         "element": {
           "entity": "education",
           "identifier": "institution",
+          "about": {
+            "what": "A school, college, university or course you studied at",
+            "not_for": "skills you have or ways you like to learn",
+            "examples": [
+              "Studied English and Media at Leeds"
+            ]
+          },
           "fields": [
             {
               "name": "institution",
@@ -634,6 +657,23 @@
         }
       }
     },
+    "promotable": [
+      {
+        "entity": "goal",
+        "title": "Goal",
+        "field": "title",
+        "label": "Title",
+        "placeholder": null,
+        "about": {
+          "what": "Something you are working toward, with an end you could reach",
+          "not_for": "habits, routines or preferences",
+          "examples": [
+            "Run a half marathon by spring",
+            "Get promoted to senior designer"
+          ]
+        }
+      }
+    ],
     "sections": [
       {
         "kind": "list",
@@ -643,6 +683,14 @@
         "element": {
           "entity": "goal",
           "identifier": "title",
+          "about": {
+            "what": "Something you are working toward, with an end you could reach",
+            "not_for": "habits, routines or preferences",
+            "examples": [
+              "Run a half marathon by spring",
+              "Get promoted to senior designer"
+            ]
+          },
           "fields": [
             {
               "name": "title",
@@ -812,6 +860,38 @@
         "identifier": "name"
       }
     },
+    "promotable": [
+      {
+        "entity": "domain",
+        "title": "Skills & domains",
+        "field": "name",
+        "label": "Name",
+        "placeholder": "e.g. Photography, Marketing, Python",
+        "about": {
+          "what": "A skill or field of knowledge you have, and how well you know it",
+          "not_for": "how you like to learn or be answered",
+          "examples": [
+            "Email marketing, advanced",
+            "Python, intermediate"
+          ]
+        }
+      },
+      {
+        "entity": "mental_tab",
+        "title": "Mental tabs",
+        "field": "title",
+        "label": "Title",
+        "placeholder": "e.g. Git commands, Recipe ideas",
+        "about": {
+          "what": "Something worth remembering that is not a skill: a list, a recommendation, a note to self",
+          "not_for": "facts about how you behave or what you prefer",
+          "examples": [
+            "Restaurants to try in Manchester",
+            "Git commands I keep forgetting"
+          ]
+        }
+      }
+    ],
     "sections": [
       {
         "kind": "list",
@@ -827,6 +907,14 @@
         "element": {
           "entity": "domain",
           "identifier": "name",
+          "about": {
+            "what": "A skill or field of knowledge you have, and how well you know it",
+            "not_for": "how you like to learn or be answered",
+            "examples": [
+              "Email marketing, advanced",
+              "Python, intermediate"
+            ]
+          },
           "fields": [
             {
               "name": "name",
@@ -933,6 +1021,14 @@
           "entity": "mental_tab",
           "identifier": "title",
           "description": "Saved topics and bookmarks to revisit later — a shelf, not an inbox",
+          "about": {
+            "what": "Something worth remembering that is not a skill: a list, a recommendation, a note to self",
+            "not_for": "facts about how you behave or what you prefer",
+            "examples": [
+              "Restaurants to try in Manchester",
+              "Git commands I keep forgetting"
+            ]
+          },
           "fields": [
             {
               "name": "title",
@@ -1180,6 +1276,140 @@
         "identifier": "key"
       }
     },
+    "promotable": [
+      {
+        "entity": "mood_override",
+        "title": "When I'm feeling...",
+        "field": "mood",
+        "label": "Mood",
+        "placeholder": "e.g. stressed, tired, excited, creative",
+        "about": {
+          "what": "How assistants should change their answers when you are in a particular mood",
+          "not_for": "your habits, hobbies, or what you do to feel better",
+          "examples": [
+            "When stressed: keep answers short",
+            "When tired: skip the background"
+          ]
+        }
+      },
+      {
+        "entity": "response_format",
+        "title": "Response format",
+        "field": "item",
+        "label": "Text",
+        "placeholder": "e.g. code blocks for anything over three lines",
+        "about": {
+          "what": "How you want an assistant's answers shaped or delivered",
+          "not_for": "how you like to learn a new subject",
+          "examples": [
+            "Code blocks for anything over three lines",
+            "Bullet points rather than paragraphs"
+          ]
+        }
+      },
+      {
+        "entity": "learning_method",
+        "title": "Preferred methods",
+        "field": "item",
+        "label": "Text",
+        "placeholder": "e.g. hands-on examples...",
+        "about": {
+          "what": "A way you like to learn something new",
+          "not_for": "how answers in general should be formatted",
+          "examples": [
+            "Worked examples before theory",
+            "Pair programming with someone who knows it"
+          ]
+        }
+      },
+      {
+        "entity": "learning_dislike",
+        "title": "Things to avoid",
+        "field": "item",
+        "label": "Text",
+        "placeholder": "e.g. walls of text...",
+        "about": {
+          "what": "A way of being taught that does not work for you",
+          "not_for": "things you dislike in general",
+          "examples": [
+            "Walls of text",
+            "Video tutorials"
+          ]
+        }
+      },
+      {
+        "entity": "like",
+        "title": "Likes & dislikes: like",
+        "field": "item",
+        "label": "Item",
+        "placeholder": "e.g. unsolicited sales tone, jargon...",
+        "about": {
+          "what": "Something you like and want every assistant to know you like",
+          "not_for": "how answers should be shaped",
+          "examples": [
+            "Dry humour",
+            "British spelling"
+          ]
+        }
+      },
+      {
+        "entity": "dislike",
+        "title": "Likes & dislikes: dislike",
+        "field": "item",
+        "label": "Item",
+        "placeholder": "e.g. unsolicited sales tone, jargon...",
+        "about": {
+          "what": "Something you dislike and want every assistant to avoid",
+          "not_for": "ways of being taught",
+          "examples": [
+            "Unsolicited sales tone",
+            "Jargon"
+          ]
+        }
+      },
+      {
+        "entity": "preferred_language",
+        "title": "Preferred languages",
+        "field": "item",
+        "label": "Text",
+        "placeholder": "e.g. Python, TypeScript...",
+        "about": {
+          "what": "A programming language you prefer to work in",
+          "examples": [
+            "Python",
+            "TypeScript"
+          ]
+        }
+      },
+      {
+        "entity": "framework",
+        "title": "Frameworks",
+        "field": "item",
+        "label": "Text",
+        "placeholder": "e.g. FastAPI, Next.js...",
+        "about": {
+          "what": "A software framework or library you prefer",
+          "examples": [
+            "FastAPI",
+            "Next.js"
+          ]
+        }
+      },
+      {
+        "entity": "dev_tool",
+        "title": "Tools",
+        "field": "item",
+        "label": "Text",
+        "placeholder": "e.g. VS Code, Docker...",
+        "about": {
+          "what": "A development tool you use",
+          "examples": [
+            "VS Code",
+            "Docker"
+          ]
+        }
+      }
+    ],
     "sections": [
       {
         "kind": "group",
@@ -1226,6 +1456,14 @@
             "element": {
               "entity": "mood_override",
               "identifier": "mood",
+              "about": {
+                "what": "How assistants should change their answers when you are in a particular mood",
+                "not_for": "your habits, hobbies, or what you do to feel better",
+                "examples": [
+                  "When stressed: keep answers short",
+                  "When tired: skip the background"
+                ]
+              },
               "fields": [
                 {
                   "name": "mood",
@@ -1261,7 +1499,15 @@
             "element": {
               "entity": "response_format",
               "identifier": "item",
-              "description": "One statement about how you want answers shaped. Bare strings, like lifestyle's energy_peaks."
+              "description": "One statement about how you want answers shaped. Bare strings, like lifestyle's energy_peaks.",
+              "about": {
+                "what": "How you want an assistant's answers shaped or delivered",
+                "not_for": "how you like to learn a new subject",
+                "examples": [
+                  "Code blocks for anything over three lines",
+                  "Bullet points rather than paragraphs"
+                ]
+              }
             },
             "$comment": "Bare strings. Was five fixed booleans until wave 6 -- a boolean can only answer yes or no to an idea someone else chose, and real preferences are more specific than that. persona_store._normalize converts the old shape, keeping the TRUE keys as text; a list of wants cannot express \"explicitly off\", and a false boolean already read the same as absent."
           }
@@ -1284,7 +1530,15 @@
             "element": {
               "entity": "learning_method",
               "identifier": "item",
-              "description": "One way you like to learn, e.g. worked examples before theory."
+              "description": "One way you like to learn, e.g. worked examples before theory.",
+              "about": {
+                "what": "A way you like to learn something new",
+                "not_for": "how answers in general should be formatted",
+                "examples": [
+                  "Worked examples before theory",
+                  "Pair programming with someone who knows it"
+                ]
+              }
             }
           },
           {
@@ -1299,7 +1553,15 @@
             "element": {
               "entity": "learning_dislike",
               "identifier": "item",
-              "description": "One way of being taught that does not work for you."
+              "description": "One way of being taught that does not work for you.",
+              "about": {
+                "what": "A way of being taught that does not work for you",
+                "not_for": "things you dislike in general",
+                "examples": [
+                  "Walls of text",
+                  "Video tutorials"
+                ]
+              }
             }
           }
         ]
@@ -1326,6 +1588,14 @@
           "entity": "like",
           "identifier": "item",
           "description": "Something you like; stored in the shared likes_dislikes list with stance=like unless you send stance explicitly",
+          "about": {
+            "what": "Something you like and want every assistant to know you like",
+            "not_for": "how answers should be shaped",
+            "examples": [
+              "Dry humour",
+              "British spelling"
+            ]
+          },
           "list": "likes_dislikes",
           "fields": [
             {
@@ -1354,7 +1624,15 @@
           "variants": [
             {
               "entity": "dislike",
-              "description": "Something you dislike; stored in the shared likes_dislikes list with stance=dislike unless you send stance explicitly"
+              "description": "Something you dislike; stored in the shared likes_dislikes list with stance=dislike unless you send stance explicitly",
+              "about": {
+                "what": "Something you dislike and want every assistant to avoid",
+                "not_for": "ways of being taught",
+                "examples": [
+                  "Unsolicited sales tone",
+                  "Jargon"
+                ]
+              }
             }
           ]
         },
@@ -1377,7 +1655,14 @@
             "element": {
               "entity": "preferred_language",
               "identifier": "item",
-              "description": "A programming language you prefer to work in."
+              "description": "A programming language you prefer to work in.",
+              "about": {
+                "what": "A programming language you prefer to work in",
+                "examples": [
+                  "Python",
+                  "TypeScript"
+                ]
+              }
             }
           },
           {
@@ -1392,7 +1677,14 @@
             "element": {
               "entity": "framework",
               "identifier": "item",
-              "description": "A framework or library you prefer."
+              "description": "A framework or library you prefer.",
+              "about": {
+                "what": "A software framework or library you prefer",
+                "examples": [
+                  "FastAPI",
+                  "Next.js"
+                ]
+              }
             }
           },
           {
@@ -1407,7 +1699,14 @@
             "element": {
               "entity": "dev_tool",
               "identifier": "item",
-              "description": "A development tool you use, e.g. an editor or a CLI."
+              "description": "A development tool you use, e.g. an editor or a CLI.",
+              "about": {
+                "what": "A development tool you use",
+                "examples": [
+                  "VS Code",
+                  "Docker"
+                ]
+              }
             }
           }
         ]
@@ -1508,6 +1807,23 @@
         "parent": "project_name"
       }
     },
+    "promotable": [
+      {
+        "entity": "top_of_mind",
+        "title": "Top of mind",
+        "field": "item",
+        "label": "Idea",
+        "placeholder": "Project idea or thing you want to build...",
+        "about": {
+          "what": "An idea or open question you are thinking about that is not a project yet",
+          "not_for": "lasting traits, values or preferences",
+          "examples": [
+            "Why newsletter clicks are flat",
+            "Whether to pitch a podcast"
+          ]
+        }
+      }
+    ],
     "sections": [
       {
         "kind": "list",
@@ -1534,6 +1850,14 @@
             "remove"
           ],
           "description": "Inbox for fleeting ideas and current thoughts — expect entries to be pruned",
+          "about": {
+            "what": "An idea or open question you are thinking about that is not a project yet",
+            "not_for": "lasting traits, values or preferences",
+            "examples": [
+              "Why newsletter clicks are flat",
+              "Whether to pitch a podcast"
+            ]
+          },
           "fields": [
             {
               "name": "idea",
@@ -1830,6 +2154,98 @@
         "description": "A situation or pattern that tends to increase your stress. Stored as a bare string in wellness.stress_triggers."
       }
     },
+    "promotable": [
+      {
+        "entity": "hobby",
+        "title": "Hobbies & activities",
+        "field": "name",
+        "label": "Name",
+        "placeholder": "Hobby name",
+        "about": {
+          "what": "Something you do outside work, including regular activities and routines",
+          "not_for": "subjects you only follow or are curious about",
+          "examples": [
+            "Bouldering",
+            "Gardening",
+            "Five-a-side football on Thursdays"
+          ]
+        }
+      },
+      {
+        "entity": "interest",
+        "title": "Interests",
+        "field": "name",
+        "label": "Name",
+        "placeholder": "Interest name",
+        "about": {
+          "what": "A subject you love following or are curious about",
+          "not_for": "activities you regularly do yourself",
+          "examples": [
+            "Typography",
+            "Urban history"
+          ]
+        }
+      },
+      {
+        "entity": "personality_trait",
+        "title": "Personality traits",
+        "field": "trait",
+        "label": "Text",
+        "placeholder": "e.g. Creative, Analytical...",
+        "about": {
+          "what": "How you think, work or deal with people",
+          "not_for": "principles you hold, or activities you do",
+          "examples": [
+            "Thinks out loud",
+            "Needs time alone to recharge"
+          ]
+        }
+      },
+      {
+        "entity": "value",
+        "title": "Values",
+        "field": "value",
+        "label": "Text",
+        "placeholder": "e.g. Integrity, Growth...",
+        "about": {
+          "what": "A principle that matters to you when you decide",
+          "not_for": "habits or ways of working",
+          "examples": [
+            "Integrity",
+            "Craft over speed"
+          ]
+        }
+      },
+      {
+        "entity": "energy_peak",
+        "title": "Energy peaks",
+        "field": "peak",
+        "label": "Text",
+        "placeholder": "e.g. Early morning (6-9am), Late night (10pm-1am)...",
+        "about": {
+          "what": "A time of day when you focus best",
+          "not_for": "activities or hobbies",
+          "examples": [
+            "Early morning",
+            "Late at night"
+          ]
+        }
+      },
+      {
+        "entity": "stress_trigger",
+        "title": "Stress triggers",
+        "field": "trigger",
+        "label": "Text",
+        "placeholder": "e.g. Tight deadlines, Open-plan noise...",
+        "about": {
+          "what": "A situation that tends to stress you",
+          "examples": [
+            "Tight deadlines",
+            "Open-plan noise"
+          ]
+        }
+      }
+    ],
     "sections": [
       {
         "kind": "list",
@@ -1845,6 +2261,15 @@
         "element": {
           "entity": "hobby",
           "identifier": "name",
+          "about": {
+            "what": "Something you do outside work, including regular activities and routines",
+            "not_for": "subjects you only follow or are curious about",
+            "examples": [
+              "Bouldering",
+              "Gardening",
+              "Five-a-side football on Thursdays"
+            ]
+          },
           "fields": [
             {
               "name": "name",
@@ -1958,6 +2383,14 @@
           "entity": "interest",
           "identifier": "name",
           "description": "Things you're into: kind=passion for what you love doing/following, kind=curiosity for what you want to explore",
+          "about": {
+            "what": "A subject you love following or are curious about",
+            "not_for": "activities you regularly do yourself",
+            "examples": [
+              "Typography",
+              "Urban history"
+            ]
+          },
           "list": "interests",
           "fields": [
             {
@@ -1999,7 +2432,15 @@
         "placeholder": "e.g. Creative, Analytical...",
         "element": {
           "entity": "personality_trait",
-          "identifier": "trait"
+          "identifier": "trait",
+          "about": {
+            "what": "How you think, work or deal with people",
+            "not_for": "principles you hold, or activities you do",
+            "examples": [
+              "Thinks out loud",
+              "Needs time alone to recharge"
+            ]
+          }
         },
         "$comment": "Bare strings: lifestyle[\"personality_traits\"] is a list of strings, not objects -- server.write_entity appends `item` directly. The entity's `trait` is an input field name, never a stored key (CANONICAL_STORED_KEY[\"trait\"] is None), so this node binds no entity and names no fields."
       },
@@ -2013,7 +2454,15 @@
         "placeholder": "e.g. Integrity, Growth...",
         "element": {
           "entity": "value",
-          "identifier": "value"
+          "identifier": "value",
+          "about": {
+            "what": "A principle that matters to you when you decide",
+            "not_for": "habits or ways of working",
+            "examples": [
+              "Integrity",
+              "Craft over speed"
+            ]
+          }
         },
         "$comment": "Bare strings, same shape as personality_traits -- server.write_entity. CANONICAL_STORED_KEY[\"value\"] is None."
       },
@@ -2101,7 +2550,15 @@
             "placeholder": "e.g. Early morning (6-9am), Late night (10pm-1am)...",
             "element": {
               "entity": "energy_peak",
-              "identifier": "peak"
+              "identifier": "peak",
+              "about": {
+                "what": "A time of day when you focus best",
+                "not_for": "activities or hobbies",
+                "examples": [
+                  "Early morning",
+                  "Late at night"
+                ]
+              }
             },
             "$comment": "Bare strings -- server.write_entity appends `item` directly."
           },
@@ -2117,7 +2574,14 @@
             "element": {
               "entity": "stress_trigger",
               "identifier": "trigger",
-              "description": "A situation or pattern that tends to increase your stress. Stored as a bare string in wellness.stress_triggers."
+              "description": "A situation or pattern that tends to increase your stress. Stored as a bare string in wellness.stress_triggers.",
+              "about": {
+                "what": "A situation that tends to stress you",
+                "examples": [
+                  "Tight deadlines",
+                  "Open-plan noise"
+                ]
+              }
             },
             "$comment": "Bare strings. persona_store._normalize seeds it as []. The UI was its only writer until wave 7 added the stress_trigger entity and its execute_modify branch; both writers append to this same list now."
           }
@@ -2177,6 +2641,22 @@
         "list": "items"
       }
     },
+    "promotable": [
+      {
+        "entity": "media_item",
+        "title": "Media item",
+        "field": "title",
+        "label": "Title",
+        "placeholder": null,
+        "about": {
+          "what": "A book, film, show, podcast, game or article you love or are into right now",
+          "examples": [
+            "Wolf Hall",
+            "Severance"
+          ]
+        }
+      }
+    ],
     "sections": [
       {
         "kind": "list",
@@ -2186,6 +2666,13 @@
         "element": {
           "entity": "media_item",
           "identifier": "title",
+          "about": {
+            "what": "A book, film, show, podcast, game or article you love or are into right now",
+            "examples": [
+              "Wolf Hall",
+              "Severance"
+            ]
+          },
           "list": "items",
           "fields": [
             {
@@ -2303,6 +2790,22 @@
         "list": "styles"
       }
     },
+    "promotable": [
+      {
+        "entity": "aesthetic",
+        "title": "Styles",
+        "field": "name",
+        "label": "Name",
+        "placeholder": null,
+        "about": {
+          "what": "A visual or design style you love, like or avoid",
+          "examples": [
+            "Swiss typography",
+            "Brutalist web design"
+          ]
+        }
+      }
+    ],
     "sections": [
       {
         "kind": "list",
@@ -2313,6 +2816,13 @@
         "element": {
           "entity": "aesthetic",
           "identifier": "name",
+          "about": {
+            "what": "A visual or design style you love, like or avoid",
+            "examples": [
+              "Swiss typography",
+              "Brutalist web design"
+            ]
+          },
           "list": "styles",
           "fields": [
             {
@@ -2456,6 +2966,22 @@
         "parent": "inventory_item_name"
       }
     },
+    "promotable": [
+      {
+        "entity": "inventory_item",
+        "title": "Inventory item",
+        "field": "name",
+        "label": "Name",
+        "placeholder": "MacBook Pro 14",
+        "about": {
+          "what": "Hardware or a service you own",
+          "examples": [
+            "MacBook Pro 14",
+            "Fastmail"
+          ]
+        }
+      }
+    ],
     "sections": [
       {
         "kind": "list",
@@ -2470,6 +2996,13 @@
         "element": {
           "entity": "inventory_item",
           "identifier": "name",
+          "about": {
+            "what": "Hardware or a service you own",
+            "examples": [
+              "MacBook Pro 14",
+              "Fastmail"
+            ]
+          },
           "fields": [
             {
               "name": "name",
@@ -2571,6 +3104,23 @@
         "identifier": "name"
       }
     },
+    "promotable": [
+      {
+        "entity": "connection",
+        "title": "Person",
+        "field": "name",
+        "label": "Name",
+        "placeholder": "Person's name",
+        "about": {
+          "what": "A person in your life, and your relationship with them",
+          "not_for": "a habit or decision that only involves someone",
+          "examples": [
+            "Priya, designer at Northgate",
+            "Dan, my manager"
+          ]
+        }
+      }
+    ],
     "sections": [
       {
         "kind": "list",
@@ -2581,6 +3131,14 @@
         "element": {
           "entity": "connection",
           "noun": "person",
+          "about": {
+            "what": "A person in your life, and your relationship with them",
+            "not_for": "a habit or decision that only involves someone",
+            "examples": [
+              "Priya, designer at Northgate",
+              "Dan, my manager"
+            ]
+          },
           "identifier": "name",
           "fields": [
             {
@@ -2643,6 +3201,7 @@
         "identifier": "topic"
       }
     },
+    "promotable": [],
     "sections": [
       {
         "kind": "list",

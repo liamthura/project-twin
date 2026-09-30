@@ -90,6 +90,9 @@ PACK_META = {
         "default_enabled": m.get("default_enabled", True),
         "sections": m["sections"],
         "entities": pack_loader.derive_entities(m),
+        # What an observation can be promoted to, and each type's `about`: the
+        # Promote dialog's list and routing's options, from one rule.
+        "promotable": pack_loader.derive_promotion_targets(m),
     }
     for key, m in _MANIFESTS.items()
 }

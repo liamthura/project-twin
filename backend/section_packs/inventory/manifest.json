@@ -37,6 +37,13 @@
       "element": {
         "entity": "inventory_item",
         "identifier": "name",
+        "about": {
+          "what": "Hardware or a service you own",
+          "examples": [
+            "MacBook Pro 14",
+            "Fastmail"
+          ]
+        },
         "fields": [
           {
             "name": "name",

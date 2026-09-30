@@ -59,6 +59,15 @@
       "element": {
         "entity": "hobby",
         "identifier": "name",
+        "about": {
+          "what": "Something you do outside work, including regular activities and routines",
+          "not_for": "subjects you only follow or are curious about",
+          "examples": [
+            "Bouldering",
+            "Gardening",
+            "Five-a-side football on Thursdays"
+          ]
+        },
         "fields": [
           {
             "name": "name",
@@ -172,6 +181,14 @@
         "entity": "interest",
         "identifier": "name",
         "description": "Things you're into: kind=passion for what you love doing/following, kind=curiosity for what you want to explore",
+        "about": {
+          "what": "A subject you love following or are curious about",
+          "not_for": "activities you regularly do yourself",
+          "examples": [
+            "Typography",
+            "Urban history"
+          ]
+        },
         "list": "interests",
         "fields": [
           {
@@ -213,7 +230,15 @@
       "placeholder": "e.g. Creative, Analytical...",
       "element": {
         "entity": "personality_trait",
-        "identifier": "trait"
+        "identifier": "trait",
+        "about": {
+          "what": "How you think, work or deal with people",
+          "not_for": "principles you hold, or activities you do",
+          "examples": [
+            "Thinks out loud",
+            "Needs time alone to recharge"
+          ]
+        }
       },
       "$comment": "Bare strings: lifestyle[\"personality_traits\"] is a list of strings, not objects -- server.write_entity appends `item` directly. The entity's `trait` is an input field name, never a stored key (CANONICAL_STORED_KEY[\"trait\"] is None), so this node binds no entity and names no fields."
     },
@@ -227,7 +252,15 @@
       "placeholder": "e.g. Integrity, Growth...",
       "element": {
         "entity": "value",
-        "identifier": "value"
+        "identifier": "value",
+        "about": {
+          "what": "A principle that matters to you when you decide",
+          "not_for": "habits or ways of working",
+          "examples": [
+            "Integrity",
+            "Craft over speed"
+          ]
+        }
       },
       "$comment": "Bare strings, same shape as personality_traits -- server.write_entity. CANONICAL_STORED_KEY[\"value\"] is None."
     },
@@ -315,7 +348,15 @@
           "placeholder": "e.g. Early morning (6-9am), Late night (10pm-1am)...",
           "element": {
             "entity": "energy_peak",
-            "identifier": "peak"
+            "identifier": "peak",
+            "about": {
+              "what": "A time of day when you focus best",
+              "not_for": "activities or hobbies",
+              "examples": [
+                "Early morning",
+                "Late at night"
+              ]
+            }
           },
           "$comment": "Bare strings -- server.write_entity appends `item` directly."
         },
@@ -331,7 +372,14 @@
           "element": {
             "entity": "stress_trigger",
             "identifier": "trigger",
-            "description": "A situation or pattern that tends to increase your stress. Stored as a bare string in wellness.stress_triggers."
+            "description": "A situation or pattern that tends to increase your stress. Stored as a bare string in wellness.stress_triggers.",
+            "about": {
+              "what": "A situation that tends to stress you",
+              "examples": [
+                "Tight deadlines",
+                "Open-plan noise"
+              ]
+            }
           },
           "$comment": "Bare strings. persona_store._normalize seeds it as []. The UI was its only writer until wave 7 added the stress_trigger entity and its execute_modify branch; both writers append to this same list now."
         }

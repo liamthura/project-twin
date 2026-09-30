@@ -36,7 +36,8 @@ No. Every read and write is scoped to the account behind the credential.
 
 <Accordion title="Is my data sent anywhere else?">
 
-Two cases where it leaves the server:
+At most three cases where it leaves the server, and the last two only if the
+instance is set up for them:
 
 1. **To your AI client**, when it asks. That is the whole point, and it means
    your persona reaches whatever provider is behind your client.
@@ -44,6 +45,10 @@ Two cases where it leaves the server:
    sent to compute search vectors. A self-hosted instance can use a local
    embedding server, or none at all, as
    [Database](/run/database#pgvector) describes.
+3. **To TypeSafe**, if the instance has a TypeSafe key. When you open Promote on
+   an observation, its note, reason and quote are sent to TypeSafe's Jev model
+   to suggest where it belongs. Nothing else of your persona is sent, and
+   nothing is filed until you choose Promote.
 
 </Accordion>
 

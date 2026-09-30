@@ -226,6 +226,7 @@ an array-typed field.
 | `actions` | array | Any of `add`, `update`, `remove`. Default all three. |
 | `description` | string | MCP-facing: what this record is, for a client choosing an entity. Distinct from a node's `description`, which is on-screen helper text. |
 | `noun` | string | What one entry is called on screen, as in "Add person". Defaults to the entity name. |
+| `about` | object | What one entry means to a person. See [`about`](#about). |
 | `variants` | array | Extra entity names over this same stored array. |
 | `parent` | string | Nested arrays only. The MCP parameter naming the enclosing row. |
 | `list` | string | The stored array's own name as the contract reports it today. |
@@ -262,7 +263,7 @@ selecting which fixed sub-object a client means.
 to a client, so an assistant can only file what it hears there as an
 observation. All six of the `strings` nodes preferences ships declare one.
 
-`entity`, `description` and `parent` mean what they do above, `actions` defaults
+`entity`, `description`, `about` and `parent` mean what they do above, `actions` defaults
 to `["add", "remove"]`, and one key belongs to this shape alone: `bulk`, a
 boolean saying whether a client may send the whole array at once under the array's
 own name.
@@ -286,9 +287,10 @@ from its value, so `update` is not available: you remove one and add another.
 
 ### `variants`
 
-Two keys, `entity` (required) and `description`. A variant is a second MCP name
-over the same stored array, same fields, same identifier, same actions,
-differing in its client-facing description and nothing else.
+Three keys, `entity` (required), `description` and `about`. A variant is a
+second MCP name over the same stored array, same fields, same identifier, same
+actions, differing in its client-facing description and in what it means to a
+person, and nothing else.
 
 ```json title="section_packs/preferences/manifest.json"
 "variants": [
@@ -300,6 +302,40 @@ differing in its client-facing description and nothing else.
 `preferences` is what it exists for: `like` and `dislike` are two entities over
 one `likes_dislikes` list, discriminated by a `stance` field. `dislike` binds no
 node, so without `variants` it could not be derived at all.
+
+### `about`
+
+The one description of an entry type written for a person rather than for a
+client. `description` is the contract an assistant reads; `about` is what the
+entry *is*:
+
+| Key | Type | Purpose |
+|---|---|---|
+| `what` | string | Required. What one entry is, in the second person, without a closing full stop. |
+| `not_for` | string | What it is most easily mistaken for. |
+| `examples` | array | One to six short examples. Invented, never copied from real data. |
+
+```json title="section_packs/preferences/manifest.json"
+"about": {
+  "what": "How assistants should change their answers when you are in a particular mood",
+  "not_for": "your habits, hobbies, or what you do to feel better",
+  "examples": ["When stressed: keep answers short", "When tired: skip the background"]
+}
+```
+
+Two things read it, so they can never disagree. The Promote dialog in Review
+shows `what` under the chosen type, and when the instance has
+[suggestions turned on](/run/self-hosting#suggestions-in-review), all three go to
+TypeSafe's Jev as that type's description when it chooses where an observation
+belongs. `not_for` does the most work there: "cooks to decompress" went to "When
+I'm feeling..." until that type said it was not for what you do to feel better.
+
+It is optional in the format, but every type a shipped pack lets an observation
+become must have it (`tests/test_promotion_targets.py`). Those types are worked
+out, not declared: an entity with `add`, no `parent`, whose only required field
+is its identifier, and which a section draws. The server derives the list once
+(`pack_loader.derive_promotion_targets`) and serves it with each pack, so a new
+pack's types are offered, and routed to, with no code.
 
 ## The field descriptor
 

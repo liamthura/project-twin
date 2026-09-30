@@ -123,6 +123,13 @@
       "element": {
         "entity": "education",
         "identifier": "institution",
+        "about": {
+          "what": "A school, college, university or course you studied at",
+          "not_for": "skills you have or ways you like to learn",
+          "examples": [
+            "Studied English and Media at Leeds"
+          ]
+        },
         "fields": [
           {
             "name": "institution",

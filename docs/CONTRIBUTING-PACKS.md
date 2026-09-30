@@ -399,10 +399,22 @@ The loader now checks the pair against the enclosing element.
 ### `variants`
 
 Two MCP names over one stored array, differing in the client-facing description
-and in nothing else — same array, same fields, same identifier, same actions.
-`preferences` needs it: `like` and `dislike` are two entities over one
-`likes_dislikes` list. Anything that differs by more than a name and a
-description is a second element shape, not a variant.
+and its `about`, and in nothing else — same array, same fields, same
+identifier, same actions. `preferences` needs it: `like` and `dislike` are two
+entities over one `likes_dislikes` list. Anything that differs by more than a
+name and its descriptions is a second element shape, not a variant.
+
+### `about`, for any type an observation can become
+
+`description` is what an assistant reads; `about` is what an entry means to a
+person: `what` it is, what it is `not_for`, and a few invented `examples`. The
+Promote dialog shows `what` under the type, and suggestions send all three to
+Jev as that type's criterion, so write `not_for` for whatever it is most often
+confused with. A type an observation can be promoted to (an entity with `add`,
+no `parent`, only its identifier required, and drawn by a section) must have
+one in a shipped pack; `tests/test_promotion_targets.py` checks. The server
+works that list out itself (`pack_loader.derive_promotion_targets`), so there
+is nothing to register.
 
 ## The rules the loader checks
 

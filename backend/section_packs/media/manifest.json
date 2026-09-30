@@ -29,6 +29,13 @@
       "element": {
         "entity": "media_item",
         "identifier": "title",
+        "about": {
+          "what": "A book, film, show, podcast, game or article you love or are into right now",
+          "examples": [
+            "Wolf Hall",
+            "Severance"
+          ]
+        },
         "list": "items",
         "fields": [
           {

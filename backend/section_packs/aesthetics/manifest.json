@@ -33,6 +33,13 @@
       "element": {
         "entity": "aesthetic",
         "identifier": "name",
+        "about": {
+          "what": "A visual or design style you love, like or avoid",
+          "examples": [
+            "Swiss typography",
+            "Brutalist web design"
+          ]
+        },
         "list": "styles",
         "fields": [
           {

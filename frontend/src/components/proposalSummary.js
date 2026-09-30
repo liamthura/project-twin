@@ -120,7 +120,7 @@ export function updateChanges(row, packs, packData) {
   return null;
 }
 
-export function bindingNodes(nodes, entity, found = []) {
+function bindingNodes(nodes, entity, found = []) {
   for (const node of nodes || []) {
     if (node?.element?.entity === entity) found.push(node);
     bindingNodes(node?.sections, entity, found);

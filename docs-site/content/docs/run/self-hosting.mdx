@@ -111,6 +111,22 @@ FTS-only mode, as [Database](/run/database) describes.
 | `EMBEDDING_MODEL` | Default `voyage-4-lite` |
 | `EMBEDDING_DIM` | Default `1024`. Must match your model's output width. See the warning on [Database](/run/database#embedding_dim). |
 
+### Suggestions in Review
+
+Optional. With a [TypeSafe](https://typesafe.ai) key, the Promote dialog in
+Review suggests where an observation belongs, and fills the type in when it is
+sure. Leave it unset and nothing is sent anywhere.
+
+| Variable | Notes |
+|---|---|
+| `TYPESAFE_API_KEY` | Turns suggestions on. Each Promote sends the observation's note, reason and quote to TypeSafe. |
+| `TYPESAFE_MODEL` | Default `jev-latest` |
+| `TYPESAFE_API_URL` | Default `https://api.typesafe.ai/v1/systemone` |
+
+The types it chooses between are the ones your section packs let an
+observation become, described by each type's `about` in its manifest. See
+[pack reference](/run/pack-reference#about).
+
 <Callout type="warn">
 `backend/.env.example` used to list `DEBUG` and `MCP_TRANSPORT`. **Neither does
 anything.** `DEBUG` appears in no Python source at all, and `MCP_TRANSPORT`
