@@ -3,9 +3,52 @@ title: Changelog
 description: What changed in each release, and what you have to do about it.
 ---
 
-Versions here are the app version, shown in the sidebar under your account as
-`v2.1.0 (a1b2c3d)` with the commit it was built from. Releases before 2.1.0
+Versions here are the app version, shown at the foot of Settings → Account as
+`v2.3.0 (a1b2c3d)` with the commit it was built from. Releases before 2.1.0
 predate this page.
+
+## 2.3.0
+
+Review is safer to work through quickly: an update shows what it would
+replace, and Approve can be undone. The rest is fixes from a design review of
+the web app. No migration and no new setting.
+
+### Review
+
+- **Updates say what they replace.** A row reads "Notes: Paused for now →
+  Weekly tutor", and so do its details and the edit form, so the value on
+  record is in front of you before you overwrite it. An update that would
+  change nothing says so.
+- **Approve has an Undo.** Approve, `a` and bulk Approve now wait for their
+  confirmation, as Reject and Delete already did, and the confirmation links
+  to the section the change went into. Leaving Review sends anything still
+  waiting.
+- **Undo means undo.** A decision is sent when its confirmation goes, and the
+  confirmation stays while the pointer or focus is on it. Before, a decision
+  went out after eight seconds even while its toast still offered Undo, and a
+  toast that closed under the pointer could leave the next one standing.
+- **Observations** use the Inbox row's layout, with the section named as the
+  editor names it.
+- **Contrast and layout.** Approve's green passes WCAG AA as text, and Approve
+  and Reject sit in the same place on every row.
+- **Why?** now works on entries changed through Review, not only ones added
+  through it, for changes approved from this version on.
+
+### Elsewhere
+
+- Dates read "28 July 2026", with the time after a comma where there is one,
+  everywhere the editor shows them. An opened entry no longer repeats a date
+  its row shows in full.
+- Search results are grouped by section for screen readers, and a match deep
+  in a long field shows in the snippet.
+- A dialog's close button is a 44px target on touch screens, and dialog titles
+  sit on the left on a phone too.
+- **Help and docs** in the account menu, a filter without a second "Clear",
+  and 44px list rows on touch screens.
+
+### Upgrading
+
+Pull the image and restart. Nothing else is needed.
 
 ## 2.2.0
 
