@@ -123,3 +123,30 @@ describe("AddEntryDialog accessibility", () => {
     expect(onAdd).not.toHaveBeenCalled();
   });
 });
+
+describe("AddEntryDialog's choice fields", () => {
+  const withStatus = (values) => withElement({
+    fields: [
+      { name: "item", role: "title" },
+      { name: "status", type: "enum", values, show: ["badge"] },
+    ],
+  });
+
+  it("offers five or more choices as a dropdown, which wrapped as buttons", () => {
+    render(
+      <AddEntryDialog node={withStatus(["active", "paused", "completed", "archived", "idea"])}
+        entity={undefined} items={[]} onAdd={vi.fn()} open onOpenChange={vi.fn()} />
+    );
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /paused/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps four as buttons, which fit on one line", () => {
+    render(
+      <AddEntryDialog node={withStatus(["active", "achieved", "paused", "dropped"])}
+        entity={undefined} items={[]} onAdd={vi.fn()} open onOpenChange={vi.fn()} />
+    );
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /paused/i })).toBeInTheDocument();
+  });
+});

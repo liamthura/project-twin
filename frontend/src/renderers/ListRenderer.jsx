@@ -333,6 +333,8 @@ export default function ListRenderer({
   // Does anything sit to the LEFT of the count in the row below? When nothing
   // does, the count is the row's only child and stays where it always was.
   const hasRowControls = facetFields.length > 0 || Boolean(sortField);
+  // Six rows or fewer need no search box; see where it renders.
+  const showSearch = node.search && (items.length > 6 || Boolean(q));
 
   // The one Add dialog this list has, trigger included. Built here rather than
   // in the section header because `addItem` (and the three invariants
@@ -409,34 +411,23 @@ export default function ListRenderer({
           on an empty state that tells them to "clear the search" with nothing
           left to clear it with. The threshold makes that reachable a second
           way: delete a seventh row while a query is live. */}
-      {node.search && (items.length > 6 || q) && (
+      {/* Search and the filters share a row, three parts to two, so the
+          ways of narrowing the list sit together. Stacked on a phone, where
+          two fifths would not hold a filter's label and its dropdown. */}
+      <div className={`${showSearch || hasRowControls ? "flex" : "hidden"} flex-col gap-2 sm:flex-row sm:items-center sm:gap-4`}>
+      {showSearch && (
         <Input
           type="search"
           aria-label="Search"
           placeholder="Search…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="h-9"
+          className="h-9 sm:min-w-0 sm:flex-[3]"
         />
       )}
 
-      {/* The count sits WITH the filters rather than in a toolbar above them:
-          it is feedback on what they did ("2 of 7"), and a row away from the
-          controls that change it there was nothing to connect the two.
-          Only while something is filtering (wave 3). Unfiltered, the rows
-          themselves say how long the list is, and "3 entries" over every list
-          was the most repeated line in the editor. With no controls and no
-          filter the row is hidden, so it adds no gap.
-
-          Within the row the controls lead and the count is pushed to the far
-          right, which is the prototype's arrangement: every toolbar row there
-          is SPACE_BETWEEN with the count last (`Order` row 327:1124, `Filters`
-          row 324:1169). Reading order follows cause then effect -- you change a
-          control on the left, the number on the right answers. The push is
-          `ml-auto` rather than `justify-between` on the row because the row can
-          hold three things (facets, sort, count) and justify-between would
-          spread the two controls apart instead of keeping them grouped. */}
-      <div className={`${hasRowControls || q || facetsActive ? "flex" : "hidden"} flex-wrap items-center gap-x-4 gap-y-2`}>
+      {hasRowControls && (
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:min-w-0 sm:flex-[2]">
         {/* Facets: display-only row filters, drawn above the list. Each entry
             in node.facets names an enum storage key; `facetOptions` above
             resolves that field's option set. A field with no resolvable
@@ -449,7 +440,7 @@ export default function ListRenderer({
             field) happens in the onChange below, never stored, never threaded
             through onItems. */}
         {facetFields.length > 0 && (
-          <div role="group" aria-label="Filters" className="flex flex-wrap gap-x-4 gap-y-2">
+          <div role="group" aria-label="Filters" className="flex min-w-0 flex-1 flex-wrap gap-x-4 gap-y-2">
             {facetFields.map((f) => {
               const options = facetOptions(f);
               return (
@@ -457,7 +448,7 @@ export default function ListRenderer({
                   key={f}
                   role="group"
                   aria-label={`Filter by ${f.replace(/_/g, " ")}`}
-                  className="flex items-center gap-1.5"
+                  className="flex min-w-0 flex-1 items-center gap-1.5"
                 >
                   <span className="text-xs font-medium text-muted-foreground">
                     {fieldLabel(meta, f).text}
@@ -466,6 +457,7 @@ export default function ListRenderer({
                     options={["All", ...options]}
                     value={facetValues[f] ?? "All"}
                     clearable={false}
+                    className="flex-1"
                     onChange={(v) =>
                       setFacetValues((prev) => ({
                         ...prev,
@@ -501,16 +493,20 @@ export default function ListRenderer({
           </div>
         )}
 
-        {/* Last in the row, and pushed right only when something precedes it --
-            with no facets and no sort this is the row's only child, and a lone
-            count belongs where it has always been rather than stranded against
-            the right edge with nothing to sit opposite. */}
-        {(q || facetsActive) && (
-          <div className={`text-sm text-muted-foreground${hasRowControls ? " ml-auto" : ""}`}>
-            {visible.length} of {items.length} {items.length === 1 ? "entry" : "entries"}
-          </div>
-        )}
       </div>
+      )}
+      </div>
+
+      {/* Feedback on what the search and filters did ("2 of 7"), under them
+          and against the right edge, where the number used to answer from.
+          Only while something is filtering: unfiltered, the rows themselves
+          say how long the list is, and "3 entries" over every list was the
+          most repeated line in the editor. */}
+      {(q || facetsActive) && (
+        <div className="text-right text-sm text-muted-foreground">
+          {visible.length} of {items.length} {items.length === 1 ? "entry" : "entries"}
+        </div>
+      )}
 
       {suggestions.length > 0 && (
         <div className="space-y-1.5">
