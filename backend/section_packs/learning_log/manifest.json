@@ -33,6 +33,13 @@
       "element": {
         "entity": "learning_entry",
         "identifier": "topic",
+        "about": {
+          "what": "Something you learnt, with what it was and where it came from",
+          "not_for": "skills you already have",
+          "examples": [
+            "Subject lines under 40 characters get opened more"
+          ]
+        },
         "fields": [
           {
             "name": "topic",

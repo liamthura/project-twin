@@ -114,12 +114,14 @@ FTS-only mode, as [Database](/run/database) describes.
 ### Suggestions in Review
 
 Optional. With a [TypeSafe](https://typesafe.ai) key, the Promote dialog in
-Review suggests where an observation belongs, and fills the type in when it is
-sure. Leave it unset and nothing is sent anywhere.
+Review suggests where an observation belongs, chooses the type when it is
+sure, and fills that type's fields from what the observation says; Edit before
+approving offers to tidy a suggested entry whose name is a sentence. Leave it
+unset and nothing is sent anywhere.
 
 | Variable | Notes |
 |---|---|
-| `TYPESAFE_API_KEY` | Turns suggestions on. Each Promote sends the observation's note, reason and quote to TypeSafe. |
+| `TYPESAFE_API_KEY` | Turns suggestions on. Promote sends the observation's note, reason and quote to TypeSafe; a tidy sends the suggested entry's name and quote. |
 | `TYPESAFE_MODEL` | Default `jev-latest` |
 | `TYPESAFE_API_URL` | Default `https://api.typesafe.ai/v1/systemone` |
 

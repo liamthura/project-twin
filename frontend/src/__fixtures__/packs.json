@@ -210,16 +210,239 @@
       {
         "entity": "education",
         "title": "Education",
-        "field": "institution",
-        "label": "Institution",
-        "placeholder": "School, college, or university",
         "about": {
           "what": "A school, college, university or course you studied at",
           "not_for": "skills you have or ways you like to learn",
           "examples": [
             "Studied English and Media at Leeds"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "institution",
+            "label": "Institution",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "School, college, or university",
+            "values": null
+          },
+          {
+            "key": "degree_level",
+            "label": "Degree level",
+            "type": "text",
+            "required": false,
+            "identifier": false,
+            "placeholder": "e.g. High School, Bachelor's, Master's, PhD",
+            "values": null
+          },
+          {
+            "key": "field_of_study",
+            "label": "Field of study",
+            "type": "text",
+            "required": false,
+            "identifier": false,
+            "placeholder": "e.g. Computer Science, Economics, Design",
+            "values": null
+          },
+          {
+            "key": "start_year",
+            "label": "Start year",
+            "type": "text",
+            "required": false,
+            "identifier": false,
+            "placeholder": "e.g. 2020",
+            "values": null
+          },
+          {
+            "key": "end_year",
+            "label": "End year",
+            "type": "text",
+            "required": false,
+            "identifier": false,
+            "placeholder": "e.g. 2024 or Expected 2026",
+            "values": null
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "current",
+              "completed",
+              "incomplete"
+            ]
+          }
+        ]
+      },
+      {
+        "entity": "work_experience",
+        "title": "Work experience",
+        "about": {
+          "what": "A job or role you have held, where and when",
+          "not_for": "skills you gained or things you learnt",
+          "examples": [
+            "Designer at Northgate Studio, 2023 to now",
+            "Barista at a café while studying"
+          ]
+        },
+        "fields": [
+          {
+            "key": "company",
+            "label": "Company",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "Company or organisation",
+            "values": null
+          },
+          {
+            "key": "role",
+            "label": "Role",
+            "type": "text",
+            "required": true,
+            "identifier": false,
+            "placeholder": "e.g. Analyst, Designer, Engineer",
+            "values": null
+          },
+          {
+            "key": "type",
+            "label": "Type",
+            "type": "text",
+            "required": true,
+            "identifier": false,
+            "placeholder": "e.g. Full-time, Internship, Freelance",
+            "values": null
+          },
+          {
+            "key": "period",
+            "label": "Period",
+            "type": "text",
+            "required": true,
+            "identifier": false,
+            "placeholder": "e.g. Jan 2022 - Jun 2023",
+            "values": null
+          },
+          {
+            "key": "location",
+            "label": "Location",
+            "type": "text",
+            "required": false,
+            "identifier": false,
+            "placeholder": "e.g. Remote, or a city",
+            "values": null
+          },
+          {
+            "key": "description",
+            "label": "Description",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": "What the role involved...",
+            "values": null
+          }
+        ]
+      },
+      {
+        "entity": "email",
+        "title": "Emails",
+        "about": {
+          "what": "An email address you use, and what for",
+          "examples": [
+            "Work address for client email"
+          ]
+        },
+        "fields": [
+          {
+            "key": "address",
+            "label": "Address",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "you@example.com",
+            "values": null
+          },
+          {
+            "key": "purpose",
+            "label": "Purpose",
+            "type": "text",
+            "required": true,
+            "identifier": false,
+            "placeholder": "e.g. primary, work, personal",
+            "values": null
+          }
+        ]
+      },
+      {
+        "entity": "link",
+        "title": "Links",
+        "about": {
+          "what": "A link to a page about you or your work",
+          "examples": [
+            "Portfolio site",
+            "LinkedIn profile"
+          ]
+        },
+        "fields": [
+          {
+            "key": "label",
+            "label": "Label",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "e.g. Portfolio, LinkedIn",
+            "values": null
+          },
+          {
+            "key": "url",
+            "label": "Url",
+            "type": "text",
+            "required": true,
+            "identifier": false,
+            "placeholder": "https://example.com",
+            "values": null
+          }
+        ]
+      },
+      {
+        "entity": "language",
+        "title": "Languages",
+        "about": {
+          "what": "A language you speak or read, and how well",
+          "not_for": "programming languages",
+          "examples": [
+            "French, conversational",
+            "Welsh, basic"
+          ]
+        },
+        "fields": [
+          {
+            "key": "name",
+            "label": "Name",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "e.g. English, Spanish",
+            "values": null
+          },
+          {
+            "key": "fluency",
+            "label": "Fluency",
+            "type": "enum",
+            "required": true,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "native",
+              "fluent",
+              "conversational",
+              "basic"
+            ]
+          }
+        ]
       }
     ],
     "sections": [
@@ -434,6 +657,14 @@
         "element": {
           "entity": "work_experience",
           "identifier": "company",
+          "about": {
+            "what": "A job or role you have held, where and when",
+            "not_for": "skills you gained or things you learnt",
+            "examples": [
+              "Designer at Northgate Studio, 2023 to now",
+              "Barista at a café while studying"
+            ]
+          },
           "fields": [
             {
               "name": "company",
@@ -521,6 +752,12 @@
             "element": {
               "entity": "email",
               "identifier": "address",
+              "about": {
+                "what": "An email address you use, and what for",
+                "examples": [
+                  "Work address for client email"
+                ]
+              },
               "fields": [
                 {
                   "name": "address",
@@ -552,6 +789,13 @@
               "entity": "link",
               "identifier": "label",
               "description": "A profile link. `label` identifies the row, so renaming one on update means sending `new_label`.",
+              "about": {
+                "what": "A link to a page about you or your work",
+                "examples": [
+                  "Portfolio site",
+                  "LinkedIn profile"
+                ]
+              },
               "fields": [
                 {
                   "name": "label",
@@ -584,6 +828,14 @@
         "element": {
           "entity": "language",
           "identifier": "name",
+          "about": {
+            "what": "A language you speak or read, and how well",
+            "not_for": "programming languages",
+            "examples": [
+              "French, conversational",
+              "Welsh, basic"
+            ]
+          },
           "fields": [
             {
               "name": "name",
@@ -661,9 +913,6 @@
       {
         "entity": "goal",
         "title": "Goal",
-        "field": "title",
-        "label": "Title",
-        "placeholder": null,
         "about": {
           "what": "Something you are working toward, with an end you could reach",
           "not_for": "habits, routines or preferences",
@@ -671,7 +920,76 @@
             "Run a half marathon by spring",
             "Get promoted to senior designer"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "title",
+            "label": "Title",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          },
+          {
+            "key": "target_date",
+            "label": "Target date",
+            "type": "date",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": null
+          },
+          {
+            "key": "why",
+            "label": "Why",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": null
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": null
+          },
+          {
+            "key": "type",
+            "label": "Type",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "career",
+              "learning",
+              "personal",
+              "health",
+              "financial",
+              "creative",
+              "other"
+            ]
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "active",
+              "achieved",
+              "paused",
+              "dropped"
+            ]
+          }
+        ]
       }
     ],
     "sections": [
@@ -864,9 +1182,6 @@
       {
         "entity": "domain",
         "title": "Skills & domains",
-        "field": "name",
-        "label": "Name",
-        "placeholder": "e.g. Photography, Marketing, Python",
         "about": {
           "what": "A skill or field of knowledge you have, and how well you know it",
           "not_for": "how you like to learn or be answered",
@@ -874,14 +1189,46 @@
             "Email marketing, advanced",
             "Python, intermediate"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "name",
+            "label": "Name",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "e.g. Photography, Marketing, Python",
+            "values": null
+          },
+          {
+            "key": "level",
+            "label": "Level",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "beginner",
+              "learning",
+              "intermediate",
+              "advanced",
+              "expert"
+            ]
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": "Add context, projects, or experience...",
+            "values": null
+          }
+        ]
       },
       {
         "entity": "mental_tab",
         "title": "Mental tabs",
-        "field": "title",
-        "label": "Title",
-        "placeholder": "e.g. Git commands, Recipe ideas",
         "about": {
           "what": "Something worth remembering that is not a skill: a list, a recommendation, a note to self",
           "not_for": "facts about how you behave or what you prefer",
@@ -889,7 +1236,40 @@
             "Restaurants to try in Manchester",
             "Git commands I keep forgetting"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "title",
+            "label": "Title",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "e.g. Git commands, Recipe ideas",
+            "values": null
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": "Your notes, code snippets, reminders...",
+            "values": null
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "open",
+              "closed",
+              "archived"
+            ]
+          }
+        ]
       }
     ],
     "sections": [
@@ -1280,9 +1660,6 @@
       {
         "entity": "mood_override",
         "title": "When I'm feeling...",
-        "field": "mood",
-        "label": "Mood",
-        "placeholder": "e.g. stressed, tired, excited, creative",
         "about": {
           "what": "How assistants should change their answers when you are in a particular mood",
           "not_for": "your habits, hobbies, or what you do to feel better",
@@ -1290,14 +1667,40 @@
             "When stressed: keep answers short",
             "When tired: skip the background"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "mood",
+            "label": "Mood",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "e.g. stressed, tired, excited, creative",
+            "values": null
+          },
+          {
+            "key": "tone",
+            "label": "Tone",
+            "type": "text",
+            "required": false,
+            "identifier": false,
+            "placeholder": "e.g. gentle, encouraging",
+            "values": null
+          },
+          {
+            "key": "detail_level",
+            "label": "Detail level",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": "e.g. brief and to the point, skip the explanations...",
+            "values": null
+          }
+        ]
       },
       {
         "entity": "response_format",
         "title": "Response format",
-        "field": "item",
-        "label": "Text",
-        "placeholder": "e.g. code blocks for anything over three lines",
         "about": {
           "what": "How you want an assistant's answers shaped or delivered",
           "not_for": "how you like to learn a new subject",
@@ -1305,14 +1708,22 @@
             "Code blocks for anything over three lines",
             "Bullet points rather than paragraphs"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "item",
+            "label": "Text",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          }
+        ]
       },
       {
         "entity": "learning_method",
         "title": "Preferred methods",
-        "field": "item",
-        "label": "Text",
-        "placeholder": "e.g. hands-on examples...",
         "about": {
           "what": "A way you like to learn something new",
           "not_for": "how answers in general should be formatted",
@@ -1320,14 +1731,22 @@
             "Worked examples before theory",
             "Pair programming with someone who knows it"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "item",
+            "label": "Text",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          }
+        ]
       },
       {
         "entity": "learning_dislike",
         "title": "Things to avoid",
-        "field": "item",
-        "label": "Text",
-        "placeholder": "e.g. walls of text...",
         "about": {
           "what": "A way of being taught that does not work for you",
           "not_for": "things you dislike in general",
@@ -1335,14 +1754,22 @@
             "Walls of text",
             "Video tutorials"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "item",
+            "label": "Text",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          }
+        ]
       },
       {
         "entity": "like",
         "title": "Likes & dislikes: like",
-        "field": "item",
-        "label": "Item",
-        "placeholder": "e.g. unsolicited sales tone, jargon...",
         "about": {
           "what": "Something you like and want every assistant to know you like",
           "not_for": "how answers should be shaped",
@@ -1350,14 +1777,22 @@
             "Dry humour",
             "British spelling"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "item",
+            "label": "Item",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "e.g. unsolicited sales tone, jargon...",
+            "values": null
+          }
+        ]
       },
       {
         "entity": "dislike",
         "title": "Likes & dislikes: dislike",
-        "field": "item",
-        "label": "Item",
-        "placeholder": "e.g. unsolicited sales tone, jargon...",
         "about": {
           "what": "Something you dislike and want every assistant to avoid",
           "not_for": "ways of being taught",
@@ -1365,49 +1800,84 @@
             "Unsolicited sales tone",
             "Jargon"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "item",
+            "label": "Item",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "e.g. unsolicited sales tone, jargon...",
+            "values": null
+          }
+        ]
       },
       {
         "entity": "preferred_language",
         "title": "Preferred languages",
-        "field": "item",
-        "label": "Text",
-        "placeholder": "e.g. Python, TypeScript...",
         "about": {
           "what": "A programming language you prefer to work in",
           "examples": [
             "Python",
             "TypeScript"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "item",
+            "label": "Text",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          }
+        ]
       },
       {
         "entity": "framework",
         "title": "Frameworks",
-        "field": "item",
-        "label": "Text",
-        "placeholder": "e.g. FastAPI, Next.js...",
         "about": {
           "what": "A software framework or library you prefer",
           "examples": [
             "FastAPI",
             "Next.js"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "item",
+            "label": "Text",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          }
+        ]
       },
       {
         "entity": "dev_tool",
         "title": "Tools",
-        "field": "item",
-        "label": "Text",
-        "placeholder": "e.g. VS Code, Docker...",
         "about": {
           "what": "A development tool you use",
           "examples": [
             "VS Code",
             "Docker"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "item",
+            "label": "Text",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          }
+        ]
       }
     ],
     "sections": [
@@ -1811,9 +2281,6 @@
       {
         "entity": "top_of_mind",
         "title": "Top of mind",
-        "field": "item",
-        "label": "Idea",
-        "placeholder": "Project idea or thing you want to build...",
         "about": {
           "what": "An idea or open question you are thinking about that is not a project yet",
           "not_for": "lasting traits, values or preferences",
@@ -1821,7 +2288,83 @@
             "Why newsletter clicks are flat",
             "Whether to pitch a podcast"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "item",
+            "label": "Idea",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "Project idea or thing you want to build...",
+            "values": null
+          },
+          {
+            "key": "note",
+            "label": "Note",
+            "type": "text",
+            "required": false,
+            "identifier": false,
+            "placeholder": "Add a note (optional)...",
+            "values": null
+          }
+        ]
+      },
+      {
+        "entity": "project",
+        "title": "Projects",
+        "about": {
+          "what": "Something you are building or working on, with a clear piece of work to it",
+          "not_for": "ideas and questions that are not a project yet",
+          "examples": [
+            "Staff picks zine",
+            "Rebuilding the studio website"
+          ]
+        },
+        "fields": [
+          {
+            "key": "name",
+            "label": "Name",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "e.g. Personal website, Mobile app",
+            "values": null
+          },
+          {
+            "key": "description",
+            "label": "Description",
+            "type": "longtext",
+            "required": true,
+            "identifier": false,
+            "placeholder": "Brief description...",
+            "values": null
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": "Additional notes, blockers, or context...",
+            "values": null
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "active",
+              "paused",
+              "completed",
+              "archived",
+              "idea"
+            ]
+          }
+        ]
       }
     ],
     "sections": [
@@ -1889,6 +2432,14 @@
         "element": {
           "entity": "project",
           "identifier": "name",
+          "about": {
+            "what": "Something you are building or working on, with a clear piece of work to it",
+            "not_for": "ideas and questions that are not a project yet",
+            "examples": [
+              "Staff picks zine",
+              "Rebuilding the studio website"
+            ]
+          },
           "fields": [
             {
               "name": "name",
@@ -2158,9 +2709,6 @@
       {
         "entity": "hobby",
         "title": "Hobbies & activities",
-        "field": "name",
-        "label": "Name",
-        "placeholder": "Hobby name",
         "about": {
           "what": "Something you do outside work, including regular activities and routines",
           "not_for": "subjects you only follow or are curious about",
@@ -2169,14 +2717,59 @@
             "Gardening",
             "Five-a-side football on Thursdays"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "name",
+            "label": "Name",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "Hobby name",
+            "values": null
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": "Additional notes about this hobby...",
+            "values": null
+          },
+          {
+            "key": "skill_level",
+            "label": "Skill level",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "beginner",
+              "learning",
+              "intermediate",
+              "advanced",
+              "expert"
+            ]
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "active",
+              "inactive",
+              "paused"
+            ]
+          }
+        ]
       },
       {
         "entity": "interest",
         "title": "Interests",
-        "field": "name",
-        "label": "Name",
-        "placeholder": "Interest name",
         "about": {
           "what": "A subject you love following or are curious about",
           "not_for": "activities you regularly do yourself",
@@ -2184,14 +2777,43 @@
             "Typography",
             "Urban history"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "name",
+            "label": "Name",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "Interest name",
+            "values": null
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": "e.g. Reading Substacks, Photography",
+            "values": null
+          },
+          {
+            "key": "kind",
+            "label": "Kind",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "passion",
+              "curiosity"
+            ]
+          }
+        ]
       },
       {
         "entity": "personality_trait",
         "title": "Personality traits",
-        "field": "trait",
-        "label": "Text",
-        "placeholder": "e.g. Creative, Analytical...",
         "about": {
           "what": "How you think, work or deal with people",
           "not_for": "principles you hold, or activities you do",
@@ -2199,14 +2821,22 @@
             "Thinks out loud",
             "Needs time alone to recharge"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "trait",
+            "label": "Text",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          }
+        ]
       },
       {
         "entity": "value",
         "title": "Values",
-        "field": "value",
-        "label": "Text",
-        "placeholder": "e.g. Integrity, Growth...",
         "about": {
           "what": "A principle that matters to you when you decide",
           "not_for": "habits or ways of working",
@@ -2214,14 +2844,22 @@
             "Integrity",
             "Craft over speed"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "value",
+            "label": "Text",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          }
+        ]
       },
       {
         "entity": "energy_peak",
         "title": "Energy peaks",
-        "field": "peak",
-        "label": "Text",
-        "placeholder": "e.g. Early morning (6-9am), Late night (10pm-1am)...",
         "about": {
           "what": "A time of day when you focus best",
           "not_for": "activities or hobbies",
@@ -2229,21 +2867,40 @@
             "Early morning",
             "Late at night"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "peak",
+            "label": "Text",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          }
+        ]
       },
       {
         "entity": "stress_trigger",
         "title": "Stress triggers",
-        "field": "trigger",
-        "label": "Text",
-        "placeholder": "e.g. Tight deadlines, Open-plan noise...",
         "about": {
           "what": "A situation that tends to stress you",
           "examples": [
             "Tight deadlines",
             "Open-plan noise"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "trigger",
+            "label": "Text",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          }
+        ]
       }
     ],
     "sections": [
@@ -2645,16 +3302,87 @@
       {
         "entity": "media_item",
         "title": "Media item",
-        "field": "title",
-        "label": "Title",
-        "placeholder": null,
         "about": {
           "what": "A book, film, show, podcast, game or article you love or are into right now",
           "examples": [
             "Wolf Hall",
             "Severance"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "title",
+            "label": "Title",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          },
+          {
+            "key": "url",
+            "label": "Url",
+            "type": "text",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": null
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": null
+          },
+          {
+            "key": "kind",
+            "label": "Kind",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "book",
+              "article",
+              "podcast",
+              "show",
+              "film",
+              "game",
+              "video",
+              "music"
+            ]
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "want",
+              "in_progress",
+              "finished",
+              "dropped"
+            ]
+          },
+          {
+            "key": "reaction",
+            "label": "Reaction",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "loved",
+              "liked",
+              "disliked"
+            ]
+          }
+        ]
       }
     ],
     "sections": [
@@ -2794,16 +3522,65 @@
       {
         "entity": "aesthetic",
         "title": "Styles",
-        "field": "name",
-        "label": "Name",
-        "placeholder": null,
         "about": {
           "what": "A visual or design style you love, like or avoid",
           "examples": [
             "Swiss typography",
             "Brutalist web design"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "name",
+            "label": "Name",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": null,
+            "values": null
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": null
+          },
+          {
+            "key": "domain",
+            "label": "Domain",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "ui",
+              "graphic",
+              "typography",
+              "color",
+              "illustration",
+              "photography",
+              "fashion",
+              "interior",
+              "general"
+            ]
+          },
+          {
+            "key": "stance",
+            "label": "Stance",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "love",
+              "like",
+              "avoid"
+            ]
+          }
+        ]
       }
     ],
     "sections": [
@@ -2970,16 +3747,65 @@
       {
         "entity": "inventory_item",
         "title": "Inventory item",
-        "field": "name",
-        "label": "Name",
-        "placeholder": "MacBook Pro 14",
         "about": {
           "what": "Hardware or a service you own",
           "examples": [
             "MacBook Pro 14",
             "Fastmail"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "name",
+            "label": "Name",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "MacBook Pro 14",
+            "values": null
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": "What you use it for, quirks, anything worth knowing...",
+            "values": null
+          },
+          {
+            "key": "category",
+            "label": "Category",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "computer",
+              "phone",
+              "server",
+              "network",
+              "peripheral",
+              "audio",
+              "camera",
+              "storage",
+              "other"
+            ]
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "type": "enum",
+            "required": false,
+            "identifier": false,
+            "placeholder": null,
+            "values": [
+              "in_use",
+              "spare",
+              "retired"
+            ]
+          }
+        ]
       }
     ],
     "sections": [
@@ -3108,9 +3934,6 @@
       {
         "entity": "connection",
         "title": "Person",
-        "field": "name",
-        "label": "Name",
-        "placeholder": "Person's name",
         "about": {
           "what": "A person in your life, and your relationship with them",
           "not_for": "a habit or decision that only involves someone",
@@ -3118,7 +3941,36 @@
             "Priya, designer at Northgate",
             "Dan, my manager"
           ]
-        }
+        },
+        "fields": [
+          {
+            "key": "name",
+            "label": "Name",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "Person's name",
+            "values": null
+          },
+          {
+            "key": "relationship",
+            "label": "Relationship",
+            "type": "text",
+            "required": false,
+            "identifier": false,
+            "placeholder": "e.g. Friend, Colleague, Mentor",
+            "values": null
+          },
+          {
+            "key": "notes",
+            "label": "Notes",
+            "type": "longtext",
+            "required": false,
+            "identifier": false,
+            "placeholder": "Context about your relationship, shared experiences, important details...",
+            "values": null
+          }
+        ]
       }
     ],
     "sections": [
@@ -3201,7 +4053,48 @@
         "identifier": "topic"
       }
     },
-    "promotable": [],
+    "promotable": [
+      {
+        "entity": "learning_entry",
+        "title": "Learning entry",
+        "about": {
+          "what": "Something you learnt, with what it was and where it came from",
+          "not_for": "skills you already have",
+          "examples": [
+            "Subject lines under 40 characters get opened more"
+          ]
+        },
+        "fields": [
+          {
+            "key": "topic",
+            "label": "Topic",
+            "type": "text",
+            "required": true,
+            "identifier": true,
+            "placeholder": "e.g. Spanish subjunctive, React hooks",
+            "values": null
+          },
+          {
+            "key": "details",
+            "label": "Details",
+            "type": "longtext",
+            "required": true,
+            "identifier": false,
+            "placeholder": "What you learned or discussed...",
+            "values": null
+          },
+          {
+            "key": "source",
+            "label": "Source",
+            "type": "text",
+            "required": false,
+            "identifier": false,
+            "placeholder": "e.g. conversation, article, course",
+            "values": null
+          }
+        ]
+      }
+    ],
     "sections": [
       {
         "kind": "list",
@@ -3216,6 +4109,13 @@
         "element": {
           "entity": "learning_entry",
           "identifier": "topic",
+          "about": {
+            "what": "Something you learnt, with what it was and where it came from",
+            "not_for": "skills you already have",
+            "examples": [
+              "Subject lines under 40 characters get opened more"
+            ]
+          },
           "fields": [
             {
               "name": "topic",

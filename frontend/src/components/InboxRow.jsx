@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FOCUS_RING } from "@/components/controls";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { fillFields } from "@/lib/api";
 import {
   proposalSummary, entityPlace, humanise, renderValue, updateChanges,
 } from "./proposalSummary";
@@ -57,20 +58,46 @@ function Change({ from, to }) {
 
 const toText = (value) => (Array.isArray(value) ? value.join(", ") : String(value ?? ""));
 
-// The draft back into the shapes the proposal arrived in.
-function fromDraft(data, draft) {
-  return Object.fromEntries(
-    Object.entries(data).map(([field, value]) => {
-      if (!(field in draft)) return [field, value];
-      const text = draft[field];
-      if (Array.isArray(value)) return [field, text.split(",").map((t) => t.trim()).filter(Boolean)];
-      if (typeof value === "number" && text.trim() !== "" && !Number.isNaN(Number(text))) {
-        return [field, Number(text)];
-      }
-      return [field, text];
-    }),
-  );
+// The draft back into the shapes the proposal arrived in, plus any field a
+// tidy added that the assistant left out.
+export function fromDraft(data, draft) {
+  const kept = Object.entries(data).map(([field, value]) => {
+    if (!(field in draft)) return [field, value];
+    const text = draft[field];
+    if (Array.isArray(value)) return [field, text.split(",").map((t) => t.trim()).filter(Boolean)];
+    if (typeof value === "number" && text.trim() !== "" && !Number.isNaN(Number(text))) {
+      return [field, Number(text)];
+    }
+    return [field, text];
+  });
+  const added = Object.entries(draft).filter(([field, text]) => !(field in data) && String(text).trim());
+  return Object.fromEntries([...kept, ...added]);
 }
+
+/**
+ * What tidying a suggested entry would change: the assistant put a sentence
+ * where a name goes, and filling (backend/filling.py) found the name in it.
+ * The sentence moves to the notes field, and any field the assistant left
+ * empty takes what filling found; a value the assistant gave is kept.
+ * Null when there is nothing worth offering.
+ */
+export function tidyChanges(data, target, fill) {
+  const name = (target?.fields || []).find((f) => f.identifier)?.key;
+  const found = fill?.values || {};
+  const was = String(data?.[name] ?? "");
+  if (!name || !found[name] || found[name].length >= was.length) return null;
+  const changes = {};
+  for (const f of target.fields) {
+    const value = found[f.key];
+    if (value == null || value === "") continue;
+    if (f.key === name || !String(data?.[f.key] ?? "").trim()) changes[f.key] = value;
+  }
+  return changes;
+}
+
+// A name the length of a sentence is what an assistant writes when it means
+// a note: worth asking filling about. Five words is past most real names.
+const SENTENCE_WORDS = 5;
 
 export default function InboxRow({
   row, packs, packData, busy, onApprove, onReject, selected = false, onSelect, onAdvance, focusProps,
@@ -86,12 +113,35 @@ export default function InboxRow({
   // Set for an update whose entry was found: the face then says what changes
   // from what, rather than an arrow that read like a rename.
   const changes = updateChanges(row, packs, packData);
-  const startEdit = () =>
+  // Only a new entry, and only one Promote could make: an update's name is
+  // how it finds the entry it changes, so it is not the reader's to split.
+  const pack = row.action === "add"
+    ? (packs || []).find((p) => (p.promotable || []).some((t) => t.entity === row.entity))
+    : null;
+  const target = pack?.promotable.find((t) => t.entity === row.entity);
+  const [tidy, setTidy] = useState(null);
+  const startEdit = () => {
     setDraft(
       Object.fromEntries(
         Object.entries(data).filter(([, v]) => isEditable(v)).map(([f, v]) => [f, toText(v)]),
       ),
     );
+    const name = target?.fields.find((f) => f.identifier)?.key;
+    if (!name || String(data[name] ?? "").trim().split(/\s+/).length < SENTENCE_WORDS) return;
+    fillFields(row.id, pack.key, row.entity)
+      .then((res) => setTidy(tidyChanges(data, target, res)))
+      .catch(() => {
+        // No offer is the form as it always was.
+      });
+  };
+  const applyTidy = () => {
+    setDraft((d) => ({ ...d, ...Object.fromEntries(Object.entries(tidy).map(([k, v]) => [k, String(v)])) }));
+    setTidy(null);
+  };
+  const sentence = String(data[target?.fields.find((f) => f.identifier)?.key] ?? "");
+  const labelOf = (key) => target?.fields.find((f) => f.key === key)?.label || fieldName(key);
+  // Fields a tidy added to the form, after the ones the assistant sent.
+  const extras = draft ? Object.keys(draft).filter((k) => !(k in data)) : [];
 
   // A row being edited is never part of a bulk approve, which would send it
   // as suggested and drop the edits.
@@ -228,6 +278,27 @@ export default function InboxRow({
           )}
           {draft ? (
             <div className="space-y-3">
+              {tidy && Object.keys(tidy).length > 0 && (
+                <div role="status" className="space-y-2 rounded-md bg-muted p-3 text-sm">
+                  <p>
+                    This reads like a note in the {labelOf(target.fields.find((f) => f.identifier).key).toLowerCase()} field.
+                    Tidy it to{" "}
+                    {Object.entries(tidy).map(([k, v], i, all) => (
+                      <Fragment key={k}>
+                        {i > 0 && (i === all.length - 1 ? " and " : ", ")}
+                        {String(v) === String(data[k] ?? "") || String(v) === sentence
+                          ? <>the sentence in {labelOf(k)}</>
+                          : <>{labelOf(k)} <span className="font-medium">“{String(v).replace(/_/g, " ")}”</span></>}
+                      </Fragment>
+                    ))}
+                    ?
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={applyTidy}>Tidy</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setTidy(null)}>Keep as written</Button>
+                  </div>
+                </div>
+              )}
               {Object.entries(data).map(([field, value]) =>
                 isEditable(value) ? (
                   <div key={field} className="space-y-1.5">
@@ -250,6 +321,16 @@ export default function InboxRow({
                   </p>
                 ),
               )}
+              {extras.map((field) => (
+                <div key={field} className="space-y-1.5">
+                  <Label htmlFor={`edit-${row.id}-${field}`}>{labelOf(field)}</Label>
+                  <Input
+                    id={`edit-${row.id}-${field}`}
+                    value={draft[field]}
+                    onChange={(e) => setDraft({ ...draft, [field]: e.target.value })}
+                  />
+                </div>
+              ))}
             </div>
           ) : (
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
@@ -272,7 +353,7 @@ export default function InboxRow({
                 <Button size="sm" disabled={busy} onClick={approve}>
                   Approve with changes
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>
+                <Button size="sm" variant="ghost" onClick={() => { setDraft(null); setTidy(null); }}>
                   Discard changes
                 </Button>
               </>

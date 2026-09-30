@@ -2,21 +2,30 @@ import { useState } from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import PromoteDialog, { promotionTargets } from "./PromoteDialog";
+import PromoteDialog, { missingRequired, promotedData, promotionTargets, startingValues } from "./PromoteDialog";
 import packs from "@/__fixtures__/packs.json";
 
+const name = (key, extra = {}) => ({
+  key, label: key.charAt(0).toUpperCase() + key.slice(1), type: "text", required: true,
+  identifier: true, placeholder: null, values: null, ...extra,
+});
 const PROMOTABLE = [
   {
     key: "lifestyle", title: "Lifestyle",
     targets: [
-      { entity: "hobby", field: "name", title: "Hobbies", label: "Name" },
-      { entity: "value", field: "value", title: "Values", label: "Value", placeholder: "e.g. honesty",
+      { entity: "hobby", title: "Hobbies", fields: [
+        name("name"),
+        { key: "skill_level", label: "Skill level", type: "enum", required: false, identifier: false,
+          placeholder: null, values: ["beginner", "expert"] },
+        { key: "notes", label: "Notes", type: "longtext", required: false, identifier: false, placeholder: null, values: null },
+      ] },
+      { entity: "value", title: "Values", fields: [name("value", { placeholder: "e.g. honesty" })],
         about: { what: "What matters most when you decide" } },
     ],
   },
   {
     key: "knowledge", title: "Knowledge",
-    targets: [{ entity: "mental_tab", field: "title", title: "Mental tabs", label: "Title" }],
+    targets: [{ entity: "mental_tab", title: "Mental tabs", fields: [name("title")] }],
   },
 ];
 
@@ -25,7 +34,8 @@ function Harness({ onConfirm = vi.fn(), onCancel = vi.fn(), entity = "hobby" }) 
     row: { id: "p2", note: "Wants the recommendation first." },
     section: "lifestyle",
     entity,
-    text: "Wants the recommendation first.",
+    values: entity === "hobby" ? { name: "Wants the recommendation first." } : {},
+    fills: {},
   });
   return (
     <PromoteDialog
@@ -104,7 +114,9 @@ describe("a Select inside the real Dialog", () => {
     await user.click(within(dialog).getByLabelText(/^type$/i));
     await user.click(await screen.findByRole("option", { name: "Values" }));
     // The field under it takes the editor's label and hint for that type.
-    expect(within(dialog).getByLabelText(/^value$/i)).toHaveAttribute("placeholder", "e.g. honesty");
+    // The field under it takes the type's label and hint, and the note.
+    expect(within(dialog).getByLabelText(/^value/i)).toHaveAttribute("placeholder", "e.g. honesty");
+    expect(within(dialog).getByLabelText(/^value/i)).toHaveValue("Wants the recommendation first.");
     expect(within(dialog).getByRole("button", { name: /^promote$/i })).toBeEnabled();
   });
 });
@@ -115,7 +127,8 @@ describe("promotionTargets", () => {
     // generated from it, so the dialog offers what the server would.
     const lifestyle = packs.find((p) => p.key === "lifestyle");
     const hobby = promotionTargets(lifestyle).find((t) => t.entity === "hobby");
-    expect(hobby).toMatchObject({ title: "Hobbies & activities", label: "Name" });
+    expect(hobby.title).toBe("Hobbies & activities");
+    expect(hobby.fields.map((f) => f.key)).toEqual(["name", "notes", "skill_level", "status"]);
     expect(hobby.about.what).toMatch(/outside work/);
     expect(promotionTargets({})).toEqual([]);
   });
@@ -164,3 +177,54 @@ describe("suggestions", () => {
     expect(await screen.findByText("What matters most when you decide.")).toBeInTheDocument();
   });
 });
+
+describe("a type's fields", () => {
+  const work = {
+    entity: "work_experience", title: "Work experience", fields: [
+      name("company"),
+      { key: "role", label: "Role", type: "text", required: true, identifier: false, placeholder: null, values: null },
+      { key: "description", label: "Description", type: "longtext", required: false, identifier: false, placeholder: null, values: null },
+    ],
+  };
+
+  it("start from the note, then from what filling found", () => {
+    expect(startingValues(work, "Copywriter at Brightside.", null)).toEqual({ company: "Copywriter at Brightside." });
+    const fill = { values: { company: "Brightside", role: "Copywriter", description: "Copywriter at Brightside." } };
+    expect(startingValues(work, "Copywriter at Brightside.", fill)).toEqual(fill.values);
+  });
+
+  it("hold Promote until the required ones are there, and send only what was given", () => {
+    expect(missingRequired(work, { company: "Brightside", role: "  " }).map((f) => f.key)).toEqual(["role"]);
+    expect(promotedData({ company: " Brightside ", role: "", description: null })).toEqual({ company: "Brightside" });
+  });
+
+  it("are drawn as the manifest describes them, and say what is still needed", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    function Work() {
+      const [promoting, setPromoting] = useState({
+        row: { id: "p9", note: "Copywriter at Brightside." }, section: "profile", entity: "work_experience",
+        values: { company: "Brightside" }, fills: { "profile.work_experience": { values: { company: "Brightside" }, confidence: { company: 0.96 } } },
+      });
+      return (
+        <PromoteDialog promoting={promoting} onChange={setPromoting} onCancel={vi.fn()}
+          onConfirm={() => onConfirm(promoting.values)}
+          promotable={[{ key: "profile", title: "Profile", targets: [work] }]} />
+      );
+    }
+    render(<Work />);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/Filled in from the observation/)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/^Company/)).toHaveValue("Brightside");
+    expect(within(dialog).getByText("Still needed: Role.")).toBeInTheDocument();
+    const promote = within(dialog).getByRole("button", { name: /^promote$/i });
+    expect(promote).toBeDisabled();
+
+    await user.type(within(dialog).getByLabelText(/^Role/), "Copywriter");
+    // Typed into, the form is the reader's, and no longer says it was filled.
+    expect(within(dialog).queryByText(/Filled in from the observation/)).not.toBeInTheDocument();
+    await user.click(promote);
+    expect(onConfirm).toHaveBeenCalledWith({ company: "Brightside", role: "Copywriter" });
+  });
+});
+

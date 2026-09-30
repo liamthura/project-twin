@@ -4,6 +4,10 @@ import userEvent from "@testing-library/user-event";
 import ProposalsPanel, { approvedMany } from "./ProposalsPanel";
 import realPacks from "@/__fixtures__/packs.json";
 
+const textField = (key) => ({
+  key, label: key.charAt(0).toUpperCase() + key.slice(1), type: "text", required: true,
+  identifier: true, placeholder: null, values: null,
+});
 const PACKS = [
   {
     key: "lifestyle", title: "Lifestyle", enabled: true,
@@ -16,8 +20,8 @@ const PACKS = [
 
     // What the server says a note can become (pack_loader.derive_promotion_targets).
     promotable: [
-      { entity: "hobby", field: "name", title: "Hobby", label: "Name" },
-      { entity: "value", field: "value", title: "Value", label: "Value" },
+      { entity: "hobby", title: "Hobby", fields: [textField("name")] },
+      { entity: "value", title: "Value", fields: [textField("value")] },
     ],
   },
   {
@@ -26,7 +30,7 @@ const PACKS = [
       mental_tab: { actions: ["add", "remove"], required: ["title"], optional: ["tags"], identifier: "title" },
     },
 
-    promotable: [{ entity: "mental_tab", field: "title", title: "Mental tab", label: "Title" }],
+    promotable: [{ entity: "mental_tab", title: "Mental tab", fields: [textField("title")] }],
   },
 ];
 
@@ -39,6 +43,7 @@ vi.mock("@/lib/api", () => ({
   rejectProposal: vi.fn(() => Promise.resolve({ status: "rejected", section: null })),
   promoteProposal: vi.fn(() => Promise.resolve({ status: "promoted", section: "lifestyle" })),
   suggestDestinations: vi.fn(() => Promise.resolve({ enabled: false, suggestions: [], confident: false })),
+  fillFields: vi.fn(() => Promise.resolve({ enabled: false, values: {}, confidence: {} })),
   listStale: vi.fn(() => Promise.resolve([])),
   keepEntry: vi.fn(() => Promise.resolve({ status: "kept" })),
 }));
@@ -697,6 +702,32 @@ describe("ProposalsPanel", () => {
         expect(api.promoteProposal).toHaveBeenCalledWith(
           "p2", "mental_tab", { title: "Recommendation first" }),
       );
+    });
+
+    it("fills the chosen type's fields from the observation, and promotes those", async () => {
+      api.fillFields.mockResolvedValueOnce({ enabled: true, values: { title: "Recommendation first" }, confidence: { title: 0.9 } });
+      const user = userEvent.setup();
+      const dialog = await openPromoteDialog(user);
+      await pick(user, dialog, /section/i, "Knowledge");
+      await waitFor(() => expect(within(dialog).getByLabelText(/^title$/i)).toHaveValue("Recommendation first"));
+      expect(api.fillFields).toHaveBeenCalledWith("p2", "knowledge", "mental_tab");
+      await user.click(within(dialog).getByRole("button", { name: /^promote$/i }));
+      await waitFor(() =>
+        expect(api.promoteProposal).toHaveBeenCalledWith("p2", "mental_tab", { title: "Recommendation first" }),
+      );
+    });
+
+    it("never overwrites what you typed with a fill that arrives late", async () => {
+      let answer;
+      api.fillFields.mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+      const user = userEvent.setup();
+      const dialog = await openPromoteDialog(user);
+      await pick(user, dialog, /section/i, "Knowledge");
+      const field = within(dialog).getByLabelText(/^title$/i);
+      await user.clear(field);
+      await user.type(field, "Mine");
+      await act(async () => answer({ enabled: true, values: { title: "Theirs" }, confidence: { title: 0.9 } }));
+      expect(field).toHaveValue("Mine");
     });
 
     it("cancelling files nothing", async () => {

@@ -97,6 +97,14 @@
       "element": {
         "entity": "project",
         "identifier": "name",
+        "about": {
+          "what": "Something you are building or working on, with a clear piece of work to it",
+          "not_for": "ideas and questions that are not a project yet",
+          "examples": [
+            "Staff picks zine",
+            "Rebuilding the studio website"
+          ]
+        },
         "fields": [
           {
             "name": "name",

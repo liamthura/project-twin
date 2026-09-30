@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   listProposals, proposalCount, approveProposal, rejectProposal, promoteProposal, suggestDestinations,
+  fillFields,
   listConnectedApps, listTokens, listStale, keepEntry,
 } from "@/lib/api";
 import { formatDateLabel } from "@/renderers/isoDate";
@@ -20,7 +21,9 @@ import { connectionStatus } from "./onboarding/connectionStatus";
 import InboxRow from "./InboxRow";
 import { entityPlace, findEntitySpec, humanise, proposalSummary, renderValue } from "./proposalSummary";
 import ObservationCard from "./ObservationCard";
-import PromoteDialog, { defaultTarget, promotionTargets } from "./PromoteDialog";
+import PromoteDialog, {
+  defaultTarget, fillKey, missingRequired, promotedData, promotionTargets, startingValues,
+} from "./PromoteDialog";
 
 const clip = (text, max = 40) =>
   text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
@@ -527,7 +530,7 @@ export default function ProposalsPanel({
       row,
       section: section?.key ?? "",
       entity: defaultTarget(section),
-      text: row.note || "",
+      fills: {},
     });
     // Where it most likely goes, when the instance asks Jev (routing.py):
     // shown as Suggested, and chosen for the reader only when Jev is sure and
@@ -544,7 +547,9 @@ export default function ProposalsPanel({
           const pick = res.confident && offered && !p.touched
             ? { section: first.section, entity: first.entity }
             : {};
-          return { ...p, suggestions, ...pick };
+          // A sure suggestion arrives with its fields already filled.
+          const fills = res.fill ? { ...p.fills, [fillKey(first.section, first.entity)]: res.fill } : p.fills;
+          return { ...p, suggestions, fills, ...pick };
         });
       })
       .catch(() => {
@@ -552,15 +557,49 @@ export default function ProposalsPanel({
       });
   }
 
+  const targetFor = (section, entity) =>
+    promotable.find((s) => s.key === section)?.targets.find((t) => t.entity === entity);
+
+  // A type chosen, however it was chosen: its form starts from the note, and
+  // is filled from the observation (backend/filling.py) unless it has been
+  // already. Filled values land only while the reader has not typed in it.
+  const chosenKey = promoting?.entity ? fillKey(promoting.section, promoting.entity) : null;
+  const askedFill = useRef(new Set());
+  const promotingId = promoting?.row?.id;
+  useEffect(() => {
+    if (!promotingId || !chosenKey) return;
+    setPromoting((p) => {
+      const target = p && targetFor(p.section, p.entity);
+      if (!target || p.valuesFor === chosenKey) return p;
+      return { ...p, valuesFor: chosenKey, edited: false,
+        values: startingValues(target, p.row.note, p.fills?.[chosenKey]) };
+    });
+    // Asked once per observation and type. A ref, not state: whether to ask
+    // cannot wait for a render to find out.
+    const asking = `${promotingId}|${chosenKey}`;
+    if (askedFill.current.has(asking) || promoting?.fills?.[chosenKey]) return;
+    askedFill.current.add(asking);
+    const [section, entity] = chosenKey.split(".");
+    fillFields(promotingId, section, entity)
+      .then((res) => setPromoting((p) => {
+        if (p?.row.id !== promotingId) return p;
+        const fills = { ...p.fills, [chosenKey]: res };
+        const target = targetFor(section, entity);
+        const fresh = p.valuesFor === chosenKey && !p.edited && target;
+        return { ...p, fills, ...(fresh ? { values: startingValues(target, p.row.note, res) } : {}) };
+      }))
+      .catch(() => {
+        // Unfilled is the form as it always was: the note as the name.
+      });
+  }, [chosenKey, promotingId]);
+
   function confirmPromote() {
-    const { row, section, entity, text } = promoting;
-    const field = promotable
-      .find((s) => s.key === section)?.targets
-      .find((t) => t.entity === entity)?.field;
+    const { row, section, entity, values } = promoting;
+    const target = targetFor(section, entity);
     setPromoting(null);
-    if (!field || !text.trim()) return;
+    if (!target || missingRequired(target, values).length) return;
     return act(row.id, "Promoted to your persona", () =>
-      promoteProposal(row.id, entity, { [field]: text.trim() }));
+      promoteProposal(row.id, entity, promotedData(values)));
   }
 
   return (

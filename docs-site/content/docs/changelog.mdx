@@ -28,10 +28,14 @@ review of the web app. No migration; one optional setting.
   eight seconds running out.
 - **Promote uses the editor's names** for types, says what the chosen type is
   for, and no longer picks the first type for you.
-- **Suggested types**, on an instance with a TypeSafe key: Promote offers the
-  three likeliest places for an observation, from any section, and chooses
-  the type when the suggestion is sure. See
-  [Suggestions in Review](/run/self-hosting#suggestions-in-review).
+- **Promote shows the type's fields**, and takes any type a section shows,
+  such as a job, waiting for the required fields.
+- **Suggestions**, on an instance with a TypeSafe key: Promote offers the
+  three likeliest places for an observation, from any section, chooses the
+  type when the suggestion is sure, and fills its fields from the
+  observation's own words, with the sentence in its notes. Edit before
+  approving offers to tidy a suggested entry whose name is a whole sentence.
+  See [Suggestions in Review](/run/self-hosting#suggestions-in-review).
 - `?`, `j` and `k` work before a row has been clicked.
 
 ### Your account
@@ -65,7 +69,7 @@ review of the web app. No migration; one optional setting.
 
 Pull the image and restart. To turn suggestions on, set `TYPESAFE_API_KEY`;
 observations' notes, reasons and quotes are then sent to TypeSafe when Promote
-opens.
+opens, and a suggested entry's name and quote when you edit one to tidy.
 
 ## 0.2.3
 

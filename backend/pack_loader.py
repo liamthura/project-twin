@@ -694,20 +694,54 @@ def _sentence(key: str) -> str:
     return words[:1].upper() + words[1:]
 
 
+FILLABLE_TYPES = ("text", "longtext", "enum", "date")
+
+
+def fill_fields(element: dict, identifier: str) -> list[dict]:
+    """The fields of one entry type a person fills in from a sentence.
+
+    Text, long text, a date or one of a fixed set: arrays, switches and times
+    are left to the editor, and so is anything no person writes (`write_only`
+    rename helpers, `ui_only` timestamps). `key` is the field's MCP spelling,
+    which is what a write sends; `label` and `placeholder` are the editor's. A
+    list of plain strings is one text field, its identifier.
+    """
+    fields = element.get("fields")
+    if not fields:
+        return [{"key": identifier, "label": "Text", "type": "text", "required": True,
+                 "identifier": True, "placeholder": None, "values": None}]
+    stored = element.get("identifier")
+    out = []
+    for f in fields:
+        kind = f.get("type", "text")
+        if kind not in FILLABLE_TYPES or f.get("write_only") or f.get("ui_only"):
+            continue
+        out.append({
+            "key": (f.get("alias") or [f["name"]])[0],
+            "label": f.get("label") or _sentence(f["name"]),
+            "type": kind,
+            "required": bool(f.get("required")),
+            "identifier": f["name"] == stored,
+            "placeholder": f.get("placeholder"),
+            "values": list(f["values"]) if kind == "enum" else None,
+        })
+    return out
+
+
 def derive_promotion_targets(manifest: dict) -> list[dict]:
     """The entry types an observation can be promoted to, as the editor names them.
 
-    An observation is one sentence, so it can only become an entity whose sole
-    required field is its own identifier -- `hobby_specific` also needs its
-    hobby, and would make a proposal that cannot execute -- and one a section
-    draws, or it would be filed where the editor never shows it (preferences'
-    generic `preference`). The Promote dialog offers exactly these, and routing
-    asks Jev to choose among exactly these, so the rule lives here once rather
-    than in both.
+    Any top-level type a section draws: an entity with `add` and no `parent`
+    (a nested row needs the row it belongs to, which a sentence cannot name),
+    and one a section shows, or it would be filed where the editor never
+    shows it (preferences' generic `preference`). A type needing more than a
+    name is offered too: filling.py fills what the observation says, and the
+    dialog asks for the rest. The Promote dialog offers exactly these and
+    routing asks Jev to choose among exactly these, so the rule lives here once.
 
-    Each carries the editor's words for it -- the subsection's title, the
-    identifier field's label and hint -- and the manifest's `about`, which is
-    both the dialog's help text and Jev's criterion. Pure, like derive_entities.
+    Each carries the editor's name for it, its manifest `about` (the dialog's
+    help text and Jev's criterion) and the fields a person fills in
+    (fill_fields). Pure, like derive_entities.
     """
     entities = derive_entities(manifest)
     drawn: dict[str, list] = {}
@@ -724,10 +758,9 @@ def derive_promotion_targets(manifest: dict) -> list[dict]:
     visit(manifest["sections"])
     out = []
     for entity, spec in entities.items():
-        required = spec.get("required") or []
         identifier = spec.get("identifier")
         if not ("add" in (spec.get("actions") or []) and identifier and not spec.get("parent")
-                and required == [identifier] and entity in drawn):
+                and entity in drawn):
             continue
         # Two nodes on one entity (sleep on weekdays and at weekends) have no
         # single title, so it goes by its own name.
@@ -740,19 +773,17 @@ def derive_promotion_targets(manifest: dict) -> list[dict]:
             # Two entities over one list (like and dislike) are told apart.
             if element.get("variants"):
                 title = f"{title}: {entity.replace('_', ' ')}"
-        # The label is the STORED field's; `identifier` above is its MCP
-        # spelling (top_of_mind stores `idea` and clients say `item`), which is
-        # what a promote sends.
-        stored = element.get("identifier") or identifier
-        field = next((f for f in element.get("fields") or [] if f["name"] == stored), None)
+        fields = fill_fields(element, identifier)
+        if element.get("variants"):
+            # The field that tells like from dislike is the type itself:
+            # filling it could contradict the type the reader chose.
+            names = {element["entity"], *(v["entity"] for v in element["variants"])}
+            fields = [f for f in fields if not (f["type"] == "enum" and names <= set(f["values"]))]
         out.append({
             "entity": entity,
             "title": title,
-            "field": identifier,
-            # A list of plain strings has no field of its own to name.
-            "label": (field or {}).get("label") or ("Text" if field is None and not element.get("fields") else _sentence(stored)),
-            "placeholder": (field or {}).get("placeholder") or node.get("placeholder"),
             "about": (variant or {}).get("about") or element.get("about"),
+            "fields": fields,
         })
     return out
 

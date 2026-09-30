@@ -364,6 +364,15 @@ async function suggestDestinations(proposalId) {
   return api(`/proposals/${proposalId}/suggest`, { method: "POST" });
 }
 
+// A type's fields filled from what a pending proposal says, for Promote and
+// for Edit before approving: {enabled, values: {field: value}, confidence}.
+async function fillFields(proposalId, section, entity) {
+  return api(`/proposals/${proposalId}/fill`, {
+    method: "POST",
+    body: JSON.stringify({ section, entity }),
+  });
+}
+
 // Delete the signed-in account and everything it owns. `confirm` is the
 // username typed back; the server compares it exactly, and refuses anything
 // but a browser sign-in.
@@ -601,6 +610,7 @@ export {
   rejectProposal,
   promoteProposal,
   suggestDestinations,
+  fillFields,
   getConfig,
   saveConfig,
   clearConfig,

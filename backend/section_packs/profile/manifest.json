@@ -281,6 +281,14 @@
       "element": {
         "entity": "work_experience",
         "identifier": "company",
+        "about": {
+          "what": "A job or role you have held, where and when",
+          "not_for": "skills you gained or things you learnt",
+          "examples": [
+            "Designer at Northgate Studio, 2023 to now",
+            "Barista at a café while studying"
+          ]
+        },
         "fields": [
           {
             "name": "company",
@@ -368,6 +376,12 @@
           "element": {
             "entity": "email",
             "identifier": "address",
+            "about": {
+              "what": "An email address you use, and what for",
+              "examples": [
+                "Work address for client email"
+              ]
+            },
             "fields": [
               {
                 "name": "address",
@@ -399,6 +413,13 @@
             "entity": "link",
             "identifier": "label",
             "description": "A profile link. `label` identifies the row, so renaming one on update means sending `new_label`.",
+            "about": {
+              "what": "A link to a page about you or your work",
+              "examples": [
+                "Portfolio site",
+                "LinkedIn profile"
+              ]
+            },
             "fields": [
               {
                 "name": "label",
@@ -431,6 +452,14 @@
       "element": {
         "entity": "language",
         "identifier": "name",
+        "about": {
+          "what": "A language you speak or read, and how well",
+          "not_for": "programming languages",
+          "examples": [
+            "French, conversational",
+            "Welsh, basic"
+          ]
+        },
         "fields": [
           {
             "name": "name",

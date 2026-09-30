@@ -42,6 +42,7 @@ import db
 import jwt_auth
 import mcp_activity
 import persona_store
+import filling
 import proposals_store
 import routing
 import scopes
@@ -1290,6 +1291,21 @@ async def promote_proposal(proposal_id: str, body: ResolveRequest):
     return {"status": "promoted", "result": result, "section": section}
 
 
+def _promotable_packs() -> list[dict]:
+    """The reader's enabled sections, with what each can take from a sentence."""
+    enabled = settings_store.enabled_sections()
+    return [
+        {"key": key, "title": meta["title"], "promotable": meta["promotable"]}
+        for key, meta in sections.PACK_META.items()
+        if key in enabled
+    ]
+
+
+def _promotable(packs: list[dict], section: str, entity: str) -> Optional[dict]:
+    pack = next((p for p in packs if p["key"] == section), None)
+    return next((t for t in (pack or {}).get("promotable", []) if t["entity"] == entity), None)
+
+
 @app.post("/api/proposals/{proposal_id}/suggest")
 async def suggest_destination(proposal_id: str):
     """Where a pending observation might belong, for the Promote dialog.
@@ -1299,17 +1315,54 @@ async def suggest_destination(proposal_id: str):
     and no suggestions when Jev fails: the dialog then works as it did. A POST
     because it sends the observation to a third party, which no prefetch or
     cache should do on the reader's behalf.
+
+    When Jev is sure, the answer carries `fill` too, the chosen type's fields
+    filled from the observation, so the dialog opens ready in one round trip.
     """
     proposal = _load_pending(proposal_id)
     if proposal["kind"] != "note":
         raise HTTPException(status_code=400, detail="only notes are promoted")
-    enabled = settings_store.enabled_sections()
-    packs = [
-        {"key": key, "title": meta["title"], "promotable": meta["promotable"]}
-        for key, meta in sections.PACK_META.items()
-        if key in enabled
-    ]
-    return await routing.suggest(proposal, packs)
+    packs = _promotable_packs()
+    result = await routing.suggest(proposal, packs)
+    if result["confident"]:
+        first = result["suggestions"][0]
+        target = _promotable(packs, first["section"], first["entity"])
+        if target:
+            result["fill"] = await filling.fill(proposal, target)
+    return result
+
+
+class FillRequest(BaseModel):
+    section: str
+    entity: str
+
+
+@app.post("/api/proposals/{proposal_id}/fill")
+async def fill_proposal_fields(proposal_id: str, body: FillRequest):
+    """A type's fields, filled from what a pending proposal says (filling.py).
+
+    An observation is read from its note and quote, for Promote. A suggested
+    new entry is read from the value in its name field -- an assistant that
+    put a whole sentence there -- and its quote, for Edit before approving,
+    which only ever offers the result. Only an addition: an update's name is
+    how it finds the entry it changes, so it is not the reader's to split.
+    """
+    proposal = _load_pending(proposal_id)
+    target = _promotable(_promotable_packs(), body.section, body.entity)
+    if target is None:
+        raise HTTPException(status_code=400, detail="not a type this can fill")
+    if proposal["kind"] == "note":
+        observation = proposal
+    elif proposal.get("action") == "add" and proposal.get("entity") == body.entity:
+        identifier = next(f["key"] for f in target["fields"] if f["identifier"])
+        observation = {
+            "note": str((proposal.get("data") or {}).get(identifier) or ""),
+            "rationale": proposal.get("rationale"),
+            "evidence": proposal.get("evidence"),
+        }
+    else:
+        raise HTTPException(status_code=400, detail="only observations and additions are filled")
+    return await filling.fill(observation, target)
 
 
 # ============================================================================

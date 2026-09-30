@@ -83,7 +83,12 @@ Approving writes through exactly the same path `persona_modify` uses, so every
 duplicate check and validation applies. Editing first is expected, because
 agents get details slightly wrong often enough that correcting before approving
 is normal: open the row and choose **Edit before approving**. A list, such as
-tags, is edited as one comma-separated line.
+tags, is edited as one comma-separated line. With suggestions turned on, a new
+entry whose name is a whole sentence ("Plays five-a-side football every
+Thursday with people from work") comes with an offer to tidy it: the name
+("five-a-side football"), the sentence in its notes, and any field the
+assistant left empty. **Tidy** applies it to the form; nothing is approved
+until you approve.
 
 To deal with several at once, tick their boxes, or **Select all**, and use the
 bar that appears: **Approve**, **Reject**, or **Delete** on Observations.
@@ -105,15 +110,22 @@ Two actions: **promote** it into a typed entry wherever you think it belongs, or
 reads them until you have promoted them into real data.
 
 Promoting asks for a section and a type, named as the editor names them ("When
-I'm feeling..."), and lets you reword the text first. The section starts on the
-one the assistant suggested; the type starts unchosen whenever there is more
-than one, so nothing is filed under a guess. Under the type, a line says what
-it is for.
+I'm feeling..."), then shows that type's fields to fill in before it becomes
+data. The section starts on the one the assistant suggested; the type starts
+unchosen whenever there is more than one, so nothing is filed under a guess.
+Under the type, a line says what it is for. Any type a section shows can take
+an observation, including ones that need more than a name, such as a job:
+**Promote** waits until the required fields are filled.
 
 If your instance has suggestions turned on, a **Suggested** row offers the
-three most likely places, from any section, one tap each. When the suggestion
-is sure, the type is already chosen for you; you can still change it, and
-nothing is filed until you choose **Promote**.
+three most likely places, from any section, one tap each, and the chosen
+type's fields are filled in from what the observation says: "Doing an MA in
+Digital Media at the University of Leeds" becomes Institution *University of
+Leeds*, Degree *MA*, Field of study *Digital Media*, and the sentence goes to
+the notes where the type has them. Every value is copied from the
+observation's own words, a field it is unsure of stays empty, and when the
+suggestion is sure the type is already chosen. Check the fields, change any of
+them, and nothing is filed until you choose **Promote**.
 
 If the same kind of observation keeps appearing and nothing fits, that is a
 signal to add a section for it. See
