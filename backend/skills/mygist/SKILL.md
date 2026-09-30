@@ -74,6 +74,12 @@ conversation with none of this context.
 **One pass, one call.** `proposals` is a list. Send everything you found in a
 single `propose_update`, not one call per item.
 
+**In their voice.** Whatever you write or propose becomes their persona, which
+they read as their own. So a note and every free-text value are first person,
+as they would put it: "I batch cook on Sundays", not "Batch cooks on Sundays"
+and not "The user batch cooks". Names and titles stay names. Only the
+`rationale` is you, and it speaks to them: "You said it twice."
+
 → [mygist-capture](../mygist-capture/SKILL.md) for what does **not** qualify.
 
 ## 4. If you cannot quote them, do not send it
