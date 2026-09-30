@@ -56,7 +56,7 @@ def test_the_shipped_packs_route_on_the_same_words_the_dialog_shows():
     c = routing.criteria(packs)
     assert c["preferences.mood_override"]["what"].endswith(
         sections.PACK_META["preferences"]["promotable"][0]["about"]["what"])
-    assert len(c) == 25  # 24 types and none
+    assert len(c) == 31  # 30 types and none
 
 
 @pytest.mark.nodb

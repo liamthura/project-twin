@@ -332,10 +332,14 @@ I'm feeling..." until that type said it was not for what you do to feel better.
 
 It is optional in the format, but every type a shipped pack lets an observation
 become must have it (`tests/test_promotion_targets.py`). Those types are worked
-out, not declared: an entity with `add`, no `parent`, whose only required field
-is its identifier, and which a section draws. The server derives the list once
-(`pack_loader.derive_promotion_targets`) and serves it with each pack, so a new
-pack's types are offered, and routed to, with no code.
+out, not declared: an entity with `add` and no `parent`, which a section draws.
+The server derives the list once (`pack_loader.derive_promotion_targets`) and
+serves it with each pack, with the fields a person fills in: text, long text,
+a date or an enum, under the field's `label` and `placeholder`, never a
+`write_only` or `ui_only` one. Suggestions fill those fields from what an
+observation says, asking about each by its label and hint and choosing an
+enum only among its `values`, so a new pack's types are offered, routed to and
+filled with no code.
 
 ## The field descriptor
 

@@ -89,7 +89,9 @@ until the user approves. Rejected proposals are never raised again.
   embedding provider (self-hosted instances can use a local embedding server or
   none); and to TypeSafe, when the instance sets `TYPESAFE_API_KEY`, which
   receives an observation's note, reason and quote to suggest where it belongs
-  in the Promote dialog (decided 2026-09-30, opt-in and off by default).
+  and fill its fields in the Promote dialog, or a suggested entry's
+  sentence-long name and quote to offer a tidy in Edit before approving
+  (decided 2026-09-30, opt-in and off by default).
 - Persona history, revert, staleness, provenance, and an unattended sweep exist
   (commit `78b0b1c`); search hits report their age.
 - Stack: Python backend, React 18 + Vite + Tailwind 3 + Radix web app, Next.js

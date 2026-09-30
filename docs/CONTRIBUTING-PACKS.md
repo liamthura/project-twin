@@ -410,11 +410,13 @@ name and its descriptions is a second element shape, not a variant.
 person: `what` it is, what it is `not_for`, and a few invented `examples`. The
 Promote dialog shows `what` under the type, and suggestions send all three to
 Jev as that type's criterion, so write `not_for` for whatever it is most often
-confused with. A type an observation can be promoted to (an entity with `add`,
-no `parent`, only its identifier required, and drawn by a section) must have
-one in a shipped pack; `tests/test_promotion_targets.py` checks. The server
-works that list out itself (`pack_loader.derive_promotion_targets`), so there
-is nothing to register.
+confused with. A type an observation can be promoted to (an entity with `add`
+and no `parent`, drawn by a section) must have one in a shipped pack;
+`tests/test_promotion_targets.py` checks. The server works that list out
+itself (`pack_loader.derive_promotion_targets`), with each type's fillable
+fields, so there is nothing to register. Suggestions fill a field by asking
+about it under its `label` and `placeholder`, so a clear label and a real
+example in the placeholder are what make it fill well.
 
 ## The rules the loader checks
 

@@ -26,14 +26,15 @@ def test_the_shipped_packs_offer_these_types():
         "goals": ["goal"],
         "inventory": ["inventory_item"],
         "knowledge": ["domain", "mental_tab"],
+        "learning_log": ["learning_entry"],
         "lifestyle": ["energy_peak", "hobby", "interest", "personality_trait", "stress_trigger", "value"],
         "media": ["media_item"],
         "preferences": [
             "dev_tool", "dislike", "framework", "learning_dislike", "learning_method",
             "like", "mood_override", "preferred_language", "response_format",
         ],
-        "profile": ["education"],
-        "projects": ["top_of_mind"],
+        "profile": ["education", "email", "language", "link", "work_experience"],
+        "projects": ["project", "top_of_mind"],
     }
 
 
@@ -50,27 +51,42 @@ def test_every_type_a_shipped_pack_offers_says_what_it_is():
     assert missing == []
 
 
-def test_only_one_line_can_make_it_and_only_where_a_section_draws_it():
+def test_only_a_top_level_type_a_section_draws():
     targets = _targets()
-    # hobby_specific needs its hobby as well, so a sentence cannot make one.
+    # hobby_specific belongs to a hobby, which a sentence cannot name.
     assert "hobby_specific" not in targets["lifestyle"]
-    # work_experience needs a company, role, type and period.
-    assert "work_experience" not in targets["profile"]
     # `preference` is in the contract but no section draws it: promoted, it
     # would sit where the editor never shows it.
     assert "preference" not in targets["preferences"]
+    # A type needing more than a name is offered, with its fields to fill.
+    work = targets["profile"]["work_experience"]
+    assert [(f["key"], f["required"]) for f in work["fields"]][:4] == [
+        ("company", True), ("role", True), ("type", True), ("period", True)]
+
+
+def test_each_type_carries_the_fields_a_person_fills_in():
+    t = _targets()
+    hobby = {f["key"]: f for f in t["lifestyle"]["hobby"]["fields"]}
+    assert set(hobby) == {"name", "notes", "skill_level", "status"}  # not specifics, references
+    assert hobby["name"]["identifier"] and hobby["name"]["required"]
+    assert hobby["status"]["values"] == ["active", "inactive", "paused"]
+    # Nobody types a rename helper or a server timestamp.
+    assert "new_topic" not in {f["key"] for f in t["learning_log"]["learning_entry"]["fields"]}
+    # A list of plain strings is one text field.
+    assert t["preferences"]["response_format"]["fields"] == [{
+        "key": "item", "label": "Text", "type": "text", "required": True,
+        "identifier": True, "placeholder": None, "values": None}]
+    # The stance that tells like from dislike is the type itself, never filled.
+    assert [f["key"] for f in t["preferences"]["dislike"]["fields"]] == ["item"]
+    # A field goes by its MCP spelling, which is what a write sends.
+    assert t["projects"]["top_of_mind"]["fields"][0]["key"] == "item"
 
 
 def test_types_are_named_as_the_editor_names_them():
     t = _targets()
     assert t["preferences"]["mood_override"]["title"] == "When I'm feeling..."
-    assert t["preferences"]["mood_override"]["label"] == "Mood"
-    # Two entities over one list are told apart, and each has its own meaning.
     assert t["preferences"]["dislike"]["title"] == "Likes & dislikes: dislike"
     assert t["preferences"]["dislike"]["about"] != t["preferences"]["like"]["about"]
-    # A list of plain strings has no field of its own.
-    assert t["preferences"]["response_format"]["label"] == "Text"
-    # An untitled list goes by its noun, and a field by its stored name while
-    # the promote sends the MCP spelling.
     assert t["circle"]["connection"]["title"] == "Person"
-    assert (t["projects"]["top_of_mind"]["label"], t["projects"]["top_of_mind"]["field"]) == ("Idea", "item")
+    top = t["projects"]["top_of_mind"]["fields"][0]
+    assert (top["label"], top["placeholder"]) == ("Idea", "Project idea or thing you want to build...")
