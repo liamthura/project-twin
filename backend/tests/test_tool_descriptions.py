@@ -101,3 +101,13 @@ def test_the_triggers_are_in_the_description_and_not_in_the_instructions():
     for phrase in TRIGGER_PHRASES:
         assert phrase in server.propose_update.description
         assert phrase not in instructions
+
+
+def test_propose_update_asks_for_the_users_own_voice():
+    # What a proposal would save becomes the user's persona, read in the app
+    # as their own words: first person, with the rationale speaking to them.
+    desc = " ".join(server.propose_update.description.split())
+    assert "VOICE:" in desc
+    assert "first person" in desc
+    assert '"I review code by reading the tests first"' in desc
+    assert "The rationale is you, speaking to them" in desc

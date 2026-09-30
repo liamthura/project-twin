@@ -39,7 +39,7 @@ time, no hand-holding."*
 {
   "kind": "entity", "action": "update", "entity": "domain",
   "data": { "name": "Datadog", "level": "advanced" },
-  "rationale": "Was intermediate on record; they now configure it unaided.",
+  "rationale": "Was intermediate on record; you now configure it unaided.",
   "evidence": "I set up the alert routing myself this time, no hand-holding.",
   "confidence": 0.8
 }
@@ -54,7 +54,7 @@ off my plate."*
 {
   "kind": "entity", "action": "update", "entity": "project",
   "data": { "name": "Postgres migration", "status": "completed" },
-  "rationale": "Shipped and closed out, so the active status is now wrong.",
+  "rationale": "You shipped it and closed it out, so the active status is now wrong.",
   "evidence": "we shipped the migration on Friday, that one's off my plate",
   "confidence": 0.9
 }
@@ -66,8 +66,8 @@ do, I'll ask if I want the alternatives."*
 ```json
 {
   "kind": "entity", "action": "add", "entity": "response_format",
-  "data": { "item": "Lead with the recommendation; list alternatives only if asked." },
-  "rationale": "Stated as a standing instruction, not a preference for this one answer.",
+  "data": { "item": "Lead with the recommendation; list alternatives only if I ask." },
+  "rationale": "You stated it as a standing instruction, not a preference for this one answer.",
   "evidence": "just lead with what you'd do, I'll ask if I want the alternatives",
   "confidence": 0.85
 }
@@ -79,8 +79,8 @@ note is a bet the user will find somewhere to put it, so keep them rare.
 ```json
 {
   "kind": "note", "section_hint": "preferences",
-  "text": "Reviews code by reading the tests first.",
-  "rationale": "Described as how they always approach a review.",
+  "text": "I review code by reading the tests first.",
+  "rationale": "You described it as how you always approach a review.",
   "evidence": "I go to the test file before the diff, every time",
   "confidence": 0.6
 }
@@ -91,12 +91,25 @@ enforces: **0.9** they said it plainly, **0.7** they clearly implied it, **0.5**
 you are reasonably sure. Below 0.5, do not send it — you are failing the quote
 test.
 
+## Whose voice
+
+What you propose becomes their persona, read by them in the app and by every
+assistant after you. So a note's text and the free-text values in `data` are
+in their voice, first person, as they would write it themselves:
+
+- **Good:** "I review code by reading the tests first."
+- **Bad:** "Reviews code by reading the tests first." *(a note about them)*
+- **Bad:** "The user reviews code by reading the tests first."
+
+Names and titles stay names: "Datadog", "Postgres migration". The `rationale`
+is different: that is you, speaking to them, so it says "you".
+
 ## `rationale` is the reason, not the change
 
 The user reads it while deciding, next to a dozen others. One sentence.
 
-- **Good:** "Was intermediate on record; they now configure it unaided."
-- **Bad:** "They are advanced at Datadog." *(restates the change)*
+- **Good:** "Was intermediate on record; you now configure it unaided."
+- **Bad:** "You are advanced at Datadog." *(restates the change)*
 - **Bad:** "The user discussed their Datadog experience in this conversation."
   *(summarises the chat)*
 

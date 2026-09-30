@@ -3092,11 +3092,19 @@ _PROPOSE_UPDATE_DESCRIPTION = """Propose durable persona changes you inferred fr
     their parent in brackets):
 @@ENTITY_TYPES@@
 
+    VOICE: what is saved becomes their persona, so it is in their voice. A
+        note's text and every free-text value in `data` read as they would
+        write it themselves, first person: "I review code by reading the tests
+        first", "I batch cook on Sundays for the week" -- not "Reviews code
+        by...", not "The user batch cooks...". Names and titles stay names
+        ("Datadog", "Postgres migration"). The rationale is you, speaking to
+        them: "You described it as how you always approach a review."
+
     REQUIRED ON EVERY PROPOSAL:
-        rationale -- why this is durable, in your words. ONE SENTENCE. The user
-            reads it while deciding, next to a dozen others, so it has to be
-            the reason -- not a restatement of the change, and not a summary of
-            the conversation.
+        rationale -- why this is durable, said to them in your words ("You
+            ..."). ONE SENTENCE. The user reads it while deciding, next to a
+            dozen others, so it has to be the reason -- not a restatement of
+            the change, and not a summary of the conversation.
         evidence -- the user's own words that prompted it. Quote them, briefly.
             If you cannot quote them, you have inferred too far and should not
             propose.

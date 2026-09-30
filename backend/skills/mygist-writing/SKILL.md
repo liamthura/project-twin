@@ -103,8 +103,11 @@ one item and resend it alone, not the whole set.
 
 ## Every proposal needs three things
 
-`rationale` (why it is durable, one sentence, in your words), `evidence` (their
-words, quoted), `confidence` (0.5–0.9). A proposal missing the quote is a guess.
+`rationale` (why it is durable, one sentence, said to them: "You ..."),
+`evidence` (their words, quoted), `confidence` (0.5–0.9). A proposal missing the
+quote is a guess. What would be saved, a note's text and the values in `data`,
+is in their voice, first person: "I batch cook on Sundays", not "Batch cooks
+on Sundays".
 
 → [mygist-capture](../mygist-capture/SKILL.md) for worked examples and the
 calibration.
