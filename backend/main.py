@@ -117,7 +117,8 @@ async def lifespan(fastapi_app: FastAPI):
 # documentation site from the static mounts near the bottom of this file.
 app = FastAPI(
     title="MyGist API",
-    version="1.0.0",
+    # The app version, as frontend/package.json has it (the changelog's).
+    version="0.2.4",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",

@@ -4,10 +4,70 @@ description: What changed in each release, and what you have to do about it.
 ---
 
 Versions here are the app version, shown at the foot of Settings → Account as
-`v2.3.0 (a1b2c3d)` with the commit it was built from. Releases before 2.1.0
+`v0.2.4 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
 predate this page.
 
-## 2.3.0
+MyGist is pre-1.0, and its versions say so. Until 0.2.4 they were numbered one
+place higher, so 0.2.3 was released as 2.3.0, 0.2.2 as 2.2.0, 0.2.1 as 2.1.0,
+0.2.0 as 2.0.0 and 0.1.0 as 1.0.0. Nothing else about those releases changed.
+
+## 0.2.4
+
+Review keeps each decision's Undo, and can suggest where an observation
+belongs. You can delete your account. The rest is fixes from a second design
+review of the web app. No migration; one optional setting.
+
+### Review
+
+- **Confirmations stack.** Approving the next row no longer sends the last one
+  with no way back: each decision keeps its Undo until its own confirmation
+  goes. Hover the stack, or Tab into it, to spread it out and stop every
+  clock. Decisions are still sent one at a time.
+- **Confirmations name the entry**, as "Hana added to Circle", count a bulk
+  approval by what each did ("Approved 4: 2 added, 2 updated"), and show their
+  eight seconds running out.
+- **Promote uses the editor's names** for types, says what the chosen type is
+  for, and no longer picks the first type for you.
+- **Suggested types**, on an instance with a TypeSafe key: Promote offers the
+  three likeliest places for an observation, from any section, and chooses
+  the type when the suggestion is sure. See
+  [Suggestions in Review](/run/self-hosting#suggestions-in-review).
+- `?`, `j` and `k` work before a row has been clicked.
+
+### Your account
+
+- **Delete account**, at the foot of Settings → Account, removes your persona,
+  its history, your suggestions, tokens and connected apps. It offers a
+  download first, asks you to type your username, and works only from a
+  browser sign-in: no assistant can delete your account.
+
+### Elsewhere
+
+- A list's filters sit behind one icon at the end of its search box, tinted
+  while one is on.
+- Search marks the word that matched and cuts snippets at whole words.
+- Token and History dates read like every other date; a token no client has
+  used says "not used yet".
+- Every status is the same control, taste chips (loved, dislike) lose their
+  colour, titles wrap on a phone, and an opened entry no longer repeats a
+  field its own box shows.
+- Section headings are in sentence case, Circle adds a "person", and Add
+  dialogs no longer repeat their heading.
+
+### For pack authors
+
+- `about` on an element or variant says what one entry means to a person:
+  `what`, `not_for` and `examples`. The Promote dialog shows it, and
+  suggestions route on it. See [`about`](/run/pack-reference#about).
+- `noun` names one entry on screen ("Add person").
+
+### Upgrading
+
+Pull the image and restart. To turn suggestions on, set `TYPESAFE_API_KEY`;
+observations' notes, reasons and quotes are then sent to TypeSafe when Promote
+opens.
+
+## 0.2.3
 
 Review is safer to work through quickly: an update shows what it would
 replace, and Approve can be undone. The rest is fixes from a design review of
@@ -50,7 +110,7 @@ the web app. No migration and no new setting.
 
 Pull the image and restart. Nothing else is needed.
 
-## 2.2.0
+## 0.2.2
 
 A security fix for password sign-in, the app moving to `/app/`, and a rebuilt
 web app: Review, History, search, and a record of where every entry came from.
@@ -58,7 +118,7 @@ Assistants get a clearer contract and five new entry types. One database
 migration, which applies itself on start.
 
 <Callout type="warn">
-Upgrade promptly. In 2.1.0 and earlier, a write-scoped token (the kind that
+Upgrade promptly. In 0.2.1 and earlier, a write-scoped token (the kind that
 sits in an `.mcp.json`) could set an account's password without the current
 one, because the check read a column that accounts created through sign-up
 never fill. It now checks the password sign-in actually uses, and an account
@@ -103,7 +163,7 @@ requests per 10 seconds. See [Self-hosting](/run/self-hosting).
 
 Open an entry to see who added it and who last changed it, and when: you, an
 app writing directly, or a suggestion approved in Review. For those, **Why?**
-shows the reasoning and the quote. This is recorded from 2.2.0 on; older
+shows the reasoning and the quote. This is recorded from 0.2.2 on; older
 entries show when they last changed.
 
 Goals and Projects are marked stale after four months unchanged, and
@@ -127,7 +187,7 @@ embeddings provider it adds entries related by meaning.
 - Preferences' Learning Style and Code Style lists are typed:
   `learning_method`, `learning_dislike`, `preferred_language`, `framework` and
   `dev_tool`, each `item`-identified and add or remove. `get_schema` returns 49
-  entities. The existing 44 are unchanged, and a client written against 2.1.0
+  entities. The existing 44 are unchanged, and a client written against 0.2.1
   keeps working.
 - Tokens created in the app propose by default. Writing directly is a switch
   you turn on when creating one.
@@ -146,7 +206,7 @@ and runs on start with the rest (`alembic upgrade head` is the image's first
 step). There is no new required setting; behind a proxy, set the variables
 under [Sign-in rate limits](#sign-in-rate-limits).
 
-## 2.1.0
+## 0.2.1
 
 The write path an AI client uses is now one implementation driven by the
 section packs, rather than one hand-written block per entity. Most of what
@@ -219,7 +279,7 @@ pack could not ship; [Section packs](/run/section-packs) covers what a
 manifest now has to say.
 
 The published entity contract is unchanged. `get_schema` returns the same 44
-entities with the same fields, and a client written against 2.0.0 keeps
+entities with the same fields, and a client written against 0.2.0 keeps
 working.
 
 ### Upgrading
