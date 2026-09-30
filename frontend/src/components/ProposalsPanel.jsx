@@ -18,9 +18,28 @@ import {
 import { formatDateLabel } from "@/renderers/isoDate";
 import { connectionStatus } from "./onboarding/connectionStatus";
 import InboxRow from "./InboxRow";
-import { entityPlace, humanise } from "./proposalSummary";
+import { entityPlace, findEntitySpec, humanise, proposalSummary, renderValue } from "./proposalSummary";
 import ObservationCard from "./ObservationCard";
-import PromoteDialog, { promotionTargets } from "./PromoteDialog";
+import PromoteDialog, { defaultTarget, promotionTargets } from "./PromoteDialog";
+
+const clip = (text, max = 40) =>
+  text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+
+// "Added 4 to your persona" said nothing true about two of them when two were
+// updates. One kind names its verb; a mix is counted by kind.
+export function approvedMany(batch) {
+  const counts = { add: 0, update: 0, remove: 0 };
+  for (const row of batch) counts[row.action in counts ? row.action : "add"] += 1;
+  const kinds = Object.entries(counts).filter(([, n]) => n);
+  if (kinds.length === 1) {
+    const [[action]] = kinds;
+    const verb = { add: "Added", update: "Updated", remove: "Removed" }[action];
+    const into = action === "remove" ? "from" : action === "update" ? "in" : "to";
+    return `${verb} ${batch.length} ${into} your persona`;
+  }
+  const done = { add: "added", update: "updated", remove: "removed" };
+  return `Approved ${batch.length}: ${kinds.map(([a, n]) => `${n} ${done[a]}`).join(", ")}`;
+}
 
 const KINDS = [
   { key: "entity", label: "Inbox" },
@@ -178,6 +197,25 @@ export default function ProposalsPanel({
     }
     e.preventDefault();
   }
+
+  // From anywhere on the page, not only from a focused row: `?` on arrival
+  // opened nothing though the list of keys offers it, and `j` had to follow a
+  // click. Anything that takes typing, or a dialog or menu, keeps its keys.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target.closest?.(
+        "[data-review-row], input, textarea, select, [contenteditable='true'], [role='dialog'], [role='menu'], [role='listbox']",
+      )) return;
+      if (e.key === "?") setShowKeys(true);
+      // j and k only: the arrow keys still scroll the page.
+      else if ((e.key === "j" || e.key === "k") && rowEls()[0]) rowEls()[0].focus();
+      else return;
+      e.preventDefault();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   // Leaving Review sends whatever is still waiting: the reader watched it go.
   // Once per batch, which shares one record across its ids.
@@ -391,22 +429,38 @@ export default function ProposalsPanel({
 
   const rejectLater = (batch, title) => resolveLater(batch, title, (row) => rejectProposal(row.id));
 
+  // What a toast calls the row it is about. "Added to Circle" did not say
+  // who, and the next row sliding up under the pointer read the same; a
+  // screen reader heard a place and no thing. A note is a sentence, so it
+  // is quoted and cut to a glance.
+  function named(row) {
+    if (row.kind === "note") return `“${clip((row.note || "").replace(/[.!?]+$/, ""))}”`;
+    const spec = findEntitySpec(row.entity, packs);
+    const value = spec?.identifier ? row.data?.[spec.identifier] : null;
+    return clip(value ? renderValue(value) : proposalSummary(row, packs).lead);
+  }
+  const said = (verb, row) => [verb, named(row)].filter(Boolean).join(" ");
+
   // Where an approval lands, in the toast's words, and a way to go and see it.
   // The section is known before the request is sent: it is the pack that
   // declares the entity. Following the link leaves Review, which sends the
   // approval at once and refreshes the section behind it.
   function approveLater(batch, edited) {
     if (batch.length > 1) {
-      resolveLater(batch, `Added ${batch.length} to your persona`, (row) => approveProposal(row.id));
+      resolveLater(batch, approvedMany(batch), (row) => approveProposal(row.id));
       return;
     }
     const [row] = batch;
     const section = packs.find((p) => p.entities?.[row.entity])?.key;
-    const verb = { update: "Updated in", remove: "Removed from" }[row.action] || "Added to";
+    const verb = { update: "updated in", remove: "removed from" }[row.action] || "added to";
     const place = section ? entityPlace(row.entity, packs) : "your persona";
+    const name = named(row);
+    const title = name
+      ? `${name} ${verb} ${place}`
+      : `${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${place}`;
     resolveLater(
       batch,
-      `${verb} ${place}${edited ? ", with your changes" : ""}`,
+      `${title}${edited ? ", with your changes" : ""}`,
       (r) => approveProposal(r.id, edited),
       section && onViewSection ? (
         <ToastAction
@@ -466,7 +520,7 @@ export default function ProposalsPanel({
     setPromoting({
       row,
       section: section?.key ?? "",
-      entity: section?.targets[0]?.entity ?? "",
+      entity: defaultTarget(section),
       text: row.note || "",
     });
   }
@@ -537,7 +591,7 @@ export default function ProposalsPanel({
           className="hidden text-muted-foreground sm:inline-flex coarse:hidden"
           onClick={() => setShowKeys(true)}
         >
-          <Keyboard className="mr-1.5 h-4 w-4" aria-hidden="true" />
+          <Keyboard className="h-4 w-4" aria-hidden="true" />
           Keyboard shortcuts
         </Button>
       )}
@@ -661,7 +715,7 @@ export default function ProposalsPanel({
               onAdvance={() => advanceFrom(row.id)}
               packData={packData}
               onApprove={(edited) => approveLater([row], edited)}
-              onReject={() => rejectLater([row], "Rejected. It won't be suggested again.")}
+              onReject={() => rejectLater([row], `${said("Rejected", row)}. It won't be suggested again.`)}
             />
           ) : (
             <ObservationCard
@@ -669,7 +723,7 @@ export default function ProposalsPanel({
               place={row.section_hint && (sectionTitles[row.section_hint] || humanise(row.section_hint))}
               canPromote={promotable.length > 0}
               onPromote={() => openPromote(row)}
-              onDelete={() => rejectLater([row], "Deleted. It won't be suggested again.")}
+              onDelete={() => rejectLater([row], `${said("Deleted", row)}. It won't be suggested again.`)}
             />
           );
         })}
@@ -702,7 +756,7 @@ export default function ProposalsPanel({
                   className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => {
                     rejectLater(chosen, chosen.length === 1
-                      ? "Rejected. It won't be suggested again."
+                      ? `${said("Rejected", chosen[0])}. It won't be suggested again.`
                       : `Rejected ${chosen.length}. They won't be suggested again.`);
                     setSelected(new Set());
                   }}
@@ -717,7 +771,7 @@ export default function ProposalsPanel({
                 className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                 onClick={() => {
                   rejectLater(chosen, chosen.length === 1
-                    ? "Deleted. It won't be suggested again."
+                    ? `${said("Deleted", chosen[0])}. It won't be suggested again.`
                     : `Deleted ${chosen.length}. They won't be suggested again.`);
                   setSelected(new Set());
                 }}

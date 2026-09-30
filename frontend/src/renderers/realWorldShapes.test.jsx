@@ -55,7 +55,7 @@ describe("a record shaped like production", () => {
     });
 
 
-    it("renders Response Format as chips, not fixed switches", async () => {
+    it("renders Response format as chips, not fixed switches", async () => {
       // Five booleans could only answer yes or no to five ideas someone else
       // chose. Free text says what a boolean cannot. Chips rather than text
       // rows since the polish pass: Preferences had three ways to add an item,
@@ -63,7 +63,7 @@ describe("a record shaped like production", () => {
       const data = { response_format: ["code blocks over three lines", "next steps at the end"] };
       const { user, latest } = renderSection({ pack: preferencesPack, initial: data });
 
-      const block = uiNode("Response Format");
+      const block = uiNode("Response format");
       expect(within(block).queryByRole("switch")).not.toBeInTheDocument();
       expect(within(block).getByText("code blocks over three lines")).toBeInTheDocument();
 
@@ -174,18 +174,18 @@ describe("a record shaped like production", () => {
     });
 
     it("shows the stored value rather than dropping it, and marks it legacy", async () => {
-      // `skill_level` has five options, past SEGMENTED_MAX, so it renders as a
-      // dropdown rather than segmented buttons -- the legacy value shows in
-      // the trigger with a dashed border instead of as a pressed chip.
+      // `skill_level` has five options, within SEGMENTED_MAX, so it renders as
+      // segmented buttons -- the legacy value shows as a dashed, pressed chip
+      // ahead of them.
       const { user } = renderSection({ pack: lifestylePack, initial: legacyHobbies });
       await user.click(screen.getByText("Badminton"));
 
-      const trigger = screen
-        .getAllByRole("combobox")
+      const chip = screen
+        .getAllByRole("button", { pressed: true })
         .find((el) => el.textContent.includes("enthusiast"));
-      expect(trigger, "the stored value is not shown anywhere").toBeTruthy();
-      expect(trigger).toHaveAttribute("title", expect.stringContaining("not in the current option"));
-      expect(trigger.className).toContain("border-dashed");
+      expect(chip, "the stored value is not shown anywhere").toBeTruthy();
+      expect(chip).toHaveAttribute("title", expect.stringContaining("not in the current option"));
+      expect(chip.className).toContain("border-dashed");
     });
 
     it("does not rewrite a legacy value when an unrelated field is edited", async () => {

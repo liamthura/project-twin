@@ -66,7 +66,7 @@ export default function ConnectedApps({ grants, onRevoke }) {
     return (
       // Says where the others are: "no app" above a token named Claude
       // Desktop read as though that connection had gone.
-      <p className="text-sm text-muted-foreground">
+      <p className="max-w-prose text-sm text-muted-foreground">
         No app has signed in with your account yet. Apps that connect with a
         token are listed under Tokens.
       </p>

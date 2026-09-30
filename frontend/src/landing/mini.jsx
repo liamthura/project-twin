@@ -64,8 +64,8 @@ export function ScopePayload() {
       <Surface>
         <div className="divide-y divide-border">
           <Row title="Preferences" sub="How you like answers, how you learn, what you like, and how you code" />
-          <Row title="Code Style" sub="Your preferred programming languages, frameworks, and tools" />
-          <Row title="Preferred Languages" sub="Python · TypeScript · SQL" />
+          <Row title="Code style" sub="Your preferred programming languages, frameworks, and tools" />
+          <Row title="Preferred languages" sub="Python · TypeScript · SQL" />
           <Row title="Projects" sub="What you are working on right now" />
         </div>
       </Surface>
@@ -119,7 +119,7 @@ export function SearchResults() {
  */
 const SECTIONS = [
   "Profile", "Goals", "Knowledge", "Preferences", "Projects",
-  "Lifestyle", "Media", "Aesthetics", "Circle", "Learning Log",
+  "Lifestyle", "Media", "Aesthetics", "Circle", "Learning log",
 ];
 
 export function SectionChips() {

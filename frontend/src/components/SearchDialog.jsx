@@ -20,6 +20,24 @@ import { searchPersona } from "./searchPersona";
 
 const MEANING_LIMIT = 5;
 
+// The words that matched, marked where they appear, so a result says why it
+// is there without the reader hunting for the term.
+function Marked({ text, q }) {
+  const lower = String(text).toLowerCase();
+  if (!q || !lower.includes(q)) return text;
+  const parts = [];
+  let from = 0;
+  for (let at = lower.indexOf(q); at !== -1; at = lower.indexOf(q, from)) {
+    parts.push(text.slice(from, at));
+    parts.push(
+      <mark key={at} className="rounded-sm bg-primary/15 text-inherit">{text.slice(at, at + q.length)}</mark>,
+    );
+    from = at + q.length;
+  }
+  parts.push(text.slice(from));
+  return parts;
+}
+
 export function SearchDialog({ open, onOpenChange, packs = [], packData = {}, onOpen }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -93,12 +111,12 @@ export function SearchDialog({ open, onOpenChange, packs = [], packData = {}, on
   }
   if (meaning.length) groups.push({ title: "Related by meaning", items: meaning });
 
+  const q = query.trim().toLowerCase();
   const option = (r) => {
     const i = all.indexOf(r);
     // Under its section's heading a word match needs only the part it is in;
     // a meaning match sits under "Related by meaning" and needs the section.
     const where = meaning.includes(r) ? r.sectionTitle : r.place.split(" › ")[1];
-    const detail = [where, r.snippet].filter(Boolean).join(" · ");
     return (
       <li
         key={r.key}
@@ -109,9 +127,13 @@ export function SearchDialog({ open, onOpenChange, packs = [], packData = {}, on
         onClick={() => choose(r)}
         className={`cursor-pointer rounded-md px-3 py-2 text-sm ${i === active ? "bg-muted" : ""}`}
       >
-        <span className="block break-words font-medium">{r.title}</span>
-        {detail && (
-          <span className="block break-words text-xs text-muted-foreground">{detail}</span>
+        <span className="block break-words font-medium"><Marked text={r.title} q={q} /></span>
+        {(where || r.snippet) && (
+          <span className="block break-words text-xs text-muted-foreground">
+            {where}
+            {where && r.snippet && " · "}
+            {r.snippet && <Marked text={r.snippet} q={q} />}
+          </span>
         )}
       </li>
     );

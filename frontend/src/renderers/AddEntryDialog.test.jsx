@@ -7,7 +7,7 @@ import { AddEntryDialog } from "./AddEntryDialog";
 // type, vocabulary, default and position instead of being named in four places
 // on the node.
 const node = {
-  kind: "list", path: ["likes_dislikes"], title: "Likes & Dislikes",
+  kind: "list", path: ["likes_dislikes"], title: "Likes & dislikes",
   element: {
     entity: "like",
     identifier: "item",
@@ -32,28 +32,29 @@ describe("AddEntryDialog accessibility", () => {
   const descriptionOf = () =>
     document.getElementById(screen.getByRole("dialog").getAttribute("aria-describedby"));
 
-  it("describes the dialog as adding one entry to the list it names", () => {
+  it("adds no description that only repeats the heading", () => {
+    // "Add to Likes & dislikes" over "Add one entry to Likes & dislikes." said
+    // the same thing twice, so a node without helper text of its own gets none.
     render(
       <AddEntryDialog node={node} entity={undefined} items={[]}
         onAdd={vi.fn()} open onOpenChange={vi.fn()} />
     );
-    // Radix needs aria-describedby to resolve to something at all, which is
-    // what this asserted before it also asserted what that something says.
-    expect(screen.getByRole("dialog")).toHaveAttribute("aria-describedby");
-    expect(descriptionOf()).toBeInTheDocument();
-    expect(descriptionOf()).toHaveTextContent("Add one entry to Likes & Dislikes.");
+    expect(screen.getByRole("dialog")).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByText(/^Add one/)).not.toBeInTheDocument();
   });
 
-  it("describes it as adding one of the entity when there is no container title", () => {
-    const untitled = { ...withElement({ entity: "mental_tab" }), title: undefined };
+  it("names an untitled list's entry by the element's noun when it declares one", () => {
+    // circle's `connection` read "Add connection", one click from the
+    // Connections settings, which are apps.
+    const untitled = { ...withElement({ entity: "connection", noun: "person" }), title: undefined };
     render(
       <AddEntryDialog node={untitled} entity={undefined} items={[]}
         onAdd={vi.fn()} open onOpenChange={vi.fn()} />
     );
-    expect(descriptionOf()).toHaveTextContent("Add one mental tab.");
+    expect(screen.getByRole("heading", { name: "Add person" })).toBeInTheDocument();
   });
 
-  it("lets a node's own description override either default", () => {
+  it("shows a node's own description when it has one", () => {
     const described = { ...node, description: "Anything you love or can't stand." };
     render(
       <AddEntryDialog node={described} entity={undefined} items={[]}
@@ -67,7 +68,7 @@ describe("AddEntryDialog accessibility", () => {
       <AddEntryDialog node={node} entity={undefined} items={[]}
         onAdd={vi.fn()} open onOpenChange={vi.fn()} />
     );
-    expect(screen.getByRole("heading", { name: "Add to Likes & Dislikes" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Add to Likes & dislikes" })).toBeInTheDocument();
   });
 
   it("says a bare 'Add <entity>' when there is no container title to add to", () => {

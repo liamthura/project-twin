@@ -34,9 +34,12 @@ describe("SearchDialog", () => {
     const options = screen.getAllByRole("option");
     expect(options.map((o) => o.textContent)).toEqual([
       "Lead climb outdoors",
-      "BoulderingHobbies & Activities · Climbing twice a week",
+      "BoulderingHobbies & activities · Climbing twice a week",
     ]);
     expect(options[0]).toHaveAttribute("aria-selected", "true");
+    // The term is marked wherever it shows, title and snippet alike.
+    expect([...options[0].querySelectorAll("mark")].map((m) => m.textContent)).toEqual(["climb"]);
+    expect([...options[1].querySelectorAll("mark")].map((m) => m.textContent)).toEqual(["Climb"]);
     // Each result sits in a group named for its section, so "Lead climb
     // outdoors", which has no detail line, is still read with where it is.
     expect(screen.getByRole("group", { name: "Goals" })).toContainElement(options[0]);
@@ -56,7 +59,9 @@ describe("SearchDialog", () => {
     await user.type(screen.getByRole("combobox"), "climb");
     expect(await screen.findByText("Related by meaning")).toBeInTheDocument();
     expect(screen.getByText("Grip strength basics")).toBeInTheDocument();
-    expect(screen.getAllByText("Lead climb outdoors")).toHaveLength(1);
+    // Split by the match's <mark>, so counted by the option's whole text.
+    expect(screen.getAllByRole("option").filter((o) => o.textContent === "Lead climb outdoors"))
+      .toHaveLength(1);
     expect(screen.queryByText(/turned off/)).not.toBeInTheDocument();
   });
 

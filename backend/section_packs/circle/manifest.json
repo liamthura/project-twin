@@ -28,6 +28,7 @@
       "search": true,
       "element": {
         "entity": "connection",
+        "noun": "person",
         "identifier": "name",
         "fields": [
           {

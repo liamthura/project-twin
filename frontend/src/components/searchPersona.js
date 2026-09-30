@@ -22,12 +22,28 @@ function strings(value, out = []) {
   return out;
 }
 
-// About 60 characters around the match, so the reader sees why it matched.
+// About 70 characters around the match, so the reader sees why it matched,
+// cut at spaces: "…e words that go out… I ru…" read as a fault.
 function excerpt(text, q) {
   const at = text.toLowerCase().indexOf(q);
-  const start = Math.max(0, at - 25);
-  const end = Math.min(text.length, at + q.length + 35);
-  return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
+  let start = Math.max(0, at - 30);
+  let end = Math.min(text.length, at + q.length + 40);
+  if (start > 0) {
+    const space = text.indexOf(" ", start - 1);
+    start = space !== -1 && space < at ? space + 1 : at;
+  }
+  if (end < text.length) {
+    const space = text.lastIndexOf(" ", end);
+    end = space >= at + q.length ? space : at + q.length;
+  }
+  return `${start > 0 ? "…" : ""}${text.slice(start, end).trim()}${end < text.length ? "…" : ""}`;
+}
+
+// The first `max` characters, ending on a whole word.
+function cutWords(text, max) {
+  if (text.length <= max) return text;
+  const space = text.lastIndexOf(" ", max - 1);
+  return `${text.slice(0, space > max / 2 ? space : max - 1).trimEnd()}…`;
 }
 
 const label = (field, fields) => {
@@ -87,7 +103,7 @@ export function searchPersona(packs, packData, query) {
             if (typeof v === "string" && v.toLowerCase().includes(q)) {
               // A long field is cut to fit the title, and the snippet shows
               // the match whenever the cut would hide it.
-              const cut = v.length > 80 ? `${v.slice(0, 77)}…` : v;
+              const cut = cutWords(v, 80);
               push({
                 ...base, key: `${pack.key}:${node.path.join(".")}:${f.name}`,
                 title: `${label(f.name, fields)}: ${cut}`,

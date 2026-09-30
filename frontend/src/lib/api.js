@@ -357,6 +357,16 @@ async function setPassword(newPassword, currentPassword) {
   });
 }
 
+// Delete the signed-in account and everything it owns. `confirm` is the
+// username typed back; the server compares it exactly, and refuses anything
+// but a browser sign-in.
+async function deleteAccount(confirm) {
+  return api("/account/delete", {
+    method: "POST",
+    body: JSON.stringify({ confirm }),
+  });
+}
+
 // List the current user's API tokens (id, label, created_at, last_used_at,
 // scopes). Account-management endpoints -- this one included -- require
 // persona:write, so a read-scoped credential (an OAuth grant, or a token
@@ -598,6 +608,7 @@ export {
   exportData,
   importData,
   setPassword,
+  deleteAccount,
   listTokens,
   createToken,
   revokeToken,

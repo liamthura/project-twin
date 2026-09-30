@@ -177,15 +177,15 @@ describe("App: where it opens", () => {
 });
 
 describe("App: circle and learning_log render through the renderer kit", () => {
-  it("renders Circle and Learning Log after Preferences, in manifest position order, keeping their original icons", async () => {
+  it("renders Circle and Learning log after Preferences, in manifest position order, keeping their original icons", async () => {
     mockApi({ packs: packsFixture });
     render(<App />);
 
-    await waitFor(() => expect(railItem(/Learning Log/)).toBeTruthy());
+    await waitFor(() => expect(railItem(/Learning log/)).toBeTruthy());
     const names = railItems().map((b) => b.textContent);
     const prefIdx = names.findIndex((n) => n.includes("Preferences"));
     const circleIdx = names.findIndex((n) => n.includes("Circle"));
-    const learningIdx = names.findIndex((n) => n.includes("Learning Log"));
+    const learningIdx = names.findIndex((n) => n.includes("Learning log"));
 
     expect(prefIdx).toBeGreaterThan(-1);
     expect(circleIdx).toBeGreaterThan(prefIdx);
@@ -200,13 +200,13 @@ describe("App: circle and learning_log render through the renderer kit", () => {
     expect(railItems()[learningIdx].querySelector(".lucide-package")).not.toBeInTheDocument();
   });
 
-  it("opens the Learning Log content, and puts it in the address bar", async () => {
+  it("opens the Learning log content, and puts it in the address bar", async () => {
     mockApi({ packs: packsFixture });
     const user = userEvent.setup();
     render(<App />);
 
-    await waitFor(() => expect(railItem(/Learning Log/)).toBeTruthy());
-    await user.click(railItem(/Learning Log/));
+    await waitFor(() => expect(railItem(/Learning log/)).toBeTruthy());
+    await user.click(railItem(/Learning log/));
 
     expect(await screen.findByText("React Server Components")).toBeInTheDocument();
     // A deliberate move, so it pushes -- and the key in the URL is the pack key
@@ -223,7 +223,7 @@ describe("App: circle and learning_log render through the renderer kit", () => {
 
     // Wait for settings to actually load before asserting an absence --
     // otherwise this would trivially pass while packs is still [].
-    await waitFor(() => expect(railItem(/Learning Log/)).toBeTruthy());
+    await waitFor(() => expect(railItem(/Learning log/)).toBeTruthy());
     expect(within(rail()).queryByRole("button", { name: /^Circle$/ })).not.toBeInTheDocument();
   });
 
@@ -236,7 +236,7 @@ describe("App: circle and learning_log render through the renderer kit", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await waitFor(() => expect(railItem(/Learning Log/)).toBeTruthy());
+    await waitFor(() => expect(railItem(/Learning log/)).toBeTruthy());
 
     // Auto-save is on by default, which leaves the header chip reading "Saved"
     // with no action. The preference moved out of the header in slice 1, so
@@ -343,8 +343,8 @@ describe("App: clicking a sub-item goes there", () => {
     const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView");
     render(<App />);
 
-    await waitFor(() => expect(railItem(/Contact & Links/)).toBeTruthy());
-    await user.click(railItem(/Contact & Links/));
+    await waitFor(() => expect(railItem(/Contact & links/)).toBeTruthy());
+    await user.click(railItem(/Contact & links/));
 
     await waitFor(() => {
       const target = document.querySelector('[data-band="contact-links"]');
@@ -363,9 +363,9 @@ describe("App: clicking a sub-item goes there", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await waitFor(() => expect(railItem(/Learning Log/)).toBeTruthy());
+    await waitFor(() => expect(railItem(/Learning log/)).toBeTruthy());
     const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView");
-    await user.click(railItem(/Learning Log/));
+    await user.click(railItem(/Learning log/));
     await waitFor(() => expect(window.location.hash).toBe("#/learning_log"));
     expect(scrollIntoView).not.toHaveBeenCalled();
     scrollIntoView.mockRestore();

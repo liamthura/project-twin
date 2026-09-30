@@ -53,7 +53,7 @@ export function SettingsPage({
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="max-w-prose text-sm text-muted-foreground">
           Your account, what is connected to it, which sections are on, and your data.
         </p>
       </div>

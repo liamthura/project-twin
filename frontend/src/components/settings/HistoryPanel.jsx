@@ -27,19 +27,12 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { api, getHistoryVersion, listHistory, revertHistory } from "@/lib/api.js";
+import { formatInstant } from "@/renderers/isoDate";
 import { restoreChanges } from "./historyDiff";
 
-function whenText(iso) {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return iso;
-  return at.toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// Date and time: a section can change several times in a day, and the
+// versions are told apart by when. The same words as every other date.
+const whenText = (iso) => formatInstant(iso, { time: true });
 
 /**
  * `fixedSection` scopes the panel to one section and drops the picker: opened
@@ -207,7 +200,7 @@ export function HistoryPanel({ fixedSection = null, sectionTitle = null, pack = 
                   disabled={reverting !== null}
                   onClick={() => openPreview(version)}
                 >
-                  <Undo2 className="mr-1.5 h-3.5 w-3.5" />
+                  <Undo2 className="h-3.5 w-3.5" />
                   Restore this
                 </Button>
               )}
@@ -297,9 +290,9 @@ function RestorePreview({ preview, reverting, onCancel, onRestore }) {
           onClick={onRestore}
         >
           {reverting ? (
-            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            <Undo2 className="mr-1.5 h-3.5 w-3.5" />
+            <Undo2 className="h-3.5 w-3.5" />
           )}
           Restore this
         </Button>

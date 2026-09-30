@@ -1,7 +1,7 @@
 {
   "$schema": "../meta_schema.json",
   "key": "learning_log",
-  "title": "Learning Log",
+  "title": "Learning log",
   "description": "What you learn, decide, and reflect on",
   "core": true,
   "position": 70,
@@ -66,7 +66,7 @@
             "name": "key_decisions",
             "type": "strings",
             "show": [],
-            "label": "Key Decisions",
+            "label": "Key decisions",
             "placeholder": "e.g. Chose Postgres over SQLite for the vector index",
             "control": "input",
             "$comment": "Bare strings on the parent row (server.py learning entry update). `control: \"input\"` for the same reason profile's work `highlights` uses it: these are SENTENCES, and a chip control makes fixing a typo mean deleting and retyping the whole line. They were chips until wave 12."
@@ -75,7 +75,7 @@
             "name": "followup_items",
             "type": "strings",
             "show": [],
-            "label": "Follow-up Items",
+            "label": "Follow-up items",
             "placeholder": "e.g. Read the migration guide before the next sprint",
             "control": "input",
             "$comment": "See the key_decisions node above -- same shape, same reasoning."

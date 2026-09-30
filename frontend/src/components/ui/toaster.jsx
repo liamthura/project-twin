@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import {
   Toast,
@@ -54,27 +54,46 @@ function useOwnClock(duration, open, close) {
   }, [run])
 
   // Held while either is true: the pointer leaving a toast whose Undo has
-  // focus must not start it closing.
+  // focus must not start it closing. The state copy is only for the time
+  // bar, which pauses with the clock.
   const held = useRef({ pointer: false, focus: false })
-  const settle = () => (held.current.pointer || held.current.focus ? hold() : run())
+  const [paused, setPaused] = useState(false)
+  const settle = () => {
+    const on = held.current.pointer || held.current.focus
+    setPaused(on)
+    return on ? hold() : run()
+  }
   return {
-    onPointerEnter: () => { held.current.pointer = true; settle() },
-    onPointerLeave: () => { held.current.pointer = false; settle() },
-    onFocus: () => { held.current.focus = true; settle() },
-    onBlur: (e) => {
-      if (e.currentTarget.contains(e.relatedTarget)) return
-      held.current.focus = false
-      settle()
+    paused,
+    handlers: {
+      onPointerEnter: () => { held.current.pointer = true; settle() },
+      onPointerLeave: () => { held.current.pointer = false; settle() },
+      onFocus: () => { held.current.focus = true; settle() },
+      onBlur: (e) => {
+        if (e.currentTarget.contains(e.relatedTarget)) return
+        held.current.focus = false
+        settle()
+      },
     },
   }
 }
 
-function TimedToast({ duration = DURATION, open, onOpenChange, children, ...props }) {
+// `timed` draws what is left of the duration along the foot: an Undo that
+// ends without warning is one people learn not to trust.
+function TimedToast({ duration = DURATION, open, onOpenChange, timed, children, ...props }) {
   const close = useCallback(() => onOpenChange?.(false), [onOpenChange])
-  const clock = useOwnClock(duration, open, close)
+  const { paused, handlers } = useOwnClock(duration, open, close)
   return (
-    <Toast {...props} {...clock} open={open} onOpenChange={onOpenChange} duration={Infinity}>
+    <Toast {...props} {...handlers} open={open} onOpenChange={onOpenChange} duration={Infinity}>
       {children}
+      {timed && Number.isFinite(duration) && (
+        <span
+          aria-hidden="true"
+          data-toast-time=""
+          className="absolute inset-x-0 bottom-0 h-0.5 origin-left animate-toast-time bg-primary/50"
+          style={{ animationDuration: `${duration}ms`, animationPlayState: paused ? "paused" : "running" }}
+        />
+      )}
     </Toast>
   )
 }
@@ -86,14 +105,17 @@ export function Toaster() {
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
         return (
-          <TimedToast key={id} {...props}>
-            <div className="grid gap-1">
+          <TimedToast key={id} timed={Boolean(action)} {...props}>
+            {/* The words take the line and the buttons go under them when
+                both will not fit, rather than squeezing a title to two words
+                a line beside them. */}
+            <div className="grid min-w-0 flex-1 basis-44 gap-1">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (
                 <ToastDescription>{description}</ToastDescription>
               )}
             </div>
-            {action}
+            {action && <div className="flex shrink-0 flex-wrap gap-2">{action}</div>}
             <ToastClose />
           </TimedToast>
         )

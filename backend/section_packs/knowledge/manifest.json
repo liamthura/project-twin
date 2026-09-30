@@ -38,7 +38,7 @@
       "path": [
         "domains"
       ],
-      "title": "Skills & Domains",
+      "title": "Skills & domains",
       "description": "What you know, how well, and where you used it",
       "search": true,
       "facets": [
@@ -109,6 +109,7 @@
           },
           {
             "name": "added_date",
+            "label": "Added",
             "show": [
               "row"
             ],
@@ -130,17 +131,17 @@
       "path": [
         "mental_tabs"
       ],
-      "title": "Mental Tabs",
+      "title": "Mental tabs",
       "description": "Things worth remembering that are not skills: lists, recommendations, notes",
       "info": {
-        "overview": "Mental Tabs are your personal knowledge snippets: random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
+        "overview": "Mental tabs are your personal knowledge snippets: random facts, lists, recommendations, or notes that don't fit into skills but you want to remember and share with AI.",
         "tips": [
           "Title: A short, memorable name for the tab.",
           "Status: Open (still live), Closed (dealt with), Archived (kept for reference).",
           "Notes: A brief description or context explaining what this tab is about.",
           "Tags: Keywords to help you (and AI) find this tab later.",
           "References: Add items with a name, optional URL, and notes.",
-          "Use Mental Tabs for: favourite restaurants, book recommendations, gift ideas, recipes, travel tips, etc.",
+          "Use Mental tabs for: favourite restaurants, book recommendations, gift ideas, recipes, travel tips, etc.",
           "Think of it as your personal wiki that AI can reference when helping you."
         ]
       },

@@ -128,10 +128,10 @@ describe("normalizeUi", () => {
 
 describe("slugify", () => {
   it("lowercases and hyphenates", () => {
-    expect(slugify("Code Style", 0)).toBe("code-style");
+    expect(slugify("Code style", 0)).toBe("code-style");
   });
   it("drops ampersands rather than transliterating them", () => {
-    expect(slugify("Contact & Links", 0)).toBe("contact-links");
+    expect(slugify("Contact & links", 0)).toBe("contact-links");
   });
   it("strips apostrophes instead of turning them into separators", () => {
     // "when-i-m-feeling" is what a naive non-alphanumeric replace produces, and
@@ -161,15 +161,15 @@ describe("outline", () => {
         {
           kind: "group",
           path: [],
-          title: "Code Style",
+          title: "Code style",
           sections: [{ kind: "strings", path: ["a"] }],
         },
-        { kind: "list", path: ["likes_dislikes"], title: "Likes & Dislikes" },
+        { kind: "list", path: ["likes_dislikes"], title: "Likes & dislikes" },
       ],
     };
     expect(outline(pack)).toEqual([
-      { id: "code-style", label: "Code Style", kind: "group", index: 0 },
-      { id: "likes-dislikes", label: "Likes & Dislikes", kind: "list", index: 1 },
+      { id: "code-style", label: "Code style", kind: "group", index: 0 },
+      { id: "likes-dislikes", label: "Likes & dislikes", kind: "list", index: 1 },
     ]);
   });
 

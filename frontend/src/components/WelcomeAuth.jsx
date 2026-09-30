@@ -55,6 +55,23 @@ function ssoErrorFromUrl() {
   return new URLSearchParams(window.location.search).get("error") || "";
 }
 
+/** `?deleted=1`: the account was deleted from Settings, and this is where the
+ *  person lands. Read once at mount, then taken off the address bar, so a
+ *  reload or a bookmark does not say it again. */
+function deletedFromUrl() {
+  if (typeof window === "undefined") return false;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("deleted") !== "1") return false;
+  params.delete("deleted");
+  const query = params.toString();
+  window.history.replaceState(
+    null,
+    "",
+    `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+  );
+  return true;
+}
+
 // Better Auth is same-origin only: its session cookie cannot be set from, or
 // sent to, another site. A UI pointed at someone else's server therefore keeps
 // the original username/password endpoints and a stored bearer token, which is
@@ -174,6 +191,7 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
   // includes whoever is about to link for the first time.
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [ssoError] = useState(ssoErrorFromUrl);
+  const [deleted] = useState(deletedFromUrl);
   const [ssoPending, setSsoPending] = useState(false);
   const [acceptedInvite, setAcceptedInvite] = useState("");
   const [linkInvite] = useState(inviteFromUrl);
@@ -566,6 +584,16 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
         {/* Which code is about to be spent, and a way back to change it. */}
         {mode === "signup" && acceptedInvite && (
           <AcceptedInvite code={acceptedInvite} onChange={() => setAcceptedInvite("")} />
+        )}
+
+        {deleted && (
+          <div role="status" className="space-y-1 rounded-lg border bg-muted/50 p-3">
+            <p className="text-sm font-medium">Your account has been deleted.</p>
+            <p className="text-xs text-muted-foreground">
+              Your persona, its history, your tokens and connected apps are gone
+              from this server.
+            </p>
+          </div>
         )}
 
         {/* A failed federated sign-in, explained where it happened. The cause

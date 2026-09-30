@@ -65,7 +65,7 @@ describe("SectionMenu", () => {
       expect(within(sheet()).getByRole("menuitem", { name: band.label })).toBeInTheDocument();
     }
     expect(
-      within(sheet()).queryByRole("menuitem", { name: "Work Experience" })
+      within(sheet()).queryByRole("menuitem", { name: "Work experience" })
     ).not.toBeInTheDocument();
   });
 
@@ -98,7 +98,7 @@ describe("SectionMenu", () => {
     renderMenu();
     await userEvent.click(trigger());
     expect(sheet()).toBeInTheDocument();
-    await userEvent.click(within(sheet()).getByRole("menuitem", { name: "Code Style" }));
+    await userEvent.click(within(sheet()).getByRole("menuitem", { name: "Code style" }));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 

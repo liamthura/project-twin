@@ -240,6 +240,9 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
               Back
             </Button>
             <div className="flex items-center gap-2">
+              {/* "Finish later", not "Skip": what you typed is already
+                  saved, so skipping read as throwing it away. What it does is
+                  leave the basics unticked on the Getting started card. */}
               <Button
                 variant="ghost"
                 onClick={() => {
@@ -249,7 +252,7 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
                   go(nextStep(current));
                 }}
               >
-                Skip this step
+                Finish later
               </Button>
               <Button
                 onClick={() => {

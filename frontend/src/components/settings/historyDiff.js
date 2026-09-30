@@ -32,7 +32,7 @@ function show(value) {
   return text.length > 80 ? `${text.slice(0, 77)}…` : text;
 }
 
-// `declared` for a form node: Personal Information sits at the section's root,
+// `declared` for a form node: Personal information sits at the section's root,
 // and comparing every key there would list the whole section as its fields.
 function fieldChanges(now, then, fields, declared = false) {
   const keys = declared

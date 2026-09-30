@@ -138,7 +138,7 @@ export function slugify(title, index) {
  * kind, in manifest order, untitled ones omitted.
  *
  * Not "groups". `group` nodes carry `path: []`, and the prototype's rail under
- * Preferences lists three groups plus a top-level `list` (Likes & Dislikes). A
+ * Preferences lists three groups plus a top-level `list` (Likes & dislikes). A
  * group renders as an eyebrow band with its cards beneath it; a top-level
  * list/strings/fields node is its own band. Never descends -- a nested title is
  * a heading inside a card, not a rail destination.

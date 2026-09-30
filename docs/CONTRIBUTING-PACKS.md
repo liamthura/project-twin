@@ -67,13 +67,13 @@ complete key sets.
 // group -- an eyebrow band over its children, and nothing else.
 // It binds no storage, so `path`, `element` and `fields` are all rejected here.
 // A group is the one kind that MUST have a title: the band is a label.
-{ "kind": "group", "title": "Contact & Links", "description": "…",
+{ "kind": "group", "title": "Contact & links", "description": "…",
   "info": { "overview": "…", "tips": ["…"] },
   "sections": [ /* 1+ nodes */ ], "$comment": "…" }
 
 // fields -- one object, edited in place. Never added to, never removed from.
 { "kind": "fields", "path": ["communication", "default"],
-  "title": "Default Communication Style", "description": "…", "info": {…},
+  "title": "Default communication style", "description": "…", "info": {…},
   "element": {
     "entity": "communication_default",   // the name an MCP client passes
     "identifier": "day_type",            // optional here -- see below
@@ -122,7 +122,7 @@ new value — so the first save would replace the section's entire stored object
 with one row. `Array.isArray([])` is true, so no renderer-side guard catches it.
 
 A `fields` node's `path` **may** be empty, and that is meaningful: `path: []`
-addresses the section root, which is how profile's Personal Information binds
+addresses the section root, which is how profile's Personal information binds
 seven top-level scalars. `FieldsRenderer` spreads the stored object on every
 write, so a root write updates those keys rather than replacing the section.
 
@@ -391,7 +391,7 @@ prefixed by the enclosing entity's name (`project_tag`'s parent is
 
 Get this wrong and the manifest is still internally consistent, which is exactly
 how it shipped wrong once: profile's Education block declared `work_highlight`
-with parent `company` and Work Experience declared `education_highlight` with
+with parent `company` and Work experience declared `education_highlight` with
 parent `institution` — swapped — and nothing noticed, because each block's own
 entity and parent agreed with each other, just not with the row they sat under.
 The loader now checks the pair against the enclosing element.

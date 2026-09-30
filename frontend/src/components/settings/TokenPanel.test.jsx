@@ -65,12 +65,12 @@ describe("what a token row says", () => {
     // The prototype's change 9 makes this point about Connected apps: a
     // sentence is not a scope string.
     render(<TokenPanel isOpen />);
-    const line = await screen.findByText(/Created 2026-08-01/);
-    expect(line.textContent).toMatch(/last used 2026-08-12/);
+    const line = await screen.findByText(/Created 1 August 2026/);
+    expect(line.textContent).toMatch(/last used 12 August 2026/);
     expect(line.className).not.toMatch(/font-mono/);
   });
 
-  it("says never, for a token no client has used", async () => {
+  it("says not used yet, for a token no client has used", async () => {
     listTokens.mockResolvedValue([
       {
         id: "t2",
@@ -82,7 +82,20 @@ describe("what a token row says", () => {
       },
     ]);
     render(<TokenPanel isOpen />);
-    expect(await screen.findByText(/last used never/)).toBeInTheDocument();
+    expect(await screen.findByText(/Created 1 August 2026 · not used yet/)).toBeInTheDocument();
+  });
+
+  it("dates a token by the day where you are, not the UTC day", async () => {
+    // 02:00 UTC on the 2nd is still the evening of the 1st in New York, where
+    // the suite runs. Slicing the ISO string said the 2nd.
+    listTokens.mockResolvedValue([
+      {
+        id: "t4", label: "late", created_at: "2026-08-02T02:00:00Z",
+        last_used_at: null, expires_at: null, scopes: ["persona:read"],
+      },
+    ]);
+    render(<TokenPanel isOpen />);
+    expect(await screen.findByText(/Created 1 August 2026/)).toBeInTheDocument();
   });
 
   it("names the expiry when there is one", async () => {
@@ -97,7 +110,7 @@ describe("what a token row says", () => {
       },
     ]);
     render(<TokenPanel isOpen />);
-    expect(await screen.findByText(/expires 2026-09-01/)).toBeInTheDocument();
+    expect(await screen.findByText(/expires 1 September 2026/)).toBeInTheDocument();
   });
 
   it("says nothing about expiry for a token that does not expire", async () => {

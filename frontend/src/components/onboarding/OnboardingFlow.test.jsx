@@ -99,7 +99,7 @@ describe("OnboardingFlow", () => {
 
     expect(screen.queryByRole("button", { name: /^back$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^continue$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /skip this step/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /finish later/i })).not.toBeInTheDocument();
   });
 
   it("delegating records both field steps as skipped and jumps to the end", async () => {
@@ -143,7 +143,7 @@ describe("OnboardingFlow", () => {
     const user = userEvent.setup();
     render(<OnboardingFlow step="about-you" onNavigate={vi.fn()} onLeave={vi.fn()} />);
 
-    await user.click(await screen.findByRole("button", { name: /skip this step/i }));
+    await user.click(await screen.findByRole("button", { name: /finish later/i }));
     // Both halves of the page, each under its own stored key.
     expect(saveOnboardingMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ steps: { "about-you": "skipped", "how-you-like": "skipped" } }),

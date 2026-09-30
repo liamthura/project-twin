@@ -83,23 +83,20 @@ export function AddEntryDialog({ node, entity, items, onAdd, open, onOpenChange,
   // thing being added. An entity name is already the singular noun, so it
   // takes a bare "Add". `Add Likes & Dislikes` was the old string.
   //
-  // The description follows the SAME branch rather than always naming a list:
-  // an entity-only node has no list name to offer, and "Add one entry to this
-  // list." under a heading reading "Add mental tab" named the same dialog two
-  // different ways.
-  const entityNoun = (node.element?.entity ?? "item").replace(/_/g, " ");
+  // No default description: "Add one connection." under "Add connection",
+  // and "Add one entry to Projects." under "Add to Projects", only said the
+  // heading twice. A node's own helper text is still shown when it has one.
+  const entityNoun = (node.element?.noun ?? node.element?.entity ?? "item").replace(/_/g, " ");
   const heading = node.title ? `Add to ${node.title}` : `Add ${entityNoun}`;
-  const description =
-    node.description ??
-    (node.title ? `Add one entry to ${node.title}.` : `Add one ${entityNoun}.`);
+  const description = node.description ?? null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent>
+      <DialogContent {...(description ? {} : { "aria-describedby": undefined })}>
         <DialogHeader>
           <DialogTitle>{heading}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">

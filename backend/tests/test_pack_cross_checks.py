@@ -568,7 +568,7 @@ def _education_like_node_with_highlight_parent(parent):
 def test_the_historical_swap_is_rejected():
     # Reconstructs the actual bug: a `highlights` block under an
     # Education-shaped row (identifier `institution`) declaring the parent name
-    # that belongs to Work Experience's row (`company`) instead of its own.
+    # that belongs to Work experience's row (`company`) instead of its own.
     node = _education_like_node_with_highlight_parent("company")
     _rejects(_without_the_goals_list(node), "company")
 

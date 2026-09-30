@@ -31,7 +31,7 @@ import { ArrayInput } from "@/components/ArrayInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-// "Values" -> "value", "Personality Traits" -> "personality trait". Only used
+// "Values" -> "value", "Personality traits" -> "personality trait". Only used
 // when a node declares no `placeholder`. The rule is deliberately naive --
 // trailing "s" only -- because it runs on manifest titles, which are authored,
 // not on arbitrary input. A title where it reads wrong is a signal to write the
@@ -95,7 +95,7 @@ export function StringsRenderer({ node, items, onItems }) {
         className="h-8 w-full border-dashed"
         onClick={() => onItems([...list, ""])}
       >
-        <Plus className="mr-1.5 h-3.5 w-3.5" />
+        <Plus className="h-3.5 w-3.5" />
         Add {singular(node)}
       </Button>
     </div>

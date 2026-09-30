@@ -702,7 +702,7 @@ describe("SectionRenderer", () => {
   //   - Both list nodes declare `info`, and this is the first section in the
   //     repo with two. ListRenderer names each info button after its node's
   //     `title`, so they are selectable by name rather than by DOM order --
-  //     "About Top of Mind" for the titled node, and the generic "About this
+  //     "About Top of mind" for the titled node, and the generic "About this
   //     section" for the projects node, which deliberately has no title
   //     (the Card header already reads "Projects").
   //   - Child rows and detail controls only exist once a row is EXPANDED, so
@@ -746,9 +746,9 @@ describe("SectionRenderer", () => {
     });
 
     // The wrapper SectionRenderer draws around a node that declares a
-    // `title`: <div><h3>Top of Mind</h3>{list}</div>. Located by the heading
+    // `title`: <div><h3>Top of mind</h3>{list}</div>. Located by the heading
     // rather than by DOM position so it survives a reordering of sections.
-    const topOfMindBlock = () => uiNode("Top of Mind");
+    const topOfMindBlock = () => uiNode("Top of mind");
 
     // ---- the top_of_mind trap: stored key is `idea`, manifest says `item` ---
 
@@ -910,13 +910,13 @@ describe("SectionRenderer", () => {
     it("carries both bespoke-editor info dialogs, each reachable by its own name", async () => {
       const { user } = renderSection({ pack: projectsPack, initial: projectsData });
 
-      await user.click(screen.getByRole("button", { name: "About Top of Mind" }));
+      await user.click(screen.getByRole("button", { name: "About Top of mind" }));
       expect(screen.getByText(/Capture quick ideas/)).toBeInTheDocument();
       expect(screen.getByText(/A short phrase or sentence/)).toBeInTheDocument();
     });
 
     it("gives Projects a description line instead of a dialog", () => {
-      // Its tips were one line per field label. Top of Mind keeps its dialog:
+      // Its tips were one line per field label. Top of mind keeps its dialog:
       // "a scratchpad before it becomes a project" is not in any label.
       renderSection({ pack: projectsPack, initial: projectsData });
       expect(screen.queryByRole("button", { name: "About Projects" })).not.toBeInTheDocument();
@@ -995,8 +995,8 @@ describe("SectionRenderer", () => {
       });
     });
 
-    const domainsBlock = () => uiNode("Skills & Domains");
-    const mentalTabsBlock = () => uiNode("Mental Tabs");
+    const domainsBlock = () => uiNode("Skills & domains");
+    const mentalTabsBlock = () => uiNode("Mental tabs");
     const tabsNode = () =>
       normalizeUi(knowledgePack).sections.find((s) => s.path[0] === "mental_tabs");
     const domainsNode = () =>
@@ -1209,13 +1209,10 @@ describe("SectionRenderer", () => {
       // ListRenderer skips a facet whose options do not resolve, so each
       // group's presence is what proves the field name is a real enum key.
       const level = screen.getByRole("group", { name: "Filter by level" });
-      // Five levels plus "All" exceed SEGMENTED_MAX -> dropdown branch.
+      // A filter is a dropdown whatever its option count, so the two match.
       expect(within(level).getByRole("combobox").textContent).toBe("All");
       const status = screen.getByRole("group", { name: "Filter by status" });
-      // Three statuses plus "All" fit -> segmented branch.
-      expect(
-        within(status).getByRole("button", { name: "All", pressed: true })
-      ).toBeInTheDocument();
+      expect(within(status).getByRole("combobox").textContent).toBe("All");
     });
 
     // ---- the references children ----
@@ -1272,10 +1269,10 @@ describe("SectionRenderer", () => {
 
     // ---- info dialogs ----
 
-    it("gives Skills & Domains a description line instead of a dialog", () => {
+    it("gives Skills & domains a description line instead of a dialog", () => {
       renderSection({ pack: knowledgePack, initial: knowledgeData });
       expect(
-        screen.queryByRole("button", { name: "About Skills & Domains" })
+        screen.queryByRole("button", { name: "About Skills & domains" })
       ).not.toBeInTheDocument();
       expect(screen.getByText("What you know, how well, and where you used it")).toBeInTheDocument();
     });
@@ -1288,7 +1285,7 @@ describe("SectionRenderer", () => {
       expect(
         screen.queryByRole("button", { name: "About this section" })
       ).not.toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "About Mental Tabs" }));
+      await user.click(screen.getByRole("button", { name: "About Mental tabs" }));
       expect(screen.getByText(/personal knowledge snippets/)).toBeInTheDocument();
       expect(screen.getByText(/A short, memorable name/)).toBeInTheDocument();
     });
@@ -1610,19 +1607,19 @@ describe("SectionRenderer", () => {
 // Mind reads better as a named sub-section above Projects than as an
 // afterthought below it.
 describe("section headings and info placement", () => {
-  it("puts Top of Mind above Projects, each under its own heading", () => {
+  it("puts Top of mind above Projects, each under its own heading", () => {
     renderSection({ pack: projectsPack, initial: projectsData });
 
     const headings = screen.getAllByRole("heading").map((h) => h.textContent);
     // The Card title comes first, then the two sub-sections in manifest order.
-    expect(headings.indexOf("Top of Mind")).toBeGreaterThan(-1);
-    expect(headings.indexOf("Top of Mind")).toBeLessThan(headings.indexOf("Projects", 1));
+    expect(headings.indexOf("Top of mind")).toBeGreaterThan(-1);
+    expect(headings.indexOf("Top of mind")).toBeLessThan(headings.indexOf("Projects", 1));
   });
 
   it("puts each list's info button beside its own heading, not in the list body", () => {
     renderSection({ pack: projectsPack, initial: projectsData });
 
-    for (const title of ["Top of Mind"]) {
+    for (const title of ["Top of mind"]) {
       const heading = screen.getAllByRole("heading", { name: title }).at(-1);
       const button = screen.getByRole("button", { name: `About ${title}` });
       // Same heading row, so the icon reads as belonging to that heading.
@@ -1801,7 +1798,7 @@ describe("section headings and info placement", () => {
       // labelled for a screen reader) and the empty panel's call to action.
       expect(screen.getAllByRole("button", { name: "Add hobby" })).toHaveLength(2);
       expect(screen.getAllByRole("button", { name: "Add interest" })).toHaveLength(2);
-      for (const heading of ["Personality Traits", "Values", "Energy Peaks", "Stress Triggers"]) {
+      for (const heading of ["Personality traits", "Values", "Energy peaks", "Stress triggers"]) {
         expect(within(block(heading)).getByRole("textbox")).toBeEnabled();
       }
       expect(within(block("Sleep on weekdays")).getByLabelText("Bedtime")).toHaveValue("");
@@ -1886,7 +1883,7 @@ describe("section headings and info placement", () => {
 
     it("keeps likes and dislikes in ONE list, discriminated by stance", () => {
       renderSection({ pack: preferencesPack, initial: preferencesData });
-      const list = block("Likes & Dislikes");
+      const list = block("Likes & dislikes");
 
       expect(within(list).getByText("worked examples")).toBeInTheDocument();
       expect(within(list).getByText("unsolicited sales tone")).toBeInTheDocument();
@@ -1945,8 +1942,8 @@ describe("section headings and info placement", () => {
     it("gives every group a usable control on a brand-new account", () => {
       renderSection({ pack: preferencesPack, initial: {} });
 
-      for (const heading of ["Preferred Languages", "Frameworks", "Tools",
-                             "Preferred Methods", "Things to Avoid"]) {
+      for (const heading of ["Preferred languages", "Frameworks", "Tools",
+                             "Preferred methods", "Things to avoid"]) {
         expect(within(block(heading)).getByRole("textbox")).toBeEnabled();
       }
       expect(screen.getByLabelText("Tone")).toHaveValue("");
@@ -1959,7 +1956,7 @@ describe("section headings and info placement", () => {
   // -------------------------------------------------------------------------
   // kind: "group" -- the two-level structure the hand-written editors had.
   // Every retired editor rendered several Cards, each a named group over a few
-  // controls ("Code Style" over its three lists, "Wellness" over sleep/energy/
+  // controls ("Code style" over its three lists, "Wellness" over sleep/energy/
   // stress). Waves 2-4 had no section that needed it; wave 5's two both did,
   // and flattening them lost the group names entirely.
   // -------------------------------------------------------------------------
@@ -1972,7 +1969,7 @@ describe("section headings and info placement", () => {
       sections: [
         {
           kind: "group",
-          title: "Code Style",
+          title: "Code style",
           description: "Languages, frameworks and tools",
           sections: [
             { kind: "strings", path: ["code_style", "frameworks"], title: "Frameworks" },
@@ -1987,10 +1984,10 @@ describe("section headings and info placement", () => {
     it("renders the group's heading and description over its children", () => {
       renderSection({ pack, initial: data });
 
-      expect(screen.getByRole("heading", { name: "Code Style" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Code style" })).toBeInTheDocument();
       expect(screen.getByText("Languages, frameworks and tools")).toBeInTheDocument();
-      expect(within(uiNode("Code Style")).getByText("React")).toBeInTheDocument();
-      expect(within(uiNode("Code Style")).getByText("Docker")).toBeInTheDocument();
+      expect(within(uiNode("Code style")).getByText("React")).toBeInTheDocument();
+      expect(within(uiNode("Code style")).getByText("Docker")).toBeInTheDocument();
     });
 
     it("keeps a grouped node's path resolving against the SECTION root", async () => {
@@ -2007,13 +2004,13 @@ describe("section headings and info placement", () => {
     it("leaves an ungrouped sibling at the top level", () => {
       renderSection({ pack, initial: data });
       expect(within(uiNode("Ungrouped")).getByText("x")).toBeInTheDocument();
-      expect(uiNode("Code Style")).not.toContainElement(uiNode("Ungrouped"));
+      expect(uiNode("Code style")).not.toContainElement(uiNode("Ungrouped"));
     });
 
     it("gives a grouped child a lower-level heading than a top-level node", () => {
       renderSection({ pack, initial: data });
 
-      expect(screen.getByRole("heading", { name: "Code Style", level: 2 })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Code style", level: 2 })).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Frameworks", level: 3 })).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Ungrouped", level: 2 })).toBeInTheDocument();
     });
@@ -2179,7 +2176,7 @@ describe("section headings and info placement", () => {
       const { user } = renderSection({ pack: profilePack, initial: profileData });
       await user.click(screen.getByText("Northumbria University"));
 
-      const coursework = uiNode("Coursework / Modules");
+      const coursework = uiNode("Coursework / modules");
       expect(within(coursework).getByText("Compilers")).toBeInTheDocument();
       expect(within(coursework).getByText("Distributed Systems")).toBeInTheDocument();
 
@@ -2191,7 +2188,7 @@ describe("section headings and info placement", () => {
     it("writes a nested topic into the right course, two levels down", async () => {
       const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
       await user.click(screen.getByText("Northumbria University"));
-      await user.click(within(uiNode("Coursework / Modules")).getByText("Compilers"));
+      await user.click(within(uiNode("Coursework / modules")).getByText("Compilers"));
 
       const topics = screen.getByText("Topics").parentElement;
       await user.type(within(topics).getByRole("textbox"), "optimisation{Enter}");
@@ -2205,7 +2202,7 @@ describe("section headings and info placement", () => {
       const { user, latest } = renderSection({ pack: profilePack, initial: profileData });
       await user.click(screen.getByText("Northumbria University"));
 
-      const coursework = uiNode("Coursework / Modules");
+      const coursework = uiNode("Coursework / modules");
       await user.click(headerAdd(within(coursework)));
       const dialog = screen.getByRole("dialog");
       await user.type(within(dialog).getAllByRole("textbox")[0], "Type Theory");
@@ -2220,7 +2217,7 @@ describe("section headings and info placement", () => {
       const { user } = renderSection({ pack: profilePack, initial: profileData });
       await user.click(screen.getByText("Northumbria University"));
 
-      const clubs = uiNode("Clubs & Societies");
+      const clubs = uiNode("Clubs & societies");
       await user.click(within(clubs).getByText("Hackathon Society"));
       expect(screen.getByText("mentoring")).toBeInTheDocument();
     });
@@ -2242,7 +2239,7 @@ describe("section headings and info placement", () => {
       const blockTitles = Array.from(educationCard.querySelectorAll("[data-ui-node]")).map(
         (el) => el.getAttribute("data-ui-node")
       );
-      expect(blockTitles).toEqual(["Highlights", "Coursework / Modules", "Clubs & Societies"]);
+      expect(blockTitles).toEqual(["Highlights", "Coursework / modules", "Clubs & societies"]);
     });
 
     it("edits a highlight in place rather than making the user retype it", async () => {
@@ -2336,10 +2333,10 @@ describe("section headings and info placement", () => {
       expect(latest().languages_spoken[0]).toEqual({ name: "English", fluency: "native" });
     });
 
-    it("groups emails and links under Contact & Links", () => {
+    it("groups emails and links under Contact & links", () => {
       renderSection({ pack: profilePack, initial: profileData });
 
-      const contact = uiNode("Contact & Links");
+      const contact = uiNode("Contact & links");
       expect(within(contact).getByText("ada@example.invalid")).toBeInTheDocument();
       expect(within(contact).getByText("GitHub")).toBeInTheDocument();
     });
@@ -2393,8 +2390,10 @@ describe("section headings and info placement", () => {
     unmount();
 
     renderSection({ pack: projectsPack, initial: projectsData });
-    expect(screen.getAllByText(/^Added date/)[0].closest("[data-row-meta]")).toHaveTextContent(
-      /Added date \d{1,2} [A-Z][a-z]+ \d{4}/
+    // The manifest's label, "Added": "Added date 20 September 2025" said
+    // "date" in front of a date.
+    expect(screen.getAllByText(/^Added/)[0].closest("[data-row-meta]")).toHaveTextContent(
+      /^Added \d{1,2} [A-Z][a-z]+ \d{4}$/
     );
   });
 
@@ -2436,11 +2435,11 @@ describe("section headings and info placement", () => {
     // it the same way -- the trigger via aria-label, the panel visibly.
     renderSection({ pack: knowledgePack, initial: {} });
 
-    // The headings are "Skills & Domains" and "Mental Tabs"; the buttons add
+    // The headings are "Skills & domains" and "Mental tabs"; the buttons add
     // one thing each, so they name the entity.
     expect(screen.getAllByRole("button", { name: "Add domain" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Add mental tab" })).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: /Add Skills & Domains/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add Skills & domains/ })).not.toBeInTheDocument();
     // And nothing is left announcing a bare "Add", which is what several list
     // nodes in one section used to give a screen reader: "Add", then "Add".
     expect(screen.queryByRole("button", { name: "Add" })).not.toBeInTheDocument();
@@ -2470,7 +2469,7 @@ describe("the Add trigger and the entry count", () => {
 
   it("puts a titled list node's Add trigger in that node's own heading row, not in the list body", () => {
     renderSection({ pack: preferencesPack, initial: preferencesData });
-    const nodeEl = uiNode("Likes & Dislikes");
+    const nodeEl = uiNode("Likes & dislikes");
 
     expect(
       headerAdd(within(headingRowOf(nodeEl)))
@@ -2512,7 +2511,7 @@ describe("the Add trigger and the entry count", () => {
     // Wave 3: the rows say how long the list is; the count only answers a
     // filter or a search ("2 of 7 entries"), and ListRenderer's tests cover it.
     renderSection({ pack: preferencesPack, initial: preferencesData });
-    expect(within(uiNode("Likes & Dislikes")).queryByText(/\d+ entr(y|ies)/)).not.toBeInTheDocument();
+    expect(within(uiNode("Likes & dislikes")).queryByText(/\d+ entr(y|ies)/)).not.toBeInTheDocument();
     expect(within(uiNode("When I'm feeling...")).queryByText(/\d+ entr(y|ies)/)).not.toBeInTheDocument();
   });
 });
@@ -2552,7 +2551,7 @@ describe("scroll-spy anchors", () => {
   it("does not stamp a nested title -- a card heading is not a rail destination", () => {
     render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
     const ids = [...document.querySelectorAll("[data-band]")].map((el) => el.dataset.band);
-    // Response Format is a `strings` node INSIDE the Communication group.
+    // Response format is a `strings` node INSIDE the Communication group.
     expect(ids).not.toContain("response-format");
   });
 
@@ -2608,23 +2607,23 @@ describe("the section's structure", () => {
   it("labels a group with an eyebrow band and puts its cards beneath it", () => {
     render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
 
-    expect(screen.getByRole("heading", { name: "Code Style", level: 2 }).className).toContain(
+    expect(screen.getByRole("heading", { name: "Code style", level: 2 }).className).toContain(
       "text-lg"
     );
-    const group = uiNode("Code Style");
+    const group = uiNode("Code style");
     expect(group.querySelector("[data-eyebrow]")).not.toBeNull();
     expect(
-      within(group).getByRole("heading", { name: "Preferred Languages", level: 3 })
+      within(group).getByRole("heading", { name: "Preferred languages", level: 3 })
     ).toBeInTheDocument();
   });
 
   it("gives an ungrouped node a card and no eyebrow of its own", () => {
     // The umbrella spec's phrase "a top-level list renders as its own band"
     // means it is a rail destination, not that it gets a label: the prototype
-    // shows Likes & Dislikes, and all four of profile's leaves, as bare cards.
+    // shows Likes & dislikes, and all four of profile's leaves, as bare cards.
     render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
 
-    const likes = uiNode("Likes & Dislikes");
+    const likes = uiNode("Likes & dislikes");
     expect(likes.hasAttribute("data-subsection-card")).toBe(true);
     expect(likes.querySelector("[data-eyebrow]")).toBeNull();
     // One band per group, and no more.
@@ -2655,11 +2654,11 @@ describe("the section's structure", () => {
     // h2 -> title block -> header row (title and actions) -> the column.
     const column = screen.getByRole("heading", { level: 1 }).parentElement.parentElement.parentElement;
     expect(column.className).toContain("space-y-10");
-    // profile: [Personal Information, Education, Work Experience], [Contact &
+    // profile: [Personal information, Education, Work experience], [Contact &
     // Links], [Languages] -- the group is its own run, and the leaf after it
     // starts another rather than joining it.
     expect(column.children).toHaveLength(4); // title block + three runs
-    expect(uiNode("Contact & Links").className).toContain("space-y-5");
+    expect(uiNode("Contact & links").className).toContain("space-y-5");
   });
 
   it("starts a new run for a leaf that follows a group, rather than tucking it under the band", () => {
@@ -2667,7 +2666,7 @@ describe("the section's structure", () => {
     // CONTACT & LINKS frame at 16px, which reads as membership the manifest
     // does not have and the rail does not show.
     render(<SectionRenderer pack={profilePack} data={profileData} onChange={vi.fn()} />);
-    expect(uiNode("Contact & Links")).not.toContainElement(uiNode("Languages"));
+    expect(uiNode("Contact & links")).not.toContainElement(uiNode("Languages"));
   });
 
   it("lays a group's cards two-across, except where the group holds a fields node", () => {
@@ -2679,12 +2678,12 @@ describe("the section's structure", () => {
     render(<SectionRenderer pack={preferencesPack} data={preferencesData} onChange={vi.fn()} />);
 
     const grid = (title) => uiNode(title).querySelector("[data-card-grid]");
-    expect(grid("Code Style").className).toContain("lg:grid-cols-2");
-    expect(grid("Learning Style").className).toContain("lg:grid-cols-2");
+    expect(grid("Code style").className).toContain("lg:grid-cols-2");
+    expect(grid("Learning style").className).toContain("lg:grid-cols-2");
     expect(grid("Communication").className).not.toContain("grid-cols-2");
     // lg, not md: at md the rail is already 240px of a 768px viewport, which
     // would leave two cards about 230px wide.
-    expect(grid("Code Style").className).not.toContain("md:grid-cols-2");
+    expect(grid("Code style").className).not.toContain("md:grid-cols-2");
   });
 
   it("never grids a run of ungrouped leaves", () => {
@@ -2857,7 +2856,7 @@ describe("the fields count in a card header", () => {
 
   it("gives a list node an Add button and no count", () => {
     renderSection({ pack: preferencesPack, initial: preferencesData });
-    const likes = uiNode("Likes & Dislikes");
+    const likes = uiNode("Likes & dislikes");
     expect(likes.querySelector("[data-fill-summary]")).toBeNull();
     expect(within(likes).getByText("Add", { selector: "button" })).toBeInTheDocument();
   });
@@ -2869,14 +2868,14 @@ describe("the fields count in a card header", () => {
     expect(within(tools).queryByText("Add", { selector: "button" })).not.toBeInTheDocument();
   });
 
-  it("counts profile's Personal Information against its own declared key set", () => {
+  it("counts profile's Personal information against its own declared key set", () => {
     // The real case, and the one the prototype shows at 6 of 7 (114:366). It
     // binds path [] -- the section root -- so a count computed from the whole
     // data object rather than the node's fields would be wrong here first.
     // One declared key left empty, so the count has a gap to report.
     const [firstKey] = profilePack.sections[0].element.fields.map((f) => f.name);
     renderSection({ pack: profilePack, initial: { ...profileData, [firstKey]: "" } });
-    const summary = summaryOf("Personal Information");
+    const summary = summaryOf("Personal information");
     const declared = profilePack.sections[0].element.fields.length;
     expect(summary.textContent).toMatch(new RegExp(`^\\d+ of ${declared}$`));
   });

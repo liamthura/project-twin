@@ -1,6 +1,6 @@
 {
  "profile": {
-  "Personal Information": {
+  "Personal information": {
    "name": "text",
    "preferred_name": "text",
    "current_role": "text",
@@ -17,15 +17,15 @@
    "end_year": "text",
    "status": "enum"
   },
-  "Education > Coursework / Modules": {
+  "Education > Coursework / modules": {
    "name": "text",
    "topics": "array"
   },
-  "Education > Clubs & Societies": {
+  "Education > Clubs & societies": {
    "name": "text",
    "activities_involved": "array"
   },
-  "Work Experience": {
+  "Work experience": {
    "company": "text",
    "role": "text",
    "type": "text",
@@ -33,11 +33,11 @@
    "location": "text",
    "description": "longtext"
   },
-  "Contact & Links > Emails": {
+  "Contact & links > Emails": {
    "address": "text",
    "purpose": "text"
   },
-  "Contact & Links > Links": {
+  "Contact & links > Links": {
    "label": "text",
    "url": "text"
   },
@@ -57,30 +57,30 @@
   }
  },
  "knowledge": {
-  "Skills & Domains": {
+  "Skills & domains": {
    "name": "text",
    "level": "enum",
    "notes": "longtext"
   },
-  "Skills & Domains > References": {
+  "Skills & domains > References": {
    "name": "text",
    "url": "text",
    "notes": "longtext"
   },
-  "Mental Tabs": {
+  "Mental tabs": {
    "title": "text",
    "notes": "longtext",
    "tags": "array",
    "status": "enum"
   },
-  "Mental Tabs > References": {
+  "Mental tabs > References": {
    "name": "text",
    "url": "text",
    "notes": "longtext"
   }
  },
  "preferences": {
-  "Communication > Default Communication Style": {
+  "Communication > Default communication style": {
    "tone": "text",
    "locale": "text",
    "detail_level": "longtext"
@@ -90,13 +90,13 @@
    "tone": "text",
    "detail_level": "longtext"
   },
-  "Likes & Dislikes": {
+  "Likes & dislikes": {
    "item": "text",
    "stance": "enum"
   }
  },
  "projects": {
-  "Top of Mind": {
+  "Top of mind": {
    "idea": "text",
    "note": "text"
   },
@@ -115,14 +115,14 @@
   }
  },
  "lifestyle": {
-  "Hobbies & Activities": {
+  "Hobbies & activities": {
    "name": "text",
    "notes": "longtext",
    "specifics": "array",
    "skill_level": "enum",
    "status": "enum"
   },
-  "Hobbies & Activities > References & URLs": {
+  "Hobbies & activities > References & URLs": {
    "name": "text",
    "url": "text",
    "notes": "longtext"

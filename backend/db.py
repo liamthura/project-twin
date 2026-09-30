@@ -577,6 +577,41 @@ def set_password(
             )
 
 
+def delete_account(user_id: str) -> bool:
+    """Delete the account and everything it owns, in one transaction. False if
+    there was no such account.
+
+    persona_data and tokens reference users without ON DELETE CASCADE, so they
+    go first; every other public table cascades from the users row. Better
+    Auth's user row cascades its sessions, sign-in methods, and OAuth consents
+    and tokens (a registered client is shared, and stays). The waitlist entry
+    for its email and the failed-login count for its username belong to the
+    account too, and would otherwise outlive it.
+    """
+    with get_pool().connection() as conn:
+        with conn.transaction():
+            user = conn.execute(
+                "select username from users where id = %s", (user_id,)
+            ).fetchone()
+            if user is None:
+                return False
+            # Text ids on the better_auth side, a uuid here (see
+            # _current_password_hash).
+            auth_user = conn.execute(
+                'select "email" from better_auth."user" where "id" = %s', (str(user_id),)
+            ).fetchone()
+            conn.execute("delete from persona_data where user_id = %s", (user_id,))
+            conn.execute("delete from tokens where user_id = %s", (user_id,))
+            conn.execute("delete from users where id = %s", (user_id,))
+            conn.execute('delete from better_auth."user" where "id" = %s', (str(user_id),))
+            if auth_user:
+                conn.execute(
+                    "delete from waitlist where lower(email) = lower(%s)", (auth_user["email"],)
+                )
+            conn.execute("delete from login_attempts where username = %s", (user["username"],))
+    return True
+
+
 def verify_password(username: str, password: str) -> Optional[dict]:
     """Check username + password. Returns {id, username} on success, None on
     bad credentials (indistinguishable for unknown user vs wrong password).

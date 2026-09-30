@@ -720,6 +720,14 @@ describe("WelcomeAuth with SSO configured", () => {
     expect(screen.getByText(/unable_to_create_user/)).toBeInTheDocument();
   });
 
+  it("says an account was deleted, once, then takes it off the address bar", async () => {
+    window.history.replaceState(null, "", "/app/?deleted=1");
+    render(<WelcomeAuth onSuccess={() => {}} />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Your account has been deleted.");
+    expect(window.location.search).toBe("");
+  });
+
   it("shows nothing about SSO on an instance that does not use it", async () => {
     getInstance.mockResolvedValue({ invite_only: false, sso: false });
     render(<WelcomeAuth onSuccess={() => {}} />);
