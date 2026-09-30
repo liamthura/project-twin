@@ -252,6 +252,20 @@ these docs do not.
 Where a test allows an exception, it demands a written reason string. Those
 strings are the documentation for why the exception exists.
 
+### Versions
+
+MyGist is pre-1.0, so versions are `0.MINOR.PATCH`. An ordinary release,
+features and fixes alike, raises the patch: 0.2.3 to 0.2.4. The minor rises
+for a release that changes what a self-hoster or a client has to do, such as
+a migration to act on or a contract change: 0.2.x to 0.3.0. 1.0.0 is a
+decision, not a count.
+
+A release sets the version in two places, `frontend/package.json` (what
+Settings → Account shows) and `FastAPI(version=...)` in `backend/main.py`
+(the API docs), and adds its entry to the [changelog](/changelog), which
+says what to do on upgrading. Releases before 30 September 2026 were
+numbered one place higher; the changelog lists the mapping.
+
 ## Next
 
 <Cards>

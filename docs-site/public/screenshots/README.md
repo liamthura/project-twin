@@ -26,6 +26,8 @@ desktop views.
 | `settings-tokens.png` | Settings → Connections: connected apps, the token list and the create form |
 | `settings-tokens-new.png` | The one look at a new token's secret (revoked straight after) |
 | `settings-data.png` | Settings → Data: export, import mode, import, Advanced |
+| `review-inbox.png` | Review → Inbox with three suggestions (stand-ins, deleted after) |
+| `review-promote.png` | Promote on an observation, the suggested type chosen and its fields filled, on an instance with a TypeSafe key |
 
 ## The conversation figures
 
