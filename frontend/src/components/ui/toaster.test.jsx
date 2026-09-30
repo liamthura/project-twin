@@ -1,83 +1,83 @@
-// The Toaster's own clock: a toast closes after its duration, holds while the
-// pointer or focus is on it, and a toast that vanished from under the pointer
-// leaves nothing held for the next one -- which is where Radix's own pause
-// stuck, and Review's decisions with it.
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// The toasts, over Sonner's stack: they stack rather than replace one another,
+// tell their owner once when they go, close from their own buttons, and hold
+// while a toast has keyboard focus -- which Sonner alone does not do, and
+// which a keyboard reader's Undo depends on.
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { toast as sonner } from "sonner";
 
 import { Toaster } from "./toaster";
+import { ToastAction } from "./toast";
 import { toast } from "./use-toast";
 
-beforeEach(() => {
-  vi.useFakeTimers();
+// Sonner keeps its toasts in module scope, so each case clears its own.
+afterEach(async () => {
+  act(() => { sonner.dismiss(); });
+  await new Promise((r) => setTimeout(r, 50));
 });
 
-afterEach(() => {
-  act(() => vi.runAllTimers());
-  vi.useRealTimers();
-});
+const wait = (ms) => act(() => new Promise((r) => setTimeout(r, ms)));
 
-const item = (title) => screen.getByText(title).closest("li");
-
-describe("the Toaster's clock", () => {
-  it("closes a toast after its duration, and holds it while hovered", () => {
+describe("the toasts", () => {
+  it("stack rather than replace one another, and each tells its owner once when it goes", async () => {
     render(<Toaster />);
-    const onClose = vi.fn();
-    act(() => { toast({ title: "Approved", duration: 8000, onClose }); });
+    const first = vi.fn();
+    let handle;
+    act(() => { handle = toast({ title: "Hana added to Circle", onClose: first }); });
+    act(() => { toast({ title: "Rejected Datadog" }); });
+    expect(await screen.findByText("Hana added to Circle")).toBeInTheDocument();
+    expect(screen.getByText("Rejected Datadog")).toBeInTheDocument();
+    expect(first).not.toHaveBeenCalled();
 
-    fireEvent.pointerEnter(item("Approved"));
-    act(() => vi.advanceTimersByTime(20000));
-    expect(onClose).not.toHaveBeenCalled();
-
-    fireEvent.pointerLeave(item("Approved"));
-    act(() => vi.advanceTimersByTime(7999));
-    expect(onClose).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(1));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    act(() => handle.dismiss());
+    await waitFor(() => expect(first).toHaveBeenCalledTimes(1));
+    await wait(50);
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Rejected Datadog")).toBeInTheDocument();
   });
 
-  it("closes the next toast on time after one vanished from under the pointer", () => {
+  it("closes after its duration", async () => {
     render(<Toaster />);
-    let first;
-    act(() => { first = toast({ title: "Rejected", duration: 8000 }); });
-    fireEvent.pointerEnter(item("Rejected"));
-    // Undo clicked: gone while the pointer is on it, with no pointerleave.
-    act(() => first.dismiss());
-    act(() => vi.advanceTimersByTime(3000));
-
     const onClose = vi.fn();
-    act(() => { toast({ title: "Approved", duration: 8000, onClose }); });
-    act(() => vi.advanceTimersByTime(8000));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    act(() => { toast({ title: "Saved", duration: 60, onClose }); });
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
-  it("stays held while its button has focus, even once the pointer leaves", () => {
+  it("closes from its own button, after the button has done its work", async () => {
+    render(<Toaster />);
+    const onClose = vi.fn();
+    const undo = vi.fn(() => expect(onClose).not.toHaveBeenCalled());
+    act(() => {
+      toast({ title: "Rejected Datadog", onClose, action: <ToastAction altText="Undo" onClick={undo}>Undo</ToastAction> });
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    expect(undo).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  it("holds while one of its buttons has keyboard focus, and runs again once it loses it", async () => {
     render(<Toaster />);
     const onClose = vi.fn();
     act(() => {
-      toast({ title: "Deleted", duration: 8000, onClose, action: <button type="button">Undo</button> });
+      toast({ title: "Deleted", duration: 100, onClose, action: <ToastAction onClick={() => {}}>Undo</ToastAction> });
     });
-    fireEvent.pointerEnter(item("Deleted"));
-    fireEvent.focus(screen.getByRole("button", { name: "Undo" }));
-    fireEvent.pointerLeave(item("Deleted"));
-    act(() => vi.advanceTimersByTime(20000));
+    const undo = await screen.findByRole("button", { name: "Undo" });
+    act(() => undo.focus());
+    await wait(300);
     expect(onClose).not.toHaveBeenCalled();
+
+    act(() => undo.blur());
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
-  it("draws the time left on a toast with an action, and pauses it with the clock", () => {
-    const { container } = render(<Toaster />);
-    act(() => {
-      toast({ title: "Hana added to Circle", duration: 8000, action: <button type="button">Undo</button> });
-    });
-    const bar = container.ownerDocument.querySelector("[data-toast-time]");
-    expect(bar).toHaveStyle({ animationDuration: "8000ms", animationPlayState: "running" });
-    fireEvent.pointerEnter(item("Hana added to Circle"));
-    expect(bar).toHaveStyle({ animationPlayState: "paused" });
-  });
-
-  it("draws no time on a toast with nothing to act on", () => {
+  it("draws the time left only on a toast with something to act on", async () => {
     render(<Toaster />);
     act(() => { toast({ title: "Saved" }); });
-    expect(document.querySelector("[data-toast-time]")).toBeNull();
+    act(() => { toast({ title: "Hana added to Circle", duration: 8000, action: <ToastAction>Undo</ToastAction> }); });
+    await screen.findByText("Hana added to Circle");
+    const bars = document.querySelectorAll("[data-toast-time]");
+    expect(bars).toHaveLength(1);
+    expect(bars[0]).toHaveStyle({ animationDuration: "8000ms" });
   });
 });

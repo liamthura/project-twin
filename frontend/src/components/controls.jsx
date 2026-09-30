@@ -133,7 +133,7 @@ const CLEAR_SENTINEL = "__clear__";
 
 // `clearable={false}` for a control whose options already hold the way back,
 // such as a filter's "All": a Clear under it did the same thing twice.
-export function SelectControl({ options, value, onChange, clearable = true, className = "" }) {
+export function SelectControl({ options, value, onChange, clearable = true }) {
   const isLegacy = Boolean(value) && !options.includes(value);
   const tone = value && !isLegacy ? VALUE_META[value]?.tone : undefined;
   return (
@@ -144,7 +144,7 @@ export function SelectControl({ options, value, onChange, clearable = true, clas
       <SelectTrigger
         // max-w-full so the 170px floor can never push the trigger past a
         // narrower container -- the same overflow the segmented control hit.
-        className={`h-9 w-auto min-w-[170px] max-w-full gap-2 ${isLegacy ? "border-dashed" : ""} ${className}`}
+        className={`h-9 w-auto min-w-[170px] max-w-full gap-2 ${isLegacy ? "border-dashed" : ""}`}
         title={isLegacy ? "stored value not in the current option set" : undefined}
       >
         {value ? (

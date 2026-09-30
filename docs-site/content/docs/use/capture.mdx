@@ -73,10 +73,11 @@ row that would change nothing says so.
 
 Approve, Reject and Delete each show a confirmation that names the entry, such
 as "Hana added to Circle", with **Undo**. Nothing is sent until it goes: a bar
-along its foot shows the eight seconds running out, and it waits while the
-pointer or focus is on it. Leaving Review sends anything still waiting, and so
-does deciding the next row, which takes the place of the confirmation before
-it. An approval's confirmation also links to the section it went into.
+along its foot shows the eight seconds running out. Confirmations stack, so
+deciding the next row leaves the last one's Undo in place; hover the stack, or
+Tab into it, to spread it out and stop every clock while you read. Leaving
+Review sends anything still waiting. An approval's confirmation also links to
+the section it went into.
 
 Approving writes through exactly the same path `persona_modify` uses, so every
 duplicate check and validation applies. Editing first is expected, because

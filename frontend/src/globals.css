@@ -309,3 +309,25 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
     transition-duration: 100ms !important;
   }
 }
+
+/* Sonner's deck, drawn with our own card (ui/toast.jsx). A toast behind the
+   front one shows only the edge of its card, as Sonner's styled toasts do,
+   and the time bars stop while the deck is open, which is when Sonner's
+   clocks stop. */
+[data-sonner-toast] [data-toast-card] > * {
+  transition: opacity 400ms;
+}
+
+[data-sonner-toast][data-expanded="false"][data-front="false"] [data-toast-card] {
+  /* The front toast's height, which Sonner sets on the row: a taller card
+     behind it otherwise hung out below the front one. */
+  height: var(--front-toast-height);
+}
+
+[data-sonner-toast][data-expanded="false"][data-front="false"] [data-toast-card] > * {
+  opacity: 0;
+}
+
+[data-sonner-toast][data-expanded="true"] [data-toast-time] {
+  animation-play-state: paused;
+}

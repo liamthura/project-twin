@@ -1755,15 +1755,16 @@ describe("facets", () => {
     { name: "Charlie", status: "active", notes: "solo work" },
   ];
 
-  function facetGroup() {
-    return screen.getByRole("group", { name: "Filter by status" });
+  // Every facet lives in one menu behind the filter icon, a radio group per
+  // field. The menu is portalled, so it is found through `screen`.
+  async function openFilters(user) {
+    await user.click(screen.getByRole("button", { name: /^Filter/ }));
+    return screen.findByRole("group", { name: "Filter by status" });
   }
 
-  // A filter is always a dropdown, whatever its option count. The listbox is
-  // portalled, so the option is found through `screen`.
   async function chooseFacet(user, name) {
-    await user.click(within(facetGroup()).getByRole("combobox"));
-    await user.click(await screen.findByRole("option", { name }));
+    const group = await openFilters(user);
+    await user.click(within(group).getByRole("menuitemradio", { name }));
   }
 
   it("renders one option per declared value plus an All, ignoring the entity's valid_values", async () => {
@@ -1771,8 +1772,8 @@ describe("facets", () => {
     render(
       <ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />
     );
-    await user.click(within(facetGroup()).getByRole("combobox"));
-    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+    const group = await openFilters(user);
+    expect(within(group).getAllByRole("menuitemradio").map((o) => o.textContent)).toEqual([
       "All", "active", "paused", "completed",
     ]);
     // The entity's (wrong) options must not have leaked in anywhere.
@@ -1840,6 +1841,20 @@ describe("facets", () => {
 
     expect(screen.getByText("Alpha")).toBeInTheDocument();
     expect(screen.getByText("Bravo")).toBeInTheDocument();
+    expect(screen.getByText("Charlie")).toBeInTheDocument();
+  });
+
+  it("shows the filter as on, on the icon itself, while one is set", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={facetNode} entity={entity} items={items} onItems={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Filter" })).not.toHaveClass("text-primary");
+
+    await chooseFacet(user, "paused");
+    expect(screen.getByRole("button", { name: "Filter, 1 on" })).toHaveClass("text-primary");
+
+    await user.click(screen.getByRole("button", { name: "Filter, 1 on" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Clear filters" }));
+    expect(screen.getByRole("button", { name: "Filter" })).toBeInTheDocument();
     expect(screen.getByText("Charlie")).toBeInTheDocument();
   });
 
