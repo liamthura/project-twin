@@ -357,6 +357,13 @@ async function setPassword(newPassword, currentPassword) {
   });
 }
 
+// Where a pending observation might belong: up to three {section, entity,
+// probability}, and whether the first is sure. `enabled: false` when the
+// instance does not ask Jev (backend/routing.py), which is the default.
+async function suggestDestinations(proposalId) {
+  return api(`/proposals/${proposalId}/suggest`, { method: "POST" });
+}
+
 // Delete the signed-in account and everything it owns. `confirm` is the
 // username typed back; the server compares it exactly, and refuses anything
 // but a browser sign-in.
@@ -593,6 +600,7 @@ export {
   approveProposal,
   rejectProposal,
   promoteProposal,
+  suggestDestinations,
   getConfig,
   saveConfig,
   clearConfig,

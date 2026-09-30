@@ -59,6 +59,7 @@ def test_get_settings_includes_pack_metadata(clean_database):
         "default_enabled": True,
         "sections": sections.PACK_META["profile"]["sections"],
         "entities": sections.PACK_META["profile"]["entities"],
+        "promotable": sections.PACK_META["profile"]["promotable"],
         "enabled": True,
     }
     # disabling a toggleable pack is reflected in `enabled`

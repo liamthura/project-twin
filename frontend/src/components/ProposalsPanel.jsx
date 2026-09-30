@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  listProposals, proposalCount, approveProposal, rejectProposal, promoteProposal,
+  listProposals, proposalCount, approveProposal, rejectProposal, promoteProposal, suggestDestinations,
   listConnectedApps, listTokens, listStale, keepEntry,
 } from "@/lib/api";
 import { formatDateLabel } from "@/renderers/isoDate";
@@ -529,6 +529,27 @@ export default function ProposalsPanel({
       entity: defaultTarget(section),
       text: row.note || "",
     });
+    // Where it most likely goes, when the instance asks Jev (routing.py):
+    // shown as Suggested, and chosen for the reader only when Jev is sure and
+    // they have not picked anything themselves in the meantime.
+    suggestDestinations(row.id)
+      .then((res) => {
+        const suggestions = res?.suggestions || [];
+        if (!suggestions.length) return;
+        const [first] = suggestions;
+        const offered = promotable
+          .find((s) => s.key === first.section)?.targets.some((t) => t.entity === first.entity);
+        setPromoting((p) => {
+          if (p?.row.id !== row.id) return p;
+          const pick = res.confident && offered && !p.touched
+            ? { section: first.section, entity: first.entity }
+            : {};
+          return { ...p, suggestions, ...pick };
+        });
+      })
+      .catch(() => {
+        // No suggestions is the dialog as it always was.
+      });
   }
 
   function confirmPromote() {

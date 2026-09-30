@@ -58,6 +58,14 @@
           "remove"
         ],
         "description": "Inbox for fleeting ideas and current thoughts — expect entries to be pruned",
+        "about": {
+          "what": "An idea or open question you are thinking about that is not a project yet",
+          "not_for": "lasting traits, values or preferences",
+          "examples": [
+            "Why newsletter clicks are flat",
+            "Whether to pitch a podcast"
+          ]
+        },
         "fields": [
           {
             "name": "idea",

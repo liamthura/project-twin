@@ -7,70 +7,16 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { bindingNodes, humanise } from "./proposalSummary";
-
-const sentence = (key) => {
-  const words = humanise(key);
-  return words.charAt(0).toUpperCase() + words.slice(1);
-};
 
 /**
- * Which entities in a pack a single line of text can actually become.
- *
- * A note is one sentence, so the only entities it can fill are the ones whose
- * sole required field is their own identifier. Anything needing a second value
- * -- `hobby_specific` needs an owning hobby, `project_reference` needs a
- * project -- would produce a proposal that cannot execute, so it is not
- * offered rather than offered and then failing on confirm.
+ * What an observation can become in one pack, as the server works it out
+ * (pack_loader.derive_promotion_targets) and /api/settings serves it: an
+ * entity a single sentence can fill, that a section draws, named as the
+ * editor names it, with its manifest `about`. The rule lives there once, so
+ * this dialog and the suggestions routing asks Jev for offer the same types.
  */
 export function promotionTargets(pack) {
-  return Object.entries(pack?.entities || {})
-    .filter(([, spec]) => {
-      const required = spec.required || [];
-      return (spec.actions || []).includes("add")
-        && spec.identifier
-        && !spec.parent
-        && required.length === 1
-        && required[0] === spec.identifier;
-    })
-    .map(([entity, spec]) => {
-      // In the editor's own words: the subsection's title, and the field's
-      // label and hint. The list read "mood override" and "response format",
-      // so "Prefers comments in the margin" went under a field called "mood"
-      // and looked no more wrong than any other choice.
-      const [node, other] = bindingNodes(pack.sections, entity);
-      const host = node || variantHost(pack.sections, entity);
-      // An entity no section draws (preferences' generic `preference`) would
-      // file the note where the editor never shows it.
-      if (pack.sections && !host) return null;
-      const shown = other ? null : host;
-      const def = shown?.element?.fields?.find((f) => f.name === spec.identifier);
-      // Two entities over one list (like and dislike) are told apart by name.
-      const shared = shown?.element?.variants?.length > 0 || shown !== node;
-      return {
-        entity,
-        field: spec.identifier,
-        // An untitled list (Goals, Circle) goes by what one entry is called.
-        title: shown?.title
-          ? (shared ? `${shown.title}: ${humanise(entity)}` : shown.title)
-          : sentence(shown?.element?.noun ?? entity),
-        // A list of plain strings has no field of its own to name.
-        label: def?.label || (shown && !def ? "Text" : sentence(spec.identifier)),
-        placeholder: def?.placeholder || shown?.placeholder,
-      };
-    })
-    .filter(Boolean);
-}
-
-// The node an entity is a variant of: `dislike` is drawn by the list whose
-// element is `like`.
-function variantHost(nodes, entity) {
-  for (const node of nodes || []) {
-    if (node?.element?.variants?.some((v) => v.entity === entity)) return node;
-    const inner = variantHost(node?.sections, entity);
-    if (inner) return inner;
-  }
-  return null;
+  return pack?.promotable || [];
 }
 
 // A section with one type has nothing to choose; one with several starts
@@ -83,6 +29,13 @@ export default function PromoteDialog({
 }) {
   const section = promotable.find((s) => s.key === promoting?.section);
   const target = section?.targets.find((t) => t.entity === promoting?.entity);
+  // Only what this dialog can actually file: a suggestion for a section the
+  // reader has since turned off is dropped rather than offered.
+  const suggested = (promoting?.suggestions || []).flatMap((s) => {
+    const sec = promotable.find((x) => x.key === s.section);
+    const t = sec?.targets.find((x) => x.entity === s.entity);
+    return t ? [{ s, sec, t }] : [];
+  });
 
   return (
     <Dialog open={Boolean(promoting)} onOpenChange={(o) => !o && onCancel()}>
@@ -96,6 +49,34 @@ export default function PromoteDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {suggested.length > 0 && (
+            <div className="space-y-1.5">
+              <p id="promote-suggested" className="text-sm font-medium">Suggested</p>
+              {/* Where it most likely goes, from any section, one tap each.
+                  Chosen for you only when the suggestion was sure. */}
+              <div role="group" aria-labelledby="promote-suggested" className="flex flex-wrap gap-2">
+                {suggested.map(({ s, sec, t }) => {
+                  const on = promoting.section === s.section && promoting.entity === s.entity;
+                  return (
+                    <Button
+                      key={`${s.section}.${s.entity}`}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      aria-pressed={on}
+                      aria-label={`${t.title}, in ${sec.title}`}
+                      className={on ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary" : ""}
+                      onClick={() => onChange((p) => ({ ...p, section: s.section, entity: s.entity, touched: true }))}
+                    >
+                      {t.title}
+                      <span className={on ? "text-primary/80" : "text-muted-foreground"}>· {sec.title}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="promote-section">Section</Label>
             {/* Label htmlFor + SelectTrigger id, the same pairing the sort
@@ -109,6 +90,7 @@ export default function PromoteDialog({
                   ...p,
                   section: value,
                   entity: defaultTarget(next),
+                  touched: true,
                 }));
               }}
             >
@@ -127,7 +109,7 @@ export default function PromoteDialog({
             <Label htmlFor="promote-entity">Type</Label>
             <Select
               value={promoting?.entity || ""}
-              onValueChange={(value) => onChange((p) => ({ ...p, entity: value }))}
+              onValueChange={(value) => onChange((p) => ({ ...p, entity: value, touched: true }))}
             >
               <SelectTrigger id="promote-entity">
                 <SelectValue placeholder="Choose a type" />
@@ -140,6 +122,11 @@ export default function PromoteDialog({
                 ))}
               </SelectContent>
             </Select>
+            {/* The manifest's own words for the type, the same ones Jev is
+                given when it suggests one. */}
+            {target?.about?.what && (
+              <p className="text-xs text-muted-foreground">{target.about.what}.</p>
+            )}
           </div>
 
           {section && (

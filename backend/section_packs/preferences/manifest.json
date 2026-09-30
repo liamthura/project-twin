@@ -78,6 +78,14 @@
           "element": {
             "entity": "mood_override",
             "identifier": "mood",
+            "about": {
+              "what": "How assistants should change their answers when you are in a particular mood",
+              "not_for": "your habits, hobbies, or what you do to feel better",
+              "examples": [
+                "When stressed: keep answers short",
+                "When tired: skip the background"
+              ]
+            },
             "fields": [
               {
                 "name": "mood",
@@ -113,7 +121,15 @@
           "element": {
             "entity": "response_format",
             "identifier": "item",
-            "description": "One statement about how you want answers shaped. Bare strings, like lifestyle's energy_peaks."
+            "description": "One statement about how you want answers shaped. Bare strings, like lifestyle's energy_peaks.",
+            "about": {
+              "what": "How you want an assistant's answers shaped or delivered",
+              "not_for": "how you like to learn a new subject",
+              "examples": [
+                "Code blocks for anything over three lines",
+                "Bullet points rather than paragraphs"
+              ]
+            }
           },
           "$comment": "Bare strings. Was five fixed booleans until wave 6 -- a boolean can only answer yes or no to an idea someone else chose, and real preferences are more specific than that. persona_store._normalize converts the old shape, keeping the TRUE keys as text; a list of wants cannot express \"explicitly off\", and a false boolean already read the same as absent."
         }
@@ -136,7 +152,15 @@
           "element": {
             "entity": "learning_method",
             "identifier": "item",
-            "description": "One way you like to learn, e.g. worked examples before theory."
+            "description": "One way you like to learn, e.g. worked examples before theory.",
+            "about": {
+              "what": "A way you like to learn something new",
+              "not_for": "how answers in general should be formatted",
+              "examples": [
+                "Worked examples before theory",
+                "Pair programming with someone who knows it"
+              ]
+            }
           }
         },
         {
@@ -151,7 +175,15 @@
           "element": {
             "entity": "learning_dislike",
             "identifier": "item",
-            "description": "One way of being taught that does not work for you."
+            "description": "One way of being taught that does not work for you.",
+            "about": {
+              "what": "A way of being taught that does not work for you",
+              "not_for": "things you dislike in general",
+              "examples": [
+                "Walls of text",
+                "Video tutorials"
+              ]
+            }
           }
         }
       ]
@@ -178,6 +210,14 @@
         "entity": "like",
         "identifier": "item",
         "description": "Something you like; stored in the shared likes_dislikes list with stance=like unless you send stance explicitly",
+        "about": {
+          "what": "Something you like and want every assistant to know you like",
+          "not_for": "how answers should be shaped",
+          "examples": [
+            "Dry humour",
+            "British spelling"
+          ]
+        },
         "list": "likes_dislikes",
         "fields": [
           {
@@ -206,7 +246,15 @@
         "variants": [
           {
             "entity": "dislike",
-            "description": "Something you dislike; stored in the shared likes_dislikes list with stance=dislike unless you send stance explicitly"
+            "description": "Something you dislike; stored in the shared likes_dislikes list with stance=dislike unless you send stance explicitly",
+            "about": {
+              "what": "Something you dislike and want every assistant to avoid",
+              "not_for": "ways of being taught",
+              "examples": [
+                "Unsolicited sales tone",
+                "Jargon"
+              ]
+            }
           }
         ]
       },
@@ -229,7 +277,14 @@
           "element": {
             "entity": "preferred_language",
             "identifier": "item",
-            "description": "A programming language you prefer to work in."
+            "description": "A programming language you prefer to work in.",
+            "about": {
+              "what": "A programming language you prefer to work in",
+              "examples": [
+                "Python",
+                "TypeScript"
+              ]
+            }
           }
         },
         {
@@ -244,7 +299,14 @@
           "element": {
             "entity": "framework",
             "identifier": "item",
-            "description": "A framework or library you prefer."
+            "description": "A framework or library you prefer.",
+            "about": {
+              "what": "A software framework or library you prefer",
+              "examples": [
+                "FastAPI",
+                "Next.js"
+              ]
+            }
           }
         },
         {
@@ -259,7 +321,14 @@
           "element": {
             "entity": "dev_tool",
             "identifier": "item",
-            "description": "A development tool you use, e.g. an editor or a CLI."
+            "description": "A development tool you use, e.g. an editor or a CLI.",
+            "about": {
+              "what": "A development tool you use",
+              "examples": [
+                "VS Code",
+                "Docker"
+              ]
+            }
           }
         }
       ]

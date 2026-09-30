@@ -74,6 +74,7 @@ def _expected() -> list[dict]:
                 "default_enabled": m.get("default_enabled", True),
                 "enabled": ALWAYS_ENABLED,
                 "entities": pack_loader.derive_entities(m),
+                "promotable": pack_loader.derive_promotion_targets(m),
                 "sections": m["sections"],
                 "_position": m.get("position", 999),
             }
@@ -102,7 +103,7 @@ def test_every_pack_in_the_fixture_matches_its_manifest():
 
 
 def test_the_fixture_carries_exactly_the_keys_the_generator_emits():
-    # A ninth key would mean the generator grew one and this file did not, which
+    # A tenth key would mean the generator grew one and this file did not, which
     # makes the comparison above partial without saying so.
     for pack in _actual():
         assert set(pack) == {
@@ -113,5 +114,6 @@ def test_the_fixture_carries_exactly_the_keys_the_generator_emits():
             "default_enabled",
             "enabled",
             "entities",
+            "promotable",
             "sections",
         }, f"{STALE} (pack '{pack.get('key')}' has an unexpected key set)"

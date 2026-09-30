@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ProposalsPanel, { approvedMany } from "./ProposalsPanel";
-import { promotionTargets } from "./PromoteDialog";
 import realPacks from "@/__fixtures__/packs.json";
 
 const PACKS = [
@@ -14,12 +13,20 @@ const PACKS = [
       // nested: needs an owning row, so it cannot take a bare note
       hobby_specific: { actions: ["add"], required: ["hobby_name", "specific"], identifier: "specific", parent: "hobby_name" },
     },
+
+    // What the server says a note can become (pack_loader.derive_promotion_targets).
+    promotable: [
+      { entity: "hobby", field: "name", title: "Hobby", label: "Name" },
+      { entity: "value", field: "value", title: "Value", label: "Value" },
+    ],
   },
   {
     key: "knowledge", title: "Knowledge", enabled: true,
     entities: {
       mental_tab: { actions: ["add", "remove"], required: ["title"], optional: ["tags"], identifier: "title" },
     },
+
+    promotable: [{ entity: "mental_tab", field: "title", title: "Mental tab", label: "Title" }],
   },
 ];
 
@@ -31,6 +38,7 @@ vi.mock("@/lib/api", () => ({
   approveProposal: vi.fn(() => Promise.resolve({ status: "approved", section: "knowledge" })),
   rejectProposal: vi.fn(() => Promise.resolve({ status: "rejected", section: null })),
   promoteProposal: vi.fn(() => Promise.resolve({ status: "promoted", section: "lifestyle" })),
+  suggestDestinations: vi.fn(() => Promise.resolve({ enabled: false, suggestions: [], confident: false })),
   listStale: vi.fn(() => Promise.resolve([])),
   keepEntry: vi.fn(() => Promise.resolve({ status: "kept" })),
 }));
@@ -613,12 +621,34 @@ describe("ProposalsPanel", () => {
       return screen.findByRole("dialog");
     }
 
-    it("only offers entities that a single line of text can actually fill", () => {
-      const targets = promotionTargets(PACKS[0]).map((t) => t.entity);
-      expect(targets).toEqual(["hobby", "value"]);
-      // hobby_specific needs an owning hobby as well, so a bare note cannot
-      // make one -- offering it would produce a proposal that cannot execute.
-      expect(targets).not.toContain("hobby_specific");
+    // Which types a note can become is the server's rule, tested there
+    // (tests/test_promotion_targets.py); the panel only lists what it serves.
+
+    it("files where Jev is sure, unless you have chosen first", async () => {
+      api.suggestDestinations.mockResolvedValueOnce({ enabled: true, confident: true, suggestions: [
+        { section: "knowledge", entity: "mental_tab", probability: 0.95 },
+        { section: "lifestyle", entity: "value", probability: 0.03 },
+      ] });
+      const user = userEvent.setup();
+      const dialog = await openPromoteDialog(user);
+      await waitFor(() => expect(within(dialog).getByLabelText(/^section$/i)).toHaveTextContent("Knowledge"));
+      expect(within(dialog).getByLabelText(/^type$/i)).toHaveTextContent("Mental tab");
+      expect(within(dialog).getByRole("group", { name: "Suggested" })).toBeInTheDocument();
+      expect(api.suggestDestinations).toHaveBeenCalledWith("p2");
+    });
+
+    it("only suggests when Jev is unsure, and never overrides a choice already made", async () => {
+      let answer;
+      api.suggestDestinations.mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+      const user = userEvent.setup();
+      const dialog = await openPromoteDialog(user);
+      // It opens on Lifestyle, the first section a note can go to.
+      await pick(user, dialog, /section/i, "Knowledge");
+      await act(async () => answer({ enabled: true, confident: true, suggestions: [
+        { section: "lifestyle", entity: "value", probability: 0.97 },
+      ] }));
+      expect(within(dialog).getByLabelText(/^section$/i)).toHaveTextContent("Knowledge");
+      expect(within(dialog).getByRole("group", { name: "Suggested" })).toBeInTheDocument();
     });
 
     it("does not file anything until you confirm", async () => {

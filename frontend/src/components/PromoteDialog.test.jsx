@@ -3,13 +3,15 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import PromoteDialog, { promotionTargets } from "./PromoteDialog";
+import packs from "@/__fixtures__/packs.json";
 
 const PROMOTABLE = [
   {
     key: "lifestyle", title: "Lifestyle",
     targets: [
       { entity: "hobby", field: "name", title: "Hobbies", label: "Name" },
-      { entity: "value", field: "value", title: "Values", label: "Value", placeholder: "e.g. honesty" },
+      { entity: "value", field: "value", title: "Values", label: "Value", placeholder: "e.g. honesty",
+        about: { what: "What matters most when you decide" } },
     ],
   },
   {
@@ -108,53 +110,57 @@ describe("a Select inside the real Dialog", () => {
 });
 
 describe("promotionTargets", () => {
-  it("names each type as the editor does, with its field's label and hint", () => {
-    const pack = {
-      entities: {
-        mood_override: { actions: ["add"], required: ["mood"], identifier: "mood" },
-        response_format: { actions: ["add"], required: ["item"], identifier: "item" },
-      },
-      sections: [{
-        kind: "group", title: "Communication",
-        sections: [
-          {
-            kind: "list", title: "When I'm feeling...",
-            element: {
-              entity: "mood_override", identifier: "mood",
-              fields: [{ name: "mood", placeholder: "e.g. stressed, tired" }],
-            },
-          },
-          {
-            kind: "strings", title: "Response format", placeholder: "e.g. code blocks",
-            element: { entity: "response_format", identifier: "item" },
-          },
-        ],
-      }],
-    };
-    expect(promotionTargets(pack)).toEqual([
-      { entity: "mood_override", field: "mood", title: "When I'm feeling...", label: "Mood", placeholder: "e.g. stressed, tired" },
-      { entity: "response_format", field: "item", title: "Response format", label: "Text", placeholder: "e.g. code blocks" },
-    ]);
+  it("is the server's list for the pack, which the real packs carry", () => {
+    // The rule is pack_loader.derive_promotion_targets; the fixture is
+    // generated from it, so the dialog offers what the server would.
+    const lifestyle = packs.find((p) => p.key === "lifestyle");
+    const hobby = promotionTargets(lifestyle).find((t) => t.entity === "hobby");
+    expect(hobby).toMatchObject({ title: "Hobbies & activities", label: "Name" });
+    expect(hobby.about.what).toMatch(/outside work/);
+    expect(promotionTargets({})).toEqual([]);
+  });
+});
+
+describe("suggestions", () => {
+  function Suggested({ suggestions, onChange = vi.fn(), section = "knowledge", entity = "mental_tab" }) {
+    const [promoting, setPromoting] = useState({
+      row: { id: "p2", note: "Wants the recommendation first." }, section, entity,
+      text: "Wants the recommendation first.", suggestions,
+    });
+    return (
+      <PromoteDialog
+        promoting={promoting}
+        promotable={PROMOTABLE}
+        onChange={(fn) => { onChange(fn); setPromoting(fn); }}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+      />
+    );
+  }
+
+  it("offers them across sections, and one tap files it there", async () => {
+    const user = userEvent.setup();
+    render(<Suggested suggestions={[
+      { section: "lifestyle", entity: "value", probability: 0.6 },
+      { section: "knowledge", entity: "mental_tab", probability: 0.3 },
+    ]} />);
+    const group = await screen.findByRole("group", { name: "Suggested" });
+    expect(within(group).getByRole("button", { name: /Mental tabs/ })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(within(group).getByRole("button", { name: "Values, in Lifestyle" }));
+    expect(within(group).getByRole("button", { name: /Values/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText(/^section$/i)).toHaveTextContent("Lifestyle");
+    expect(screen.getByLabelText(/^type$/i)).toHaveTextContent("Values");
   });
 
-  it("names two entities over one list apart, and leaves out one no section draws", () => {
-    const pack = {
-      entities: {
-        like: { actions: ["add"], required: ["item"], identifier: "item" },
-        dislike: { actions: ["add"], required: ["item"], identifier: "item" },
-        preference: { actions: ["add"], required: ["key"], identifier: "key" },
-      },
-      sections: [{
-        kind: "list", title: "Likes & dislikes",
-        element: {
-          entity: "like", identifier: "item", variants: [{ entity: "dislike" }],
-          fields: [{ name: "item" }],
-        },
-      }],
-    };
-    expect(promotionTargets(pack).map((t) => [t.entity, t.title])).toEqual([
-      ["like", "Likes & dislikes: like"],
-      ["dislike", "Likes & dislikes: dislike"],
-    ]);
+  it("leaves out a suggestion this dialog could not file", async () => {
+    render(<Suggested suggestions={[{ section: "media", entity: "media_item", probability: 0.9 }]} />);
+    await screen.findByRole("dialog");
+    expect(screen.queryByRole("group", { name: "Suggested" })).not.toBeInTheDocument();
+  });
+
+  it("says what the chosen type is for, in the manifest's words", async () => {
+    render(<Suggested suggestions={[]} section="lifestyle" entity="value" />);
+    expect(await screen.findByText("What matters most when you decide.")).toBeInTheDocument();
   });
 });

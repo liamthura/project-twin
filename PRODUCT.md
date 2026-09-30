@@ -84,9 +84,12 @@ until the user approves. Rejected proposals are never raised again.
 - A new persona section is one declarative manifest (`backend/section_packs/`) —
   no backend or frontend code.
 - Every read and write is scoped to the account behind the credential.
-- Data leaves the server in exactly two cases: to the user's AI client when it
-  asks, and to an embedding provider when the instance is configured with one
-  (self-hosted instances can use a local embedding server or none).
+- Data leaves the server in exactly three cases, the last two only when the
+  instance is configured for them: to the user's AI client when it asks; to an
+  embedding provider (self-hosted instances can use a local embedding server or
+  none); and to TypeSafe, when the instance sets `TYPESAFE_API_KEY`, which
+  receives an observation's note, reason and quote to suggest where it belongs
+  in the Promote dialog (decided 2026-09-30, opt-in and off by default).
 - Persona history, revert, staleness, provenance, and an unattended sweep exist
   (commit `78b0b1c`); search hits report their age.
 - Stack: Python backend, React 18 + Vite + Tailwind 3 + Radix web app, Next.js

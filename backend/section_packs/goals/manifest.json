@@ -38,6 +38,14 @@
       "element": {
         "entity": "goal",
         "identifier": "title",
+        "about": {
+          "what": "Something you are working toward, with an end you could reach",
+          "not_for": "habits, routines or preferences",
+          "examples": [
+            "Run a half marathon by spring",
+            "Get promoted to senior designer"
+          ]
+        },
         "fields": [
           {
             "name": "title",
