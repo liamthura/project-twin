@@ -933,8 +933,10 @@ describe('the "row" position -- read-only values on the collapsed row', () => {
   // than hardcoding a string that breaks in another timezone.
   const d = new Date(iso);
   const p = (n) => String(n).padStart(2, "0");
+  // Read as the rest of the app writes a date: "15 January 2026, 04:30".
+  const month = d.toLocaleString("en-GB", { month: "long" });
   const expected =
-    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${d.getDate()} ${month} ${d.getFullYear()}, ` +
     `${p(d.getHours())}:${p(d.getMinutes())}`;
   const items = [{ topic: "RSC", details: "d", timestamp: iso }];
 
@@ -948,15 +950,16 @@ describe('the "row" position -- read-only values on the collapsed row', () => {
     render(
       <ListRenderer node={dated("date")} items={items} onItems={vi.fn()} />
     );
-    expect(screen.getByText(expected.slice(0, 10))).toBeInTheDocument();
+    expect(screen.getByText(expected.split(",")[0])).toBeInTheDocument();
+    expect(screen.queryByText(expected)).not.toBeInTheDocument();
   });
 
   // A stored yyyy-mm-dd is a CALENDAR DATE, not an instant. `new Date` parses
   // the date-only form as UTC midnight, so formatting it through local-time
   // getters rolls it back a day in every negative-offset zone. The suite is
   // pinned to America/New_York (vitest.config.js) precisely so this is
-  // observable: under the pre-fix formatDisplay these render "2026-01-11" and
-  // "2025-12-31", and at UTC they would have rendered correctly by accident.
+  // observable: under the pre-fix formatDisplay these render the 11th and
+  // 31 December 2025, and at UTC they would have rendered correctly by accident.
   describe("a calendar date, which carries no instant to convert", () => {
     const dateOnly = [{ topic: "Proj", details: "d", timestamp: "2026-01-12" }];
 
@@ -966,8 +969,8 @@ describe('the "row" position -- read-only values on the collapsed row', () => {
       expect(new Date("2026-01-12").getDate()).toBe(11);
 
       render(<ListRenderer node={dated("date")} items={dateOnly} onItems={vi.fn()} />);
-      expect(screen.getByText("2026-01-12")).toBeInTheDocument();
-      expect(screen.queryByText("2026-01-11")).not.toBeInTheDocument();
+      expect(screen.getByText("12 January 2026")).toBeInTheDocument();
+      expect(screen.queryByText("11 January 2026")).not.toBeInTheDocument();
     });
 
     it("does not roll a new-year date back into the previous year", () => {
@@ -978,8 +981,8 @@ describe('the "row" position -- read-only values on the collapsed row', () => {
           onItems={vi.fn()}
         />
       );
-      expect(screen.getByText("2026-01-01")).toBeInTheDocument();
-      expect(screen.queryByText("2025-12-31")).not.toBeInTheDocument();
+      expect(screen.getByText("1 January 2026")).toBeInTheDocument();
+      expect(screen.queryByText("31 December 2025")).not.toBeInTheDocument();
     });
 
     it("shows no invented midnight under the datetime format either", () => {
@@ -987,7 +990,7 @@ describe('the "row" position -- read-only values on the collapsed row', () => {
         <ListRenderer node={dated("datetime")} items={dateOnly} onItems={vi.fn()} />
       );
       // There is no time in the stored value, so there is none to display.
-      expect(screen.getByText("2026-01-12")).toBeInTheDocument();
+      expect(screen.getByText("12 January 2026")).toBeInTheDocument();
       expect(screen.queryByText(/19:00|00:00/)).not.toBeInTheDocument();
     });
 
@@ -997,7 +1000,7 @@ describe('the "row" position -- read-only values on the collapsed row', () => {
       render(<ListRenderer node={node} items={items} onItems={vi.fn()} />);
       expect(screen.getByText(expected)).toBeInTheDocument();
       // 09:30Z is 04:30 in the pinned zone: converted, not passed through.
-      expect(expected).toBe("2026-01-15 04:30");
+      expect(expected).toBe("15 January 2026, 04:30");
     });
   });
 
@@ -1009,6 +1012,14 @@ describe('the "row" position -- read-only values on the collapsed row', () => {
     expect(screen.getByDisplayValue("d")).toBeInTheDocument();
     expect(screen.queryByDisplayValue(iso)).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue(expected)).not.toBeInTheDocument();
+  });
+
+  it("does not repeat a date in the opened row that the row already shows in full", async () => {
+    const user = userEvent.setup();
+    render(<ListRenderer node={dated("date")} items={items} onItems={vi.fn()} />);
+    await user.click(screen.getByText("RSC"));
+    expect(screen.getByDisplayValue("d")).toBeInTheDocument();
+    expect(screen.getAllByText(expected.split(",")[0])).toHaveLength(1);
   });
 
   it("shows an unparseable value as-is rather than hiding it", () => {

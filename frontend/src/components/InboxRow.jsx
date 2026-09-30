@@ -5,7 +5,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FOCUS_RING } from "@/components/controls";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { proposalSummary, entityPlace, humanise, renderValue } from "./proposalSummary";
+import {
+  proposalSummary, entityPlace, humanise, renderValue, updateChanges,
+} from "./proposalSummary";
 
 const ACTION_VERB = { add: "Add", update: "Update", remove: "Remove" };
 
@@ -39,6 +41,20 @@ const fieldName = (field) => {
   return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
+const shown = (value) => renderValue(value ?? "") || "(empty)";
+
+// "Notes: Paused → Weekly call". The arrow is drawn, and read out as a word.
+function Change({ from, to }) {
+  return (
+    <>
+      <span className="text-muted-foreground">{shown(from)}</span>
+      <span className="text-muted-foreground" aria-hidden="true"> → </span>
+      <span className="sr-only"> becomes </span>
+      {shown(to)}
+    </>
+  );
+}
+
 const toText = (value) => (Array.isArray(value) ? value.join(", ") : String(value ?? ""));
 
 // The draft back into the shapes the proposal arrived in.
@@ -57,7 +73,7 @@ function fromDraft(data, draft) {
 }
 
 export default function InboxRow({
-  row, packs, busy, onApprove, onReject, selected = false, onSelect, onAdvance, focusProps,
+  row, packs, packData, busy, onApprove, onReject, selected = false, onSelect, onAdvance, focusProps,
 }) {
   const [open, setOpen] = useState(false);
   // null while not editing. Agents get a detail slightly wrong often enough
@@ -67,6 +83,9 @@ export default function InboxRow({
   const data = row.data || {};
   const approve = () => onApprove(draft ? fromDraft(data, draft) : undefined);
   const { lead, trail, extra } = proposalSummary(row, packs);
+  // Set for an update whose entry was found: the face then says what changes
+  // from what, rather than an arrow that read like a rename.
+  const changes = updateChanges(row, packs, packData);
   const startEdit = () =>
     setDraft(
       Object.fromEntries(
@@ -104,8 +123,9 @@ export default function InboxRow({
       className={`rounded-lg border ${FOCUS_RING}`}
     >
       {/* Wraps on a phone: the summary takes the full width and the buttons
-          the line below it. */}
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-2 px-3 py-2.5 text-sm">
+          the line below it. Never from sm up, where a long title wrapped them
+          under itself on some rows and not others, so the buttons moved. */}
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2 px-3 py-2.5 text-sm sm:flex-nowrap">
         <div className="flex min-w-0 basis-full items-start gap-3 sm:flex-1 sm:basis-auto">
         {onSelect && (
           <Checkbox
@@ -127,16 +147,28 @@ export default function InboxRow({
           </p>
           <p className="break-words font-medium">
             {lead}
-            {trail && (
+            {trail && !changes && (
               <>
                 <span className="font-normal text-muted-foreground"> → </span>
                 {trail}
               </>
             )}
-            {extra > 0 && (
+            {extra > 0 && !changes && (
               <span className="ml-2 text-xs font-normal text-muted-foreground">+{extra} more</span>
             )}
           </p>
+          {changes?.length === 0 && (
+            <p className="text-muted-foreground">Matches what is already there.</p>
+          )}
+          {changes?.length > 0 && (
+            <p className={`break-words ${open ? "" : "line-clamp-3"}`}>
+              <span className="text-muted-foreground">{fieldName(changes[0].field)}: </span>
+              <Change {...changes[0]} />
+              {changes.length > 1 && (
+                <span className="ml-2 text-xs text-muted-foreground">+{changes.length - 1} more</span>
+              )}
+            </p>
+          )}
           {row.rationale && <p className="text-muted-foreground">{row.rationale}</p>}
           {/* Three lines while closed, so one long quote cannot push the
               queue off the screen. */}
@@ -162,7 +194,7 @@ export default function InboxRow({
         <span className="ml-auto flex shrink-0 items-center gap-1">
         <Button
           size="sm" variant="ghost" disabled={busy} onClick={approve}
-          className="text-success hover:bg-success/10 hover:text-success"
+          className="text-emerald-700 hover:bg-success/10 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-300"
           aria-label={`Approve ${lead}`}
         >
           <Check className="h-4 w-4" />
@@ -205,6 +237,11 @@ export default function InboxRow({
                       value={draft[field]}
                       onChange={(e) => setDraft({ ...draft, [field]: e.target.value })}
                     />
+                    {changes?.some((c) => c.field === field) && (
+                      <p className="text-xs text-muted-foreground">
+                        Now: {shown(changes.find((c) => c.field === field).from)}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <p key={field} className="text-sm">
@@ -216,12 +253,17 @@ export default function InboxRow({
             </div>
           ) : (
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
-              {Object.entries(data).map(([field, value]) => (
-                <Fragment key={field}>
-                  <dt className="text-muted-foreground">{fieldName(field)}</dt>
-                  <dd className="min-w-0 break-words">{renderValue(value)}</dd>
-                </Fragment>
-              ))}
+              {Object.entries(data).map(([field, value]) => {
+                const change = changes?.find((c) => c.field === field);
+                return (
+                  <Fragment key={field}>
+                    <dt className="text-muted-foreground">{fieldName(field)}</dt>
+                    <dd className="min-w-0 break-words">
+                      {change ? <Change {...change} /> : renderValue(value)}
+                    </dd>
+                  </Fragment>
+                );
+              })}
             </dl>
           )}
           <div className="flex flex-wrap gap-2">

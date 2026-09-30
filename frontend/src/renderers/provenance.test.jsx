@@ -22,6 +22,7 @@ const node = {
 const items = [
   { id: "goal_1", title: "Run a half marathon" },
   { id: "goal_2", title: "Ship MyGist v3" },
+  { id: "goal_3", title: "Learn French" },
 ];
 const entries = {
   goal_1: {
@@ -30,6 +31,11 @@ const entries = {
     changed: { by: "", via: "editor", at: "2026-02-14" },
   },
   goal_2: { stale: false, updated_at: "2026-09-01", added: null, changed: null },
+  goal_3: {
+    stale: false, updated_at: "2026-09-20",
+    added: { by: "", via: "editor", at: "2026-01-03" },
+    changed: { by: "Claude", via: "review", at: "2026-09-20" },
+  },
 };
 
 function renderList(keep = vi.fn(() => Promise.resolve())) {
@@ -65,6 +71,14 @@ describe("provenance in the editor", () => {
 
     await user.click(screen.getByRole("button", { name: "Keep" }));
     expect(keep).toHaveBeenCalledWith("goal_1");
+  });
+
+  it("explains a change approved in Review, not only an addition", async () => {
+    const user = userEvent.setup();
+    renderList();
+    await user.click(screen.getByRole("button", { name: /^Learn French/ }));
+    await user.click(screen.getByRole("button", { name: "Why?" }));
+    expect(api.proposalsFor).toHaveBeenCalledWith("goal_3");
   });
 
   it("falls back to the last change for an entry older than the record", async () => {

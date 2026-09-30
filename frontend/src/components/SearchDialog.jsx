@@ -11,7 +11,7 @@
  * A combobox over a listbox: focus stays in the input, ↑/↓ move the active
  * option (aria-activedescendant), Enter opens it.
  */
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -132,7 +132,7 @@ export function SearchDialog({ open, onOpenChange, packs = [], packData = {}, on
         <DialogDescription className="sr-only">
           Type to search every section. Use the arrow keys to move and Enter to open.
         </DialogDescription>
-        <div className="flex items-center gap-2 border-b px-4 py-3 pr-12">
+        <div className="flex items-center gap-2 border-b px-4 py-0.5 pr-14">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <input
             autoFocus
@@ -145,7 +145,7 @@ export function SearchDialog({ open, onOpenChange, packs = [], packData = {}, on
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Search every section"
-            className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground sm:text-sm"
+            className="h-11 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground sm:text-sm"
           />
         </div>
         <div className="max-h-[60dvh] overflow-y-auto p-2 max-sm:max-h-none">
@@ -158,21 +158,30 @@ export function SearchDialog({ open, onOpenChange, packs = [], packData = {}, on
               Nothing matches &ldquo;{query.trim()}&rdquo;.
             </p>
           ) : (
-            <ul id="search-results" role="listbox" aria-label="Results" className="space-y-2">
-              {groups.map((g) => (
-                <Fragment key={g.title}>
-                  <li role="presentation" className="px-3 pt-1 text-xs font-medium text-muted-foreground">
-                    {g.title}
-                  </li>
-                  {g.items.map(option)}
-                </Fragment>
-              ))}
+            <>
+              {/* Grouped, so a screen reader names the section with each
+                  result: a bare heading row was skipped, and a result with
+                  no detail line was read with no location at all. */}
+              <div id="search-results" role="listbox" aria-label="Results" className="space-y-2">
+                {groups.map((g, n) => (
+                  <ul key={g.title} role="group" aria-labelledby={`search-group-${n}`} className="space-y-2">
+                    <li
+                      role="presentation"
+                      id={`search-group-${n}`}
+                      className="px-3 pt-1 text-xs font-medium text-muted-foreground"
+                    >
+                      {g.title}
+                    </li>
+                    {g.items.map(option)}
+                  </ul>
+                ))}
+              </div>
               {truncated && (
-                <li role="presentation" className="px-3 py-1 text-xs text-muted-foreground">
+                <p className="px-3 py-1 text-xs text-muted-foreground">
                   Showing the first {results.length} matches. Type more to narrow them.
-                </li>
+                </p>
               )}
-            </ul>
+            </>
           )}
         </div>
       </DialogContent>

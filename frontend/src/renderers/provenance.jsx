@@ -85,7 +85,9 @@ export function EntryOrigin({ id }) {
       {parts.length > 0 && (
         <p>
           {parts.join(" · ")}
-          {added?.via === "review" && (
+          {/* Newest first from the server, so an entry changed through
+              Review shows the reasoning for the change. */}
+          {(added?.via === "review" || changed?.via === "review") && (
             <>
               {" "}
               <button

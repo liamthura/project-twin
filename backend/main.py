@@ -1151,18 +1151,23 @@ async def count_proposals():
 
 
 def _written_entity_id() -> Optional[str]:
-    """The entity id the write that just ran assigned, or None.
+    """The entity id the write that just ran added or changed, or None.
 
     Read from db.last_write, which persona_store.save() fills by diffing the
     section before and after -- so this works for every entity in every section
     without the write path having to return anything new.
 
-    Only ever one id: an approve or a promote performs a single add. Anything
-    else means the diff saw something this cannot attribute, and None is the
-    honest answer.
+    Only ever one id: an approve or a promote performs a single add or update.
+    An update adds nothing and changes one entry, and without it an approved
+    change had no "why" to show. Anything else means the diff saw something
+    this cannot attribute, and None is the honest answer.
     """
-    added = (db.last_write.get() or {}).get("added") or []
-    return added[0] if len(added) == 1 else None
+    diff = db.last_write.get() or {}
+    added = diff.get("added") or []
+    if added:
+        return added[0] if len(added) == 1 else None
+    changed = list(diff.get("changed") or {})
+    return changed[0] if len(changed) == 1 else None
 
 
 def _as_review(proposal: dict, write, *args):

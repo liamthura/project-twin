@@ -8,6 +8,7 @@
  * because there the parent is the context and the identifier is the thing
  * being proposed.
  */
+import { getAt } from "@/renderers/paths";
 
 // Entity names and field keys are snake_case in the schema. A person reads this
 // surface, so they get read as words.
@@ -85,6 +86,38 @@ export function entityPlace(entity, packs) {
       : pack.title;
   }
   return humanise(entity);
+}
+
+const norm = (v) => String(v ?? "").trim().toLowerCase();
+
+/**
+ * What an update would overwrite: [{ field, from, to }] for each proposed
+ * field that differs from the entry as it stands, or null when the entry
+ * cannot be found (a child row, an entity two nodes share, a name the agent
+ * got wrong). A proposal stores only the new values, so without this the
+ * reader approves a replacement for something they cannot see.
+ */
+export function updateChanges(row, packs, packData) {
+  if (row?.action !== "update") return null;
+  for (const pack of packs || []) {
+    const spec = pack?.entities?.[row.entity];
+    if (!spec) continue;
+    const [node, other] = bindingNodes(pack.sections, row.entity);
+    if (!node?.path || other || spec.parent) return null;
+    const value = getAt(packData?.[pack.key], node.path);
+    const data = row.data || {};
+    const current = spec.identifier
+      ? (Array.isArray(value) ? value : []).find(
+          (item) => norm(item?.[spec.identifier]) === norm(data[spec.identifier]),
+        )
+      : value;
+    if (!current || typeof current !== "object") return null;
+    return Object.entries(data)
+      .filter(([k, v]) => k !== spec.identifier && present(v))
+      .filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(current[k] ?? null))
+      .map(([field, to]) => ({ field, from: current[field], to }));
+  }
+  return null;
 }
 
 function bindingNodes(nodes, entity, found = []) {

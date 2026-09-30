@@ -85,10 +85,14 @@ export function searchPersona(packs, packData, query) {
           for (const f of fields) {
             const v = value?.[f.name];
             if (typeof v === "string" && v.toLowerCase().includes(q)) {
+              // A long field is cut to fit the title, and the snippet shows
+              // the match whenever the cut would hide it.
+              const cut = v.length > 80 ? `${v.slice(0, 77)}…` : v;
               push({
                 ...base, key: `${pack.key}:${node.path.join(".")}:${f.name}`,
-                title: `${label(f.name, fields)}: ${v.length > 80 ? `${v.slice(0, 77)}…` : v}`,
-                snippet: null, entityId: null,
+                title: `${label(f.name, fields)}: ${cut}`,
+                snippet: cut.toLowerCase().includes(q) ? null : excerpt(v, q),
+                entityId: null,
               });
             }
           }

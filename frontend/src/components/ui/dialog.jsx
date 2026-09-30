@@ -37,7 +37,9 @@ const DialogContent = React.forwardRef(
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+        {/* A box, not a bare 16px icon: it measured 16x16 at 70% opacity,
+            the hardest target in any dialog on a phone. 44px on touch. */}
+        <DialogPrimitive.Close className="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground ring-offset-background transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none coarse:h-11 coarse:w-11">
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
@@ -47,10 +49,12 @@ const DialogContent = React.forwardRef(
 );
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
+// Left on every screen. Centred on a phone and left from sm up, the same
+// dialog moved its title between the two.
 const DialogHeader = ({ className, ...props }) => (
   <div
     className={cn(
-      "flex flex-col space-y-1.5 text-center sm:text-left pr-8",
+      "flex flex-col space-y-1.5 text-left pr-8",
       className
     )}
     {...props}

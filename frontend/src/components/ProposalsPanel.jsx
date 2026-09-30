@@ -18,6 +18,7 @@ import {
 import { formatDateLabel } from "@/renderers/isoDate";
 import { connectionStatus } from "./onboarding/connectionStatus";
 import InboxRow from "./InboxRow";
+import { entityPlace, humanise } from "./proposalSummary";
 import ObservationCard from "./ObservationCard";
 import PromoteDialog, { promotionTargets } from "./PromoteDialog";
 
@@ -44,9 +45,10 @@ const KINDS = [
 // which Radix already scopes to the tab being open.
 const QUEUE_POLL_MS = 15000;
 
-// How long a Reject or Delete waits before it reaches the server. Nothing on
-// the server takes a rejection back, so the toast's Undo is only real if the
-// request has not been sent yet.
+// How long the toast carrying an Approve, Reject or Delete's Undo stands. The
+// decision is sent when that toast goes, not on a timer of its own: Radix
+// pauses the toast while the pointer or focus is on it, and nothing on the
+// server takes a decision back, so Undo is only real while nothing is sent.
 const UNDO_MS = 8000;
 
 // The row that has focus takes these. Only the row: a key typed into one of
@@ -66,7 +68,7 @@ const MOVES = { j: 1, ArrowDown: 1, k: -1, ArrowUp: -1 };
 
 export default function ProposalsPanel({
   onViewSection, onSectionChanged, onCounts, onOpenSettings, onConnect,
-  sectionTitles = {}, packs = [],
+  sectionTitles = {}, packs = [], packData = {},
 }) {
   const [kind, setKind] = useState("entity");
   const [rows, setRows] = useState([]);
@@ -84,7 +86,8 @@ export default function ProposalsPanel({
   // has left the list -- so the queue can be worked down without the mouse.
   const focusAfterRef = useRef(null);
   const { toast } = useToast();
-  // id -> { kind, timer, dismiss } for each rejection not yet confirmed sent.
+  // id -> { kind, sent, undone, fire, dismiss } for each decision not yet
+  // confirmed sent. A batch shares one record across its ids.
   const pendingRef = useRef(new Map());
 
   // Held in a ref so refreshCounts never changes identity. It is a dependency
@@ -177,14 +180,12 @@ export default function ProposalsPanel({
   }
 
   // Leaving Review sends whatever is still waiting: the reader watched it go.
+  // Once per batch, which shares one record across its ids.
   useEffect(() => () => {
-    for (const [id, pending] of pendingRef.current) {
-      if (pending.sent) continue;
-      clearTimeout(pending.timer);
+    for (const pending of new Set(pendingRef.current.values())) {
+      pending.fire();
       pending.dismiss();
-      rejectProposal(id).catch(() => {});
     }
-    pendingRef.current.clear();
   }, []);
 
   useEffect(() => {
@@ -291,11 +292,18 @@ export default function ProposalsPanel({
   }
 
   /**
-   * Reject (or Delete) now on screen, on the server once the toast has gone.
-   * The row leaves at once, as it does for Approve; Undo puts it back where it
-   * was. A failed send puts it back too, and says so.
+   * Approve, Reject or Delete now on screen, on the server once the toast has
+   * gone. The rows leave at once and Undo puts them back where they were:
+   * nothing on the server takes a decision back, so Undo is only real while
+   * the request has not been sent. An approval waits like the rest because it
+   * is the one that writes, and a stray `a` should cost no more than a stray
+   * `r`. Sent one after another -- two writes landing on one section at once
+   * could lose one -- and a failure comes back to the queue, and says so.
+   *
+   * `call(row)` makes the request. `action`, when given, is a second toast
+   * button beside Undo.
    */
-  function rejectLater(batch, title) {
+  function resolveLater(batch, title, call, action) {
     const ids = new Set(batch.map((r) => r.id));
     const kind = batch[0].kind;
     // Where each sat, in order, so Undo puts them all back where they were.
@@ -326,12 +334,23 @@ export default function ProposalsPanel({
     setRows((current) => current.filter((r) => !ids.has(r.id)));
 
     // Held until the server answers, so a poll landing mid-request neither
-    // lists the rows again nor counts them.
+    // lists the rows again nor counts them. Also run by leaving Review, when
+    // this panel is gone: the section refresh and a failure's toast still
+    // reach the app.
     const send = async () => {
-      const results = await Promise.allSettled(batch.map((r) => rejectProposal(r.id)));
+      const failed = new Set();
+      const sections = new Set();
+      for (const row of batch) {
+        try {
+          const res = await call(row);
+          if (res?.section) sections.add(res.section);
+        } catch {
+          failed.add(row.id);
+        }
+      }
       for (const id of ids) pendingRef.current.delete(id);
-      const failed = new Set(batch.filter((_, i) => results[i].status === "rejected").map((r) => r.id));
       refreshCounts();
+      sections.forEach((section) => onSectionChanged?.(section));
       if (failed.size) {
         restore(failed);
         toast({
@@ -343,33 +362,65 @@ export default function ProposalsPanel({
         });
       }
     };
-    // One record for the batch, under each of its ids.
-    const pending = { kind, sent: false };
+    // One record for the batch, under each of its ids. `fire` sends it once,
+    // when the toast goes however it goes (its time, its close button, a newer
+    // toast replacing it, leaving Review), and never after Undo.
+    const pending = { kind, sent: false, undone: false };
+    pending.fire = () => {
+      if (pending.sent || pending.undone) return;
+      pending.sent = true;
+      send();
+    };
     const undo = () => {
-      // `sent` once the timer has fired: the requests are out, and there is
-      // nothing left to take back.
-      if (pending.sent || !pendingRef.current.has(batch[0].id)) return;
-      clearTimeout(pending.timer);
+      if (pending.sent || pending.undone) return;
+      pending.undone = true;
       for (const id of ids) pendingRef.current.delete(id);
       restore();
       bump(batch.length);
     };
+    const undoButton = <ToastAction altText="Undo" onClick={undo}>Undo</ToastAction>;
     const shown = toast({
       title,
       duration: UNDO_MS,
-      action: <ToastAction altText="Undo" onClick={undo}>Undo</ToastAction>,
+      action: action ? <>{undoButton}{action}</> : undoButton,
+      onClose: pending.fire,
     });
     pending.dismiss = shown.dismiss;
-    pending.timer = setTimeout(() => {
-      pending.sent = true;
-      send();
-    }, UNDO_MS);
     for (const id of ids) pendingRef.current.set(id, pending);
   }
 
+  const rejectLater = (batch, title) => resolveLater(batch, title, (row) => rejectProposal(row.id));
+
+  // Where an approval lands, in the toast's words, and a way to go and see it.
+  // The section is known before the request is sent: it is the pack that
+  // declares the entity. Following the link leaves Review, which sends the
+  // approval at once and refreshes the section behind it.
+  function approveLater(batch, edited) {
+    if (batch.length > 1) {
+      resolveLater(batch, `Added ${batch.length} to your persona`, (row) => approveProposal(row.id));
+      return;
+    }
+    const [row] = batch;
+    const section = packs.find((p) => p.entities?.[row.entity])?.key;
+    const verb = { update: "Updated in", remove: "Removed from" }[row.action] || "Added to";
+    const place = section ? entityPlace(row.entity, packs) : "your persona";
+    resolveLater(
+      batch,
+      `${verb} ${place}${edited ? ", with your changes" : ""}`,
+      (r) => approveProposal(r.id, edited),
+      section && onViewSection ? (
+        <ToastAction
+          altText={`View in ${sectionTitles[section] || section}`}
+          onClick={() => onViewSection(section)}
+        >
+          View in {sectionTitles[section] || section}
+        </ToastAction>
+      ) : null,
+    );
+  }
+
   /**
-   * Approve or Keep several, one request after another: two writes landing on
-   * the same section at once could lose one. Each row leaves as its own
+   * Keep several, one request after another. Each row leaves as its own
    * request succeeds; a failure stays, and the closing toast says how many.
    */
   async function resolveMany(batch, call, done) {
@@ -432,12 +483,14 @@ export default function ProposalsPanel({
   }
 
   return (
-    <div className="space-y-4">
+    // Narrower than the editor, as Settings is: at full width a row's reason
+    // and quote ran to 120 characters a line.
+    <div className="max-w-3xl space-y-4">
       {/* Titled as Settings and every section are, so the page says where you
           are and a screen reader has an h1 to land on. */}
       <div className="space-y-1 pb-2">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Review</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="max-w-prose text-sm text-muted-foreground">
           What your assistants suggested, and entries that may be out of date. Nothing
           suggested reaches your persona until you say so.
         </p>
@@ -475,17 +528,28 @@ export default function ProposalsPanel({
           ))}
         </TabsList>
       </Tabs>
-      {/* Not on a touch screen, where there is no keyboard to use them. */}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="hidden text-muted-foreground sm:inline-flex coarse:hidden"
-        onClick={() => setShowKeys(true)}
-      >
-        <Keyboard className="mr-1.5 h-4 w-4" aria-hidden="true" />
-        Keyboard shortcuts
-      </Button>
+      {/* Not on a touch screen, where there is no keyboard to use them, nor
+          over an empty tab, where there is no row to use them on. */}
+      {rows.length > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="hidden text-muted-foreground sm:inline-flex coarse:hidden"
+          onClick={() => setShowKeys(true)}
+        >
+          <Keyboard className="mr-1.5 h-4 w-4" aria-hidden="true" />
+          Keyboard shortcuts
+        </Button>
+      )}
       </div>
+
+      {/* Read with each row, so a screen reader learns the keys exist without
+          finding the button first. */}
+      <p id="review-keys-hint" className="sr-only">
+        {kind === "entity"
+          ? "Press a to approve, r to reject, e to edit, j and k to move, x to select, question mark for all shortcuts."
+          : "Press j and k to move, x to select, question mark for all shortcuts."}
+      </p>
 
       <Dialog open={showKeys} onOpenChange={setShowKeys}>
         <DialogContent className="sm:max-w-sm">
@@ -578,6 +642,7 @@ export default function ProposalsPanel({
             // Roving: Tab enters the list at its first row, and j/k move.
             focusProps: {
               tabIndex: index === 0 ? 0 : -1,
+              "aria-describedby": "review-keys-hint",
               "data-review-row": "",
               "data-row-id": row.id,
             },
@@ -594,15 +659,14 @@ export default function ProposalsPanel({
               {...common}
               packs={packs}
               onAdvance={() => advanceFrom(row.id)}
-              onApprove={(edited) =>
-                act(row.id, edited ? "Added to your persona, with your changes" : "Added to your persona", () =>
-                  approveProposal(row.id, edited))
-              }
+              packData={packData}
+              onApprove={(edited) => approveLater([row], edited)}
               onReject={() => rejectLater([row], "Rejected. It won't be suggested again.")}
             />
           ) : (
             <ObservationCard
               {...common}
+              place={row.section_hint && (sectionTitles[row.section_hint] || humanise(row.section_hint))}
               canPromote={promotable.length > 0}
               onPromote={() => openPromote(row)}
               onDelete={() => rejectLater([row], "Deleted. It won't be suggested again.")}
@@ -625,8 +689,11 @@ export default function ProposalsPanel({
               <>
                 <Button
                   size="sm" variant="ghost" disabled={bulkBusy}
-                  className="text-success hover:bg-success/10 hover:text-success"
-                  onClick={() => resolveMany(chosen, (id) => approveProposal(id), (n) => `Added ${n} to your persona`)}
+                  className="text-emerald-700 hover:bg-success/10 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-300"
+                  onClick={() => {
+                    approveLater(chosen);
+                    setSelected(new Set());
+                  }}
                 >
                   Approve {chosen.length}
                 </Button>

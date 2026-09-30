@@ -37,6 +37,10 @@ describe("SearchDialog", () => {
       "BoulderingHobbies & Activities · Climbing twice a week",
     ]);
     expect(options[0]).toHaveAttribute("aria-selected", "true");
+    // Each result sits in a group named for its section, so "Lead climb
+    // outdoors", which has no detail line, is still read with where it is.
+    expect(screen.getByRole("group", { name: "Goals" })).toContainElement(options[0]);
+    expect(screen.getByRole("group", { name: "Lifestyle" })).toContainElement(options[1]);
     await user.keyboard("{ArrowDown}{Enter}");
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ section: "lifestyle", entityId: "hobby_1" }));
   });

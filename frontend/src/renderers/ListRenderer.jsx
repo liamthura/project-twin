@@ -54,6 +54,7 @@ import { AddEntryDialog } from "./AddEntryDialog";
 import { HeaderActionSlotContext, useHeaderActionSlot } from "./headerActionSlot";
 import { EntryOrigin, ProvenanceContext } from "./provenance";
 import { FocusEntryContext } from "./focusEntry";
+import { formatDateLabel, formatIsoDate } from "./isoDate";
 // Circular by construction: renderNode imports ListRenderer to dispatch a
 // "list" node, and ListRenderer imports renderNode to dispatch a row's block
 // fields (an array-valued field with a `label`) against one of its own items.
@@ -72,32 +73,40 @@ import { FocusEntryContext } from "./focusEntry";
 import { renderNode } from "./renderNode";
 
 // Read-only display of a machine-written key (a created-at stamp, an id).
-// Local time and locale-free: an instant is stored as UTC, showing it raw
-// would be wrong by the offset, and a locale-formatted string would make the
-// same log read differently on two machines. An unparseable value is shown
-// verbatim rather than dropped -- nothing validates these on write, and
-// hiding a value the user can see in their own JSON is worse than an odd
-// looking badge.
 //
-// A CALENDAR DATE is the exception, and it is why the early return below
-// exists. "2026-01-12" is not an instant: `new Date` parses a bare
-// yyyy-mm-dd as UTC midnight (per the spec's date-only form), and the
-// local-time getters below then roll it back a day in every negative-offset
-// zone -- TZ=America/New_York rendered projects' `added_date` of 2026-01-12
-// as "2026-01-11". There is no offset to correct for, because there is no
-// instant; the honest rendering is the stored string itself, which already
-// has exactly the shape this function would produce. Tested on the value's
-// shape rather than on `format` so a "datetime" format asks nothing of a
-// date-only value either -- there is no time in it to show.
-function formatDisplay(value, format) {
+// Dates read as the rest of the app writes them, "28 July 2026", with the time
+// after a comma where the value has one: the row, the opened entry and the
+// origin line used to show 2025-09-20, 2026-07-28 09:14 and 15 August 2026 for
+// the same kind of thing. formatDateLabel is en-GB whatever the machine, so the
+// same log still reads the same everywhere. An instant is shown in local time,
+// since it is stored as UTC; an unparseable value is shown verbatim rather than
+// dropped -- nothing validates these on write, and hiding a value the user can
+// see in their own JSON is worse than an odd looking badge.
+//
+// A CALENDAR DATE never goes through `new Date`, which parses a bare
+// yyyy-mm-dd as UTC midnight: the local getters then roll it back a day in
+// every negative-offset zone, and TZ=America/New_York rendered projects'
+// `added_date` of 2026-01-12 as the 11th. Tested on the value's shape rather
+// than on `format`, so a "datetime" format asks nothing of a date-only value
+// either -- there is no time in it to show.
+//
+// `date` alone is what a phone's timeline column has room for.
+function displayParts(value, format) {
   const raw = String(value);
-  if (!format) return raw;
-  if (ISO_DATE.test(raw)) return raw;
+  if (ISO_DATE.test(raw)) return { date: formatDateLabel(raw), time: "" };
+  if (!format) return { date: raw, time: "" };
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return raw;
+  if (Number.isNaN(d.getTime())) return { date: raw, time: "" };
   const p = (n) => String(n).padStart(2, "0");
-  const date = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-  return format === "date" ? date : `${date} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return {
+    date: formatDateLabel(formatIsoDate(d)),
+    time: format === "date" ? "" : `${p(d.getHours())}:${p(d.getMinutes())}`,
+  };
+}
+
+function formatDisplay(value, format) {
+  const { date, time } = displayParts(value, format);
+  return time ? `${date}, ${time}` : date;
 }
 
 // A field's label: the manifest's declared `label` as authored, or the field
@@ -455,6 +464,7 @@ export default function ListRenderer({
                   <EnumControl
                     options={["All", ...options]}
                     value={facetValues[f] ?? "All"}
+                    clearable={false}
                     onChange={(v) =>
                       setFacetValues((prev) => ({
                         ...prev,
@@ -594,9 +604,16 @@ export default function ListRenderer({
       displayFields.some((f) => f !== sortField && present(f)) ||
       countBadges.some((f) => Array.isArray(item[f]) && item[f].length > 0) ||
       badges.some((b) => item[b]);
-    const bodyDisplayFields = displayFields.filter(
-      (f) => item[f] != null && item[f] !== ""
-    );
+    // Only what the row above does not already show in full: a date on the
+    // row is never cut, so "Added date" once there and again here was the
+    // same line twice. A text value truncates on the row, and the ordering
+    // date drops its time on a phone, so those stay.
+    const bodyDisplayFields = displayFields.filter((f) => {
+      if (item[f] == null || item[f] === "") return false;
+      const dated = ["date", "datetime"].includes(formats[f]) || ISO_DATE.test(String(item[f]));
+      if (!dated) return true;
+      return f === sortField && Boolean(displayParts(item[f], formats[f]).time);
+    });
     return (
             // Keyed by the row's stored index, not its id or title: every
             // writer here (updateItem, updateItemAt, removeItem, and
@@ -618,8 +635,9 @@ export default function ListRenderer({
                   badges are two stacked lines, and centring would float the
                   chevron and the buttons against the middle of a two-line
                   block. From `sm` up the inner div goes back to one row and
-                  everything lines up as before. */}
-              <div className={`flex cursor-pointer ${hasMeta ? "items-start" : "items-center"} gap-2 px-3 py-2.5 hover:bg-muted/40 sm:items-center`}
+                  everything lines up as before. coarse:py-3 makes a one-line
+                  row, which the whole of is the tap target, 44px on touch. */}
+              <div className={`flex cursor-pointer ${hasMeta ? "items-start" : "items-center"} gap-2 px-3 py-2.5 hover:bg-muted/40 sm:items-center coarse:py-3`}
                 onClick={() => setExpanded({ ...expanded, [idx]: !expanded[idx] })}>
                 {/* The row opens from anywhere on it with a mouse, but only a
                     real button is reachable by Tab and announced as
@@ -712,12 +730,12 @@ export default function ListRenderer({
                   <span data-row-sort-value className="shrink-0 self-center whitespace-nowrap text-xs tabular-nums text-muted-foreground">
                     {/* Date only on a phone, so the topic keeps the width. */}
                     {(() => {
-                      const full = String(formatDisplay(item[sortField], formats[sortField]));
-                      if (!full.includes(" ")) return full;
+                      const { date, time } = displayParts(item[sortField], formats[sortField]);
+                      if (!time) return date;
                       return (
                         <>
-                          <span className="sm:hidden">{full.split(" ")[0]}</span>
-                          <span className="hidden sm:inline">{full}</span>
+                          <span className="sm:hidden">{date}</span>
+                          <span className="hidden sm:inline">{date}, {time}</span>
                         </>
                       );
                     })()}
