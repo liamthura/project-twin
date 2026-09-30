@@ -4,12 +4,30 @@ description: What changed in each release, and what you have to do about it.
 ---
 
 Versions here are the app version, shown at the foot of Settings → Account as
-`v0.2.4 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
+`v0.2.5 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
 predate this page.
 
 MyGist is pre-1.0, and its versions say so. Until 0.2.4 they were numbered one
 place higher, so 0.2.3 was released as 2.3.0, 0.2.2 as 2.2.0, 0.2.1 as 2.1.0,
 0.2.0 as 2.0.0 and 0.1.0 as 1.0.0. Nothing else about those releases changed.
+
+## 0.2.5
+
+Suggestions are written in your voice. What an assistant proposes becomes your
+persona, so it now reads as you would put it yourself: "I batch cook on
+Sundays for the week", not "Batch cooks on Sundays". Names and titles stay
+names, and the reason under a suggestion is still the assistant talking to
+you: "You mentioned the routine twice." No migration and no new setting.
+
+- The `propose_update` tool description and the MyGist skills ask for it,
+  with their examples rewritten in the new voice. Direct writes follow the
+  same rule, so a persona does not end up in two voices.
+- Suggestions already in your queue keep the words they were sent with.
+
+### Upgrading
+
+Pull the image and restart. An assistant picks the change up when it next
+fetches its tool list; one that caches it may need restarting.
 
 ## 0.2.4
 
