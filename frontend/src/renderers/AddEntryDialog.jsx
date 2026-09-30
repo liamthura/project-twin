@@ -135,10 +135,14 @@ export function AddEntryDialog({ node, entity, items, onAdd, open, onOpenChange,
           {editFields.filter((f) => f !== titleField).map((f) => (
             <div key={f} className="space-y-1.5">
               <Label className="text-xs capitalize">{f.replace(/_/g, " ")}</Label>
+              {/* Four choices fit the dialog's width as buttons; five
+                  wrapped to two lines, so from five it is a dropdown, as
+                  Media's eight kinds already were. */}
               <ScalarField
                 field={f}
                 value={draft[f]}
                 meta={meta}
+                segmentedMax={4}
                 customValue={draft[`custom_${f}`]}
                 onChange={(v) => {
                   const next = { ...draft, [f]: v };

@@ -133,7 +133,7 @@ const CLEAR_SENTINEL = "__clear__";
 
 // `clearable={false}` for a control whose options already hold the way back,
 // such as a filter's "All": a Clear under it did the same thing twice.
-export function SelectControl({ options, value, onChange, clearable = true }) {
+export function SelectControl({ options, value, onChange, clearable = true, className = "" }) {
   const isLegacy = Boolean(value) && !options.includes(value);
   const tone = value && !isLegacy ? VALUE_META[value]?.tone : undefined;
   return (
@@ -144,7 +144,7 @@ export function SelectControl({ options, value, onChange, clearable = true }) {
       <SelectTrigger
         // max-w-full so the 170px floor can never push the trigger past a
         // narrower container -- the same overflow the segmented control hit.
-        className={`h-9 w-auto min-w-[170px] max-w-full gap-2 ${isLegacy ? "border-dashed" : ""}`}
+        className={`h-9 w-auto min-w-[170px] max-w-full gap-2 ${isLegacy ? "border-dashed" : ""} ${className}`}
         title={isLegacy ? "stored value not in the current option set" : undefined}
       >
         {value ? (
@@ -189,7 +189,9 @@ export function SelectControl({ options, value, onChange, clearable = true }) {
 
 // Convenience wrapper: picks segmented-vs-chips based on option count so
 // call sites don't have to.
-export function EnumControl({ options, value, onChange, clearable = true }) {
+// `max` lowers the segmented limit where the room is narrower than a list
+// row: in the Add dialog five statuses wrapped to two lines.
+export function EnumControl({ options, value, onChange, clearable = true, max = SEGMENTED_MAX }) {
   // On a phone a four-value segmented control with word labels ("in progress")
   // eats the whole width and wraps to three lines, which is most of why a
   // status field looked broken there. Narrow screens get the dropdown the
@@ -197,7 +199,7 @@ export function EnumControl({ options, value, onChange, clearable = true }) {
   // rendered controls with one `sm:hidden`: two controls for one field would
   // both sit in the accessibility tree and both answer to a screen reader.
   const wide = useMediaQuery(SM_UP);
-  if (options.length > SEGMENTED_MAX || !wide) {
+  if (options.length > max || !wide) {
     // Large enums: compact dropdown (legacy values render dashed in-trigger).
     return <SelectControl options={options} value={value} onChange={onChange} clearable={clearable} />;
   }

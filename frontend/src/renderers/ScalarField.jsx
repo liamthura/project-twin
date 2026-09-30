@@ -39,7 +39,7 @@ export const HH_MM = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 // a <Label htmlFor> aimed at those stays a visible caption without a
 // programmatic association. FieldsRenderer is the caller that needs this;
 // ListRenderer's edit grid labels its own cells and passes nothing.
-export function ScalarField({ id, field, value, meta, onChange, customValue, onCustomChange }) {
+export function ScalarField({ id, field, value, meta, onChange, customValue, onCustomChange, segmentedMax }) {
   // meta.long_text is documented as a Set, and every caller inside this
   // codebase passes one -- `buildFieldMeta` (fieldMeta.js) always builds it as
   // one, for the only path it has left after Task 10 deleted the pre-v2 branch
@@ -75,7 +75,7 @@ export function ScalarField({ id, field, value, meta, onChange, customValue, onC
       (meta.optional || []).includes(`custom_${field}`);
     return (
       <div className="space-y-2">
-        <EnumControl options={enums} value={value} onChange={onChange} />
+        <EnumControl options={enums} value={value} onChange={onChange} max={segmentedMax} />
         {hasCustom && value === "other" && (
           <Input
             value={customValue || ""}
