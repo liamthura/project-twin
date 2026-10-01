@@ -136,6 +136,16 @@ describe("App on an onboarding route", () => {
     expect(window.location.hash).toBe("#/onboarding/about-you");
   });
 
+  it("reloads the persona when onboarding hands back, so the editor shows what was typed", async () => {
+    window.location.hash = "#/onboarding/assistant";
+    const userEvent = (await import("@testing-library/user-event")).default;
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "Skip for now" }));
+    await waitFor(() => expect(window.location.hash).toBe("#/profile"));
+    // Once at start, once on the way out of the flow.
+    await waitFor(() => expect(apiMock.mock.calls.filter(([path]) => path === "/all").length).toBeGreaterThanOrEqual(3));
+  });
+
   it("replays the editor tour from Show me around", async () => {
     window.location.hash = "#/profile";
     const userEvent = (await import("@testing-library/user-event")).default;

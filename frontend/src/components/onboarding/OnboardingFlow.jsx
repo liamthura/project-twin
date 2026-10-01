@@ -111,9 +111,9 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
 
   const send = useCallback((key) => {
     const payload = dataRef.current?.[key];
-    if (payload === undefined) return;
+    if (payload === undefined) return Promise.resolve();
     setSaveState("saving");
-    api(`/files/${key}`, { method: "PUT", body: JSON.stringify({ data: payload }) }).then(
+    return api(`/files/${key}`, { method: "PUT", body: JSON.stringify({ data: payload }) }).then(
       () => {
         failed.current.delete(key);
         setSaveState(failed.current.size ? "error" : "saved");
@@ -139,13 +139,15 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
   );
 
   // Flush anything still waiting before the step changes, so moving on cannot
-  // outrun the debounce and lose the last thing typed.
+  // outrun the debounce and lose the last thing typed. Resolves when the
+  // writes have landed, failed ones included.
   const flush = useCallback(() => {
-    for (const [key, timer] of Object.entries(timers.current)) {
+    const writes = Object.entries(timers.current).map(([key, timer]) => {
       clearTimeout(timer);
       delete timers.current[key];
-      send(key);
-    }
+      return send(key);
+    });
+    return Promise.all(writes);
   }, [send]);
 
   const retry = useCallback(() => [...failed.current].forEach(send), [send]);
@@ -161,10 +163,14 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
     [write],
   );
 
+  // Between steps the writes carry on behind the next screen. Leaving waits
+  // for them: the editor reloads what is stored when the flow hands back, and
+  // a reload that beat the last write showed the persona as it was before,
+  // which the editor's next save would then have written back over it.
   const go = (to, leave) => {
-    flush();
+    const landed = flush();
     if (to) onNavigate(to);
-    else onLeave(leave);
+    else landed.finally(() => onLeave(leave));
   };
 
   const choose = (id) => {

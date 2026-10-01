@@ -772,6 +772,10 @@ export default function App() {
         // with the editor tour after Complete.
         onLeave={({ to, tour } = {}) => {
           if (tour) setTourPending("first");
+          // The flow wrote through its own saves, and only hands back once
+          // they have landed; without this the editor showed, and would then
+          // save back, the persona as it was before onboarding.
+          loadAllData();
           navigate(to || "profile", null);
         }}
       />

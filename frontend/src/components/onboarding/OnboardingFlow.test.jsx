@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const apiMock = vi.hoisted(() => vi.fn());
@@ -142,6 +142,24 @@ describe("OnboardingFlow", () => {
     render(<OnboardingFlow step="about-you" onNavigate={onNavigate} onLeave={vi.fn()} />);
     await userEvent.setup().click(await screen.findByRole("button", { name: "Back" }));
     expect(onNavigate).toHaveBeenCalledWith("assistant");
+  });
+
+  it("leaves only once the last save has landed, so the editor reloads what was typed", async () => {
+    let land;
+    apiMock.mockImplementation((path, opts) => {
+      if (path === "/all") return Promise.resolve({ data: { profile: {}, preferences: {} } });
+      if (path === "/settings") return Promise.resolve({ disabled_sections: [], packs: packsFixture });
+      if (opts?.method === "PUT") return new Promise((resolve) => { land = resolve; });
+      return Promise.resolve({});
+    });
+    const onLeave = vi.fn();
+    const user = userEvent.setup();
+    render(<OnboardingFlow step="about-you" onNavigate={vi.fn()} onLeave={onLeave} />);
+    await user.type(await screen.findByLabelText("Name"), "Ada");
+    await user.click(screen.getByRole("button", { name: "Finish later" }));
+    expect(onLeave).not.toHaveBeenCalled();
+    land({});
+    await waitFor(() => expect(onLeave).toHaveBeenCalled());
   });
 
   it("renders no app shell at all", async () => {
