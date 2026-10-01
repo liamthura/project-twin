@@ -16,6 +16,13 @@ describe("InstallCard, a command client", () => {
     ).toBeInTheDocument();
   });
 
+  it("says where to run it, in a terminal", () => {
+    render(<InstallCard client={client("claude-code")} url={TEST_URL} />);
+    expect(
+      screen.getByText("Run this in a terminal. Claude Code then opens MyGist in your browser for you to sign in."),
+    ).toBeInTheDocument();
+  });
+
   it("shows both of Codex's lines", async () => {
     render(<InstallCard client={client("codex")} url={TEST_URL} />);
     expect(await screen.findByText(`codex mcp add mygist --url ${TEST_URL}`)).toBeInTheDocument();
@@ -90,12 +97,16 @@ describe("InstallCard, a steps client", () => {
 
     const items = screen.getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual([
-      expect.stringMatching(/^1.*Connectors/),
+      expect.stringMatching(/^1.*Customize, then Connectors/),
       expect.stringMatching(/^2.*Add custom connector/),
-      expect.stringMatching(/^3.*Paste the address/),
-      expect.stringMatching(/^4.*Claude opens/),
+      expect.stringMatching(/^3.*Claude opens MyGist/),
     ]);
     expect(screen.getByText(TEST_URL)).toBeInTheDocument();
+  });
+
+  it("says what a Team or Enterprise plan does differently", () => {
+    render(<InstallCard client={client("claude-desktop")} url={TEST_URL} />);
+    expect(screen.getByText(/an Owner adds it in Organization settings/)).toBeInTheDocument();
   });
 
   it("offers the address for copying", async () => {

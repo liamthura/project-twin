@@ -72,7 +72,7 @@ export function CopyButton({ value, label, children, variant = "outline" }) {
  * not a field anyone edits, and `select-all` makes a click take the whole
  * string rather than a word of it.
  */
-function AddressRow({ id, url }) {
+export function AddressRow({ id, url }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>Server address</Label>
@@ -114,9 +114,9 @@ export function InstallCard({ client, url }) {
   if (client.kind === "deeplink") {
     return (
       <div className="space-y-3">
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          This opens {client.name} and adds MyGist for you. Sign in when it asks,
-          and keep the permission to suggest changes.
+        <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+          This opens {client.name} and adds MyGist. Sign in when it asks, and keep
+          the permission to suggest changes.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild>
@@ -139,10 +139,12 @@ export function InstallCard({ client, url }) {
   if (client.kind === "command") {
     return (
       <div className="space-y-3">
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Run this, then sign in when {client.name} opens MyGist in your browser.
+        <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+          Run this in a terminal. {client.name} then opens MyGist in your browser for you to sign in.
         </p>
-        <Terminal title={client.name}>
+        {/* Wrapped rather than scrolled: on a phone the command was cut off
+            at "http://", with the rest out of sight. */}
+        <Terminal title={client.name} className="[&_code]:break-all [&_pre]:whitespace-pre-wrap">
           {payload.map((line, i) => (
             <AnimatedSpan key={line} delay={i * 60} className="text-foreground">
               {line}
@@ -162,6 +164,7 @@ export function InstallCard({ client, url }) {
     <div className="space-y-4">
       <Steps items={payload} />
       <AddressRow id={`install-address-${client.id}`} url={url} />
+      {client.note && <p className="max-w-prose text-sm text-muted-foreground">{client.note}</p>}
     </div>
   );
 }
