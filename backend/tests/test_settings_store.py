@@ -54,7 +54,7 @@ def test_enabled_sections_force_includes_always_on(as_user):
 
 
 def test_onboarding_defaults_for_an_account_that_predates_it(as_user):
-    assert ss.get_onboarding() == {"dismissed": False, "steps": {}}
+    assert ss.get_onboarding() == {"dismissed": False, "steps": {}, "seen": []}
 
 
 def test_onboarding_round_trips(as_user):
@@ -62,6 +62,7 @@ def test_onboarding_round_trips(as_user):
     assert ss.get_onboarding() == {
         "dismissed": True,
         "steps": {"about-you": "done"},
+        "seen": [],
     }
 
 
@@ -79,7 +80,7 @@ def test_onboarding_repairs_a_blob_written_by_hand(as_user):
     blob = ss.get_settings()
     blob["onboarding"] = "yes"
     ss.set_settings(blob)
-    assert ss.get_onboarding() == {"dismissed": False, "steps": {}}
+    assert ss.get_onboarding() == {"dismissed": False, "steps": {}, "seen": []}
 
 
 def test_onboarding_drops_steps_and_statuses_it_does_not_recognise(as_user):
@@ -87,4 +88,4 @@ def test_onboarding_drops_steps_and_statuses_it_does_not_recognise(as_user):
     ss.set_onboarding(
         {"dismissed": False, "steps": {"welcome": "done", "about-you": "later"}}
     )
-    assert ss.get_onboarding() == {"dismissed": False, "steps": {}}
+    assert ss.get_onboarding() == {"dismissed": False, "steps": {}, "seen": []}

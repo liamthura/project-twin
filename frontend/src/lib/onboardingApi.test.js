@@ -7,7 +7,7 @@ vi.mock("./api.js", async (importOriginal) => {
   return { ...actual, api: apiMock };
 });
 
-const { getOnboarding, saveOnboarding } = await import("./onboarding.js");
+const { getOnboarding, saveOnboarding, markSeen } = await import("./onboarding.js");
 // The real one: the mock above spreads every actual export and replaces only
 // `api`, and mcpUrl derives from getApiBase and localStorage rather than from
 // any request.
@@ -21,11 +21,12 @@ describe("getOnboarding", () => {
   it("returns the stored state", async () => {
     apiMock.mockResolvedValue({
       disabled_sections: [],
-      onboarding: { dismissed: true, steps: { "about-you": "done" } },
+      onboarding: { dismissed: true, steps: { "about-you": "done" }, seen: ["guide:editor"] },
     });
     await expect(getOnboarding()).resolves.toEqual({
       dismissed: true,
       steps: { "about-you": "done" },
+      seen: ["guide:editor"],
     });
   });
 
@@ -33,7 +34,18 @@ describe("getOnboarding", () => {
     // A backend that predates the settings change, or a detached instance
     // pointed at an older server. A missing key is not a broken page.
     apiMock.mockResolvedValue({ disabled_sections: [] });
-    await expect(getOnboarding()).resolves.toEqual({ dismissed: false, steps: {} });
+    await expect(getOnboarding()).resolves.toEqual({ dismissed: false, steps: {}, seen: [] });
+  });
+});
+
+describe("markSeen", () => {
+  it("remembers a guide on the server", async () => {
+    apiMock.mockResolvedValue({ seen: ["guide:editor"] });
+    await markSeen("guide:editor");
+    expect(apiMock).toHaveBeenCalledWith("/onboarding/seen", {
+      method: "POST",
+      body: JSON.stringify({ key: "guide:editor" }),
+    });
   });
 });
 

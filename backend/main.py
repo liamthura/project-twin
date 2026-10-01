@@ -857,6 +857,7 @@ async def get_settings():
                 "sections": meta["sections"],
                 "entities": meta["entities"],
                 "promotable": meta["promotable"],
+                "defaults": meta["defaults"],
                 "enabled": key in enabled,
             }
             for key, meta in sections.PACK_META.items()
@@ -907,6 +908,18 @@ async def update_settings(update: SettingsUpdate):
     return {"status": "saved", "disabled_sections": sorted(requested),
             "enabled_sections": sorted(settings_store.get_enabled_optins()),
             "onboarding": settings_store.get_onboarding()}
+
+
+class SeenRequest(BaseModel):
+    key: str
+
+
+@app.post("/api/onboarding/seen")
+async def onboarding_seen(body: SeenRequest):
+    """Remember a guide or hint as shown, for this account on every device."""
+    if not settings_store.SEEN_KEY.match(body.key):
+        raise HTTPException(status_code=400, detail="key must be 1-48 of a-z, 0-9, ':' and '-'")
+    return {"seen": settings_store.add_seen(body.key)}
 
 
 @app.get("/api/all")

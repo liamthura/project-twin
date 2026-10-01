@@ -93,6 +93,9 @@ PACK_META = {
         # What an observation can be promoted to, and each type's `about`: the
         # Promote dialog's list and routing's options, from one rule.
         "promotable": pack_loader.derive_promotion_targets(m),
+        # What a new persona starts with, so the app can tell a value someone
+        # typed from one the manifest filled in (British English, say).
+        "defaults": m["defaults"],
     }
     for key, m in _MANIFESTS.items()
 }

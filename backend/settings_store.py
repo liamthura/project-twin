@@ -6,6 +6,7 @@ VALID_FILES / get_all / exports. Scoped to the current request's user via
 db.current_user_id.
 """
 import json
+import re
 
 import db
 import sections
@@ -68,6 +69,27 @@ ONBOARDING_STEP_KEYS = frozenset({"about-you", "how-you-like"})
 # passed a step has not failed it, and both look identical from the data.
 ONBOARDING_STATUSES = frozenset({"done", "skipped"})
 
+# Guides and hints already shown (frontend/src/lib/guide.js). Kept here rather
+# than in the browser so a second device does not replay them. The pattern is
+# the contract; no list of keys is mirrored on the server.
+SEEN_KEY = re.compile(r"^[a-z0-9:-]{1,48}$")
+MAX_SEEN = 32
+
+
+def _seen(raw) -> list[str]:
+    """Repaired, never trusted: anything that is not a short key goes, repeats
+    go, and the list stops at MAX_SEEN."""
+    out = []
+    for key in raw if isinstance(raw, list) else []:
+        if isinstance(key, str) and SEEN_KEY.match(key) and key not in out:
+            out.append(key)
+    return out[:MAX_SEEN]
+
+
+def _stored_onboarding(blob: dict) -> dict:
+    raw = blob.get("onboarding")
+    return raw if isinstance(raw, dict) else {}
+
 
 def get_onboarding() -> dict:
     """Onboarding progress, always in the documented shape.
@@ -78,7 +100,7 @@ def get_onboarding() -> dict:
     """
     raw = get_settings().get("onboarding")
     if not isinstance(raw, dict):
-        return {"dismissed": False, "steps": {}}
+        return {"dismissed": False, "steps": {}, "seen": []}
     steps = raw.get("steps")
     if not isinstance(steps, dict):
         steps = {}
@@ -89,6 +111,7 @@ def get_onboarding() -> dict:
             for k, v in steps.items()
             if k in ONBOARDING_STEP_KEYS and v in ONBOARDING_STATUSES
         },
+        "seen": _seen(raw.get("seen")),
     }
 
 
@@ -97,8 +120,20 @@ def set_onboarding(state: dict) -> None:
     blob["onboarding"] = {
         "dismissed": bool(state.get("dismissed", False)),
         "steps": dict(state.get("steps") or {}),
+        # Only ever grows, and only through add_seen: a stale copy of the
+        # card's state must not un-see a guide.
+        "seen": _seen(_stored_onboarding(blob).get("seen")),
     }
     set_settings(blob)
+
+
+def add_seen(key: str) -> list[str]:
+    blob = get_settings()
+    stored = _stored_onboarding(blob)
+    seen = _seen([*_seen(stored.get("seen")), key])
+    blob["onboarding"] = {"dismissed": False, "steps": {}, **stored, "seen": seen}
+    set_settings(blob)
+    return seen
 
 
 def enabled_sections() -> set:

@@ -1,7 +1,9 @@
+import pytest
 from fastapi.testclient import TestClient
 
 import main
 import sections
+import settings_store
 
 
 def _client_and_auth():
@@ -60,6 +62,7 @@ def test_get_settings_includes_pack_metadata(clean_database):
         "sections": sections.PACK_META["profile"]["sections"],
         "entities": sections.PACK_META["profile"]["entities"],
         "promotable": sections.PACK_META["profile"]["promotable"],
+        "defaults": sections.PACK_META["profile"]["defaults"],
         "enabled": True,
     }
     # disabling a toggleable pack is reflected in `enabled`
@@ -72,7 +75,7 @@ def test_get_settings_includes_pack_metadata(clean_database):
 def test_get_settings_reports_onboarding_defaults(clean_database):
     client, auth = _client_and_auth()
     body = client.get("/api/settings", headers=auth).json()
-    assert body["onboarding"] == {"dismissed": False, "steps": {}}
+    assert body["onboarding"] == {"dismissed": False, "steps": {}, "seen": []}
 
 
 def test_put_settings_persists_onboarding(clean_database):
@@ -87,7 +90,7 @@ def test_put_settings_persists_onboarding(clean_database):
     )
     assert r.status_code == 200
     body = client.get("/api/settings", headers=auth).json()
-    assert body["onboarding"] == {"dismissed": False, "steps": {"about-you": "done"}}
+    assert body["onboarding"] == {"dismissed": False, "steps": {"about-you": "done"}, "seen": []}
 
 
 def test_put_settings_leaves_onboarding_alone_when_omitted(clean_database):
@@ -124,3 +127,31 @@ def test_put_rejects_an_unknown_onboarding_status(clean_database):
     )
     assert r.status_code == 400
     assert "later" in r.json()["detail"]
+
+
+def test_seen_is_remembered_once_and_survives_other_writes(clean_database):
+    client, auth = _client_and_auth()
+    assert client.get("/api/settings", headers=auth).json()["onboarding"]["seen"] == []
+    for key in ("guide:editor", "guide:editor", "hint:promote"):
+        assert client.post("/api/onboarding/seen", headers=auth, json={"key": key}).status_code == 200
+    assert client.post("/api/onboarding/seen", headers=auth, json={"key": "Bad Key!"}).status_code == 400
+    # The card's dismiss sends dismissed and steps; it must not wipe seen.
+    client.put("/api/settings", headers=auth,
+               json={"disabled_sections": [], "onboarding": {"dismissed": True, "steps": {}}})
+    onboarding = client.get("/api/settings", headers=auth).json()["onboarding"]
+    assert onboarding["seen"] == ["guide:editor", "hint:promote"]
+    assert onboarding["dismissed"] is True
+
+
+@pytest.mark.nodb
+def test_seen_is_repaired_on_read():
+    assert settings_store._seen(None) == []
+    assert settings_store._seen(["a", "a", 5, "NO", "b:c"]) == ["a", "b:c"]
+    assert len(settings_store._seen([f"k{i}" for i in range(40)])) == settings_store.MAX_SEEN
+
+
+def test_settings_packs_carry_their_defaults(clean_database):
+    client, auth = _client_and_auth()
+    packs = client.get("/api/settings", headers=auth).json()["packs"]
+    prefs = next(p for p in packs if p["key"] == "preferences")
+    assert prefs["defaults"]["communication"]["default"]["locale"] == "British English"
