@@ -899,6 +899,7 @@ export default function App() {
                 onStart={(step) => navigate("onboarding", step)}
                 onReview={() => navigate("review", null)}
                 onAddEmail={addEmail}
+                onOpenSettings={openSettings}
                 onShownChange={setCardShown}
               />
             )}

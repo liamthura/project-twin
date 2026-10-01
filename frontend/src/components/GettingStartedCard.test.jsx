@@ -47,6 +47,7 @@ const renderCard = (props = {}) =>
       onStart={vi.fn()}
       onReview={vi.fn()}
       onAddEmail={vi.fn()}
+      onOpenSettings={vi.fn()}
       {...props}
     />,
   );
@@ -56,8 +57,16 @@ describe("GettingStartedCard", () => {
     // A token that has never been used is waiting, not connected.
     watch.report = report({ state: "waiting", name: "my assistant" });
     renderCard({ profile: { name: "Ada" } });
-    expect(await screen.findByText("1 of 3")).toBeInTheDocument();
+    expect(await screen.findByText("1 of 3 done")).toBeInTheDocument();
     expect(screen.getByText("Waiting for my assistant…")).toBeInTheDocument();
+  });
+
+  it("marks one step as next, the first one not done", async () => {
+    watch.report = report({ state: "connected", name: "Cursor" });
+    renderCard();
+    const next = await screen.findByRole("listitem", { current: "step" });
+    expect(next).toHaveTextContent("Fill in the basics");
+    expect(screen.getAllByRole("listitem").filter((li) => li.getAttribute("aria-current"))).toHaveLength(1);
   });
 
   it("keeps a way back to the steps while a connection is waiting", async () => {
@@ -77,12 +86,21 @@ describe("GettingStartedCard", () => {
     expect(onStart.mock.calls).toEqual([["assistant"], ["about-you"]]);
   });
 
-  it("ticks the first suggestion and links to what is waiting", async () => {
+  it("says when the connection can only read, and offers to change its access", async () => {
+    const onOpenSettings = vi.fn();
+    watch.report = report({ state: "connected", name: "Cursor", can_propose: false });
+    renderCard({ profile: { name: "Ada" }, onOpenSettings });
+    expect(await screen.findByText("Cursor can only read your persona, so it can't suggest anything.")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Change access" }));
+    expect(onOpenSettings).toHaveBeenCalledWith("connections");
+  });
+
+  it("ends with you're set up, and a way to what is waiting", async () => {
     const onReview = vi.fn();
     watch.report = report({ state: "connected", name: "Cursor" }, { suggested: true, pending: 2 });
     renderCard({ profile: { name: "Ada" }, onReview });
-    expect(await screen.findByText("3 of 3")).toBeInTheDocument();
-    expect(screen.getByText("Cursor connected")).toBeInTheDocument();
+    expect(await screen.findByText("You're set up")).toBeInTheDocument();
+    expect(screen.getByText("Cursor reads your persona, and what it suggests waits in Review.")).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "Review 2" }));
     expect(onReview).toHaveBeenCalled();
   });
@@ -108,12 +126,12 @@ describe("GettingStartedCard", () => {
     expect(showHintMock).not.toHaveBeenCalled();
   });
 
-  it("carries the email nudge while it shows", async () => {
+  it("carries the email nudge as one quiet line", async () => {
     getSessionMock.mockResolvedValue({ user: { email: "x@placeholder.invalid" } });
     const onAddEmail = vi.fn();
     renderCard({ onAddEmail });
-    expect(await screen.findByText("Add an email so you can reset your password")).toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Add email" }));
+    expect(await screen.findByText("No recovery email yet.")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Add one" }));
     expect(onAddEmail).toHaveBeenCalled();
   });
 
@@ -121,8 +139,8 @@ describe("GettingStartedCard", () => {
     localStorage.setItem("mygist_add_email_dismissed", "1");
     getSessionMock.mockResolvedValue({ user: { email: "x@placeholder.invalid" } });
     renderCard();
-    await screen.findByText("0 of 3");
-    expect(screen.queryByText("Add an email so you can reset your password")).not.toBeInTheDocument();
+    await screen.findByText("0 of 3 done");
+    expect(screen.queryByText("No recovery email yet.")).not.toBeInTheDocument();
   });
 
   it("tells the page whether it is showing, and hides when dismissed", async () => {

@@ -28,7 +28,7 @@ export function atStart(name, fallback = "your assistant") {
 /**
  * The latest report. While `active`, asks every 3 s, then every 10 s after two
  * minutes, and not at all while the tab is hidden. Not active, it asks once,
- * hidden or not.
+ * hidden or not. Either way it asks again when the tab is shown.
  */
 export function useWatchtower({ active = false, since = null } = {}) {
   // Kept with the `since` it answered, so a report asked for another one is
@@ -38,24 +38,32 @@ export function useWatchtower({ active = false, since = null } = {}) {
     let cancelled = false;
     let timer;
     const started = Date.now();
+    const ask = async () => {
+      try {
+        const next = await getWatchtower(since);
+        if (!cancelled) setHeld({ since, report: next });
+      } catch {
+        // The next tick asks again; a screen that is waiting keeps waiting.
+      }
+    };
     const tick = async () => {
       // A screen that asks once asks even from a background tab, or it would
       // show nothing (or "Connect" to someone connected) until reloaded.
-      if (!active || document.visibilityState !== "hidden") {
-        try {
-          const next = await getWatchtower(since);
-          if (!cancelled) setHeld({ since, report: next });
-        } catch {
-          // The next tick asks again; a screen that is waiting keeps waiting.
-        }
-      }
+      if (!active || document.visibilityState !== "hidden") await ask();
       if (cancelled || !active) return;
       timer = setTimeout(tick, Date.now() - started > SLOW_AFTER_MS ? SLOW_MS : FAST_MS);
     };
+    // Back on the tab, ask again: an assistant connected in another window
+    // shows here without a reload.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") ask();
+    };
     tick();
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [active, since]);
   return held && held.since === since ? held.report : null;

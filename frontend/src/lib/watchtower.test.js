@@ -29,6 +29,16 @@ describe("useWatchtower", () => {
     expect(apiMock).toHaveBeenCalledTimes(1);
   });
 
+  it("asks again when you come back to the tab, so a screen that asked once is not left stale", async () => {
+    renderHook(() => useWatchtower());
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    visibility("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    visibility("visible");
+    await act(async () => document.dispatchEvent(new Event("visibilitychange")));
+    expect(apiMock).toHaveBeenCalledTimes(2);
+  });
+
   it("asks only about calls after `since` when given one", async () => {
     renderHook(() => useWatchtower({ since: "2026-10-01T10:00:00+00:00" }));
     await act(() => vi.advanceTimersByTimeAsync(0));
