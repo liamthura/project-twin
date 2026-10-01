@@ -4,12 +4,42 @@ description: What changed in each release, and what you have to do about it.
 ---
 
 Versions here are the app version, shown at the foot of Settings → Account as
-`v0.2.5 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
+`v0.3.0 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
 predate this page.
 
 MyGist is pre-1.0, and its versions say so. Until 0.2.4 they were numbered one
 place higher, so 0.2.3 was released as 2.3.0, 0.2.2 as 2.2.0, 0.2.1 as 2.1.0,
 0.2.0 as 2.0.0 and 0.1.0 as 1.0.0. Nothing else about those releases changed.
+
+## 0.3.0
+
+A new first run that ends on your first approved suggestion. After signing up
+you choose the assistant you use, follow its own steps, and paste a prompt; the
+screen follows the assistant as it connects, reads your persona and suggests
+things, then takes you to Review for the first one. Typing it yourself ends
+with a short tour of the editor instead.
+
+- Connect is three screens: which assistant, its steps, and who fills it in.
+  Something else holds the paste-in prompt and the token, and a token keeps
+  its steps beside it. An existing token no longer hides the sign-in steps.
+- Connected now means the assistant has called, everywhere it is shown. The
+  Getting started card ticks only what happened, its third step can be
+  ticked, and Show getting started brings it back as it was.
+- Guides, shown once per account and remembered on the server: your first
+  suggestion in Review, a tour of the editor (Show me around in the account
+  menu replays it), and hints on Promote, your first connected app, and where
+  to paste the prompt. The confetti moved to your first approval.
+- The Claude entry covers claude.ai and the desktop app, with Claude's current
+  steps (Customize → Connectors).
+- About you shows when it has saved, leaves nationality to Profile, and starts
+  the locale from your browser's language.
+
+### Upgrading
+
+Pull the image and restart. No migration. `/api/usage` is now
+`/api/watchtower`, which returns the same `activity` rows plus `connection`,
+`assistant` and `pending`; the old name still answers in 0.3.x and goes in the
+next minor release.
 
 ## 0.2.5
 

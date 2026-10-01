@@ -81,10 +81,13 @@ The connection is fine, the tools are listed, and the assistant answers your
 questions from general knowledge as if MyGist were not there. Ask it to check
 MyGist and it works perfectly, which is the tell.
 
-`/api/usage` separates the three cases that look identical from the outside:
+`/api/watchtower` separates the three cases that look identical from the
+outside. Its `activity` rows are per client; `connection` and `assistant`
+summarise them, the same answer the app's onboarding and Review read. It was
+`/api/usage` before 0.3.0, and that name still answers in 0.3.x.
 
 ```bash
-curl -s https://your-instance/api/usage -H "Authorization: Bearer YOUR_TOKEN"
+curl -s https://your-instance/api/watchtower -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 | What you see | What it means |
