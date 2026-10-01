@@ -83,11 +83,11 @@ afterEach(() => {
 
 describe("App on an onboarding route", () => {
   it("renders the flow with no shell around it", async () => {
-    // The retired Welcome step: an old link lands on Connect, which carries it.
+    // The retired Welcome step: an old link lands on the choice of assistant.
     window.location.hash = "#/onboarding/welcome";
     render(<App />);
 
-    await screen.findByRole("heading", { name: /welcome to mygist/i });
+    await screen.findByRole("heading", { name: "Which assistant do you use?" });
     // The two things the shell always draws. Their absence IS the feature.
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
@@ -105,10 +105,10 @@ describe("App on an onboarding route", () => {
     const push = vi.spyOn(window.history, "pushState");
     render(<App />);
 
-    await screen.findByRole("heading", { name: /welcome to mygist/i });
+    await screen.findByRole("heading", { name: "Which assistant do you use?" });
     await waitFor(() => {
       expect(replace).toHaveBeenCalled();
-      expect(window.location.hash).toBe("#/onboarding/connect");
+      expect(window.location.hash).toBe("#/onboarding/assistant");
     });
     expect(push).not.toHaveBeenCalled();
     replace.mockRestore();

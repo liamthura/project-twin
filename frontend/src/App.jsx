@@ -134,6 +134,9 @@ export default function App() {
   const [disabledSections, setDisabledSections] = useState([]);
   const [packs, setPacks] = useState([]);
   const [pendingCount, setPendingCount] = useState(0);
+  // The editor tour waiting to run: "first" once after onboarding, "force"
+  // from Show me around, which replays it.
+  const [tourPending, setTourPending] = useState(null);
   // Where you are lives in the URL, in two segments -- `#/preferences/code-style`
   // -- so a refresh keeps your place down to the subsection. Without it a reload
   // drops you on Profile, which is worst exactly when a "View in ..." link just
@@ -750,7 +753,12 @@ export default function App() {
       <OnboardingFlow
         step={step}
         onNavigate={(next) => navigate("onboarding", next)}
-        onLeave={() => navigate("profile", null)}
+        // Review when handover's suggestions have arrived; Profile otherwise,
+        // with the editor tour after Complete.
+        onLeave={({ to, tour } = {}) => {
+          if (tour) setTourPending("first");
+          navigate(to || "profile", null);
+        }}
       />
     );
   }

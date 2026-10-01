@@ -6,6 +6,7 @@
  * node it renders is the same one Profile renders, read out of the same
  * manifest.
  */
+import { Button } from "@/components/ui/button";
 import { FieldsRenderer } from "@/renderers/FieldsRenderer";
 import { BlurFade } from "@/components/ui/blur-fade";
 
@@ -16,7 +17,25 @@ import { nodeAt } from "./manifestNode";
 // missing.
 const PROFILE_ROOT = [];
 
-export function StepAboutYou({ packs, data, onChange, onOfferAssistant, children }) {
+// Back, then Finish later beside Continue. "Finish later", not "Skip": what
+// you typed is already saved, so skipping read as throwing it away.
+function Footer({ onBack, onLater, onContinue }) {
+  return (
+    <div className="mt-10 flex items-center justify-between gap-3">
+      <Button variant="ghost" className="-ml-3" onClick={onBack}>
+        Back
+      </Button>
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" onClick={onLater}>
+          Finish later
+        </Button>
+        <Button onClick={onContinue}>Continue</Button>
+      </div>
+    </div>
+  );
+}
+
+export function StepAboutYou({ packs, data, onChange, onOfferAssistant, onBack, onLater, onContinue, children }) {
   const node = nodeAt(packs, "profile", PROFILE_ROOT);
 
   if (!node) {
@@ -40,6 +59,7 @@ export function StepAboutYou({ packs, data, onChange, onOfferAssistant, children
             Let my assistant fill this in instead
           </button>
         )}
+        <Footer onBack={onBack} onLater={onLater} onContinue={onContinue} />
       </div>
     );
   }
@@ -78,6 +98,7 @@ export function StepAboutYou({ packs, data, onChange, onOfferAssistant, children
             Let my assistant fill this in instead
           </button>
         )}
+        <Footer onBack={onBack} onLater={onLater} onContinue={onContinue} />
       </div>
     </BlurFade>
   );

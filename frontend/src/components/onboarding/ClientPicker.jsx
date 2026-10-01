@@ -1,108 +1,66 @@
 /**
- * Which client are you connecting.
+ * Which assistant are you connecting: one row per assistant, and choosing a
+ * row is the answer.
+ *
+ * It was an accordion that opened each client's steps in place, on the same
+ * screen as every other way to connect and the question of who fills it in --
+ * eleven actions and no filled button. Now the steps get a screen of their own
+ * (StepConnect), so a row only has to say what it is and what it takes.
  *
  * A single column, and that is a rule rather than a preference: three identical
- * cards in a row is one of the named AI-slop signatures in the design record,
- * and six of them would be a worse version of the same thing. A list also
- * scales without reflowing, which matters because the roster grows.
+ * cards in a row is one of the named AI-slop signatures in the design record. A
+ * list also scales without reflowing, which matters because the roster grows.
  *
- * One row open at a time. Two open cards put two server addresses and two copy
- * buttons on screen at once, and there is no reading of that which helps.
- *
- * `renderExpanded` rather than importing InstallCard directly: the picker knows
- * about rows and selection, and nothing about what installing involves. That
- * keeps the two testable apart, and the picker reusable from Settings later.
- *
- * This is the ARIA Authoring Practices Accordion pattern, not just a button
- * that toggles a div. Someone navigating by region in JAWS, NVDA or VoiceOver
- * jumps between landmarks rather than reading every row in order, so the panel
- * needs its own region identity and a spoken link back to the header that
- * opened it, not only the `aria-expanded` on that header.
+ * `lib/clients.js` explains `kind`: of the clients MyGist names, exactly one has
+ * a real deeplink, so the effort label is a fact about each, not decoration.
  */
-import { ChevronDown } from "lucide-react";
+import { AppWindow, ChevronRight, MoreHorizontal, Terminal } from "lucide-react";
 
 import { MagicCard } from "@/components/ui/magic-card";
-import { cn } from "@/lib/utils";
 
-// What the row promises the action will be. Named for the reader rather than
-// for the roster: "deeplink" is our word, "One click" is theirs.
-const ACTION_LABEL = {
+const EFFORT = {
   deeplink: "One click",
   command: "One command",
   steps: "A few steps",
+  other: "Paste a prompt, or use a token",
 };
 
+// A client with no logo file gets an icon for how it installs, not a letter in
+// a box, which read as a placeholder.
+const KIND_ICON = { command: Terminal, steps: AppWindow, deeplink: AppWindow, other: MoreHorizontal };
+
 function Mark({ client }) {
-  if (!client.mark) {
-    // No logo file for this one. `design/logos/README.md` records why, and an
-    // invented glyph would be worse than an initial.
+  if (client.mark) {
     return (
-      <span
-        aria-hidden="true"
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded border text-[10px] font-semibold text-muted-foreground"
-      >
-        {client.name.charAt(0)}
-      </span>
+      <img src={`/landing/logos/${client.slug}.svg`} alt="" aria-hidden="true" className="h-6 w-6 shrink-0" />
     );
   }
-  return (
-    <img
-      src={`/landing/logos/${client.slug}.svg`}
-      alt=""
-      aria-hidden="true"
-      className="h-6 w-6 shrink-0"
-    />
-  );
+  const Icon = KIND_ICON[client.kind];
+  return <Icon aria-hidden="true" className="h-5 w-6 shrink-0 text-muted-foreground" />;
 }
 
-export function ClientPicker({ clients, selectedId, onSelect, renderExpanded }) {
+export function ClientPicker({ clients, onChoose }) {
   return (
     <ul className="space-y-2">
-      {clients.map((client) => {
-        const open = client.id === selectedId;
-        // Derived from client.id rather than an index or generated id: it is
-        // already unique across the roster and stable across renders, so the
-        // aria-controls/aria-labelledby pair never drifts out of sync.
-        const triggerId = `client-picker-trigger-${client.id}`;
-        const panelId = `client-picker-panel-${client.id}`;
-        return (
-          <li key={client.id}>
-            <MagicCard>
-              <button
-                type="button"
-                id={triggerId}
-                aria-expanded={open}
-                aria-controls={panelId}
-                className="flex w-full items-center gap-3 px-3 py-3 text-left"
-                onClick={() => onSelect(open ? null : client.id)}
-              >
-                <Mark client={client} />
-                <span className="flex-1 text-sm font-medium">{client.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {ACTION_LABEL[client.kind]}
-                </span>
-                <ChevronDown
-                  aria-hidden="true"
-                  className={cn(
-                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
-                    open && "rotate-180",
-                  )}
-                />
-              </button>
-              {open && (
-                <div
-                  id={panelId}
-                  role="region"
-                  aria-labelledby={triggerId}
-                  className="border-t px-3 py-4"
-                >
-                  {renderExpanded(client)}
-                </div>
-              )}
-            </MagicCard>
-          </li>
-        );
-      })}
+      {clients.map((client) => (
+        <li key={client.id}>
+          <MagicCard>
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 px-3 py-3 text-left coarse:min-h-14"
+              // The name and the effort are two spans, which a screen reader
+              // would run together as "ClaudeA few steps".
+              aria-label={`${client.name}, ${EFFORT[client.kind].toLowerCase()}`}
+              onClick={() => onChoose(client.id)}
+            >
+              <Mark client={client} />
+              <span className="flex-1 text-sm font-medium">{client.name}</span>
+              <span className="text-xs text-muted-foreground">{EFFORT[client.kind]}</span>
+              <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          </MagicCard>
+        </li>
+      ))}
     </ul>
   );
 }
