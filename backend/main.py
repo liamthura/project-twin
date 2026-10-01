@@ -41,6 +41,7 @@ import auth_proxy
 import db
 import jwt_auth
 import mcp_activity
+import watchtower
 import persona_store
 import filling
 import proposals_store
@@ -713,20 +714,27 @@ async def whoami(request: Request):
     return {"user_id": db.current_user_id.get(), "username": request.state.username}
 
 
-@app.get("/api/usage")
-async def usage():
-    """What each connected client has actually done, for this account.
+@app.get("/api/watchtower")
+async def watchtower_report():
+    """What is connected to this account, and what it has done.
 
-    The answer to "is my assistant using MyGist at all", which until now could
-    only be guessed at from the outside. `tools/list` is the row worth reading
-    first: a client that has never fetched it is running on a cached tool
-    schema, and no deploy will reach it.
+    `activity` is every client's counters, as /api/usage always returned: the
+    answer to "is my assistant using MyGist at all". `tools/list` is the row
+    worth reading first: a client that has never fetched it is running on a
+    cached tool schema, and no deploy will reach it. Counters only -- method
+    names, tool names, the client's own label -- so this needs no scope beyond
+    the read every other /api GET requires.
 
-    Counters only -- method names, tool names, the client's own label. Nothing
-    from arguments and no persona content, which is why this needs no scope
-    beyond the read every other /api GET already requires.
+    `connection`, `assistant` and `pending` are worked out from those rows, the
+    account's grants and tokens, and the review queue (see watchtower.py).
     """
-    return {"activity": mcp_activity.usage(db.current_user_id.get())}
+    return watchtower.report(db.current_user_id.get())
+
+
+@app.get("/api/usage", deprecated=True)
+async def usage():
+    """Renamed /api/watchtower in 0.3.0. Answers for one more release."""
+    return watchtower.report(db.current_user_id.get())
 
 
 @app.post("/api/auth/set-password")

@@ -8,7 +8,7 @@ Two rules govern everything here:
 
   Never store content. Method names, tool names and the client's own label --
   nothing from arguments, and no persona data. This table is safe to read over
-  someone's shoulder, which is what makes it safe to expose on /api/usage.
+  someone's shoulder, which is what makes it safe to expose on /api/watchtower.
 """
 import logging
 
@@ -77,7 +77,7 @@ def record(client: str, method: str, tool: str = "") -> None:
 
 
 def usage(user_id) -> list[dict]:
-    """Every row for one user, busiest first. Powers GET /api/usage."""
+    """Every row for one user, busiest first. Powers GET /api/watchtower."""
     with db.get_pool().connection() as conn:
         rows = conn.execute(
             "select client, method, tool, calls, first_seen, last_seen"
