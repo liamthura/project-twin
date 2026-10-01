@@ -25,6 +25,18 @@ import { AnimatedSpan, Terminal } from "@/components/ui/terminal";
 // number rather than carrying a second one that could drift from it.
 export const COPIED_RESET_MS = 2000;
 
+/**
+ * Copy text, and say whether it worked. The browser can refuse -- no
+ * permission, an insecure page, a document without focus -- and a button that
+ * then reads "Copied" claims something that did not happen. Resolves true only
+ * when the text is on the clipboard. (TokenPanel's copy already worked so.)
+ */
+export const copyText = (value) =>
+  (navigator.clipboard ? navigator.clipboard.writeText(value) : Promise.reject()).then(
+    () => true,
+    () => false,
+  );
+
 export function CopyButton({ value, label, children, variant = "outline" }) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef(null);
@@ -48,8 +60,9 @@ export function CopyButton({ value, label, children, variant = "outline" }) {
       size="sm"
       className="shrink-0"
       aria-label={accessibleLabel}
-      onClick={() => {
-        navigator.clipboard?.writeText(value);
+      onClick={async () => {
+        // Refused, the value is still on screen to copy by hand.
+        if (!(await copyText(value))) return;
         setCopied(true);
         clearTimeout(timeoutRef.current);
         timeoutRef.current = setTimeout(() => setCopied(false), COPIED_RESET_MS);

@@ -40,6 +40,15 @@ describe("StepHandover", () => {
     );
   });
 
+  it("does not say copied, or ask for a paste, when the browser refuses the copy", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(new Error("denied"));
+    renderStep();
+    await user.click(screen.getByRole("button", { name: "Copy prompt" }));
+    expect(screen.getByRole("button", { name: "Copy prompt" })).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
   it("says when the assistant is reading", () => {
     renderStep({ report: report({ read: true }) });
     expect(screen.getByRole("status")).toHaveTextContent("Codex is reading your persona…");

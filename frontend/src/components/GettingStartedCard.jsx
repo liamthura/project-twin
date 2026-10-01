@@ -27,6 +27,7 @@ import { getSession, isPlaceholderEmail } from "@/lib/session.js";
 import { atStart, useWatchtower } from "@/lib/watchtower.js";
 
 import { AUTOFILL_PROMPT } from "./onboarding/autofillPrompt";
+import { copyText } from "./onboarding/InstallCard";
 
 // About you's fields (StepAboutYou), so "the basics" means the same thing here.
 const BASICS = ["name", "preferred_name", "current_role", "organisation", "location", "bio"];
@@ -153,8 +154,8 @@ export function GettingStartedCard({
                 size="sm"
                 className="shrink-0"
                 data-guide="copy-prompt"
-                onClick={() => {
-                  navigator.clipboard?.writeText(AUTOFILL_PROMPT);
+                onClick={async () => {
+                  if (!(await copyText(AUTOFILL_PROMPT))) return;
                   setCopied(true);
                   showHint("hint:paste-prompt", {
                     element: '[data-guide="copy-prompt"]',

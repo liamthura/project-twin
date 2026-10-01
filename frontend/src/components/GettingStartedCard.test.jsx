@@ -90,6 +90,16 @@ describe("GettingStartedCard", () => {
     );
   });
 
+  it("does not say copied when the browser refuses the copy", async () => {
+    watch.report = report({ state: "connected", name: "Cursor" });
+    const user = userEvent.setup();
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(new Error("denied"));
+    renderCard();
+    await user.click(await screen.findByRole("button", { name: "Copy prompt" }));
+    expect(screen.getByRole("button", { name: "Copy prompt" })).toBeInTheDocument();
+    expect(showHintMock).not.toHaveBeenCalled();
+  });
+
   it("carries the email nudge while it shows", async () => {
     getSessionMock.mockResolvedValue({ user: { email: "x@placeholder.invalid" } });
     const onAddEmail = vi.fn();

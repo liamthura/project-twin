@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { atStart } from "@/lib/watchtower.js";
 
 import { AUTOFILL_PROMPT } from "./autofillPrompt";
+import { copyText } from "./InstallCard";
 import { StatusLine } from "./StepConnect";
 
 const suggestions = (n) => `${n} ${n === 1 ? "suggestion" : "suggestions"}`;
@@ -65,10 +66,9 @@ export function StepHandover({ client, report, onReview, onTypeMyself, onLater }
             <Button onClick={onReview}>Review {suggestions(pending)}</Button>
           ) : (
             <Button
-              onClick={() => {
-                navigator.clipboard?.writeText(AUTOFILL_PROMPT);
-                setCopied(true);
-              }}
+              // Refused, the prompt is on screen to copy by hand, and the
+              // status does not ask for a paste of nothing.
+              onClick={async () => setCopied(await copyText(AUTOFILL_PROMPT))}
             >
               {copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
               {copied ? "Copied" : "Copy prompt"}
