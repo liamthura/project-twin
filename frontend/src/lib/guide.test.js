@@ -64,6 +64,19 @@ describe("startTour", () => {
   });
 });
 
+describe("placement on a phone", () => {
+  it("puts a popover below its element, unless the step asks for a side", async () => {
+    globalThis.matchMedia = vi.fn((q) => ({ matches: q.includes("max-width") }));
+    await startTour("guide:p", [
+      { element: '[data-guide="a"]', popover: { title: "A" } },
+      { element: '[data-guide="a"]', popover: { title: "B", side: "top" } },
+    ]);
+    const [first, second] = driverMock.mock.calls[0][0].steps;
+    expect(first.popover.side).toBe("bottom");
+    expect(second.popover.side).toBe("top");
+  });
+});
+
 describe("showHint", () => {
   it("shows once and is remembered when dismissed", async () => {
     expect(await showHint("hint:a", { element: '[data-guide="a"]', title: "T", description: "D" })).toBe(true);

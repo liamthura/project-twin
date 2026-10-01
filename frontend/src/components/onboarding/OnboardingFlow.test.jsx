@@ -19,8 +19,9 @@ vi.mock("@/lib/api.js", async (importOriginal) => {
     getInstance: () => Promise.resolve({ mcp_oauth: true }),
   };
 });
+const watch = vi.hoisted(() => ({ report: null }));
 vi.mock("@/lib/watchtower.js", () => ({
-  useWatchtower: () => null,
+  useWatchtower: () => watch.report,
   atStart: (n, f = "your assistant") => {
     const s = n || f;
     return s.charAt(0).toUpperCase() + s.slice(1);
@@ -37,6 +38,7 @@ const OnboardingFlow = (await import("./OnboardingFlow")).default;
 const packsFixture = (await import("@/__fixtures__/packs.json")).default;
 
 beforeEach(() => {
+  watch.report = null;
   sessionStorage.clear();
   apiMock.mockReset();
   getOnboardingMock.mockReset();
@@ -70,6 +72,14 @@ describe("OnboardingFlow", () => {
     await user.click(await screen.findByRole("button", { name: /^cursor/i }));
     expect(onNavigate).toHaveBeenCalledWith("connect");
     expect(sessionStorage.getItem("mygist_onboarding_client")).toBe("cursor");
+  });
+
+  it("remembers the last call it had seen when you choose, so Connect waits for a new one", async () => {
+    watch.report = { assistant: { last_seen: "2026-09-30T08:00:00+00:00" } };
+    const user = userEvent.setup();
+    render(<OnboardingFlow step="assistant" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    await user.click(await screen.findByRole("button", { name: /^cursor/i }));
+    expect(sessionStorage.getItem("mygist_onboarding_since")).toBe("2026-09-30T08:00:00+00:00");
   });
 
   it("a step that needs an assistant shows the choice when none is chosen", async () => {

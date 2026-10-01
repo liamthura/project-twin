@@ -24,6 +24,12 @@ def _bare(label):
     return head if head and tail[:1].isdigit() else (label or None)
 
 
+def after(rows, since):
+    """The rows with a call later than `since`, which is a last_seen this
+    endpoint returned before: the server's own clock, so no skew. None is all."""
+    return rows if not since else [r for r in rows if r["last_seen"] > since]
+
+
 def summary(rows):
     calls = [r for r in rows if r["method"] == "tools/call"]
     return {
@@ -52,12 +58,15 @@ def connection(grants, tokens, rows):
     }
 
 
-def report(user_id):
+def report(user_id, since=None):
+    """`since` narrows `assistant` to calls after it. Onboarding passes the last
+    call it had seen when you chose an assistant, so "connected" and "reading"
+    mean the one being connected now, not one that called last week."""
     rows = mcp_activity.usage(user_id)
     tokens = sorted(db.list_tokens(user_id), key=lambda t: t["created_at"], reverse=True)
     return {
         "activity": rows,
         "connection": connection(db.list_grants(user_id), tokens, rows),
-        "assistant": summary(rows),
+        "assistant": summary(after(rows, since)),
         "pending": proposals_store.pending_counts(),
     }

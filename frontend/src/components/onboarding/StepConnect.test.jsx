@@ -18,9 +18,11 @@ const { INSTALLABLE_CLIENTS } = await import("@/lib/clients.js");
 const { OTHER_CLIENT } = await import("./StepAssistant");
 const cursor = INSTALLABLE_CLIENTS.find((c) => c.id === "cursor");
 
-const report = (state, extra = {}) => ({
+// `called` is watchtower's since-filtered answer: did anything call after you
+// chose this assistant. The connection is the account's, whatever called.
+const report = (state, extra = {}, called = state === "connected") => ({
   connection: { state, name: null, can_propose: true, ...extra },
-  assistant: {},
+  assistant: { called },
   pending: { total: 0 },
 });
 const renderStep = (props = {}) =>
@@ -41,12 +43,26 @@ describe("StepConnect", () => {
     expect(screen.queryByRole("button", { name: /^continue$/i })).not.toBeInTheDocument();
   });
 
-  it("says so once it is connected, by the name it connected with", async () => {
+  it("says so once it calls, by the name you chose", async () => {
     const onContinue = vi.fn();
-    renderStep({ report: report("connected", { name: "Cursor (work)" }), onContinue });
-    expect(await screen.findByRole("status")).toHaveTextContent("Cursor (work) is connected.");
+    // The newest token's label is not the assistant being connected.
+    renderStep({ report: report("connected", { name: "my assistant" }), onContinue });
+    expect(await screen.findByRole("status")).toHaveTextContent("Cursor is connected.");
     await userEvent.setup().click(screen.getByRole("button", { name: "Continue" }));
     expect(onContinue).toHaveBeenCalled();
+  });
+
+  it("does not call it connected because an older assistant is", async () => {
+    renderStep({ report: report("connected", { name: "Hermes" }, false) });
+    expect(await screen.findByRole("status")).toHaveTextContent("Waiting for Cursor to connect…");
+  });
+
+  it("names the token after the assistant it is for", async () => {
+    getInstanceMock.mockResolvedValue({ mcp_oauth: false });
+    const user = userEvent.setup();
+    renderStep();
+    await user.click(await screen.findByRole("button", { name: "Create a token" }));
+    expect(createTokenMock).toHaveBeenCalledWith("Cursor", ["persona:propose"]);
   });
 
   it("warns when the connection can only read", async () => {

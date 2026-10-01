@@ -98,3 +98,27 @@ def test_the_endpoint_and_its_old_name(clean_database):
     assert body["connection"]["state"] == "connected"
     assert body["assistant"]["read"] is True
     assert client.get("/api/usage", headers=auth).json()["connection"] == body["connection"]
+
+
+@pytest.mark.nodb
+def test_since_counts_only_what_happened_after_it():
+    # Onboarding asks about the assistant being connected now, not one that
+    # called last week: the screen passes the latest call it had already seen.
+    old = call("get_context", "2026-09-01T10:00:00+00:00")
+    new = call("propose_update", "2026-10-01T10:09:00+00:00")
+    after = watchtower.after([old, new], "2026-09-01T10:00:00+00:00")
+    assert after == [new]
+    assert watchtower.summary(after)["read"] is False
+    assert watchtower.after([old, new], None) == [old, new]
+
+
+def test_the_endpoint_takes_since(clean_database):
+    client = TestClient(main.app)
+    token = client.post("/api/auth/register", json={"username": "watch-since"}).json()["token"]
+    auth = {"Authorization": f"Bearer {token}"}
+    db.current_user_id.set(client.get("/api/auth/whoami", headers=auth).json()["user_id"])
+    mcp_activity.record("cursor 1.0", "tools/call", "get_context")
+    seen = client.get("/api/watchtower", headers=auth).json()["assistant"]["last_seen"]
+    body = client.get("/api/watchtower", headers=auth, params={"since": seen}).json()
+    assert body["assistant"]["called"] is False
+    assert body["connection"]["state"] == "connected"  # the account is still connected

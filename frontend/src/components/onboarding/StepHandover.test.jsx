@@ -49,6 +49,11 @@ describe("StepHandover", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
+  it("names the assistant you chose, not the newest token", () => {
+    renderStep({ report: report({ read: true, name: "my assistant" }) });
+    expect(screen.getByRole("status")).toHaveTextContent("Codex is reading your persona…");
+  });
+
   it("says when the assistant is reading", () => {
     renderStep({ report: report({ read: true }) });
     expect(screen.getByRole("status")).toHaveTextContent("Codex is reading your persona…");

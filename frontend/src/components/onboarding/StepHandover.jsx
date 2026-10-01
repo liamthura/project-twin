@@ -23,8 +23,9 @@ const suggestions = (n) => `${n} ${n === 1 ? "suggestion" : "suggestions"}`;
 export function StepHandover({ client, report, onReview, onTypeMyself, onLater }) {
   const [copied, setCopied] = useState(false);
   const connection = report?.connection;
+  // The assistant you chose; for Something else, whatever connected.
   const name =
-    (connection?.state === "connected" && connection.name) || (client.kind === "other" ? null : client.name);
+    (client.kind === "other" ? null : client.name) || (connection?.state === "connected" && connection.name) || null;
   const mid = name || "your assistant";
   const pending = report?.pending?.total ?? 0;
   // mcp_scopes.py HIDES tools a credential is not scoped for rather than

@@ -34,8 +34,12 @@ import { StepComplete } from "./StepComplete";
 // The editor's debounce, from App.jsx. The same number on purpose: a reader who
 // learns the app's saving rhythm here should find it unchanged afterwards.
 const SAVE_DELAY_MS = 1500;
-// Kept for the tab, so a reload on Connect still knows which assistant.
+// Kept for the tab, so a reload on Connect still knows which assistant, and
+// the last call already seen when it was chosen: Connect and handover wait for
+// a call after that, so an assistant connected last week does not read as the
+// one being connected now.
 const CLIENT_KEY = "mygist_onboarding_client";
+const SINCE_KEY = "mygist_onboarding_since";
 const COMMUNICATION = ["communication", "default"];
 
 const clientById = (id) => [...INSTALLABLE_CLIENTS, OTHER_CLIENT].find((c) => c.id === id) || null;
@@ -73,7 +77,8 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
   const client = clientById(clientId);
   const requested = normaliseStep(step);
   const current = NEEDS_CLIENT.has(requested) && !client ? "assistant" : requested;
-  const report = useWatchtower({ active: NEEDS_CLIENT.has(current) });
+  const [since, setSince] = useState(() => sessionStorage.getItem(SINCE_KEY));
+  const report = useWatchtower({ active: NEEDS_CLIENT.has(current), since: NEEDS_CLIENT.has(current) ? since : null });
 
   const [data, setData] = useState(null);
   const [packs, setPacks] = useState([]);
@@ -174,8 +179,11 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
   };
 
   const choose = (id) => {
+    const seen = report?.assistant?.last_seen || "";
     sessionStorage.setItem(CLIENT_KEY, id);
+    sessionStorage.setItem(SINCE_KEY, seen);
     setClientId(id);
+    setSince(seen);
     go("connect");
   };
 

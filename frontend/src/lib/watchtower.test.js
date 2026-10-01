@@ -22,6 +22,26 @@ describe("useWatchtower", () => {
     expect(apiMock).toHaveBeenCalledWith("/watchtower");
   });
 
+  it("asks only about calls after `since` when given one", async () => {
+    renderHook(() => useWatchtower({ since: "2026-10-01T10:00:00+00:00" }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(apiMock).toHaveBeenCalledWith("/watchtower?since=2026-10-01T10%3A00%3A00%2B00%3A00");
+  });
+
+  it("never answers with a report asked for a different `since`", async () => {
+    apiMock.mockResolvedValueOnce({ assistant: { called: true } });
+    const { result, rerender } = renderHook((props) => useWatchtower(props), { initialProps: {} });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(result.current.assistant.called).toBe(true);
+    let land;
+    apiMock.mockImplementationOnce(() => new Promise((resolve) => { land = resolve; }));
+    rerender({ since: "2026-10-01T10:00:00+00:00" });
+    // The unfiltered report would read as "connected" for an older assistant.
+    expect(result.current).toBe(null);
+    await act(async () => land({ assistant: { called: false } }));
+    expect(result.current.assistant.called).toBe(false);
+  });
+
   it("polls fast, then slow after two minutes", async () => {
     renderHook(() => useWatchtower({ active: true }));
     await act(() => vi.advanceTimersByTimeAsync(FAST_MS * 2));

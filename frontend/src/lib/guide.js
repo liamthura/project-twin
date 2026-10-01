@@ -109,7 +109,9 @@ function place(step) {
   return {
     ...step,
     element,
-    popover: { ...step.popover, ...(narrow() ? { side: "bottom", align: "center" } : {}) },
+    // Below its element on a phone, where there is no room beside it, unless
+    // the step chose a side (the token's, so it does not cover the warning).
+    popover: { ...(narrow() ? { side: "bottom", align: "center" } : {}), ...step.popover },
   };
 }
 

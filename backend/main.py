@@ -715,7 +715,7 @@ async def whoami(request: Request):
 
 
 @app.get("/api/watchtower")
-async def watchtower_report():
+async def watchtower_report(since: Optional[str] = None):
     """What is connected to this account, and what it has done.
 
     `activity` is every client's counters, as /api/usage always returned: the
@@ -727,8 +727,10 @@ async def watchtower_report():
 
     `connection`, `assistant` and `pending` are worked out from those rows, the
     account's grants and tokens, and the review queue (see watchtower.py).
+    `since`, a `last_seen` this endpoint returned, narrows `assistant` to the
+    calls after it.
     """
-    return watchtower.report(db.current_user_id.get())
+    return watchtower.report(db.current_user_id.get(), since)
 
 
 @app.get("/api/usage", deprecated=True)

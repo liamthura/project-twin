@@ -13,8 +13,10 @@ export const FAST_MS = 3000;
 export const SLOW_MS = 10000;
 export const SLOW_AFTER_MS = 120000;
 
-export function getWatchtower() {
-  return api("/watchtower");
+/** `since` is a `last_seen` this endpoint returned before (the server's own
+ *  clock); `assistant` then covers only the calls after it. */
+export function getWatchtower(since) {
+  return api(since ? `/watchtower?since=${encodeURIComponent(since)}` : "/watchtower");
 }
 
 /** A name that opens a sentence: a token labelled "my assistant" reads "My assistant". */
@@ -27,8 +29,10 @@ export function atStart(name, fallback = "your assistant") {
  * The latest report. While `active`, asks every 3 s, then every 10 s after two
  * minutes, and not at all while the tab is hidden. Not active, it asks once.
  */
-export function useWatchtower({ active = false } = {}) {
-  const [report, setReport] = useState(null);
+export function useWatchtower({ active = false, since = null } = {}) {
+  // Kept with the `since` it answered, so a report asked for another one is
+  // never returned: unfiltered, it would call an older assistant "connected".
+  const [held, setHeld] = useState(null);
   useEffect(() => {
     let cancelled = false;
     let timer;
@@ -36,8 +40,8 @@ export function useWatchtower({ active = false } = {}) {
     const tick = async () => {
       if (document.visibilityState !== "hidden") {
         try {
-          const next = await getWatchtower();
-          if (!cancelled) setReport(next);
+          const next = await getWatchtower(since);
+          if (!cancelled) setHeld({ since, report: next });
         } catch {
           // The next tick asks again; a screen that is waiting keeps waiting.
         }
@@ -50,6 +54,6 @@ export function useWatchtower({ active = false } = {}) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [active]);
-  return report;
+  }, [active, since]);
+  return held && held.since === since ? held.report : null;
 }

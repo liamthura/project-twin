@@ -102,9 +102,12 @@ export function StepConnect({ client, report, onBack, onContinue }) {
     startTour("guide:token", [
       {
         element: '[data-guide="token"]',
+        // Above the token: below it sat on top of the "shown once" warning.
         popover: {
           title: "Copy the token now",
           description: "It's shown once. Paste it into your assistant before you continue.",
+          side: "top",
+          align: "start",
         },
       },
     ]);
@@ -122,8 +125,11 @@ export function StepConnect({ client, report, onBack, onContinue }) {
   const chosen = other ? null : client.name;
   const address = mcpUrl();
   const connection = report?.connection;
-  const connected = connection?.state === "connected";
-  const name = (connected && connection.name) || chosen;
+  // `assistant` is since-filtered (OnboardingFlow): a call after you chose
+  // this assistant. The connection is the account's, whatever called, so it
+  // supplies what it may do and, for Something else, a name.
+  const connected = !!report?.assistant?.called;
+  const name = chosen || (connected && connection?.name) || null;
   const tokenRoute = tokenOnly || (other && wantsToken);
   // On the token route the status waits until the token has gone where it is
   // needed; a "waiting" line under a token nobody has copied yet is noise.
@@ -133,7 +139,8 @@ export function StepConnect({ client, report, onBack, onContinue }) {
     setGenerating(true);
     setError(null);
     try {
-      setToken((await createToken("my assistant", FIRST_TOKEN_SCOPES)).token);
+      // Named for the assistant it is for, as Settings lists it.
+      setToken((await createToken(chosen || "my assistant", FIRST_TOKEN_SCOPES)).token);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -204,7 +211,7 @@ export function StepConnect({ client, report, onBack, onContinue }) {
       )}
 
       {showStatus &&
-        (connected && connection.can_propose ? (
+        (connected && connection?.can_propose ? (
           <StatusLine state="done">{atStart(name)} is connected.</StatusLine>
         ) : connected ? (
           <StatusLine state="warn">
