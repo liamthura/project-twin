@@ -10,6 +10,10 @@
  * learned on day one rather than discovered later when something has already
  * changed under them.
  *
+ * The sentence about the project is for coding assistants (Claude Code, Codex,
+ * Cursor), which can see the repository someone is in and otherwise suggest
+ * nothing about the stack they use every day.
+ *
  * The wording about compactness is deliberate and matches `propose_update`'s
  * own docstring (backend/server.py). Not every model is equally careful, and a
  * client that sends the whole record back on every suggestion produces a review
@@ -17,5 +21,6 @@
  */
 export const AUTOFILL_PROMPT =
   "Read my MyGist persona. Then propose updates for anything you know about me " +
-  "that is missing or wrong. Send one proposal per fact, include only the " +
+  "that is missing or wrong. If you can see the project I'm working in, include " +
+  "my stack and tools from it. Send one proposal per fact, include only the " +
   "fields that change, and give a one-sentence reason for each.";
