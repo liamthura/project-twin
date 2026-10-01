@@ -73,6 +73,11 @@ describe("StepHandover", () => {
     expect(screen.queryByRole("button", { name: "Copy prompt" })).not.toBeInTheDocument();
   });
 
+  it("calls Something else your assistant, not an older connection's name", () => {
+    renderStep({ client: OTHER_CLIENT, report: report({ read: true, name: "Claude Code" }) });
+    expect(screen.getByRole("heading", { name: "Let your assistant fill it in" })).toBeInTheDocument();
+  });
+
   it("calls Something else your assistant", () => {
     renderStep({ client: OTHER_CLIENT, report: report({ read: true }) });
     expect(screen.getByRole("heading", { name: "Let your assistant fill it in" })).toBeInTheDocument();

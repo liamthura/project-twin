@@ -51,7 +51,7 @@ import { Rail } from "@/shell/Rail";
 import { SectionMenu } from "@/shell/SectionMenu";
 import { useScrollSpy } from "@/shell/useScrollSpy";
 import { useKeyedDebounce } from "@/lib/useKeyedDebounce";
-import { TOURS, startTour } from "@/lib/guide.js";
+import { TOURS, closeGuides, resetSeen, startTour } from "@/lib/guide.js";
 
 // Main App
 export default function App() {
@@ -256,14 +256,21 @@ export default function App() {
   // The editor tour: once after onboarding's Complete, and from Show me
   // around, always. It waits a beat so the section has laid out the fields and
   // History button it points at; startTour drops any step still missing.
+  //
+  // Not while the persona reloads: the app shows only a spinner then, and a
+  // tour started over it found nothing to point at and was lost.
   useEffect(() => {
-    if (!tourPending || !activePack) return undefined;
+    if (!tourPending || !activePack || isLoading) return undefined;
     const timer = setTimeout(() => {
       startTour("guide:editor", TOURS.editor, { force: tourPending === "force" });
       setTourPending(null);
     }, 400);
     return () => clearTimeout(timer);
-  }, [tourPending, activePack]);
+  }, [tourPending, activePack, isLoading]);
+
+  // A guide belongs to the screen it points at. Moving to another section
+  // takes it down, so a tour or a hint's dot cannot float over the next one.
+  useEffect(() => closeGuides, [activeSection]);
 
   /**
    * Go somewhere. A deliberate move, so it PUSHES: back walks the places you
@@ -703,6 +710,7 @@ export default function App() {
     return (
       <WelcomeAuth
         onSuccess={({ isNew } = {}) => {
+          resetSeen();
           // A brand-new account lands on Welcome, not on an empty Profile:
           // that is the moment intent is highest, and Welcome is where the
           // offer to hand the work to a client is made.
@@ -810,6 +818,8 @@ export default function App() {
   };
 
   const handleSignOut = async () => {
+    // What has been seen is per account; the next one in this tab gets its own.
+    resetSeen();
     // The session cookie is HttpOnly, so only the service can revoke it.
     await signOut();
     clearConfig();

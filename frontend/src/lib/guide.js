@@ -93,9 +93,19 @@ async function remember(key) {
   markSeen(key).catch(() => {});
 }
 
-/** Tests only: forget the cached set. */
+/** Forget the cached set: a different account is signed in now. */
 export function resetSeen() {
   seen = null;
+}
+
+// What is on screen now, each as the call that takes it down.
+let open = [];
+
+/** Take down any open tour or hint. App calls it when the screen changes. */
+export function closeGuides() {
+  const now = open;
+  open = [];
+  now.forEach((close) => close());
 }
 
 /** The first match that is laid out: the rail is in the DOM on a phone, only hidden. */
@@ -131,15 +141,21 @@ export async function startTour(key, steps, { force = false } = {}) {
   if (!force && (await loadSeen()).has(key)) return false;
   const live = steps.map(place).filter(Boolean);
   if (!live.length) return false;
-  driver({
+  const tour = driver({
     ...THEME,
     animate: !reduced(),
     smoothScroll: !reduced(),
     showProgress: live.length > 1,
     progressText: "{{current}} of {{total}}",
     steps: live,
-    onDestroyed: () => remember(key),
-  }).drive();
+    onDestroyed: () => {
+      open = open.filter((c) => c !== close);
+      remember(key);
+    },
+  });
+  const close = () => tour.destroy();
+  open.push(close);
+  tour.drive();
   return true;
 }
 
@@ -152,12 +168,19 @@ export async function showHint(key, { element, title, description }) {
   if ((await loadSeen()).has(key)) return false;
   const target = visible(element);
   if (!target) return false;
-  hints({
+  const hint = hints({
     popoverClass: "mygist-guide",
     beacon: { animate: !reduced() },
     hints: [{ id: key, element: target, popover: { title, description, showButton: true, buttonText: "Got it" } }],
-    onDismiss: () => remember(key),
-  }).show();
+    onDismiss: () => {
+      open = open.filter((c) => c !== close);
+      remember(key);
+    },
+  });
+  // hide() removes the dot, its popover and their listeners.
+  const close = () => hint.hide();
+  open.push(close);
+  hint.show();
   return true;
 }
 

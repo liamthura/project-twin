@@ -116,11 +116,13 @@ export function GettingStartedCard({
               <span className="shrink-0 text-xs text-muted-foreground">{atStart(connection.name)} connected</span>
             )}
             {waiting && (
-              <span className="shrink-0 text-xs text-muted-foreground">
+              <span className="ml-auto truncate text-xs text-muted-foreground">
                 Waiting for {connection.name || "your assistant"}…
               </span>
             )}
-            {!connected && !waiting && (
+            {/* While waiting too: a token made and never pasted otherwise left
+                no way back to the steps from here. */}
+            {!connected && (
               <Button variant="outline" size="sm" className="shrink-0" onClick={() => onStart("assistant")}>
                 Connect
               </Button>

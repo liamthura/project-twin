@@ -9,7 +9,7 @@ vi.mock("driver.js/hints", () => ({ hints: hintsMock }));
 vi.mock("canvas-confetti", () => ({ default: vi.fn() }));
 vi.mock("./onboarding.js", () => ({ getOnboarding: getOnboardingMock, markSeen: markSeenMock }));
 
-const { startTour, showHint, resetSeen, visible, celebrateFirst } = await import("./guide.js");
+const { startTour, showHint, resetSeen, visible, celebrateFirst, closeGuides } = await import("./guide.js");
 const confetti = (await import("canvas-confetti")).default;
 
 const media = (reduce) => {
@@ -19,8 +19,9 @@ const media = (reduce) => {
 beforeEach(() => {
   resetSeen();
   // A tour that runs and is closed straight away.
-  driverMock.mockReset().mockImplementation((config) => ({ drive: () => config.onDestroyed?.() }));
-  hintsMock.mockReset().mockImplementation(() => ({ show: vi.fn() }));
+  driverMock.mockReset().mockImplementation((config) => ({ drive: () => config.onDestroyed?.(), destroy: vi.fn() }));
+  hintsMock.mockReset().mockImplementation(() => ({ show: vi.fn(), hide: vi.fn() }));
+  closeGuides();
   getOnboardingMock.mockReset().mockResolvedValue({ seen: [] });
   markSeenMock.mockReset().mockResolvedValue(undefined);
   confetti.mockClear();
@@ -85,6 +86,22 @@ describe("showHint", () => {
     config.onDismiss();
     await vi.waitFor(() => expect(markSeenMock).toHaveBeenCalledWith("hint:a"));
     expect(await showHint("hint:a", { element: '[data-guide="a"]', title: "T", description: "D" })).toBe(false);
+  });
+});
+
+describe("closeGuides", () => {
+  it("takes down an open tour and hint, so nothing floats over the next screen", async () => {
+    const destroy = vi.fn();
+    const hide = vi.fn();
+    driverMock.mockImplementation(() => ({ drive: vi.fn(), destroy }));
+    hintsMock.mockImplementation(() => ({ show: vi.fn(), hide }));
+    await startTour("guide:open", steps);
+    await showHint("hint:open", { element: '[data-guide="a"]', title: "T", description: "D" });
+    closeGuides();
+    expect(destroy).toHaveBeenCalled();
+    expect(hide).toHaveBeenCalled();
+    closeGuides();
+    expect(destroy).toHaveBeenCalledTimes(1);
   });
 });
 

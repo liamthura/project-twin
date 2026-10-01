@@ -127,9 +127,10 @@ export function StepConnect({ client, report, onBack, onContinue }) {
   const connection = report?.connection;
   // `assistant` is since-filtered (OnboardingFlow): a call after you chose
   // this assistant. The connection is the account's, whatever called, so it
-  // supplies what it may do and, for Something else, a name.
+  // says what the account may do, but never names Something else: the newest
+  // connection may be an older assistant.
   const connected = !!report?.assistant?.called;
-  const name = chosen || (connected && connection?.name) || null;
+  const name = chosen;
   const tokenRoute = tokenOnly || (other && wantsToken);
   // On the token route the status waits until the token has gone where it is
   // needed; a "waiting" line under a token nobody has copied yet is noise.

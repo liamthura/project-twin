@@ -22,6 +22,13 @@ describe("useWatchtower", () => {
     expect(apiMock).toHaveBeenCalledWith("/watchtower");
   });
 
+  it("fetches its one report even in a tab opened in the background", async () => {
+    visibility("hidden");
+    renderHook(() => useWatchtower());
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(apiMock).toHaveBeenCalledTimes(1);
+  });
+
   it("asks only about calls after `since` when given one", async () => {
     renderHook(() => useWatchtower({ since: "2026-10-01T10:00:00+00:00" }));
     await act(() => vi.advanceTimersByTimeAsync(0));

@@ -27,7 +27,8 @@ export function atStart(name, fallback = "your assistant") {
 
 /**
  * The latest report. While `active`, asks every 3 s, then every 10 s after two
- * minutes, and not at all while the tab is hidden. Not active, it asks once.
+ * minutes, and not at all while the tab is hidden. Not active, it asks once,
+ * hidden or not.
  */
 export function useWatchtower({ active = false, since = null } = {}) {
   // Kept with the `since` it answered, so a report asked for another one is
@@ -38,7 +39,9 @@ export function useWatchtower({ active = false, since = null } = {}) {
     let timer;
     const started = Date.now();
     const tick = async () => {
-      if (document.visibilityState !== "hidden") {
+      // A screen that asks once asks even from a background tab, or it would
+      // show nothing (or "Connect" to someone connected) until reloaded.
+      if (!active || document.visibilityState !== "hidden") {
         try {
           const next = await getWatchtower(since);
           if (!cancelled) setHeld({ since, report: next });

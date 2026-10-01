@@ -21,7 +21,8 @@ import { Loader2 } from "lucide-react";
 import { api } from "@/lib/api.js";
 import { INSTALLABLE_CLIENTS } from "@/lib/clients.js";
 import { NEEDS_CLIENT, PHASE_COUNT, normaliseStep, phaseOf } from "@/lib/onboardingSteps.js";
-import { useWatchtower } from "@/lib/watchtower.js";
+import { closeGuides } from "@/lib/guide.js";
+import { getWatchtower, useWatchtower } from "@/lib/watchtower.js";
 import { getAt, setAt } from "@/renderers/paths";
 
 import { OTHER_CLIENT, StepAssistant } from "./StepAssistant";
@@ -55,12 +56,13 @@ function browserLocale() {
 /**
  * What you typed in this flow: fields that differ from what was loaded and are
  * not empty, plus anything added on Complete. A default the server filled in
- * (British English) was there before you arrived, so it does not count.
+ * (British English) was there before you arrived, so it does not count, and
+ * nor does a value the flow filled in itself (`filled`: the browser's locale).
  */
-export function countAdded(before, after) {
+export function countAdded(before, after, filled = {}) {
   const changed = (a = {}, b = {}) =>
     Object.keys(b).filter(
-      (k) => typeof b[k] !== "object" && String(b[k] ?? "").trim() && b[k] !== a[k],
+      (k) => typeof b[k] !== "object" && String(b[k] ?? "").trim() && b[k] !== a[k] && b[k] !== filled[k],
     ).length;
   const grew = (a, b) => Math.max(0, (b?.length || 0) - (a?.length || 0));
   return (
@@ -112,13 +114,18 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
   // is what Retry sends again.
   const timers = useRef({});
   const failed = useRef(new Set());
+  // Writes already sent and not yet answered: leaving waits for these too.
+  const inflight = useRef(new Set());
+  const leaving = useRef(false);
+  // The locale the flow wrote from the browser, so Complete does not count it.
+  const filledLocale = useRef(null);
   useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), []);
 
   const send = useCallback((key) => {
     const payload = dataRef.current?.[key];
     if (payload === undefined) return Promise.resolve();
     setSaveState("saving");
-    return api(`/files/${key}`, { method: "PUT", body: JSON.stringify({ data: payload }) }).then(
+    const write = api(`/files/${key}`, { method: "PUT", body: JSON.stringify({ data: payload }) }).then(
       () => {
         failed.current.delete(key);
         setSaveState(failed.current.size ? "error" : "saved");
@@ -128,6 +135,9 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
         setSaveState("error");
       },
     );
+    inflight.current.add(write);
+    write.finally(() => inflight.current.delete(write));
+    return write;
   }, []);
 
   const write = useCallback(
@@ -144,15 +154,16 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
   );
 
   // Flush anything still waiting before the step changes, so moving on cannot
-  // outrun the debounce and lose the last thing typed. Resolves when the
-  // writes have landed, failed ones included.
+  // outrun the debounce and lose the last thing typed. Resolves when every
+  // write has landed -- these and any already on their way -- failed ones
+  // included.
   const flush = useCallback(() => {
     const writes = Object.entries(timers.current).map(([key, timer]) => {
       clearTimeout(timer);
       delete timers.current[key];
       return send(key);
     });
-    return Promise.all(writes);
+    return Promise.all([...inflight.current, ...writes]);
   }, [send]);
 
   const retry = useCallback(() => [...failed.current].forEach(send), [send]);
@@ -174,12 +185,24 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
   // which the editor's next save would then have written back over it.
   const go = (to, leave) => {
     const landed = flush();
-    if (to) onNavigate(to);
-    else landed.finally(() => onLeave(leave));
+    if (to) {
+      onNavigate(to);
+      return;
+    }
+    // Once: a second click while the writes land would leave twice.
+    if (leaving.current) return;
+    leaving.current = true;
+    landed.finally(() => onLeave(leave));
   };
 
-  const choose = (id) => {
-    const seen = report?.assistant?.last_seen || "";
+  // A guide belongs to the step it points at (the token's spotlight).
+  useEffect(() => closeGuides, [current]);
+
+  const choose = async (id) => {
+    // Chosen before the first report arrived, it asks: without a last call to
+    // wait past, an assistant that called last week reads as connected now.
+    const known = report ?? (await getWatchtower().catch(() => null));
+    const seen = known?.assistant?.last_seen || "";
     sessionStorage.setItem(CLIENT_KEY, id);
     sessionStorage.setItem(SINCE_KEY, seen);
     setClientId(id);
@@ -270,6 +293,7 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
                 onLater={() => go(null)}
                 onContinue={() => {
                   if (shownLocale) {
+                    filledLocale.current = shownLocale;
                     write("preferences", setAt(data.preferences || {}, [...COMMUNICATION, "locale"], shownLocale));
                   }
                   go("complete");
@@ -285,7 +309,7 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
             )}
             {current === "complete" && (
               <StepComplete
-                added={countAdded(loaded.current, data)}
+                added={countAdded(loaded.current, data, { locale: filledLocale.current })}
                 report={report}
                 onAdd={append}
                 onDone={() => go(null, { tour: true })}

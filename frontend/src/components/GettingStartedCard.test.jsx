@@ -60,6 +60,14 @@ describe("GettingStartedCard", () => {
     expect(screen.getByText("Waiting for my assistant…")).toBeInTheDocument();
   });
 
+  it("keeps a way back to the steps while a connection is waiting", async () => {
+    const onStart = vi.fn();
+    watch.report = report({ state: "waiting", name: "my assistant" });
+    renderCard({ onStart });
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Connect" }));
+    expect(onStart).toHaveBeenCalledWith("assistant");
+  });
+
   it("sends each step to its own screen", async () => {
     const onStart = vi.fn();
     const user = userEvent.setup();

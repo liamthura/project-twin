@@ -83,6 +83,11 @@ describe("StepConnect", () => {
     expect(screen.queryByText(/sign in/i)).not.toBeInTheDocument();
   });
 
+  it("calls Something else your assistant, whatever else the account has connected", async () => {
+    renderStep({ client: OTHER_CLIENT, report: report("connected", { name: "Claude Code" }) });
+    expect(await screen.findByText("Your assistant is connected.")).toBeInTheDocument();
+  });
+
   it("Back goes back to the choice", async () => {
     const onBack = vi.fn();
     renderStep({ onBack });

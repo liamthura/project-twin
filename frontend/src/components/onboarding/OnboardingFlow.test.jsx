@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { useState } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -19,15 +20,17 @@ vi.mock("@/lib/api.js", async (importOriginal) => {
     getInstance: () => Promise.resolve({ mcp_oauth: true }),
   };
 });
-const watch = vi.hoisted(() => ({ report: null }));
+const watch = vi.hoisted(() => ({ report: null, fetch: vi.fn() }));
 vi.mock("@/lib/watchtower.js", () => ({
   useWatchtower: () => watch.report,
+  getWatchtower: watch.fetch,
   atStart: (n, f = "your assistant") => {
     const s = n || f;
     return s.charAt(0).toUpperCase() + s.slice(1);
   },
 }));
-vi.mock("@/lib/guide.js", () => ({ startTour: vi.fn(async () => false) }));
+const closeGuides = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/guide.js", () => ({ startTour: vi.fn(async () => false), closeGuides }));
 vi.mock("@/lib/onboarding.js", () => ({
   getOnboarding: getOnboardingMock,
   saveOnboarding: saveOnboardingMock,
@@ -39,6 +42,7 @@ const packsFixture = (await import("@/__fixtures__/packs.json")).default;
 
 beforeEach(() => {
   watch.report = null;
+  watch.fetch.mockReset().mockResolvedValue(null);
   sessionStorage.clear();
   apiMock.mockReset();
   getOnboardingMock.mockReset();
@@ -80,6 +84,24 @@ describe("OnboardingFlow", () => {
     render(<OnboardingFlow step="assistant" onNavigate={vi.fn()} onLeave={vi.fn()} />);
     await user.click(await screen.findByRole("button", { name: /^cursor/i }));
     expect(sessionStorage.getItem("mygist_onboarding_since")).toBe("2026-09-30T08:00:00+00:00");
+  });
+
+  it("asks for the last call itself when you choose before its first report arrived", async () => {
+    watch.fetch.mockResolvedValue({ assistant: { last_seen: "2026-09-29T08:00:00+00:00" } });
+    const user = userEvent.setup();
+    render(<OnboardingFlow step="assistant" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    await user.click(await screen.findByRole("button", { name: /^cursor/i }));
+    await waitFor(() =>
+      expect(sessionStorage.getItem("mygist_onboarding_since")).toBe("2026-09-29T08:00:00+00:00"),
+    );
+  });
+
+  it("closes any open guide when the step changes", async () => {
+    closeGuides.mockClear();
+    const { rerender } = render(<OnboardingFlow step="assistant" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Which assistant do you use?" });
+    rerender(<OnboardingFlow step="about-you" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    await waitFor(() => expect(closeGuides).toHaveBeenCalled());
   });
 
   it("a step that needs an assistant shows the choice when none is chosen", async () => {
@@ -170,6 +192,55 @@ describe("OnboardingFlow", () => {
     expect(onLeave).not.toHaveBeenCalled();
     land({});
     await waitFor(() => expect(onLeave).toHaveBeenCalled());
+  });
+
+  it("waits for a save already on its way, and leaves once on a double click", async () => {
+    let land;
+    apiMock.mockImplementation((path, opts) => {
+      if (path === "/all") return Promise.resolve({ data: { profile: {}, preferences: {} } });
+      if (path === "/settings") return Promise.resolve({ disabled_sections: [], packs: packsFixture });
+      if (opts?.method === "PUT") return new Promise((resolve) => { land = resolve; });
+      return Promise.resolve({});
+    });
+    const onLeave = vi.fn();
+    const user = userEvent.setup();
+    render(<OnboardingFlow step="about-you" onNavigate={vi.fn()} onLeave={onLeave} />);
+    await user.type(await screen.findByLabelText("Name"), "Ada");
+    // Continue sends the write; the screen stays (onNavigate is a mock).
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.dblClick(screen.getByRole("button", { name: "Finish later" }));
+    expect(onLeave).not.toHaveBeenCalled();
+    land({});
+    await waitFor(() => expect(onLeave).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not count the locale it filled in from the browser as something you typed", async () => {
+    const packs = packsFixture.map((p) =>
+      p.key === "preferences" ? { ...p, defaults: { communication: { default: { locale: "British English" } } } } : p,
+    );
+    apiMock.mockImplementation((path) => {
+      if (path === "/all") {
+        return Promise.resolve({
+          data: { profile: {}, preferences: { communication: { default: { locale: "British English" } } } },
+        });
+      }
+      if (path === "/settings") return Promise.resolve({ disabled_sections: [], packs });
+      return Promise.resolve({});
+    });
+    function Flow() {
+      const [step, setStep] = useState("about-you");
+      return <OnboardingFlow step={step} onNavigate={setStep} onLeave={vi.fn()} />;
+    }
+    const user = userEvent.setup();
+    render(<Flow />);
+    // jsdom's language is en-US, so the field shows American English.
+    expect(await screen.findByLabelText("Locale")).toHaveValue("American English");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(
+      await screen.findByText("Nothing added yet. Fill it in whenever you like, or let an assistant do it."),
+    ).toBeInTheDocument();
   });
 
   it("renders no app shell at all", async () => {
