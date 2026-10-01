@@ -1,105 +1,104 @@
 /**
  * The spine card, on Profile. Three steps, and it ROUTES rather than collects.
  *
- * It survived the reversal that turned onboarding into a standalone flow, and
- * it survived deliberately: the flow is where the work happens, and this is
- * where someone finds their way back to it.
+ * Every tick is a fact, not a stored claim that could disagree with what
+ * happened. Connected means watchtower saw an MCP call (backend/watchtower.py),
+ * so a token nobody has used waits with a clock rather than a tick. The basics
+ * are done when a basics field holds something. The first suggestion is ticked
+ * when the assistant has made one. The old card ticked an unused token, could
+ * never tick its third step, and moved backwards when you chose the assistant.
+ *
+ * While it shows, it carries the email nudge, so Profile has one banner and
+ * not two: App hides AddEmailBanner there while `onShownChange` says true.
  *
  * Dismissing is not destructive. Nothing is deleted -- the flow is a view over
- * fields that already exist, and `#/onboarding/welcome` still works if typed.
- * The card comes back from Connection Settings.
+ * fields that already exist. The card comes back from Settings → Account, as
+ * it was.
  */
 import { useEffect, useState } from "react";
-import { Check, Copy, X } from "lucide-react";
+import { Check, Clock, Copy, X } from "lucide-react";
 
+import { DISMISSED_KEY } from "@/components/AddEmailBanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { listConnectedApps, listTokens } from "@/lib/api.js";
+import { showHint } from "@/lib/guide.js";
 import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
+import { getSession, isPlaceholderEmail } from "@/lib/session.js";
+import { atStart, useWatchtower } from "@/lib/watchtower.js";
 
 import { AUTOFILL_PROMPT } from "./onboarding/autofillPrompt";
-import { connectionStatus } from "./onboarding/connectionStatus";
 
-function StepMark({ done, n }) {
-  return done ? (
-    <Check className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />
-  ) : (
-    <span className="w-4 shrink-0 text-center text-xs text-muted-foreground">{n}</span>
-  );
+// About you's fields (StepAboutYou), so "the basics" means the same thing here.
+const BASICS = ["name", "preferred_name", "current_role", "organisation", "location", "bio"];
+
+function Mark({ done, waiting, n }) {
+  if (done) return <Check className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />;
+  if (waiting) return <Clock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />;
+  return <span className="w-4 shrink-0 text-center text-xs text-muted-foreground">{n}</span>;
 }
 
 export function GettingStartedCard({
-  disabledSections = [], onStart, onOpenSettings, onConnect,
+  profile, disabledSections = [], onStart, onReview, onAddEmail, onShownChange,
 }) {
   const [state, setState] = useState(null);
-  const [connection, setConnection] = useState({
-    state: "none",
-    name: null,
-    canPropose: false,
-  });
+  const [needsEmail, setNeedsEmail] = useState(false);
   const [copied, setCopied] = useState(false);
+  const report = useWatchtower();
 
   useEffect(() => {
     let cancelled = false;
     getOnboarding()
-      .then((saved) => {
-        if (!cancelled) setState(saved);
-      })
-      .catch(() => {
-        // A card that cannot load its own progress is better hidden than wrong:
-        // showing "0 of 3" to someone who finished would be a lie.
-        if (!cancelled) setState({ dismissed: true, steps: {} });
-      });
+      .then((saved) => !cancelled && setState(saved))
+      // Hidden rather than wrong: "0 of 3" to someone who finished is a lie.
+      .catch(() => !cancelled && setState({ dismissed: true, steps: {}, seen: [] }));
+    if (localStorage.getItem(DISMISSED_KEY) !== "1") {
+      getSession()
+        .then((s) => !cancelled && setNeedsEmail(!!s?.user && isPlaceholderEmail(s.user.email)))
+        .catch(() => {});
+    }
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const shown = !!state && !state.dismissed;
   useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      // listTokens throws for a read-scoped credential -- see its comment in
-      // api.js. That is a permission, not a failure, so it degrades to "no
-      // tokens I can see" rather than taking the card down.
-      listTokens().catch(() => []),
-      listConnectedApps().catch(() => []),
-    ]).then(([tokens, grants]) => {
-      if (!cancelled) setConnection(connectionStatus(tokens, grants));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    onShownChange?.(shown);
+  }, [shown, onShownChange]);
+  if (!shown) return null;
 
-  if (!state || state.dismissed) return null;
-
-  const connected = connection.state !== "none";
-  const basicsDone = state.steps["about-you"] === "done";
-  const doneCount = [connected, basicsDone].filter(Boolean).length;
+  const connection = report?.connection;
+  const connected = connection?.state === "connected";
+  const waiting = connection?.state === "waiting";
+  const basics = BASICS.some((k) => String(profile?.[k] ?? "").trim());
+  const suggested = !!report?.assistant?.suggested;
+  const pending = report?.pending?.total ?? 0;
+  const done = [connected, basics, suggested].filter(Boolean).length;
 
   const dismiss = () => {
     const next = { ...state, dismissed: true };
     setState(next);
     saveOnboarding(next, disabledSections).catch(() => {
       // The card is already gone from this page. A lost write costs one
-      // reappearance on the next load, which is a smaller failure than an
+      // reappearance on the next load, a smaller failure than an
       // undismissable card.
     });
   };
 
+  const row = "flex items-center justify-between gap-3 text-sm";
   return (
     <Card className="mb-6">
       <CardContent className="space-y-4 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-0.5">
             <p className="text-sm font-medium">Getting started</p>
-            <p className="text-xs text-muted-foreground">{doneCount} of 3</p>
+            <p className="text-xs text-muted-foreground">{done} of 3</p>
           </div>
           <Button
             variant="ghost"
             size="icon"
             className="h-7 w-7 shrink-0 text-muted-foreground"
-            aria-label="Dismiss getting started"
+            aria-label="Hide getting started"
             onClick={dismiss}
           >
             <X className="h-4 w-4" />
@@ -107,92 +106,80 @@ export function GettingStartedCard({
         </div>
 
         <ol className="space-y-3">
-          <li className="flex items-center justify-between gap-3 text-sm">
+          <li className={row}>
             <span className="flex min-w-0 items-center gap-2">
-              <StepMark done={connected} n={1} />
-              <span className="truncate">Connect a client</span>
+              <Mark done={connected} waiting={waiting} n={1} />
+              <span className="truncate">Connect an assistant</span>
             </span>
-            {connection.state === "connected" && (
+            {connected && (
+              <span className="shrink-0 text-xs text-muted-foreground">{atStart(connection.name)} connected</span>
+            )}
+            {waiting && (
               <span className="shrink-0 text-xs text-muted-foreground">
-                connected · {connection.name || "a client"}
+                Waiting for {connection.name || "your assistant"}…
               </span>
             )}
-            {connection.state === "waiting" && (
-              <span className="shrink-0 text-xs text-muted-foreground">
-                waiting for first call…
-              </span>
-            )}
-            {connection.state === "none" && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={onConnect}
-              >
+            {!connected && !waiting && (
+              <Button variant="outline" size="sm" className="shrink-0" onClick={() => onStart("assistant")}>
                 Connect
               </Button>
             )}
           </li>
 
-          <li className="flex items-center justify-between gap-3 text-sm">
+          <li className={row}>
             <span className="flex min-w-0 items-center gap-2">
-              <StepMark done={basicsDone} n={2} />
+              <Mark done={basics} n={2} />
               <span className="truncate">Fill in the basics</span>
             </span>
-            <Button variant="outline" size="sm" onClick={onStart} className="shrink-0">
-              {basicsDone ? "Review" : "Start"}
+            <Button variant="outline" size="sm" className="shrink-0" onClick={() => onStart("about-you")}>
+              {basics ? "Edit" : "Fill in"}
             </Button>
           </li>
 
-          <li className="space-y-2 text-sm">
-            <span className="flex items-center justify-between gap-3">
-              <span className="flex min-w-0 items-center gap-2">
-                <StepMark done={false} n={3} />
-                <span className="truncate">Ask your client to fill in the rest</span>
-              </span>
-              <span className="shrink-0 text-xs text-muted-foreground">optional</span>
+          <li className={row}>
+            <span className="flex min-w-0 items-center gap-2">
+              <Mark done={suggested} n={3} />
+              <span className="truncate">Get a first suggestion</span>
             </span>
-
-            {/* The silent-failure guard. mcp_scopes.py HIDES tools a connection
-                is not scoped for rather than failing them, so pasting this
-                prompt into a read-only connection does nothing at all, with no
-                error anywhere. Offering the button there would be offering a
-                button that cannot work. */}
-            {connected && !connection.canPropose && (
-              <p className="pl-6 text-xs leading-relaxed text-muted-foreground">
-                Your connection can only read your persona, so it cannot suggest
-                anything.{" "}
-                <button
-                  type="button"
-                  className="underline underline-offset-2 hover:text-foreground"
-                  onClick={() => onOpenSettings?.(connection.kind === "grant" ? "apps" : "tokens")}
-                >
-                  Reconnect with permission to suggest
-                </button>{" "}
-                to use this.
-              </p>
-            )}
-
-            {connected && connection.canPropose && (
-              <div className="pl-6">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard?.writeText(AUTOFILL_PROMPT);
-                    setCopied(true);
-                  }}
-                >
-                  {copied ? (
-                    <Check className="h-3.5 w-3.5" />
-                  ) : (
-                    <Copy className="h-3.5 w-3.5" />
-                  )}
-                  {copied ? "Copied" : "Copy prompt"}
-                </Button>
-              </div>
-            )}
+            {pending > 0 ? (
+              <Button variant="outline" size="sm" className="shrink-0" onClick={onReview}>
+                Review {pending}
+              </Button>
+            ) : connected && connection.can_propose ? (
+              // mcp_scopes.py HIDES tools a connection is not scoped for, so
+              // the prompt is offered only where it can work.
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                data-guide="copy-prompt"
+                onClick={() => {
+                  navigator.clipboard?.writeText(AUTOFILL_PROMPT);
+                  setCopied(true);
+                  showHint("hint:paste-prompt", {
+                    element: '[data-guide="copy-prompt"]',
+                    title: `Paste it into ${connection.name || "your assistant"}`,
+                    description: "Your assistant reads your persona and sends its suggestions to Review.",
+                  });
+                }}
+              >
+                {copied ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+                {copied ? "Copied" : "Copy prompt"}
+              </Button>
+            ) : null}
           </li>
+
+          {needsEmail && (
+            <li className={row}>
+              <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                <span className="w-4 shrink-0" aria-hidden="true" />
+                <span>Add an email so you can reset your password</span>
+              </span>
+              <Button variant="outline" size="sm" className="shrink-0" onClick={onAddEmail}>
+                Add email
+              </Button>
+            </li>
+          )}
         </ol>
       </CardContent>
     </Card>

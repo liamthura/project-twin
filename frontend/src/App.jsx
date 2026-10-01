@@ -137,6 +137,8 @@ export default function App() {
   // The editor tour waiting to run: "first" once after onboarding, "force"
   // from Show me around, which replays it.
   const [tourPending, setTourPending] = useState(null);
+  // Whether the Getting started card is on screen; it carries the email nudge.
+  const [cardShown, setCardShown] = useState(false);
   // Where you are lives in the URL, in two segments -- `#/preferences/code-style`
   // -- so a refresh keeps your place down to the subsection. Without it a reload
   // drops you on Profile, which is worst exactly when a "View in ..." link just
@@ -785,6 +787,11 @@ export default function App() {
     onNavigate: navigate,
   };
 
+  const addEmail = () => {
+    setAddEmailRequest((n) => n + 1);
+    openSettings("account");
+  };
+
   const handleSignOut = async () => {
     // The session cookie is HttpOnly, so only the service can revoke it.
     await signOut();
@@ -831,14 +838,14 @@ export default function App() {
         {/* On every screen, deliberately: it is a nudge. An account with no
             email cannot be recovered, which is worth a line of the page until
             it is fixed or dismissed. */}
-        <div className="mb-4 empty:mb-0">
-          <AddEmailBanner
-            onAddEmail={() => {
-              setAddEmailRequest((n) => n + 1);
-              openSettings("account");
-            }}
-          />
-        </div>
+        {/* Not on Profile while the Getting started card shows: the card
+            carries the same nudge, and two banners pushed the persona below
+            the first screen on a phone. */}
+        {!(activeSection === "profile" && cardShown) && (
+          <div className="mb-4 empty:mb-0">
+            <AddEmailBanner onAddEmail={addEmail} />
+          </div>
+        )}
 
         <SectionMenu {...shellProps} />
 
@@ -854,10 +861,12 @@ export default function App() {
                 than a starting point. */}
             {activeSection === "profile" && (
               <GettingStartedCard
+                profile={packData.profile}
                 disabledSections={disabledSections}
-                onStart={() => navigate("onboarding", DEFAULT_ONBOARDING_STEP)}
-                onOpenSettings={openSettings}
-                onConnect={() => navigate("onboarding", "connect")}
+                onStart={(step) => navigate("onboarding", step)}
+                onReview={() => navigate("review", null)}
+                onAddEmail={addEmail}
+                onShownChange={setCardShown}
               />
             )}
 

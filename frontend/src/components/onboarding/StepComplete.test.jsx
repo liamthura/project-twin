@@ -1,133 +1,74 @@
-// canvas-confetti calls getContext("2d"), which jsdom does not implement. The
-// mock keeps every StepComplete test off that path; whether confetti fired is
-// asserted through this spy rather than through the canvas.
-const confettiCreateMock = vi.hoisted(() => vi.fn(() => Object.assign(vi.fn(), { reset: vi.fn() })));
-vi.mock("canvas-confetti", () => ({
-  default: Object.assign(vi.fn(), { create: confettiCreateMock }),
-}));
-
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { StepComplete } from "./StepComplete";
+vi.mock("@/lib/guide.js", () => ({ startTour: vi.fn(async () => false) }));
 
-const filled = {
-  profile: { name: "Ada", preferred_name: "", bio: "Builds things." },
-  preferences: { communication: { default: { tone: "direct" } } },
-};
+const { StepComplete } = await import("./StepComplete");
+const { countAdded } = await import("./OnboardingFlow");
 
-describe("StepComplete", () => {
-  it("counts what was actually filled, not what was offered", () => {
-    render(<StepComplete data={filled} onAdd={vi.fn()} onDone={vi.fn()} />);
-    // name and bio on profile, tone on preferences. preferred_name is empty and
-    // must not be counted -- a count that included it would congratulate
-    // someone for a field they skipped.
-    expect(screen.getByText(/3 things saved/i)).toBeInTheDocument();
+const connected = { connection: { state: "connected", name: "Cursor" } };
+
+describe("countAdded", () => {
+  it("counts what you typed, not what was already there", () => {
+    const before = {
+      profile: { name: "" },
+      preferences: { communication: { default: { locale: "British English" } } },
+    };
+    const after = { ...before, profile: { name: "Ada", current_role: "Engineer" } };
+    expect(countAdded(before, after)).toBe(2);
+    expect(countAdded(before, before)).toBe(0);
   });
 
-  it("says so plainly when nothing was filled", () => {
-    render(<StepComplete data={{}} onAdd={vi.fn()} onDone={vi.fn()} />);
-    expect(screen.getByText(/nothing saved yet/i)).toBeInTheDocument();
-  });
-
-  it("appends one top-of-mind idea in the shape the entity declares", async () => {
-    const onAdd = vi.fn();
-    const user = userEvent.setup();
-    render(<StepComplete data={filled} onAdd={onAdd} onDone={vi.fn()} />);
-
-    await user.type(screen.getByLabelText(/what is on your mind/i), "Ship the flow");
-    await user.click(screen.getByRole("button", { name: /add this/i }));
-
-    expect(onAdd).toHaveBeenCalledWith("projects", ["top_of_mind"], {
-      idea: "Ship the flow",
-    });
-  });
-
-  it("appends one goal by its title field", async () => {
-    const onAdd = vi.fn();
-    const user = userEvent.setup();
-    render(<StepComplete data={filled} onAdd={onAdd} onDone={vi.fn()} />);
-
-    await user.type(screen.getByLabelText(/one goal/i), "Learn Rust");
-    await user.click(screen.getByRole("button", { name: /add goal/i }));
-
-    expect(onAdd).toHaveBeenCalledWith("goals", ["goals"], { title: "Learn Rust" });
-  });
-
-  it("adds nothing for whitespace, and clears the box after a real add", async () => {
-    const onAdd = vi.fn();
-    const user = userEvent.setup();
-    render(<StepComplete data={filled} onAdd={onAdd} onDone={vi.fn()} />);
-
-    const box = screen.getByLabelText(/what is on your mind/i);
-    await user.type(box, "   ");
-    await user.click(screen.getByRole("button", { name: /add this/i }));
-    expect(onAdd).not.toHaveBeenCalled();
-
-    await user.clear(box);
-    await user.type(box, "Ship it");
-    await user.click(screen.getByRole("button", { name: /add this/i }));
-    expect(box).toHaveValue("");
-  });
-
-  it("has one way into the app", async () => {
-    const onDone = vi.fn();
-    const user = userEvent.setup();
-    render(<StepComplete data={filled} onAdd={vi.fn()} onDone={onDone} />);
-
-    await user.click(screen.getByRole("button", { name: /go to my persona/i }));
-    expect(onDone).toHaveBeenCalled();
+  it("counts an extra added on Complete", () => {
+    const before = { goals: { goals: [] } };
+    expect(countAdded(before, { goals: { goals: [{ title: "Learn Rust" }] } })).toBe(1);
   });
 });
 
-describe("StepComplete, the arrival", () => {
-  // Nothing in vitest.config.js clears mocks between tests, and this file has
-  // several renders of StepComplete before these run -- without this, a
-  // confetti assertion could pass on a call left over from an earlier test
-  // rather than on its own render.
-  beforeEach(() => {
-    confettiCreateMock.mockClear();
+describe("StepComplete", () => {
+  it("says who can read it now", () => {
+    render(<StepComplete added={3} report={connected} onAdd={vi.fn()} onDone={vi.fn()} />);
+    expect(screen.getByText("You've added 3 things. Cursor can read them now.")).toBeInTheDocument();
   });
 
-  it("counts one saved field as one thing, not '1 things'", () => {
-    render(
-      <StepComplete
-        data={{ profile: { name: "Liam" } }}
-        onAdd={vi.fn()}
-        onDone={vi.fn()}
-      />,
-    );
-    expect(screen.getByText(/1 thing saved/)).toBeInTheDocument();
-    expect(screen.queryByText(/1 things saved/)).not.toBeInTheDocument();
+  it("says what connecting would do when nothing is connected", () => {
+    render(<StepComplete added={1} report={null} onAdd={vi.fn()} onDone={vi.fn()} />);
+    expect(
+      screen.getByText("You've added 1 thing. Connect an assistant and it can read them and suggest the rest."),
+    ).toBeInTheDocument();
   });
 
-  it("still pluralises more than one", () => {
-    render(
-      <StepComplete
-        data={{ profile: { name: "Liam", current_role: "Specialist" } }}
-        onAdd={vi.fn()}
-        onDone={vi.fn()}
-      />,
-    );
-    expect(screen.getByText(/things saved/)).toBeInTheDocument();
+  it("is honest about nothing", () => {
+    render(<StepComplete added={0} report={null} onAdd={vi.fn()} onDone={vi.fn()} />);
+    expect(
+      screen.getByText("Nothing added yet. Fill it in whenever you like, or let an assistant do it."),
+    ).toBeInTheDocument();
   });
 
-  it("celebrates arriving with something saved", () => {
-    render(
-      <StepComplete
-        data={{ profile: { name: "Liam" } }}
-        onAdd={vi.fn()}
-        onDone={vi.fn()}
-      />,
-    );
-    expect(confettiCreateMock).toHaveBeenCalled();
+  it("confirms an extra where it was added", async () => {
+    const onAdd = vi.fn();
+    const user = userEvent.setup();
+    render(<StepComplete added={0} report={null} onAdd={onAdd} onDone={vi.fn()} />);
+    await user.type(screen.getByLabelText("A goal you're working towards"), "Learn Rust{Enter}");
+    expect(onAdd).toHaveBeenCalledWith("goals", ["goals"], { title: "Learn Rust" });
+    expect(screen.getByRole("status")).toHaveTextContent("Added to Goals");
   });
 
-  it("does not celebrate an empty persona", () => {
-    // Nothing was saved. Confetti over that is a party for a job not done, and
-    // the copy beside it already says as much.
-    render(<StepComplete data={{}} onAdd={vi.fn()} onDone={vi.fn()} />);
-    expect(confettiCreateMock).not.toHaveBeenCalled();
+  it("adds a top-of-mind item under projects", async () => {
+    const onAdd = vi.fn();
+    const user = userEvent.setup();
+    render(<StepComplete added={0} report={null} onAdd={onAdd} onDone={vi.fn()} />);
+    await user.type(screen.getByLabelText("What's on your mind at the moment?"), "The migration");
+    await user.click(screen.getByRole("button", { name: "Add this" }));
+    expect(onAdd).toHaveBeenCalledWith("projects", ["top_of_mind"], { idea: "The migration" });
+    expect(screen.getByRole("status")).toHaveTextContent("Added to Top of mind");
+  });
+
+  it("goes to the persona", async () => {
+    const onDone = vi.fn();
+    render(<StepComplete added={0} report={null} onAdd={vi.fn()} onDone={onDone} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Go to my persona" }));
+    expect(onDone).toHaveBeenCalled();
   });
 });

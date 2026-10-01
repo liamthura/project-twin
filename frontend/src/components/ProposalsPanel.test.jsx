@@ -34,6 +34,12 @@ const PACKS = [
   },
 ];
 
+const getWatchtower = vi.hoisted(() => vi.fn(() => Promise.resolve({ connection: { state: "none", total: 0 } })));
+vi.mock("@/lib/watchtower.js", async (importOriginal) => ({
+  ...(await importOriginal()),
+  getWatchtower,
+}));
+
 vi.mock("@/lib/api", () => ({
   listProposals: vi.fn(),
   listConnectedApps: vi.fn(() => Promise.resolve([])),
@@ -801,72 +807,47 @@ describe("ProposalsPanel", () => {
 
   describe("an empty queue says which fix applies", () => {
     beforeEach(() => { api.listProposals.mockResolvedValue([]); });
+    const connection = (c) => getWatchtower.mockResolvedValue({ connection: { total: 1, kind: "grant", ...c } });
 
     it("points at the connect flow when nothing is connected", async () => {
-      api.listConnectedApps.mockResolvedValue([]);
+      connection({ state: "none", total: 0, kind: null });
       render(<ProposalsPanel />);
       expect(await screen.findByText(/nothing is connected yet/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /connect an app/i })).toBeInTheDocument();
     });
 
     it("names the app that can read but not propose", async () => {
-      api.listConnectedApps.mockResolvedValue([
-        { id: "g1", clientId: "c1", clientName: "Claude Desktop", scopes: ["persona:read"] },
-      ]);
+      connection({ state: "connected", name: "Claude Desktop", can_propose: false });
       render(<ProposalsPanel />);
       expect(await screen.findByText(
         /Claude Desktop can read your persona but not suggest changes/i)).toBeInTheDocument();
     });
 
     it("does not name one app when several are connected and none can propose", async () => {
-      api.listConnectedApps.mockResolvedValue([
-        { id: "g1", clientId: "c1", clientName: "Claude Desktop", scopes: ["persona:read"] },
-        { id: "g2", clientId: "c2", clientName: "Cursor", scopes: ["persona:read"] },
-      ]);
+      connection({ state: "connected", name: "Claude Desktop", can_propose: false, total: 2 });
       render(<ProposalsPanel />);
       expect(await screen.findByText(
         /None of your connections can suggest changes/i)).toBeInTheDocument();
     });
 
     it("says nothing extra when something can propose", async () => {
-      api.listConnectedApps.mockResolvedValue([
-        { id: "g1", clientId: "c1", clientName: "Cursor",
-          scopes: ["persona:read", "persona:propose"] },
-      ]);
+      connection({ state: "connected", name: "Cursor", can_propose: true });
       render(<ProposalsPanel />);
       expect(await screen.findByText(/nothing waiting/i)).toBeInTheDocument();
-      await waitFor(() => expect(api.listConnectedApps).toHaveBeenCalled());
+      await waitFor(() => expect(getWatchtower).toHaveBeenCalled());
       expect(screen.queryByText(/not suggest changes/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/nothing is connected/i)).not.toBeInTheDocument();
     });
 
-    it("counts a used token as connected, not just OAuth grants", async () => {
-      // The P0 from the 2026-09-24 critique: a token-only user was told
-      // "Nothing is connected yet" by the one screen that waits on a client.
-      api.listConnectedApps.mockResolvedValue([]);
-      api.listTokens.mockResolvedValue([
-        { id: "t1", label: "Claude Code", last_used_at: "2026-09-22T10:00:00Z",
-          scopes: ["persona:read", "persona:propose"] },
-      ]);
+    it("says a token is waiting for its first call, with its name capitalised", async () => {
+      connection({ state: "waiting", name: "my assistant", kind: "token", can_propose: true });
       render(<ProposalsPanel />);
-      await waitFor(() => expect(api.listTokens).toHaveBeenCalled());
-      expect(await screen.findByText(/nothing waiting/i)).toBeInTheDocument();
-      expect(screen.queryByText(/nothing is connected/i)).not.toBeInTheDocument();
-    });
-
-    it("says a token is waiting for its first call", async () => {
-      api.listConnectedApps.mockResolvedValue([]);
-      api.listTokens.mockResolvedValue([
-        { id: "t1", label: "Cursor", last_used_at: null, scopes: ["persona:read"] },
-      ]);
-      render(<ProposalsPanel />);
-      expect(await screen.findByText(/Cursor is set up but hasn.t been used yet/i))
+      expect(await screen.findByText(/My assistant is set up but hasn.t been used yet/))
         .toBeInTheDocument();
     });
 
     it("sends Connect an app to the connect flow", async () => {
-      api.listConnectedApps.mockResolvedValue([]);
-      api.listTokens.mockResolvedValue([]);
+      connection({ state: "none", total: 0, kind: null });
       const onConnect = vi.fn();
       render(<ProposalsPanel onConnect={onConnect} />);
       fireEvent.click(await screen.findByRole("button", { name: /connect an app/i }));
@@ -874,10 +855,7 @@ describe("ProposalsPanel", () => {
     });
 
     it("opens the tab that manages the read-only connection", async () => {
-      api.listTokens.mockResolvedValue([]);
-      api.listConnectedApps.mockResolvedValue([
-        { id: "g1", clientId: "c1", clientName: "Claude Desktop", scopes: ["persona:read"] },
-      ]);
+      connection({ state: "connected", name: "Claude Desktop", can_propose: false });
       const onOpenSettings = vi.fn();
       render(<ProposalsPanel onOpenSettings={onOpenSettings} />);
       fireEvent.click(await screen.findByRole("button", { name: /review access/i }));
@@ -889,7 +867,7 @@ describe("ProposalsPanel", () => {
         Promise.resolve(kind === "entity" ? [ENTITY] : []));
       render(<ProposalsPanel />);
       await screen.findByRole("button", { name: /^approve /i });
-      expect(api.listConnectedApps).not.toHaveBeenCalled();
+      expect(getWatchtower).not.toHaveBeenCalled();
     });
   });
 });
