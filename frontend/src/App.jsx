@@ -51,6 +51,7 @@ import { Rail } from "@/shell/Rail";
 import { SectionMenu } from "@/shell/SectionMenu";
 import { useScrollSpy } from "@/shell/useScrollSpy";
 import { useKeyedDebounce } from "@/lib/useKeyedDebounce";
+import { TOURS, startTour } from "@/lib/guide.js";
 
 // Main App
 export default function App() {
@@ -251,6 +252,18 @@ export default function App() {
   // complete before any content mounts -- which is what lets a cold deep link
   // render a correctly marked rail immediately.
   const activeBands = activePack ? outline(activePack) : [];
+
+  // The editor tour: once after onboarding's Complete, and from Show me
+  // around, always. It waits a beat so the section has laid out the fields and
+  // History button it points at; startTour drops any step still missing.
+  useEffect(() => {
+    if (!tourPending || !activePack) return undefined;
+    const timer = setTimeout(() => {
+      startTour("guide:editor", TOURS.editor, { force: tourPending === "force" });
+      setTourPending(null);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [tourPending, activePack]);
 
   /**
    * Go somewhere. A deliberate move, so it PUSHES: back walks the places you
@@ -823,6 +836,12 @@ export default function App() {
         onOpenSettings={() => openSettings()}
         onSaveNow={saveAll}
         onSearch={() => setSearchOpen(true)}
+        onShowMeAround={() => {
+          // The tour points at a section's fields and History, so it runs on
+          // a section; from Review or Settings it opens Profile first.
+          if (!activePack) navigate("profile", null);
+          setTourPending("force");
+        }}
       />
       <SearchDialog
         open={searchOpen}
@@ -882,7 +901,7 @@ export default function App() {
                 // editing ticks once -- autosave flush or an explicit Save now.
                 savedAt={lastSaved}
                 headerActions={
-                  <Button variant="outline" size="sm" onClick={() => setHistoryFor(activePack.key)}>
+                  <Button variant="outline" size="sm" data-guide="history" onClick={() => setHistoryFor(activePack.key)}>
                     <History className="h-3.5 w-3.5" aria-hidden="true" />
                     History
                   </Button>
@@ -901,6 +920,7 @@ export default function App() {
                 packs={packs}
                 onTogglePack={togglePack}
                 addEmailRequest={addEmailRequest}
+                onConnect={() => navigate("onboarding", "assistant")}
                 onConnectionChange={() => {
                   loadAllData();
                   loadSettings();

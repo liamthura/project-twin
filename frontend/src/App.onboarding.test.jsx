@@ -26,6 +26,15 @@ vi.mock("@/lib/onboarding.js", () => ({
   EMPTY_ONBOARDING: { dismissed: false, steps: {} },
 }));
 
+const guide = vi.hoisted(() => ({
+  startTour: vi.fn(async () => true),
+  showHint: vi.fn(async () => true),
+  celebrateFirst: vi.fn(async () => {}),
+  TOURS: { editor: [{ element: "#main-content" }], firstSuggestion: [] },
+  HINTS: { promote: {} },
+}));
+vi.mock("@/lib/guide.js", () => guide);
+
 // Pinned so a test can hold the spy on a band the current section does not
 // have, which is what it reports for a render after leaving Profile.
 const spied = vi.hoisted(() => ({ band: null }));
@@ -125,6 +134,17 @@ describe("App on an onboarding route", () => {
     await screen.findByRole("heading", { name: /about you/i });
     await new Promise((r) => setTimeout(r, 50));
     expect(window.location.hash).toBe("#/onboarding/about-you");
+  });
+
+  it("replays the editor tour from Show me around", async () => {
+    window.location.hash = "#/profile";
+    const userEvent = (await import("@testing-library/user-event")).default;
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "Account" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Show me around" }));
+    await waitFor(() =>
+      expect(guide.startTour).toHaveBeenCalledWith("guide:editor", guide.TOURS.editor, { force: true }),
+    );
   });
 
   it("puts the getting-started card on Profile and nowhere else", async () => {

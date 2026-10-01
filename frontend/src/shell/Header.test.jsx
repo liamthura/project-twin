@@ -81,6 +81,14 @@ describe("Header", () => {
       expect(onOpenSettings).toHaveBeenCalledTimes(1);
     });
 
+    it("offers Show me around, which replays the editor tour", async () => {
+      const onShowMeAround = vi.fn();
+      renderHeader({ accountName: "Liam", onShowMeAround });
+      await userEvent.click(screen.getByRole("button", { name: "Liam" }));
+      await userEvent.click(await screen.findByRole("menuitem", { name: "Show me around" }));
+      expect(onShowMeAround).toHaveBeenCalledTimes(1);
+    });
+
     it("links to the docs from the menu, in a new tab", async () => {
       renderHeader({ accountName: "Liam" });
       await userEvent.click(screen.getByRole("button", { name: "Liam" }));

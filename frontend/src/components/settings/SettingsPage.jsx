@@ -36,6 +36,7 @@ export function SettingsPage({
   onTogglePack,
   onConnectionChange,
   addEmailRequest = 0,
+  onConnect,
 }) {
   const active = resolveTab(tab);
   const [username, setUsername] = useState(null);
@@ -83,7 +84,7 @@ export function SettingsPage({
             onSignedOut={() => onConnectionChange?.()}
           />
         )}
-        {active === "connections" && <ConnectionsPanel />}
+        {active === "connections" && <ConnectionsPanel onConnect={onConnect} />}
         {active === "sections" && <SectionsPanel packs={packs} onTogglePack={onTogglePack} />}
         {active === "data" && (
           <DataPanel

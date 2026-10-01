@@ -40,6 +40,15 @@ vi.mock("@/lib/watchtower.js", async (importOriginal) => ({
   getWatchtower,
 }));
 
+const guide = vi.hoisted(() => ({
+  startTour: vi.fn(async () => true),
+  showHint: vi.fn(async () => true),
+  celebrateFirst: vi.fn(async () => {}),
+  TOURS: { firstSuggestion: [{ element: '[data-guide="approve"]' }] },
+  HINTS: { promote: { element: '[data-guide="promote"]' } },
+}));
+vi.mock("@/lib/guide.js", () => guide);
+
 vi.mock("@/lib/api", () => ({
   listProposals: vi.fn(),
   listConnectedApps: vi.fn(() => Promise.resolve([])),
@@ -89,6 +98,36 @@ beforeEach(() => {
   api.listProposals.mockImplementation((kind) =>
     Promise.resolve(kind === "entity" ? [ENTITY] : [NOTE]),
   );
+});
+
+describe("ProposalsPanel guides", () => {
+  it("starts the first-suggestion guide once suggestions are listed", async () => {
+    render(<ProposalsPanel />);
+    await screen.findByRole("button", { name: /^approve /i });
+    await waitFor(() =>
+      expect(guide.startTour).toHaveBeenCalledWith("guide:first-suggestion", guide.TOURS.firstSuggestion),
+    );
+  });
+
+  it("does not start it over an empty queue", async () => {
+    api.listProposals.mockResolvedValue([]);
+    render(<ProposalsPanel />);
+    await screen.findByText(/nothing waiting/i);
+    expect(guide.startTour).not.toHaveBeenCalled();
+  });
+
+  it("celebrates the first approval", async () => {
+    render(<ProposalsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: /^approve /i }));
+    expect(guide.celebrateFirst).toHaveBeenCalled();
+  });
+
+  it("marks the buttons the guide points at", async () => {
+    render(<ProposalsPanel />);
+    const approve = await screen.findByRole("button", { name: /^approve /i });
+    expect(approve).toHaveAttribute("data-guide", "approve");
+    expect(screen.getByRole("button", { name: /^reject /i })).toHaveAttribute("data-guide", "reject");
+  });
 });
 
 describe("ProposalsPanel", () => {

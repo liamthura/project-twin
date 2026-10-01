@@ -17,6 +17,7 @@ import {
   listStale, keepEntry,
 } from "@/lib/api";
 import { formatDateLabel } from "@/renderers/isoDate";
+import { HINTS, TOURS, celebrateFirst, showHint, startTour } from "@/lib/guide.js";
 import { atStart, getWatchtower } from "@/lib/watchtower.js";
 import InboxRow from "./InboxRow";
 import { entityPlace, findEntitySpec, humanise, proposalSummary, renderValue } from "./proposalSummary";
@@ -270,6 +271,16 @@ export default function ProposalsPanel({
     return () => { cancelled = true; };
   }, [loaded, rows.length, connection]);
 
+  // Once there is something on screen to point at: the approve loop on the
+  // first suggestion, Promote on the first observation. Each runs once per
+  // account (lib/guide.js), and never over an empty queue.
+  const anyRows = rows.length > 0;
+  useEffect(() => {
+    if (!loaded || !anyRows) return;
+    if (kind === "entity") startTour("guide:first-suggestion", TOURS.firstSuggestion);
+    if (kind === "note") showHint("hint:promote", HINTS.promote);
+  }, [loaded, anyRows, kind]);
+
   /**
    * Run one resolution, then say what happened.
    *
@@ -444,6 +455,9 @@ export default function ProposalsPanel({
   // declares the entity. Following the link leaves Review, which sends the
   // approval at once and refreshes the section behind it.
   function approveLater(batch, edited) {
+    // The first approval ever is the moment the product is for, so it gets
+    // the confetti onboarding's Complete used to have. Once per account.
+    celebrateFirst();
     if (batch.length > 1) {
       resolveLater(batch, approvedMany(batch), (row) => approveProposal(row.id));
       return;

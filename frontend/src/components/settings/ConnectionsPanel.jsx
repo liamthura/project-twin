@@ -6,12 +6,24 @@
  * list in two groups. OAuth apps first: they are what a client that can open
  * a browser should use, and a token is the fallback for one that cannot.
  */
+import { Plus } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+
 import { AppsPanel } from "./AppsPanel";
 import { TokenPanel } from "./TokenPanel";
 
-export function ConnectionsPanel() {
+export function ConnectionsPanel({ onConnect }) {
   return (
     <div className="space-y-8">
+      {/* The same first screen onboarding opens on. Settings used to have no
+          way to connect an assistant at all, only to list what already was. */}
+      {onConnect && (
+        <Button variant="outline" size="sm" onClick={onConnect}>
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Connect an assistant
+        </Button>
+      )}
       <section aria-labelledby="connections-apps" className="space-y-3">
         <h2 id="connections-apps" className="text-base font-semibold">
           Connected apps

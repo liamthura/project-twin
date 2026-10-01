@@ -12,6 +12,9 @@ vi.mock("@/lib/api.js", async (importOriginal) => {
   };
 });
 
+const showHint = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("@/lib/guide.js", () => ({ showHint }));
+
 vi.mock("@/components/ui/use-toast", () => ({
   useToast: () => ({ toast: vi.fn() }),
 }));
@@ -22,6 +25,18 @@ import { AppsPanel } from "./AppsPanel";
 beforeEach(() => vi.clearAllMocks());
 
 describe("AppsPanel", () => {
+  it("explains the first app once, in the words consent used", async () => {
+    render(<AppsPanel isOpen />);
+    await screen.findByText(/Claude Desktop/);
+    await waitFor(() =>
+      expect(showHint).toHaveBeenCalledWith("hint:first-app", {
+        element: '[data-guide="app"]',
+        title: "What Claude Desktop can do",
+        description: "It can read your persona and suggest changes for your approval. Disconnect it here whenever you like.",
+      }),
+    );
+  });
+
   it("fetches nothing while its tab is closed", () => {
     render(<AppsPanel isOpen={false} />);
     expect(listConnectedApps).not.toHaveBeenCalled();

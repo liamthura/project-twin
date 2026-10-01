@@ -55,7 +55,7 @@ export default function ObservationCard({
             and the same tombstone as Reject, so it looks the same. */}
         <span className="ml-auto flex shrink-0 items-center gap-1">
           <Button
-            size="sm" variant="ghost" disabled={busy || !canPromote} onClick={onPromote}
+            size="sm" variant="ghost" disabled={busy || !canPromote} onClick={onPromote} data-guide="promote"
             className="text-primary hover:bg-primary/10 hover:text-primary"
             aria-label={`Promote ${row.note}`}
           >

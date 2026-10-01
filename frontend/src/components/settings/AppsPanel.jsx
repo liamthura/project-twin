@@ -13,6 +13,7 @@ import { Loader2 } from "lucide-react";
 
 import { useToast } from "@/components/ui/use-toast";
 import { listConnectedApps, revokeConnectedApp } from "@/lib/api.js";
+import { showHint } from "@/lib/guide.js";
 import ConnectedApps from "@/components/ConnectedApps";
 
 export function AppsPanel({ isOpen }) {
@@ -33,6 +34,24 @@ export function AppsPanel({ isOpen }) {
       setLoading(false);
     }
   };
+
+  // The first app listed, explained once (lib/guide.js), in the words its
+  // consent screen used (lib/scopes.js SCOPE_LABELS).
+  useEffect(() => {
+    const first = grants[0];
+    if (!first) return;
+    const scopes = first.scopes || [];
+    const can = scopes.includes("persona:write")
+      ? " and change it directly"
+      : scopes.includes("persona:propose")
+        ? " and suggest changes for your approval"
+        : "";
+    showHint("hint:first-app", {
+      element: '[data-guide="app"]',
+      title: `What ${first.clientName || "this app"} can do`,
+      description: `It can read your persona${can}. Disconnect it here whenever you like.`,
+    });
+  }, [grants]);
 
   useEffect(() => {
     if (isOpen) load();
