@@ -16,6 +16,13 @@ describe("InstallCard, a command client", () => {
     ).toBeInTheDocument();
   });
 
+  it("says where to run it, in a terminal", () => {
+    render(<InstallCard client={client("claude-code")} url={TEST_URL} />);
+    expect(
+      screen.getByText("Run this in a terminal. Claude Code then opens MyGist in your browser for you to sign in."),
+    ).toBeInTheDocument();
+  });
+
   it("shows both of Codex's lines", async () => {
     render(<InstallCard client={client("codex")} url={TEST_URL} />);
     expect(await screen.findByText(`codex mcp add mygist --url ${TEST_URL}`)).toBeInTheDocument();
@@ -45,22 +52,28 @@ describe("InstallCard, a command client", () => {
     expect(button).toHaveAttribute("aria-label", "Copied");
   });
 
-  it("resets to its label after the copied state times out", () => {
+  it("resets to its label after the copied state times out", async () => {
     // fireEvent, not userEvent: userEvent awaits promises that vitest's fake
     // clock also owns, so the click never settles and the test hangs before
-    // reaching an assertion.
+    // reaching an assertion. Without userEvent there is no clipboard, so one
+    // is stubbed; the copy is awaited (copyText), hence the act() to settle it.
     vi.useFakeTimers();
+    const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: () => Promise.resolve() }, configurable: true });
     try {
       render(<InstallCard client={client("codex")} url={TEST_URL} />);
       const button = screen.getByRole("button", { name: /copy command/i });
 
       fireEvent.click(button);
+      await act(async () => {});
       expect(screen.getByText("Copied")).toBeInTheDocument();
 
       act(() => vi.advanceTimersByTime(2000));
       expect(screen.getByText("Copy command")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
+      if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+      else delete navigator.clipboard;
     }
   });
 });
@@ -84,18 +97,32 @@ describe("InstallCard, a deeplink client", () => {
   });
 });
 
+describe("a copy the browser refuses", () => {
+  it("does not claim it was copied", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(new Error("denied"));
+    render(<InstallCard client={client("claude-code")} url={TEST_URL} />);
+    await user.click(screen.getByRole("button", { name: "Copy command" }));
+    expect(screen.queryByText("Copied")).not.toBeInTheDocument();
+  });
+});
+
 describe("InstallCard, a steps client", () => {
   it("numbers the steps and shows the address to paste", () => {
     render(<InstallCard client={client("claude-desktop")} url={TEST_URL} />);
 
     const items = screen.getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual([
-      expect.stringMatching(/^1.*Connectors/),
+      expect.stringMatching(/^1.*Customize, then Connectors/),
       expect.stringMatching(/^2.*Add custom connector/),
-      expect.stringMatching(/^3.*Paste the address/),
-      expect.stringMatching(/^4.*Claude opens/),
+      expect.stringMatching(/^3.*Claude opens MyGist/),
     ]);
     expect(screen.getByText(TEST_URL)).toBeInTheDocument();
+  });
+
+  it("says what a Team or Enterprise plan does differently", () => {
+    render(<InstallCard client={client("claude-desktop")} url={TEST_URL} />);
+    expect(screen.getByText(/an Owner adds it in Organization settings/)).toBeInTheDocument();
   });
 
   it("offers the address for copying", async () => {

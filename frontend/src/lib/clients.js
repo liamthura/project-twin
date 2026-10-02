@@ -88,17 +88,24 @@ export const CLIENTS = [
     install: (url) => [`claude mcp add --transport http mygist ${url}`],
   },
   {
+    // The id predates the rename; stored picks and tests use it.
     id: "claude-desktop",
-    name: "Claude Desktop",
+    name: "Claude",
     slug: "claude",
     mark: hasMark("claude"),
     kind: "steps",
+    // claude.ai and the desktop app share an account's connectors, so one row
+    // covers both. Checked against Claude's "Add a connector that isn't in the
+    // directory" (claude.com/docs/connectors/custom/remote-mcp), 2026-10-01:
+    // the old "Settings, then Connectors" had moved to Customize.
     install: () => [
-      "Open Settings, then Connectors.",
-      "Choose Add custom connector.",
-      "Paste the address below and save it.",
-      "Claude opens MyGist and asks you to sign in. Approve the connection, and keep the permission to suggest changes.",
+      "In Claude, open Customize, then Connectors.",
+      "Choose Add custom connector, and paste the address below.",
+      "Choose Add. Claude opens MyGist for you to sign in. Approve it, and keep the permission to suggest changes.",
     ],
+    note:
+      "On a Team or Enterprise plan, an Owner adds it in Organization settings, then Connectors. " +
+      "The Free plan allows one custom connector.",
   },
   {
     id: "cursor",

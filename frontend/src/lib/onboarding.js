@@ -8,7 +8,7 @@
  */
 import { api } from "./api.js";
 
-export const EMPTY_ONBOARDING = { dismissed: false, steps: {} };
+export const EMPTY_ONBOARDING = { dismissed: false, steps: {}, seen: [] };
 
 export async function getOnboarding() {
   const settings = await api("/settings");
@@ -17,7 +17,17 @@ export async function getOnboarding() {
   return {
     dismissed: !!state.dismissed,
     steps: state.steps && typeof state.steps === "object" ? state.steps : {},
+    seen: Array.isArray(state.seen) ? state.seen : [],
   };
+}
+
+/**
+ * A guide or hint has been shown (lib/guide.js). Its own endpoint rather than
+ * a field on PUT /settings, which needs the current disabled_sections and would
+ * re-enable every section the reader turned off if a guide sent a stale list.
+ */
+export async function markSeen(key) {
+  await api("/onboarding/seen", { method: "POST", body: JSON.stringify({ key }) });
 }
 
 /**

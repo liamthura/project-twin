@@ -182,10 +182,11 @@ export function AccountPanel({
 
   const restoreGettingStarted = () => {
     setOnboardingDismissed(false);
-    saveOnboarding({ dismissed: false, steps: {} }, disabledSections).catch(() => {
-      // The offer is already gone from this panel; a lost write costs one more
-      // click on the next visit.
-    });
+    // Brings the card back as it was, progress included: "pick up where you
+    // left off" used to send empty steps. A lost write costs one more click.
+    getOnboarding()
+      .then((saved) => saveOnboarding({ ...saved, dismissed: false }, disabledSections))
+      .catch(() => {});
   };
 
   // An account with a linked provider and no password has nothing to change,

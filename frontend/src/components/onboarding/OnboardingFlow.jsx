@@ -5,114 +5,171 @@
  * sees before they have any reason to care what the rail contains, and putting
  * the whole navigation around four questions was the version that got reversed.
  *
+ * Two paths, three phases on one bar (lib/onboardingSteps.js). With an
+ * assistant, the flow ends in Review on your first suggestion, which is the
+ * moment the product is for; typing it yourself ends on your persona.
+ *
  * The flow owns its own load and its own save. It writes through the same
  * `PUT /api/files/{key}` the editor uses, debounced by the same 1500 ms, so
  * there is no onboarding-specific write path to keep in step -- and leaving
  * mid-step costs nothing, because there is no "finish" to abandon.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Loader2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api.js";
-import { getOnboarding, saveOnboarding } from "@/lib/onboarding.js";
-import {
-  ONBOARDING_STEPS,
-  isStorableStep,
-  normaliseStep,
-  nextStep,
-  prevStep,
-} from "@/lib/onboardingSteps.js";
+import { INSTALLABLE_CLIENTS } from "@/lib/clients.js";
+import { NEEDS_CLIENT, PHASE_COUNT, normaliseStep, phaseOf } from "@/lib/onboardingSteps.js";
+import { closeGuides } from "@/lib/guide.js";
+import { getWatchtower, useWatchtower } from "@/lib/watchtower.js";
 import { getAt, setAt } from "@/renderers/paths";
 
+import { OTHER_CLIENT, StepAssistant } from "./StepAssistant";
 import { StepConnect } from "./StepConnect";
+import { StepHandover } from "./StepHandover";
 import { StepAboutYou } from "./StepAboutYou";
 import { StepHowYouLike } from "./StepHowYouLike";
 import { StepComplete } from "./StepComplete";
 
-// Every step counts, Complete included as the destination -- a progress bar
-// that never fills reads as unfinished work.
-const COUNTED_STEPS = ONBOARDING_STEPS;
-
 // The editor's debounce, from App.jsx. The same number on purpose: a reader who
 // learns the app's saving rhythm here should find it unchanged afterwards.
 const SAVE_DELAY_MS = 1500;
+// Kept for the tab, so a reload on Connect still knows which assistant, and
+// the last call already seen when it was chosen: Connect and handover wait for
+// a call after that, so an assistant connected last week does not read as the
+// one being connected now.
+const CLIENT_KEY = "mygist_onboarding_client";
+const SINCE_KEY = "mygist_onboarding_since";
+const COMMUNICATION = ["communication", "default"];
+
+const clientById = (id) => [...INSTALLABLE_CLIENTS, OTHER_CLIENT].find((c) => c.id === id) || null;
+
+function browserLocale() {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "language" }).of(navigator.language) || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What you typed in this flow: fields that differ from what was loaded and are
+ * not empty, plus anything added on Complete. A default the server filled in
+ * (British English) was there before you arrived, so it does not count, and
+ * nor does a value the flow filled in itself (`filled`: the browser's locale).
+ */
+export function countAdded(before, after, filled = {}) {
+  const changed = (a = {}, b = {}) =>
+    Object.keys(b).filter(
+      (k) => typeof b[k] !== "object" && String(b[k] ?? "").trim() && b[k] !== a[k] && b[k] !== filled[k],
+    ).length;
+  const grew = (a, b) => Math.max(0, (b?.length || 0) - (a?.length || 0));
+  return (
+    changed(before?.profile, after?.profile) +
+    changed(getAt(before?.preferences || {}, COMMUNICATION), getAt(after?.preferences || {}, COMMUNICATION)) +
+    grew(before?.projects?.top_of_mind, after?.projects?.top_of_mind) +
+    grew(before?.goals?.goals, after?.goals?.goals)
+  );
+}
 
 export default function OnboardingFlow({ step, onNavigate, onLeave }) {
-  const current = normaliseStep(step);
+  const reduce = useReducedMotion();
+  const [clientId, setClientId] = useState(() => sessionStorage.getItem(CLIENT_KEY));
+  const client = clientById(clientId);
+  const requested = normaliseStep(step);
+  const current = NEEDS_CLIENT.has(requested) && !client ? "assistant" : requested;
+  const [since, setSince] = useState(() => sessionStorage.getItem(SINCE_KEY));
+  const report = useWatchtower({ active: NEEDS_CLIENT.has(current), since: NEEDS_CLIENT.has(current) ? since : null });
 
   const [data, setData] = useState(null);
   const [packs, setPacks] = useState([]);
-  const [disabledSections, setDisabledSections] = useState([]);
-  const [progress, setProgress] = useState({ dismissed: false, steps: {} });
+  const [saveState, setSaveState] = useState(null);
+  const loaded = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
     Promise.all([
       api("/all").catch(() => ({ data: {} })),
-      api("/settings").catch(() => ({ packs: [], disabled_sections: [] })),
-      getOnboarding().catch(() => ({ dismissed: false, steps: {} })),
-    ]).then(([all, settings, saved]) => {
+      api("/settings").catch(() => ({ packs: [] })),
+    ]).then(([all, settings]) => {
       if (cancelled) return;
+      loaded.current = all?.data || {};
       setData(all?.data || {});
       setPacks(settings?.packs || []);
-      setDisabledSections(settings?.disabled_sections || []);
-      setProgress(saved);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // `flush` and `append` run from event handlers and need the latest data
-  // without being rebuilt on every keystroke, which would re-run anything
-  // depending on them.
+  // `send` and `flush` run from timers and handlers and need the latest data
+  // without being rebuilt on every keystroke.
   const dataRef = useRef(data);
   dataRef.current = data;
 
   // One timer per section key. Editing profile and then preferences must not
   // have the second edit cancel the first section's pending write -- a single
-  // shared timer would do exactly that, and the loss would be silent.
+  // shared timer would do exactly that, and the loss would be silent. `failed`
+  // is what Retry sends again.
   const timers = useRef({});
-  useEffect(
-    () => () => {
-      for (const t of Object.values(timers.current)) clearTimeout(t);
+  const failed = useRef(new Set());
+  // Writes already sent and not yet answered: leaving waits for these too.
+  const inflight = useRef(new Set());
+  const leaving = useRef(false);
+  // The locale the flow wrote from the browser, so Complete does not count it.
+  const filledLocale = useRef(null);
+  useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), []);
+
+  const send = useCallback((key) => {
+    const payload = dataRef.current?.[key];
+    if (payload === undefined) return Promise.resolve();
+    setSaveState("saving");
+    const write = api(`/files/${key}`, { method: "PUT", body: JSON.stringify({ data: payload }) }).then(
+      () => {
+        failed.current.delete(key);
+        setSaveState(failed.current.size ? "error" : "saved");
+      },
+      () => {
+        failed.current.add(key);
+        setSaveState("error");
+      },
+    );
+    inflight.current.add(write);
+    write.finally(() => inflight.current.delete(write));
+    return write;
+  }, []);
+
+  const write = useCallback(
+    (key, next) => {
+      dataRef.current = { ...(dataRef.current || {}), [key]: next };
+      setData(dataRef.current);
+      clearTimeout(timers.current[key]);
+      timers.current[key] = setTimeout(() => {
+        delete timers.current[key];
+        send(key);
+      }, SAVE_DELAY_MS);
     },
-    [],
+    [send],
   );
 
-  const write = useCallback((key, next) => {
-    setData((prev) => ({ ...(prev || {}), [key]: next }));
-    clearTimeout(timers.current[key]);
-    timers.current[key] = setTimeout(() => {
-      delete timers.current[key];
-      api(`/files/${key}`, { method: "PUT", body: JSON.stringify({ data: next }) }).catch(
-        () => {
-          // Deliberately quiet. There is no toaster on this screen and no
-          // action to offer: the next keystroke schedules another write, and
-          // the fields are still on screen either way.
-        },
-      );
-    }, SAVE_DELAY_MS);
-  }, []);
-
   // Flush anything still waiting before the step changes, so moving on cannot
-  // outrun the debounce and lose the last thing typed.
+  // outrun the debounce and lose the last thing typed. Resolves when every
+  // write has landed -- these and any already on their way -- failed ones
+  // included.
   const flush = useCallback(() => {
-    for (const [key, timer] of Object.entries(timers.current)) {
+    const writes = Object.entries(timers.current).map(([key, timer]) => {
       clearTimeout(timer);
       delete timers.current[key];
-      const payload = dataRef.current?.[key];
-      if (payload === undefined) continue;
-      api(`/files/${key}`, { method: "PUT", body: JSON.stringify({ data: payload }) }).catch(
-        () => {},
-      );
-    }
-  }, []);
+      return send(key);
+    });
+    return Promise.all([...inflight.current, ...writes]);
+  }, [send]);
+
+  const retry = useCallback(() => [...failed.current].forEach(send), [send]);
 
   // An optional extra from Complete. Prepends, matching what the list editor
-  // does, and goes through `write` so it is saved by the same debounce as
-  // everything else on this screen -- there is no second write path.
+  // does, and goes through `write`, so there is no second write path.
   const append = useCallback(
     (key, path, item) => {
       const section = dataRef.current?.[key] || {};
@@ -122,150 +179,144 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
     [write],
   );
 
-  const markStep = useCallback(
-    (key, status) => {
-      // The server stores a status for the two steps that collect fields and
-      // rejects anything else with a 400. `connect` is derived from whether a
-      // token or grant exists, so sending one here would be a write that could
-      // only ever fail -- silently, since the failure is swallowed below.
-      if (!isStorableStep(key)) return;
-      setProgress((prev) => {
-        const next = { ...prev, steps: { ...prev.steps, [key]: status } };
-        saveOnboarding(next, disabledSections).catch(() => {
-          // A lost status costs the reader a card that reappears, which is a
-          // far smaller failure than a blocked step.
-        });
-        return next;
-      });
-    },
-    [disabledSections],
-  );
+  // Between steps the writes carry on behind the next screen. Leaving waits
+  // for them: the editor reloads what is stored when the flow hands back, and
+  // a reload that beat the last write showed the persona as it was before,
+  // which the editor's next save would then have written back over it.
+  const go = (to, leave) => {
+    const landed = flush();
+    if (to) {
+      onNavigate(to);
+      return;
+    }
+    // Once: a second click while the writes land would leave twice.
+    if (leaving.current) return;
+    leaving.current = true;
+    landed.finally(() => onLeave(leave));
+  };
 
-  const go = useCallback(
-    (to) => {
-      flush();
-      if (to) onNavigate(to);
-      else onLeave();
-    },
-    [flush, onNavigate, onLeave],
-  );
+  // A guide belongs to the step it points at (the token's spotlight).
+  useEffect(() => closeGuides, [current]);
+
+  const choose = async (id) => {
+    // Chosen before the first report arrived, it asks: without a last call to
+    // wait past, an assistant that called last week reads as connected now.
+    const known = report ?? (await getWatchtower().catch(() => null));
+    const seen = known?.assistant?.last_seen || "";
+    sessionStorage.setItem(CLIENT_KEY, id);
+    sessionStorage.setItem(SINCE_KEY, seen);
+    setClientId(id);
+    setSince(seen);
+    go("connect");
+  };
 
   if (data === null) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden="true" />
       </div>
     );
   }
 
-  const countedAt = COUNTED_STEPS.indexOf(current);
+  // The locale starts from the browser's language while it is still the
+  // manifest default, and is written when you continue, so a value you saw and
+  // kept is saved and one you never saw is not.
+  const defaultLocale = packs.find((p) => p.key === "preferences")?.defaults?.communication?.default?.locale;
+  const storedLocale = getAt(data.preferences || {}, [...COMMUNICATION, "locale"]);
+  const suggested = browserLocale();
+  const shownLocale =
+    defaultLocale && storedLocale === defaultLocale && suggested && suggested !== defaultLocale ? suggested : null;
+
+  const phase = phaseOf(current);
+  // Typing it yourself never passes through Connect, so its segment stays empty.
+  const skippedConnect = !client && phase > 0;
 
   return (
     <div className="min-h-dvh bg-background">
       <div className="mx-auto flex min-h-dvh max-w-xl flex-col px-4 py-10 sm:py-16">
-        {countedAt >= 0 && (
-          // The bar alone. A "Step 1 of 3" label above it said the same thing
-          // twice; the words stay for screen readers.
-          <div className="mb-8">
-            <span className="sr-only">
-              Step {countedAt + 1} of {COUNTED_STEPS.length}
-            </span>
-            <div className="flex gap-1.5" aria-hidden="true">
-              {COUNTED_STEPS.map((key, i) => (
+        {/* The bar alone. A "Step 1 of 3" label above it said the same thing
+            twice; the words stay for screen readers. */}
+        <div className="mb-8">
+          <span className="sr-only">
+            Step {phase + 1} of {PHASE_COUNT}
+          </span>
+          <div className="flex gap-1.5" aria-hidden="true">
+            {Array.from({ length: PHASE_COUNT }, (_, i) => (
+              <span key={i} className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
                 <span
-                  key={key}
-                  className={`h-1 flex-1 rounded-full ${
-                    i <= countedAt ? "bg-primary" : "bg-muted"
+                  className={`block h-full origin-left bg-primary transition-transform duration-300 ease-standard motion-reduce:transition-none ${
+                    i <= phase && !(skippedConnect && i === 0) ? "scale-x-100" : "scale-x-0"
                   }`}
                 />
-              ))}
-            </div>
+              </span>
+            ))}
           </div>
-        )}
-
-        {/* Not flex-1 on Connect: pinned to the foot of the window, "Skip for
-            now" floated a screen-height away from the choice it is the third
-            answer to. */}
-        <div className={current === "connect" ? undefined : "flex-1"}>
-          {current === "connect" && (
-            <StepConnect
-              // Handing the work over is a real answer, not an abandonment:
-              // both field steps are recorded as deliberately skipped, and the
-              // reader goes straight to the end. Complete then reads correctly
-              // -- nothing was filled in, and that was the plan.
-              onDelegate={() => {
-                markStep("about-you", "skipped");
-                markStep("how-you-like", "skipped");
-                go("complete");
-              }}
-              onFillManually={() => go("about-you")}
-            />
-          )}
-
-          {current === "about-you" && (
-            <StepAboutYou
-              packs={packs}
-              data={data.profile || {}}
-              onChange={(next) => write("profile", next)}
-              onOfferAssistant={() => go("connect")}
-            >
-              <StepHowYouLike
-                packs={packs}
-                data={data.preferences || {}}
-                onChange={(next) => write("preferences", next)}
-              />
-            </StepAboutYou>
-          )}
-
-          {current === "complete" && (
-            <StepComplete data={data} onAdd={append} onDone={() => go(null)} />
-          )}
         </div>
 
-        {/* Connect ends in its own two-way choice and Complete has its own
-            single way out, so neither takes the standard footer -- a Continue
-            beside "I'll fill it in myself" would be two buttons for one
-            decision. Connect is first now, so it owes a way out, not back. */}
-        {current === "connect" && (
-          <div className="mt-10">
-            <Button variant="ghost" onClick={() => go(null)}>
-              Skip for now
-            </Button>
-          </div>
-        )}
-
-        {current === "about-you" && (
-          <div className="mt-10 flex items-center justify-between gap-3">
-            <Button variant="ghost" onClick={() => go(prevStep(current))}>
-              Back
-            </Button>
-            <div className="flex items-center gap-2">
-              {/* "Finish later", not "Skip": what you typed is already
-                  saved, so skipping read as throwing it away. What it does is
-                  leave the basics unticked on the Getting started card. */}
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  // Both halves of the page, each stored under its own key.
-                  markStep("about-you", "skipped");
-                  markStep("how-you-like", "skipped");
-                  go(nextStep(current));
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={current}
+            initial={reduce ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduce ? { opacity: 1 } : { opacity: 0, y: -8 }}
+            transition={{ duration: reduce ? 0 : 0.2, ease: [0.2, 0, 0, 1] }}
+          >
+            {current === "assistant" && (
+              <StepAssistant onChoose={choose} onTypeMyself={() => go("about-you")} onSkip={() => go(null)} />
+            )}
+            {current === "connect" && (
+              <StepConnect
+                client={client}
+                report={report}
+                onBack={() => go("assistant")}
+                onContinue={() => go("handover")}
+              />
+            )}
+            {current === "handover" && (
+              <StepHandover
+                client={client}
+                report={report}
+                onReview={() => go(null, { to: "review" })}
+                onTypeMyself={() => go("about-you")}
+                onLater={() => go(null)}
+              />
+            )}
+            {current === "about-you" && (
+              <StepAboutYou
+                packs={packs}
+                data={data.profile || {}}
+                onChange={(next) => write("profile", next)}
+                saveState={saveState}
+                onRetry={retry}
+                onOfferAssistant={() => go("assistant")}
+                onBack={() => go(client ? "handover" : "assistant")}
+                onLater={() => go(null)}
+                onContinue={() => {
+                  if (shownLocale) {
+                    filledLocale.current = shownLocale;
+                    write("preferences", setAt(data.preferences || {}, [...COMMUNICATION, "locale"], shownLocale));
+                  }
+                  go("complete");
                 }}
               >
-                Finish later
-              </Button>
-              <Button
-                onClick={() => {
-                  markStep("about-you", "done");
-                  markStep("how-you-like", "done");
-                  go(nextStep(current));
-                }}
-              >
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
+                <StepHowYouLike
+                  packs={packs}
+                  data={data.preferences || {}}
+                  locale={shownLocale}
+                  onChange={(next) => write("preferences", next)}
+                />
+              </StepAboutYou>
+            )}
+            {current === "complete" && (
+              <StepComplete
+                added={countAdded(loaded.current, data, { locale: filledLocale.current })}
+                report={report}
+                onAdd={append}
+                onDone={() => go(null, { tour: true })}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );

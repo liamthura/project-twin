@@ -51,6 +51,7 @@ import { Rail } from "@/shell/Rail";
 import { SectionMenu } from "@/shell/SectionMenu";
 import { useScrollSpy } from "@/shell/useScrollSpy";
 import { useKeyedDebounce } from "@/lib/useKeyedDebounce";
+import { TOURS, closeGuides, resetSeen, startTour } from "@/lib/guide.js";
 
 // Main App
 export default function App() {
@@ -134,6 +135,11 @@ export default function App() {
   const [disabledSections, setDisabledSections] = useState([]);
   const [packs, setPacks] = useState([]);
   const [pendingCount, setPendingCount] = useState(0);
+  // The editor tour waiting to run: "first" once after onboarding, "force"
+  // from Show me around, which replays it.
+  const [tourPending, setTourPending] = useState(null);
+  // Whether the Getting started card is on screen; it carries the email nudge.
+  const [cardShown, setCardShown] = useState(false);
   // Where you are lives in the URL, in two segments -- `#/preferences/code-style`
   // -- so a refresh keeps your place down to the subsection. Without it a reload
   // drops you on Profile, which is worst exactly when a "View in ..." link just
@@ -246,6 +252,25 @@ export default function App() {
   // complete before any content mounts -- which is what lets a cold deep link
   // render a correctly marked rail immediately.
   const activeBands = activePack ? outline(activePack) : [];
+
+  // The editor tour: once after onboarding's Complete, and from Show me
+  // around, always. It waits a beat so the section has laid out the fields and
+  // History button it points at; startTour drops any step still missing.
+  //
+  // Not while the persona reloads: the app shows only a spinner then, and a
+  // tour started over it found nothing to point at and was lost.
+  useEffect(() => {
+    if (!tourPending || !activePack || isLoading) return undefined;
+    const timer = setTimeout(() => {
+      startTour("guide:editor", TOURS.editor, { force: tourPending === "force" });
+      setTourPending(null);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [tourPending, activePack, isLoading]);
+
+  // A guide belongs to the screen it points at. Moving to another section
+  // takes it down, so a tour or a hint's dot cannot float over the next one.
+  useEffect(() => closeGuides, [activeSection]);
 
   /**
    * Go somewhere. A deliberate move, so it PUSHES: back walks the places you
@@ -685,6 +710,7 @@ export default function App() {
     return (
       <WelcomeAuth
         onSuccess={({ isNew } = {}) => {
+          resetSeen();
           // A brand-new account lands on Welcome, not on an empty Profile:
           // that is the moment intent is highest, and Welcome is where the
           // offer to hand the work to a client is made.
@@ -750,7 +776,16 @@ export default function App() {
       <OnboardingFlow
         step={step}
         onNavigate={(next) => navigate("onboarding", next)}
-        onLeave={() => navigate("profile", null)}
+        // Review when handover's suggestions have arrived; Profile otherwise,
+        // with the editor tour after Complete.
+        onLeave={({ to, tour } = {}) => {
+          if (tour) setTourPending("first");
+          // The flow wrote through its own saves, and only hands back once
+          // they have landed; without this the editor showed, and would then
+          // save back, the persona as it was before onboarding.
+          loadAllData();
+          navigate(to || "profile", null);
+        }}
       />
     );
   }
@@ -777,7 +812,14 @@ export default function App() {
     onNavigate: navigate,
   };
 
+  const addEmail = () => {
+    setAddEmailRequest((n) => n + 1);
+    openSettings("account");
+  };
+
   const handleSignOut = async () => {
+    // What has been seen is per account; the next one in this tab gets its own.
+    resetSeen();
     // The session cookie is HttpOnly, so only the service can revoke it.
     await signOut();
     clearConfig();
@@ -808,6 +850,12 @@ export default function App() {
         onOpenSettings={() => openSettings()}
         onSaveNow={saveAll}
         onSearch={() => setSearchOpen(true)}
+        onShowMeAround={() => {
+          // The tour points at a section's fields and History, so it runs on
+          // a section; from Review or Settings it opens Profile first.
+          if (!activePack) navigate("profile", null);
+          setTourPending("force");
+        }}
       />
       <SearchDialog
         open={searchOpen}
@@ -823,14 +871,14 @@ export default function App() {
         {/* On every screen, deliberately: it is a nudge. An account with no
             email cannot be recovered, which is worth a line of the page until
             it is fixed or dismissed. */}
-        <div className="mb-4 empty:mb-0">
-          <AddEmailBanner
-            onAddEmail={() => {
-              setAddEmailRequest((n) => n + 1);
-              openSettings("account");
-            }}
-          />
-        </div>
+        {/* Not on Profile while the Getting started card shows: the card
+            carries the same nudge, and two banners pushed the persona below
+            the first screen on a phone. */}
+        {!(activeSection === "profile" && cardShown) && (
+          <div className="mb-4 empty:mb-0">
+            <AddEmailBanner onAddEmail={addEmail} />
+          </div>
+        )}
 
         <SectionMenu {...shellProps} />
 
@@ -846,10 +894,13 @@ export default function App() {
                 than a starting point. */}
             {activeSection === "profile" && (
               <GettingStartedCard
+                profile={packData.profile}
                 disabledSections={disabledSections}
-                onStart={() => navigate("onboarding", DEFAULT_ONBOARDING_STEP)}
+                onStart={(step) => navigate("onboarding", step)}
+                onReview={() => navigate("review", null)}
+                onAddEmail={addEmail}
                 onOpenSettings={openSettings}
-                onConnect={() => navigate("onboarding", "connect")}
+                onShownChange={setCardShown}
               />
             )}
 
@@ -865,7 +916,7 @@ export default function App() {
                 // editing ticks once -- autosave flush or an explicit Save now.
                 savedAt={lastSaved}
                 headerActions={
-                  <Button variant="outline" size="sm" onClick={() => setHistoryFor(activePack.key)}>
+                  <Button variant="outline" size="sm" data-guide="history" onClick={() => setHistoryFor(activePack.key)}>
                     <History className="h-3.5 w-3.5" aria-hidden="true" />
                     History
                   </Button>
@@ -884,6 +935,7 @@ export default function App() {
                 packs={packs}
                 onTogglePack={togglePack}
                 addEmailRequest={addEmailRequest}
+                onConnect={() => navigate("onboarding", "assistant")}
                 onConnectionChange={() => {
                   loadAllData();
                   loadSettings();

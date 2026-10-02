@@ -122,11 +122,13 @@ const COPY = {
   app: {
     signin: {
       title: "Welcome to MyGist",
-      description: "Your portable personal context for AI.",
+      // The hero line (PRODUCT.md), then what it means. "Portable personal
+      // context for AI" named a category rather than what you get.
+      description: "Explain yourself once. Every assistant you connect reads the same persona.",
     },
     signup: {
       title: "Create your account",
-      description: "One account, and every AI client you use reads the same persona.",
+      description: "One persona for every assistant you use. Assistants suggest additions for you to approve.",
     },
     forgot: {
       title: "Reset your password",

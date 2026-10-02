@@ -41,6 +41,7 @@ import auth_proxy
 import db
 import jwt_auth
 import mcp_activity
+import watchtower
 import persona_store
 import filling
 import proposals_store
@@ -119,7 +120,7 @@ async def lifespan(fastapi_app: FastAPI):
 app = FastAPI(
     title="MyGist API",
     # The app version, as frontend/package.json has it (the changelog's).
-    version="0.2.5",
+    version="0.3.0",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -713,20 +714,29 @@ async def whoami(request: Request):
     return {"user_id": db.current_user_id.get(), "username": request.state.username}
 
 
-@app.get("/api/usage")
-async def usage():
-    """What each connected client has actually done, for this account.
+@app.get("/api/watchtower")
+async def watchtower_report(since: Optional[str] = None):
+    """What is connected to this account, and what it has done.
 
-    The answer to "is my assistant using MyGist at all", which until now could
-    only be guessed at from the outside. `tools/list` is the row worth reading
-    first: a client that has never fetched it is running on a cached tool
-    schema, and no deploy will reach it.
+    `activity` is every client's counters, as /api/usage always returned: the
+    answer to "is my assistant using MyGist at all". `tools/list` is the row
+    worth reading first: a client that has never fetched it is running on a
+    cached tool schema, and no deploy will reach it. Counters only -- method
+    names, tool names, the client's own label -- so this needs no scope beyond
+    the read every other /api GET requires.
 
-    Counters only -- method names, tool names, the client's own label. Nothing
-    from arguments and no persona content, which is why this needs no scope
-    beyond the read every other /api GET already requires.
+    `connection`, `assistant` and `pending` are worked out from those rows, the
+    account's grants and tokens, and the review queue (see watchtower.py).
+    `since`, a `last_seen` this endpoint returned, narrows `assistant` to the
+    calls after it.
     """
-    return {"activity": mcp_activity.usage(db.current_user_id.get())}
+    return watchtower.report(db.current_user_id.get(), since)
+
+
+@app.get("/api/usage", deprecated=True)
+async def usage():
+    """Renamed /api/watchtower in 0.3.0. Answers for one more release."""
+    return watchtower.report(db.current_user_id.get())
 
 
 @app.post("/api/auth/set-password")
@@ -849,6 +859,7 @@ async def get_settings():
                 "sections": meta["sections"],
                 "entities": meta["entities"],
                 "promotable": meta["promotable"],
+                "defaults": meta["defaults"],
                 "enabled": key in enabled,
             }
             for key, meta in sections.PACK_META.items()
@@ -899,6 +910,18 @@ async def update_settings(update: SettingsUpdate):
     return {"status": "saved", "disabled_sections": sorted(requested),
             "enabled_sections": sorted(settings_store.get_enabled_optins()),
             "onboarding": settings_store.get_onboarding()}
+
+
+class SeenRequest(BaseModel):
+    key: str
+
+
+@app.post("/api/onboarding/seen")
+async def onboarding_seen(body: SeenRequest):
+    """Remember a guide or hint as shown, for this account on every device."""
+    if not settings_store.SEEN_KEY.match(body.key):
+        raise HTTPException(status_code=400, detail="key must be 1-48 of a-z, 0-9, ':' and '-'")
+    return {"seen": settings_store.add_seen(body.key)}
 
 
 @app.get("/api/all")

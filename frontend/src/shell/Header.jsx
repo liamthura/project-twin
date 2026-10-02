@@ -1,4 +1,4 @@
-import { BookOpen, Check, LogOut, Monitor, Moon, Search, Settings, Sun, User, WifiOff } from "lucide-react";
+import { BookOpen, Check, Compass, LogOut, Monitor, Moon, Search, Settings, Sun, User, WifiOff } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ export function Header({
   onOpenSettings,
   onSaveNow,
   onSearch,
+  onShowMeAround,
 }) {
 
   return (
@@ -91,6 +92,7 @@ export function Header({
               onClick={onSearch}
               aria-label="Search"
               aria-keyshortcuts="Meta+K Control+K"
+              data-guide="search"
               className="tap-target gap-2 text-muted-foreground"
             >
               <Search className="h-4 w-4" aria-hidden="true" />
@@ -167,6 +169,14 @@ export function Header({
                   Help and docs
                 </a>
               </DropdownMenuItem>
+              {/* The editor tour onboarding ends on, again whenever it is
+                  wanted (lib/guide.js TOURS.editor). */}
+              {onShowMeAround && (
+                <DropdownMenuItem onSelect={() => onShowMeAround()}>
+                  <Compass className="h-4 w-4" aria-hidden="true" />
+                  Show me around
+                </DropdownMenuItem>
+              )}
               <div className="my-1 h-px bg-border" role="separator" />
               <p className="px-2 pb-1 pt-1.5 text-xs text-muted-foreground">Theme</p>
               {THEMES.map(({ id, label, Icon }) => (

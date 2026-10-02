@@ -31,14 +31,36 @@ an invite code? Use it**: enter your code first, then choose a username and
 password. An invite link skips the code and opens the form directly. No invite
 yet? **Join the waitlist** goes to the form on the landing page.
 
-After signing up, a three-step setup offers to connect an assistant, then asks
-for the basics about you and how you like answers written. Every step can be
-skipped, and everything in it is also in the editor.
-
 <Screenshot
   src="/screenshots/welcome-signup.png"
   caption="The welcome screen, with 'Create an account' selected"
 />
+
+### The first run
+
+After signing up, MyGist asks which assistant you use, then shows that
+assistant's own steps and waits while you connect it. The screen notices when
+the assistant first calls, so there is no reload and no guessing.
+
+<Screenshot
+  src="/screenshots/onboarding-assistant.png"
+  caption="The first screen: choose the assistant you use"
+/>
+
+Next it gives you a prompt to paste into the assistant. As the assistant reads
+your persona and sends its suggestions, the same screen says so, and **Review
+N suggestions** takes you to them. Nothing is saved until you approve one, and
+the first time you do, Review points out **Approve** and **Reject**.
+
+<Screenshot
+  src="/screenshots/onboarding-handover.png"
+  caption="Waiting for the assistant's suggestions after pasting the prompt"
+/>
+
+If you would rather type it yourself, **I'll type it myself** asks for the
+basics and how you like answers written, then shows you around the editor.
+Every screen can be skipped, everything on it is also in the editor, and
+**Show me around** in the account menu replays the tour.
 
 <Accordions>
 <Accordion title="Prefer to do it from a terminal?">

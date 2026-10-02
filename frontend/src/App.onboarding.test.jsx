@@ -18,13 +18,24 @@ vi.mock("@/lib/api.js", async (importOriginal) => {
 // before a single test runs.
 vi.mock("@/lib/session.js", async (importOriginal) => {
   const actual = await importOriginal();
-  return { ...actual, hasSession: () => Promise.resolve(true) };
+  return { ...actual, hasSession: () => Promise.resolve(true), signOut: () => Promise.resolve() };
 });
 vi.mock("@/lib/onboarding.js", () => ({
   getOnboarding: () => Promise.resolve({ dismissed: false, steps: {} }),
   saveOnboarding: () => Promise.resolve(),
   EMPTY_ONBOARDING: { dismissed: false, steps: {} },
 }));
+
+const guide = vi.hoisted(() => ({
+  startTour: vi.fn(async () => true),
+  showHint: vi.fn(async () => true),
+  celebrateFirst: vi.fn(async () => {}),
+  resetSeen: vi.fn(),
+  closeGuides: vi.fn(),
+  TOURS: { editor: [{ element: "#main-content" }], firstSuggestion: [] },
+  HINTS: { promote: {} },
+}));
+vi.mock("@/lib/guide.js", () => guide);
 
 // Pinned so a test can hold the spy on a band the current section does not
 // have, which is what it reports for a render after leaving Profile.
@@ -83,11 +94,11 @@ afterEach(() => {
 
 describe("App on an onboarding route", () => {
   it("renders the flow with no shell around it", async () => {
-    // The retired Welcome step: an old link lands on Connect, which carries it.
+    // The retired Welcome step: an old link lands on the choice of assistant.
     window.location.hash = "#/onboarding/welcome";
     render(<App />);
 
-    await screen.findByRole("heading", { name: /welcome to mygist/i });
+    await screen.findByRole("heading", { name: "Which assistant do you use?" });
     // The two things the shell always draws. Their absence IS the feature.
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
@@ -105,10 +116,10 @@ describe("App on an onboarding route", () => {
     const push = vi.spyOn(window.history, "pushState");
     render(<App />);
 
-    await screen.findByRole("heading", { name: /welcome to mygist/i });
+    await screen.findByRole("heading", { name: "Which assistant do you use?" });
     await waitFor(() => {
       expect(replace).toHaveBeenCalled();
-      expect(window.location.hash).toBe("#/onboarding/connect");
+      expect(window.location.hash).toBe("#/onboarding/assistant");
     });
     expect(push).not.toHaveBeenCalled();
     replace.mockRestore();
@@ -125,6 +136,82 @@ describe("App on an onboarding route", () => {
     await screen.findByRole("heading", { name: /about you/i });
     await new Promise((r) => setTimeout(r, 50));
     expect(window.location.hash).toBe("#/onboarding/about-you");
+  });
+
+  it("reloads the persona when onboarding hands back, so the editor shows what was typed", async () => {
+    window.location.hash = "#/onboarding/assistant";
+    const userEvent = (await import("@testing-library/user-event")).default;
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "Skip for now" }));
+    await waitFor(() => expect(window.location.hash).toBe("#/profile"));
+    // Once at start, once on the way out of the flow.
+    await waitFor(() => expect(apiMock.mock.calls.filter(([path]) => path === "/all").length).toBeGreaterThanOrEqual(3));
+  });
+
+  it("forgets which guides were seen when you sign out, so the next account gets its own", async () => {
+    window.location.hash = "#/profile";
+    const userEvent = (await import("@testing-library/user-event")).default;
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "Account" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
+    await waitFor(() => expect(guide.resetSeen).toHaveBeenCalled());
+  });
+
+  it("closes an open guide when you move to another section", async () => {
+    window.location.hash = "#/profile";
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("banner")).toBeInTheDocument());
+    guide.closeGuides.mockClear();
+    await act(async () => {
+      window.location.hash = "#/review";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    await waitFor(() => expect(guide.closeGuides).toHaveBeenCalled());
+  });
+
+  it("starts the editor tour after Complete only once the persona has reloaded", async () => {
+    let allCalls = 0;
+    let land;
+    apiMock.mockImplementation((path) => {
+      if (path === "/all") {
+        allCalls += 1;
+        // The reload on the way out of the flow is slow, as it can be online.
+        if (allCalls > 2) return new Promise((resolve) => { land = () => resolve({ data: { profile: {}, preferences: {} } }); });
+        return Promise.resolve({ data: { profile: {}, preferences: {} } });
+      }
+      if (path === "/settings") {
+        return Promise.resolve({
+          disabled_sections: [],
+          packs: [{ key: "profile", title: "Profile", core: true, enabled: true, sections: [] }],
+          onboarding: { dismissed: false, steps: {} },
+        });
+      }
+      if (path === "/proposals/count") return Promise.resolve({ entity: 0, note: 0, total: 0 });
+      return Promise.resolve({});
+    });
+    window.location.hash = "#/onboarding/complete";
+    const userEvent = (await import("@testing-library/user-event")).default;
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "Go to my persona" }));
+    await waitFor(() => expect(land).toBeTypeOf("function"));
+    await new Promise((r) => setTimeout(r, 700));
+    expect(guide.startTour).not.toHaveBeenCalledWith("guide:editor", expect.anything(), expect.anything());
+    await act(async () => land());
+    await waitFor(
+      () => expect(guide.startTour).toHaveBeenCalledWith("guide:editor", guide.TOURS.editor, { force: false }),
+      { timeout: 2000 },
+    );
+  });
+
+  it("replays the editor tour from Show me around", async () => {
+    window.location.hash = "#/profile";
+    const userEvent = (await import("@testing-library/user-event")).default;
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "Account" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Show me around" }));
+    await waitFor(() =>
+      expect(guide.startTour).toHaveBeenCalledWith("guide:editor", guide.TOURS.editor, { force: true }),
+    );
   });
 
   it("puts the getting-started card on Profile and nowhere else", async () => {

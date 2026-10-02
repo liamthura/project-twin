@@ -13,7 +13,7 @@ import { nodeAt } from "./manifestNode";
 
 const COMMUNICATION_DEFAULT = ["communication", "default"];
 
-export function StepHowYouLike({ packs, data, onChange }) {
+export function StepHowYouLike({ packs, data, onChange, locale }) {
   const communication = nodeAt(packs, "preferences", COMMUNICATION_DEFAULT);
   // A server without the node leaves About you as it was; the fields are in
   // Preferences whenever they exist.
@@ -24,7 +24,7 @@ export function StepHowYouLike({ packs, data, onChange }) {
       <div className="space-y-1">
         <h2 className="text-lg font-semibold tracking-tight">How you like answers</h2>
         <p className="text-sm text-muted-foreground">
-          These apply to every assistant you connect.
+          Every assistant you connect follows these.
         </p>
       </div>
       {/* The path is inside preferences, so the write goes through `setAt`:
@@ -32,7 +32,9 @@ export function StepHowYouLike({ packs, data, onChange }) {
       <FieldsRenderer
         node={communication}
         entity={communication.element?.entity}
-        value={getAt(data || {}, COMMUNICATION_DEFAULT)}
+        // `locale` is the browser's language, shown in place of the manifest
+        // default until it is changed (OnboardingFlow writes it on Continue).
+        value={locale ? { ...(getAt(data || {}, COMMUNICATION_DEFAULT) || {}), locale } : getAt(data || {}, COMMUNICATION_DEFAULT)}
         onValue={(next) => onChange(setAt(data || {}, COMMUNICATION_DEFAULT, next))}
         packKey="onboarding-preferences"
       />

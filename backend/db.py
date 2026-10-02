@@ -422,6 +422,22 @@ def list_tokens(user_id: str) -> list[dict]:
     return rows
 
 
+def list_grants(user_id: str) -> list[dict]:
+    """The apps this account approved over OAuth, newest first: each one's
+    registered name (nullable in Better Auth) and the scopes granted.
+
+    Read from Better Auth's tables, as delete_account writes to them. Its ids
+    are text and users.id is a uuid, hence the cast."""
+    with get_pool().connection() as conn:
+        return conn.execute(
+            'select k."name" as name, c."scopes" as scopes, c."createdAt" as created_at'
+            ' from better_auth."oauthConsent" c'
+            ' left join better_auth."oauthClient" k on k."clientId" = c."clientId"'
+            ' where c."userId" = %s order by c."createdAt" desc',
+            (str(user_id),),
+        ).fetchall()
+
+
 def revoke_token(user_id: str, token_id: str) -> bool:
     """Delete one of the user's tokens. False if it doesn't exist or isn't theirs."""
     try:

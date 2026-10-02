@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { useState } from "react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const apiMock = vi.hoisted(() => vi.fn());
@@ -16,8 +17,20 @@ vi.mock("@/lib/api.js", async (importOriginal) => {
     listTokens: listTokensMock,
     listConnectedApps: listConnectedAppsMock,
     mcpUrl: () => "https://example.test/mcp",
+    getInstance: () => Promise.resolve({ mcp_oauth: true }),
   };
 });
+const watch = vi.hoisted(() => ({ report: null, fetch: vi.fn() }));
+vi.mock("@/lib/watchtower.js", () => ({
+  useWatchtower: () => watch.report,
+  getWatchtower: watch.fetch,
+  atStart: (n, f = "your assistant") => {
+    const s = n || f;
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  },
+}));
+const closeGuides = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/guide.js", () => ({ startTour: vi.fn(async () => false), closeGuides }));
 vi.mock("@/lib/onboarding.js", () => ({
   getOnboarding: getOnboardingMock,
   saveOnboarding: saveOnboardingMock,
@@ -28,6 +41,9 @@ const OnboardingFlow = (await import("./OnboardingFlow")).default;
 const packsFixture = (await import("@/__fixtures__/packs.json")).default;
 
 beforeEach(() => {
+  watch.report = null;
+  watch.fetch.mockReset().mockResolvedValue(null);
+  sessionStorage.clear();
   apiMock.mockReset();
   getOnboardingMock.mockReset();
   saveOnboardingMock.mockReset();
@@ -47,30 +63,73 @@ beforeEach(() => {
 });
 
 describe("OnboardingFlow", () => {
-  it("opens on Connect, which carries the welcome", async () => {
-    // Welcome was a page of its own before Connect; wave 4 folded it in.
-    render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={vi.fn()} />);
-    expect(
-      await screen.findByRole("heading", { name: /welcome to mygist/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /skip for now/i })).toBeInTheDocument();
+  it("opens on the choice of assistant, with nothing chosen", async () => {
+    render(<OnboardingFlow step="assistant" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Which assistant do you use?" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^something else/i })).toBeInTheDocument();
   });
 
-  it("Skip for now leaves, and does not pretend a step was done", async () => {
-    const onLeave = vi.fn();
+  it("choosing an assistant remembers it and moves on", async () => {
+    const onNavigate = vi.fn();
     const user = userEvent.setup();
-    render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={onLeave} />);
+    render(<OnboardingFlow step="assistant" onNavigate={onNavigate} onLeave={vi.fn()} />);
+    await user.click(await screen.findByRole("button", { name: /^cursor/i }));
+    expect(onNavigate).toHaveBeenCalledWith("connect");
+    expect(sessionStorage.getItem("mygist_onboarding_client")).toBe("cursor");
+  });
 
-    await user.click(await screen.findByRole("button", { name: /skip for now/i }));
-    expect(onLeave).toHaveBeenCalled();
-    expect(saveOnboardingMock).not.toHaveBeenCalled();
+  it("remembers the last call it had seen when you choose, so Connect waits for a new one", async () => {
+    watch.report = { assistant: { last_seen: "2026-09-30T08:00:00+00:00" } };
+    const user = userEvent.setup();
+    render(<OnboardingFlow step="assistant" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    await user.click(await screen.findByRole("button", { name: /^cursor/i }));
+    expect(sessionStorage.getItem("mygist_onboarding_since")).toBe("2026-09-30T08:00:00+00:00");
+  });
+
+  it("asks for the last call itself when you choose before its first report arrived", async () => {
+    watch.fetch.mockResolvedValue({ assistant: { last_seen: "2026-09-29T08:00:00+00:00" } });
+    const user = userEvent.setup();
+    render(<OnboardingFlow step="assistant" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    await user.click(await screen.findByRole("button", { name: /^cursor/i }));
+    await waitFor(() =>
+      expect(sessionStorage.getItem("mygist_onboarding_since")).toBe("2026-09-29T08:00:00+00:00"),
+    );
+  });
+
+  it("closes any open guide when the step changes", async () => {
+    closeGuides.mockClear();
+    const { rerender } = render(<OnboardingFlow step="assistant" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Which assistant do you use?" });
+    rerender(<OnboardingFlow step="about-you" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    await waitFor(() => expect(closeGuides).toHaveBeenCalled());
+  });
+
+  it("a step that needs an assistant shows the choice when none is chosen", async () => {
+    render(<OnboardingFlow step="handover" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Which assistant do you use?" })).toBeInTheDocument();
+  });
+
+  it("keeps the chosen assistant across a reload", async () => {
+    sessionStorage.setItem("mygist_onboarding_client", "codex");
+    render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    await screen.findByText(/step 1 of 3/i);
+    expect(screen.queryByRole("heading", { name: "Which assistant do you use?" })).not.toBeInTheDocument();
   });
 
   it("corrects an unknown step to the first rather than rendering blank", async () => {
     render(<OnboardingFlow step="nonsense" onNavigate={vi.fn()} onLeave={vi.fn()} />);
-    expect(
-      await screen.findByRole("heading", { name: /welcome to mygist/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Which assistant do you use?" })).toBeInTheDocument();
+  });
+
+  it("Skip for now leaves, and I'll type it myself goes to About you", async () => {
+    const onLeave = vi.fn();
+    const onNavigate = vi.fn();
+    const user = userEvent.setup();
+    render(<OnboardingFlow step="assistant" onNavigate={onNavigate} onLeave={onLeave} />);
+    await user.click(await screen.findByRole("button", { name: "I'll type it myself" }));
+    expect(onNavigate).toHaveBeenCalledWith("about-you");
+    await user.click(screen.getByRole("button", { name: "Skip for now" }));
+    expect(onLeave).toHaveBeenCalled();
   });
 
   it("says which step of three, to screen readers, beside a bar", async () => {
@@ -90,72 +149,103 @@ describe("OnboardingFlow", () => {
     expect(screen.getByRole("heading", { name: /how you like answers/i, level: 2 })).toBeInTheDocument();
   });
 
-  it("gives Connect a way out but not a Back or a second Continue", async () => {
-    // First step, so nothing to go back to. It ends in its own two-way choice;
-    // a Continue beside "I'll fill it in myself" would be two buttons for one
-    // decision.
-    render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={vi.fn()} />);
-    await screen.findByRole("heading", { name: /welcome to mygist/i });
-
-    expect(screen.queryByRole("button", { name: /^back$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^continue$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /finish later/i })).not.toBeInTheDocument();
-  });
-
-  it("delegating records both field steps as skipped and jumps to the end", async () => {
+  it("saves what was typed before moving on, and stores no step status", async () => {
+    apiMock.mockImplementation((path) => {
+      if (path === "/all") return Promise.resolve({ data: { profile: {}, preferences: {} } });
+      if (path === "/settings") return Promise.resolve({ disabled_sections: [], packs: packsFixture });
+      return Promise.resolve({});
+    });
     const onNavigate = vi.fn();
     const user = userEvent.setup();
-    listTokensMock.mockResolvedValue([
-      { id: "t1", label: "Claude", last_used_at: null, scopes: ["persona:propose"] },
-    ]);
-    render(<OnboardingFlow step="connect" onNavigate={onNavigate} onLeave={vi.fn()} />);
-
-    await user.click(
-      await screen.findByRole("button", { name: /my assistant will fill it in/i }),
-    );
-
-    // Skipped, not merely unvisited: handing the work over is a decision, and
-    // the two are indistinguishable from the field values alone.
-    expect(saveOnboardingMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        steps: { "about-you": "skipped", "how-you-like": "skipped" },
-      }),
-      [],
-    );
+    render(<OnboardingFlow step="about-you" onNavigate={onNavigate} onLeave={vi.fn()} />);
+    await user.type(await screen.findByLabelText("Name"), "Ada");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(apiMock).toHaveBeenCalledWith("/files/profile", {
+      method: "PUT",
+      body: JSON.stringify({ data: { name: "Ada" } }),
+    });
     expect(onNavigate).toHaveBeenCalledWith("complete");
+    // The card works "basics done" out from the fields now.
+    expect(saveOnboardingMock).not.toHaveBeenCalled();
   });
 
-  it("never sends the server a step it would reject", async () => {
-    // settings_store rejects any key outside about-you / how-you-like with a
-    // 400, and saveOnboarding's failure is swallowed -- so an unguarded write
-    // here would fail silently rather than loudly.
-    const user = userEvent.setup();
-    render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={vi.fn()} />);
-    await screen.findByRole("heading", { name: /welcome to mygist/i });
-
-    await user.click(screen.getByRole("button", { name: /fill it in myself/i }));
-    for (const [state] of saveOnboardingMock.mock.calls) {
-      expect(Object.keys(state.steps)).not.toContain("connect");
-    }
+  it("Back from About you goes to the choice when no assistant was chosen", async () => {
+    const onNavigate = vi.fn();
+    render(<OnboardingFlow step="about-you" onNavigate={onNavigate} onLeave={vi.fn()} />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Back" }));
+    expect(onNavigate).toHaveBeenCalledWith("assistant");
   });
 
-  it("records a skipped step as skipped, not as done", async () => {
+  it("leaves only once the last save has landed, so the editor reloads what was typed", async () => {
+    let land;
+    apiMock.mockImplementation((path, opts) => {
+      if (path === "/all") return Promise.resolve({ data: { profile: {}, preferences: {} } });
+      if (path === "/settings") return Promise.resolve({ disabled_sections: [], packs: packsFixture });
+      if (opts?.method === "PUT") return new Promise((resolve) => { land = resolve; });
+      return Promise.resolve({});
+    });
+    const onLeave = vi.fn();
     const user = userEvent.setup();
-    render(<OnboardingFlow step="about-you" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    render(<OnboardingFlow step="about-you" onNavigate={vi.fn()} onLeave={onLeave} />);
+    await user.type(await screen.findByLabelText("Name"), "Ada");
+    await user.click(screen.getByRole("button", { name: "Finish later" }));
+    expect(onLeave).not.toHaveBeenCalled();
+    land({});
+    await waitFor(() => expect(onLeave).toHaveBeenCalled());
+  });
 
-    await user.click(await screen.findByRole("button", { name: /finish later/i }));
-    // Both halves of the page, each under its own stored key.
-    expect(saveOnboardingMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ steps: { "about-you": "skipped", "how-you-like": "skipped" } }),
-      [],
+  it("waits for a save already on its way, and leaves once on a double click", async () => {
+    let land;
+    apiMock.mockImplementation((path, opts) => {
+      if (path === "/all") return Promise.resolve({ data: { profile: {}, preferences: {} } });
+      if (path === "/settings") return Promise.resolve({ disabled_sections: [], packs: packsFixture });
+      if (opts?.method === "PUT") return new Promise((resolve) => { land = resolve; });
+      return Promise.resolve({});
+    });
+    const onLeave = vi.fn();
+    const user = userEvent.setup();
+    render(<OnboardingFlow step="about-you" onNavigate={vi.fn()} onLeave={onLeave} />);
+    await user.type(await screen.findByLabelText("Name"), "Ada");
+    // Continue sends the write; the screen stays (onNavigate is a mock).
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.dblClick(screen.getByRole("button", { name: "Finish later" }));
+    expect(onLeave).not.toHaveBeenCalled();
+    land({});
+    await waitFor(() => expect(onLeave).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not count the locale it filled in from the browser as something you typed", async () => {
+    const packs = packsFixture.map((p) =>
+      p.key === "preferences" ? { ...p, defaults: { communication: { default: { locale: "British English" } } } } : p,
     );
+    apiMock.mockImplementation((path) => {
+      if (path === "/all") {
+        return Promise.resolve({
+          data: { profile: {}, preferences: { communication: { default: { locale: "British English" } } } },
+        });
+      }
+      if (path === "/settings") return Promise.resolve({ disabled_sections: [], packs });
+      return Promise.resolve({});
+    });
+    function Flow() {
+      const [step, setStep] = useState("about-you");
+      return <OnboardingFlow step={step} onNavigate={setStep} onLeave={vi.fn()} />;
+    }
+    const user = userEvent.setup();
+    render(<Flow />);
+    // jsdom's language is en-US, so the field shows American English.
+    expect(await screen.findByLabelText("Locale")).toHaveValue("American English");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(
+      await screen.findByText("Nothing added yet. Fill it in whenever you like, or let an assistant do it."),
+    ).toBeInTheDocument();
   });
 
   it("renders no app shell at all", async () => {
-    render(<OnboardingFlow step="connect" onNavigate={vi.fn()} onLeave={vi.fn()} />);
-    await screen.findByRole("heading", { name: /welcome to mygist/i });
-    // The whole point of the standalone flow. The rail and the header are the
-    // two things that must not be here.
+    render(<OnboardingFlow step="assistant" onNavigate={vi.fn()} onLeave={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Which assistant do you use?" });
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
   });

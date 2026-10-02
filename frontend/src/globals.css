@@ -331,3 +331,71 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 [data-sonner-toast][data-expanded="true"] [data-toast-time] {
   animation-play-state: paused;
 }
+
+/* driver.js, in the app's own surface (lib/guide.js sets the class). Its own
+   sheet starts every popover from `all: unset`, so each property the app's
+   look depends on is set here rather than inherited. */
+.driver-popover.mygist-guide {
+  background-color: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  box-shadow: 0 12px 32px -12px hsl(24 10% 10% / 0.28);
+  font-family: inherit;
+  min-width: 15rem;
+  max-width: 20rem;
+  padding: 1rem;
+}
+.driver-popover.mygist-guide .driver-popover-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+  padding-right: 1.5rem;
+}
+.driver-popover.mygist-guide .driver-popover-description {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: hsl(var(--muted-foreground));
+}
+.driver-popover.mygist-guide .driver-popover-progress-text {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+.driver-popover.mygist-guide .driver-popover-footer {
+  margin-top: 0.875rem;
+}
+.driver-popover.mygist-guide .driver-popover-footer-btn {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-shadow: none;
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.375rem 0.75rem;
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+.driver-popover.mygist-guide .driver-popover-next-btn,
+.driver-popover.mygist-guide .driver-popover-done-btn {
+  background-color: hsl(var(--primary));
+  border-color: transparent;
+  color: hsl(var(--primary-foreground));
+}
+.driver-popover.mygist-guide .driver-popover-close-btn {
+  color: hsl(var(--muted-foreground));
+}
+.driver-popover.mygist-guide .driver-popover-close-btn:hover,
+.driver-popover.mygist-guide .driver-popover-close-btn:focus-visible {
+  color: hsl(var(--foreground));
+}
+.driver-popover.mygist-guide button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+.driver-popover.mygist-guide .driver-popover-arrow-side-bottom { border-bottom-color: hsl(var(--card)); }
+.driver-popover.mygist-guide .driver-popover-arrow-side-top { border-top-color: hsl(var(--card)); }
+.driver-popover.mygist-guide .driver-popover-arrow-side-left { border-left-color: hsl(var(--card)); }
+.driver-popover.mygist-guide .driver-popover-arrow-side-right { border-right-color: hsl(var(--card)); }
+.driver-hint {
+  --driver-hint-color: hsl(var(--primary));
+}

@@ -84,6 +84,7 @@ export function Rail({
   return (
     <nav
       aria-label="Sections"
+      data-guide="sections"
       className="sticky top-[60px] hidden w-60 shrink-0 self-start md:block"
     >
       {/* Review first: it is the one place something waits for the reader,

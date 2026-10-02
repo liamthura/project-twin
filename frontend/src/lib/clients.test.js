@@ -125,3 +125,18 @@ describe("steps clients", () => {
     }
   });
 });
+
+describe("the Claude row", () => {
+  // claude.ai and the desktop app share an account's connectors, so one row
+  // covers both. Steps checked against Claude's own page, 2026-10-01.
+  const claude = INSTALLABLE_CLIENTS.find((c) => c.id === "claude-desktop");
+
+  it("is Claude, not Claude Desktop", () => {
+    expect(claude.name).toBe("Claude");
+  });
+
+  it("goes through Customize, then Connectors", () => {
+    expect(claude.install(TEST_URL)[0]).toBe("In Claude, open Customize, then Connectors.");
+    expect(claude.note).toMatch(/Team or Enterprise plan, an Owner adds it/);
+  });
+});

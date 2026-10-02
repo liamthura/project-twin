@@ -127,4 +127,12 @@ describe("the Sections tab", () => {
     await user.click(screen.getByRole("switch", { name: "Media" }));
     expect(onTogglePack).toHaveBeenCalledWith("media", true);
   });
+
+  it("offers to connect an assistant from Connections", async () => {
+    const onConnect = vi.fn();
+    const user = (await import("@testing-library/user-event")).default.setup();
+    render(<SettingsPage tab="connections" onTabChange={vi.fn()} packs={PACKS} onConnect={onConnect} />);
+    await user.click(await screen.findByRole("button", { name: "Connect an assistant" }));
+    expect(onConnect).toHaveBeenCalled();
+  });
 });

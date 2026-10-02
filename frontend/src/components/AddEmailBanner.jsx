@@ -18,7 +18,7 @@ import { Mail, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getSession, isPlaceholderEmail } from "@/lib/session.js";
 
-const DISMISSED_KEY = "mygist_add_email_dismissed";
+export const DISMISSED_KEY = "mygist_add_email_dismissed";
 
 export function AddEmailBanner({ onAddEmail }) {
   const [show, setShow] = useState(false);

@@ -15,6 +15,8 @@ describe("StepAboutYou", () => {
     expect(screen.getByLabelText("Organisation")).toBeInTheDocument();
     expect(screen.getByLabelText("Location")).toBeInTheDocument();
     expect(screen.getByLabelText("Bio")).toBeInTheDocument();
+    // Sensitive, and of little use to an assistant on day one. Profile has it.
+    expect(screen.queryByLabelText("Nationality")).not.toBeInTheDocument();
   });
 
   it("hands the whole section back on an edit, keys it does not render included", async () => {
@@ -37,9 +39,23 @@ describe("StepAboutYou", () => {
     });
   });
 
-  it("says nothing is required", () => {
+  it("says it saves as you go", () => {
     render(<StepAboutYou packs={packs} data={{}} onChange={vi.fn()} />);
-    expect(screen.getByText(/nothing here is required/i)).toBeInTheDocument();
+    expect(
+      screen.getByText("Type what's useful and leave the rest. It saves as you go, and you can change all of it later."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows saving, saved, and a retry when a save fails", async () => {
+    const onRetry = vi.fn();
+    const { rerender } = render(<StepAboutYou packs={packs} data={{}} onChange={vi.fn()} saveState="saving" />);
+    expect(screen.getByRole("status")).toHaveTextContent("Saving…");
+    rerender(<StepAboutYou packs={packs} data={{}} onChange={vi.fn()} saveState="saved" />);
+    expect(screen.getByRole("status")).toHaveTextContent("Saved");
+    rerender(<StepAboutYou packs={packs} data={{}} onChange={vi.fn()} saveState="error" onRetry={onRetry} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Couldn't save.");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetry).toHaveBeenCalled();
   });
 
   it("renders an explanation rather than throwing when the pack is absent", () => {
@@ -77,6 +93,19 @@ describe("StepHowYouLike", () => {
     render(<StepHowYouLike packs={packs} data={{}} onChange={vi.fn()} />);
     expect(screen.getByRole("heading", { name: /how you like answers/i, level: 2 })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /add response format/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the locale it was given in place of the stored default", () => {
+    render(
+      <StepHowYouLike
+        packs={packs}
+        data={{ communication: { default: { locale: "British English" } } }}
+        locale="American English"
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText("Locale")).toHaveValue("American English");
+    expect(screen.getByText("Every assistant you connect follows these.")).toBeInTheDocument();
   });
 
   it("renders nothing on a server without the node", () => {

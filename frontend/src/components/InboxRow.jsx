@@ -243,7 +243,7 @@ export default function InboxRow({
             either: a queue of filled buttons out-shouts its own rows. */}
         <span className="ml-auto flex shrink-0 items-center gap-1">
         <Button
-          size="sm" variant="ghost" disabled={busy} onClick={approve}
+          size="sm" variant="ghost" disabled={busy} onClick={approve} data-guide="approve"
           className="text-emerald-700 hover:bg-success/10 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-300"
           aria-label={`Approve ${lead}`}
         >
@@ -253,7 +253,7 @@ export default function InboxRow({
         {/* Colour alone is not an accessible signal, which is what the
             aria-label is for. */}
         <Button
-          size="sm" variant="ghost" disabled={busy} onClick={onReject}
+          size="sm" variant="ghost" disabled={busy} onClick={onReject} data-guide="reject"
           className="text-destructive hover:bg-destructive/10 hover:text-destructive"
           aria-label={`Reject ${lead}`}
         >

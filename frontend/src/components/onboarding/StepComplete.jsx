@@ -1,10 +1,17 @@
 /**
- * The last screen: what landed, two optional extras, and the way in.
+ * The last screen on the typing path: what you added, two optional extras, and
+ * the way in.
  *
  * The extras exist because the reversed design had four field bands and this
  * one has two. Rather than lose `top_of_mind` and a goal entirely, they are
  * offered here as a one-line add -- so the flow stays short without the fields
  * disappearing.
+ *
+ * The count is `added` from OnboardingFlow's countAdded: what you typed in this
+ * flow. It used to count every filled value, so the British English default
+ * the server writes into a new persona was congratulated as something you
+ * saved. The confetti moved to your first approval in Review, the moment the
+ * assistant path ends on.
  *
  * The one place in this slice that does not reuse a renderer. A ListRenderer
  * would bring search, badges, an add dialog and a remove confirmation to
@@ -15,27 +22,19 @@ import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Confetti } from "@/components/ui/confetti";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { atStart } from "@/lib/watchtower.js";
 
-// A value someone actually gave us. An empty string is a field they passed
-// over, and counting it would congratulate them for skipping.
-function filledCount(value) {
-  if (Array.isArray(value)) return value.length > 0 ? 1 : 0;
-  if (value && typeof value === "object") {
-    return Object.values(value).reduce((n, v) => n + filledCount(v), 0);
-  }
-  return String(value ?? "").trim() === "" ? 0 : 1;
-}
-
-function OneLineAdd({ id, label, placeholder, buttonLabel, onAdd }) {
+function OneLineAdd({ id, label, placeholder, buttonLabel, place, onAdd }) {
   const [text, setText] = useState("");
+  const [added, setAdded] = useState(false);
   const submit = () => {
     const value = text.trim();
     if (!value) return;
     onAdd(value);
     setText("");
+    setAdded(true);
   };
   return (
     <div className="space-y-2">
@@ -45,7 +44,10 @@ function OneLineAdd({ id, label, placeholder, buttonLabel, onAdd }) {
           id={id}
           value={text}
           placeholder={placeholder}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            setAdded(false);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -57,64 +59,52 @@ function OneLineAdd({ id, label, placeholder, buttonLabel, onAdd }) {
           {buttonLabel}
         </Button>
       </div>
+      {/* "Add this" used to clear the field and say nothing. */}
+      {added && (
+        <p role="status" className="animate-in fade-in text-sm text-muted-foreground motion-reduce:animate-none">
+          Added to {place}
+        </p>
+      )}
     </div>
   );
 }
 
-export function StepComplete({ data, onAdd, onDone }) {
-  const saved =
-    filledCount(data?.profile) + filledCount(data?.preferences?.communication);
+export function StepComplete({ added, report, onAdd, onDone }) {
+  const connection = report?.connection;
+  const things = `${added} ${added === 1 ? "thing" : "things"}`;
+  const line =
+    added === 0
+      ? "Nothing added yet. Fill it in whenever you like, or let an assistant do it."
+      : connection?.state === "connected"
+        ? `You've added ${things}. ${atStart(connection.name)} can read them now.`
+        : `You've added ${things}. Connect an assistant and it can read them and suggest the rest.`;
 
   return (
     <div className="space-y-8">
-      {/* Only when something was actually saved. Confetti over an empty
-          persona celebrates a job not done, and the sentence underneath it
-          says so in the same breath. StrictMode double-invokes this effect in
-          dev, so a fire, reset, fire flash there is expected and harmless --
-          canvas-confetti guards re-entry with canvas.__confetti_initialized. */}
-      {saved > 0 && <Confetti />}
-
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 text-success" />
-          <h1 className="text-2xl font-semibold tracking-tight">
-            That's the basics
-          </h1>
+          <CheckCircle2 className="h-5 w-5 text-success" aria-hidden="true" />
+          <h1 className="text-2xl font-semibold tracking-tight">That&apos;s the basics</h1>
         </div>
-        {saved > 0 ? (
-          // A NumberTicker count-up was tried here and removed: the noun is
-          // picked off the final value while the ticker is still walking up
-          // to it, so mid-animation frames read "1 things saved" -- the exact
-          // bug this screen exists to fix, just made transient (measured
-          // ~51ms at saved=3, and worse at smaller counts, which this screen
-          // usually shows). The count is rendered directly instead.
-          <p className="text-muted-foreground">
-            {`${Intl.NumberFormat("en-GB").format(saved)} ${
-              saved === 1 ? "thing" : "things"
-            } saved. Everything is editable later, and an assistant can fill in the rest.`}
-          </p>
-        ) : (
-          <p className="text-muted-foreground">
-            Nothing saved yet, which is fine. You can fill this in whenever, or
-            let an assistant do it.
-          </p>
-        )}
+        <p className="max-w-prose text-muted-foreground">{line}</p>
       </div>
 
       <div className="space-y-5 rounded-lg border p-4">
-        <p className="text-sm font-medium">Two more, if you want them</p>
+        <p className="text-sm font-medium">Two more, if you like</p>
         <OneLineAdd
           id="onboarding-top-of-mind"
-          label="What is on your mind right now?"
+          label="What's on your mind at the moment?"
           placeholder="e.g. finishing the migration"
           buttonLabel="Add this"
+          place="Top of mind"
           onAdd={(value) => onAdd("projects", ["top_of_mind"], { idea: value })}
         />
         <OneLineAdd
           id="onboarding-goal"
-          label="One goal you are working towards"
+          label="A goal you're working towards"
           placeholder="e.g. learn Rust properly"
           buttonLabel="Add goal"
+          place="Goals"
           onAdd={(value) => onAdd("goals", ["goals"], { title: value })}
         />
       </div>

@@ -10,31 +10,23 @@
  * routing still has one import while this stays testable on its own.
  */
 
-// Three steps (wave 4). Welcome folded into Connect, which now opens with the
-// same two sentences; How you like answers folded into About you, as its
-// second half.
-export const ONBOARDING_STEPS = ["connect", "about-you", "complete"];
+// Five steps on two paths (wave 10). With an assistant: assistant, connect,
+// handover, then Review. Typing it yourself: about-you, complete, then Profile.
+export const ONBOARDING_STEPS = ["assistant", "connect", "handover", "about-you", "complete"];
 
 // Steps that no longer have a page of their own, and where they went. An old
 // link or bookmark lands on the step that holds what it used to show.
-const RETIRED_STEPS = { welcome: "connect", "how-you-like": "about-you" };
+const RETIRED_STEPS = { welcome: "assistant", "how-you-like": "about-you" };
 
-/**
- * The steps whose status the SERVER will store.
- *
- * It mirrors `settings_store.ONBOARDING_STEP_KEYS`, which rejects anything else
- * with a 400. Only the two sets of fields qualify, now both on the about-you
- * page (how-you-like is its second half): `complete` is a page, and `connect` is derived from whether a token or grant
- * actually exists -- storing a claim about that would let it disagree with the
- * connections themselves.
- */
-export const STORABLE_STEPS = ["about-you", "how-you-like"];
+export const DEFAULT_ONBOARDING_STEP = "assistant";
 
-export function isStorableStep(step) {
-  return STORABLE_STEPS.includes(step);
-}
+// The progress bar's three parts: Connect, Fill in, and the end. Both paths
+// read the same way, whichever steps they pass through.
+const PHASE = { assistant: 0, connect: 0, handover: 1, "about-you": 1, complete: 2 };
+export const PHASE_COUNT = 3;
 
-export const DEFAULT_ONBOARDING_STEP = "connect";
+// Steps about the assistant you chose. With none chosen they show the choice.
+export const NEEDS_CLIENT = new Set(["connect", "handover"]);
 
 export function isOnboardingRoute(section) {
   return section === "onboarding";
@@ -53,18 +45,6 @@ export function normaliseStep(step) {
   return RETIRED_STEPS[step] ?? DEFAULT_ONBOARDING_STEP;
 }
 
-// 0 for an unknown step, so this agrees with normaliseStep rather than
-// returning -1 and letting a progress indicator render "step 0 of 4".
-export function stepIndex(step) {
-  const at = ONBOARDING_STEPS.indexOf(step);
-  return at === -1 ? 0 : at;
-}
-
-export function nextStep(step) {
-  return ONBOARDING_STEPS[stepIndex(step) + 1] ?? null;
-}
-
-export function prevStep(step) {
-  const at = stepIndex(step);
-  return at === 0 ? null : ONBOARDING_STEPS[at - 1];
+export function phaseOf(step) {
+  return PHASE[normaliseStep(step)];
 }

@@ -14,10 +14,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   listProposals, proposalCount, approveProposal, rejectProposal, promoteProposal, suggestDestinations,
   fillFields,
-  listConnectedApps, listTokens, listStale, keepEntry,
+  listStale, keepEntry,
 } from "@/lib/api";
 import { formatDateLabel } from "@/renderers/isoDate";
-import { connectionStatus } from "./onboarding/connectionStatus";
+import { HINTS, TOURS, celebrateFirst, showHint, startTour } from "@/lib/guide.js";
+import { atStart, getWatchtower } from "@/lib/watchtower.js";
 import InboxRow from "./InboxRow";
 import { entityPlace, findEntitySpec, humanise, proposalSummary, renderValue } from "./proposalSummary";
 import ObservationCard from "./ObservationCard";
@@ -254,32 +255,31 @@ export default function ProposalsPanel({
   // proposals waiting never sees this line, and this is the one surface in the
   // app that already polls.
   //
-  // Tokens and grants both count. Checking grants alone told everyone who
-  // connected with a token that nothing was connected -- the same shared rule
-  // as onboarding and the Getting-started card, so the three cannot disagree.
-  // listTokens throws for a read-scoped credential; that is a permission, not
-  // a failure, so it degrades to "no tokens I can see".
+  // Watchtower answers it (backend/watchtower.py), the same rule onboarding
+  // and the Getting started card read, so the three cannot disagree. Its
+  // `total` counts tokens and grants, because naming one connection when
+  // several can only read would imply the others can suggest.
   useEffect(() => {
     // `loaded` matters: rows is [] on the first render too, before the queue
     // has been fetched at all. Without it this fires on every mount, which is
     // the opposite of asking only when there is nothing to review.
     if (!loaded || rows.length > 0 || connection !== null) return;
     let cancelled = false;
-    Promise.all([
-      listTokens().catch(() => []),
-      listConnectedApps().catch(() => []),
-    ]).then(([tokens, grants]) => {
-      // `total` because naming one connection when several can only read
-      // would imply the others can suggest.
-      if (!cancelled) {
-        setConnection({
-          ...connectionStatus(tokens, grants),
-          total: tokens.length + grants.length,
-        });
-      }
-    });
+    getWatchtower()
+      .then((report) => !cancelled && setConnection(report.connection))
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [loaded, rows.length, connection]);
+
+  // Once there is something on screen to point at: the approve loop on the
+  // first suggestion, Promote on the first observation. Each runs once per
+  // account (lib/guide.js), and never over an empty queue.
+  const anyRows = rows.length > 0;
+  useEffect(() => {
+    if (!loaded || !anyRows) return;
+    if (kind === "entity") startTour("guide:first-suggestion", TOURS.firstSuggestion);
+    if (kind === "note") showHint("hint:promote", HINTS.promote);
+  }, [loaded, anyRows, kind]);
 
   /**
    * Run one resolution, then say what happened.
@@ -455,6 +455,9 @@ export default function ProposalsPanel({
   // declares the entity. Following the link leaves Review, which sends the
   // approval at once and refreshes the section behind it.
   function approveLater(batch, edited) {
+    // The first approval ever is the moment the product is for, so it gets
+    // the confetti onboarding's Complete used to have. Once per account.
+    celebrateFirst();
     if (batch.length > 1) {
       resolveLater(batch, approvedMany(batch), (row) => approveProposal(row.id));
       return;
@@ -731,14 +734,14 @@ export default function ProposalsPanel({
           )}
           {kind !== "stale" && connection?.state === "waiting" && (
             <p>
-              {connection.name || "Your token"} is set up but hasn&apos;t been used yet.
-              Suggestions arrive once your client makes its first call.
+              {atStart(connection.name, "your token")} is set up but hasn&apos;t been used yet.
+              Suggestions arrive once it makes its first call.
             </p>
           )}
-          {kind !== "stale" && connection?.state === "connected" && !connection.canPropose && (
+          {kind !== "stale" && connection?.state === "connected" && !connection.can_propose && (
             <p>
               {connection.total === 1
-                ? `${connection.name || "Your connection"} can read your persona but not suggest changes to it.`
+                ? `${atStart(connection.name, "your connection")} can read your persona but not suggest changes to it.`
                 : "None of your connections can suggest changes to your persona."}{" "}
               <Button
                 variant="link"

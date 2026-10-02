@@ -825,3 +825,17 @@ describe("the server line in the footer", () => {
   });
 });
 
+
+describe("the welcome copy", () => {
+  it("says what MyGist does, in its own words", async () => {
+    const user = userEvent.setup();
+    render(<WelcomeAuth onSuccess={() => {}} />);
+    expect(
+      screen.getByText("Explain yourself once. Every assistant you connect reads the same persona."),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Create an account" }));
+    expect(
+      screen.getByText("One persona for every assistant you use. Assistants suggest additions for you to approve."),
+    ).toBeInTheDocument();
+  });
+});

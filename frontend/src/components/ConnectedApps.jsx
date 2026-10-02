@@ -79,7 +79,7 @@ export default function ConnectedApps({ grants, onRevoke }) {
         {grants.map((grant) => {
           const granted = grant.scopes || [];
           return (
-            <div key={grant.id} className="flex items-start justify-between gap-3 p-3">
+            <div key={grant.id} data-guide="app" className="flex items-start justify-between gap-3 p-3">
               <div className="min-w-0 space-y-1">
                 <p className="truncate text-sm font-medium">{grant.clientName}</p>
                 <ul className="space-y-0.5 text-xs text-muted-foreground">

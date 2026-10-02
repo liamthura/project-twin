@@ -151,18 +151,18 @@ describe("the getting-started restore", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps the current disabled sections when restoring", async () => {
+  it("brings the card back as it was, with the current disabled sections", async () => {
     // SettingsUpdate requires disabled_sections and writes what it is sent, so
-    // [] here would re-enable every section the reader turned off.
-    getOnboarding.mockResolvedValue({ dismissed: true, steps: {} });
+    // [] here would re-enable every section the reader turned off. And "pick
+    // up where you left off" means the progress comes back too.
+    const saved = { dismissed: true, steps: { "about-you": "done" }, seen: ["guide:editor"] };
+    getOnboarding.mockResolvedValue(saved);
     open({ disabledSections: ["media"] });
 
     fireEvent.click(await screen.findByRole("button", { name: /show getting started/i }));
 
     await waitFor(() =>
-      expect(saveOnboarding).toHaveBeenCalledWith({ dismissed: false, steps: {} }, [
-        "media",
-      ]),
+      expect(saveOnboarding).toHaveBeenCalledWith({ ...saved, dismissed: false }, ["media"]),
     );
   });
 

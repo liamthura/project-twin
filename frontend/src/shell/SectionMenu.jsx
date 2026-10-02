@@ -68,7 +68,7 @@ export function SectionMenu({
   };
 
   return (
-    <div className="sticky top-[60px] z-10 -mx-4 mb-6 border-b bg-background px-4 py-2 md:hidden">
+    <div data-guide="sections" className="sticky top-[60px] z-10 -mx-4 mb-6 border-b bg-background px-4 py-2 md:hidden">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
