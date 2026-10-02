@@ -544,6 +544,26 @@ Fixed: the bare path now redirects. If you see it, you are on an older build.
 
 </Accordions>
 
+## Reporting a problem
+
+Signed in, **Feedback** in the bottom right of every screen sends a report to
+whoever runs this instance. Choose Problem, Idea or Something else, say what
+happened, and add a screenshot if it helps: pick an image, or paste one into
+the box. The browser shrinks it and saves it again, which drops the location a
+phone photo carries.
+
+A report carries your username, the page you were on, the MyGist version, and
+your browser and screen size. Nothing from your persona is attached. Replies
+go to your recovery email, so add one in **Settings → Account** if you want an
+answer. Error messages in the app have a **Report** button that opens the same
+form with the error filled in.
+
+If you run the instance, reports are saved in the `feedback` table and emailed
+to `FEEDBACK_TO` through Resend (`RESEND_API_KEY` and `EMAIL_FROM` on the API).
+Read them with `python scripts/feedback.py`, one in full with `show <id>`, and
+close one with `done <id>`. An account can send 10 an hour, and deleting an
+account deletes its reports.
+
 ## Getting more detail
 
 `get_raw` dumps a section file verbatim, bypassing every read scope. It is the

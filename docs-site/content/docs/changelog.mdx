@@ -4,12 +4,31 @@ description: What changed in each release, and what you have to do about it.
 ---
 
 Versions here are the app version, shown at the foot of Settings → Account as
-`v0.3.0 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
+`v0.4.0 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
 predate this page.
 
 MyGist is pre-1.0, and its versions say so. Until 0.2.4 they were numbered one
 place higher, so 0.2.3 was released as 2.3.0, 0.2.2 as 2.2.0, 0.2.1 as 2.1.0,
 0.2.0 as 2.0.0 and 0.1.0 as 1.0.0. Nothing else about those releases changed.
+
+## 0.4.0
+
+A Feedback button in the bottom right of every signed-in screen opens a short
+form for a problem, an idea or anything else, with a screenshot you attach or
+paste. Error messages have a Report button that opens it with the error filled
+in.
+
+- A report carries your username, the page, the version, and your browser and
+  screen size, never your persona. A screenshot is shrunk in your browser,
+  which drops a photo's location.
+- Reports are saved, emailed to whoever runs the instance, and deleted with
+  the account. An account can send 10 an hour.
+
+### Upgrading
+
+One migration, `0012_feedback`, which runs on start. To have reports emailed,
+set `FEEDBACK_TO` on the API with `RESEND_API_KEY` and `EMAIL_FROM`. Without
+them, reports are saved and `python scripts/feedback.py` lists them.
 
 ## 0.3.0
 
