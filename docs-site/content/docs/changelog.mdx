@@ -4,12 +4,22 @@ description: What changed in each release, and what you have to do about it.
 ---
 
 Versions here are the app version, shown at the foot of Settings → Account as
-`v0.4.0 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
+`v0.4.1 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
 predate this page.
 
 MyGist is pre-1.0, and its versions say so. Until 0.2.4 they were numbered one
 place higher, so 0.2.3 was released as 2.3.0, 0.2.2 as 2.2.0, 0.2.1 as 2.1.0,
 0.2.0 as 2.0.0 and 0.1.0 as 1.0.0. Nothing else about those releases changed.
+
+## 0.4.1
+
+Signing out lands on the sign-in page. It showed Couldn't reach MyGist
+instead: the app still thought you were signed in, so it read the refused
+reload that follows signing out as the server being down.
+
+### Upgrading
+
+Pull the image and restart. No migration.
 
 ## 0.4.0
 
