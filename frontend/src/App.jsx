@@ -53,6 +53,8 @@ import { SectionMenu } from "@/shell/SectionMenu";
 import { useScrollSpy } from "@/shell/useScrollSpy";
 import { useKeyedDebounce } from "@/lib/useKeyedDebounce";
 import { TOURS, closeGuides, resetSeen, startTour } from "@/lib/guide.js";
+import { forgetOnboarding, primeOnboarding } from "@/lib/onboarding.js";
+import { forgetProvenance } from "@/renderers/provenance";
 
 // Main App
 export default function App() {
@@ -510,6 +512,7 @@ export default function App() {
   // refetch exactly that -- no polling, and no window where the "View in ..."
   // link shows the old data.
   const refreshSection = useCallback(async (key) => {
+    forgetProvenance(key);
     try {
       const response = await api(`/files/${key}`);
       setPackData((prev) => ({ ...prev, [key]: response.data ?? {} }));
@@ -557,6 +560,9 @@ export default function App() {
     generationRef.current += 1;
     const generation = generationRef.current;
     inflightRef.current = new Set();
+    // What else the page holds about this account goes with it.
+    forgetOnboarding();
+    forgetProvenance();
     setPackData({});
     setSectionErrors({});
     setIsLoading(true);
@@ -584,8 +590,12 @@ export default function App() {
   }, [activeKey, isConnected, isLoading, loadSections]);
 
   const loadSettings = async () => {
+    const request = api("/settings");
+    // Onboarding progress rides on this response, which is large; the card and
+    // panels that show it read it from here instead of fetching it again.
+    primeOnboarding(request.then((s) => s?.onboarding));
     try {
-      const s = await api("/settings");
+      const s = await request;
       setDisabledSections(s.disabled_sections || []);
       setPacks(s.packs || []);
     } catch (_) {
@@ -606,6 +616,8 @@ export default function App() {
         body,
         keepalive: closing && body.length < 60000,
       });
+      // The write moved this section's dates, so its held provenance is old.
+      forgetProvenance(fileType);
       setLastSaved(new Date());
       setHasUnsavedChanges(false);
       // No success toast. This fires on every debounced flush, so editing three
@@ -666,6 +678,7 @@ export default function App() {
         method: "PUT",
         body: JSON.stringify(packData),
       });
+      forgetProvenance();
       setLastSaved(new Date());
       setHasUnsavedChanges(false);
       // This one keeps its toast: it answers a button the user just pressed,

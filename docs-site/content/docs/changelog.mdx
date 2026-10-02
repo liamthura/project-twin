@@ -26,6 +26,10 @@ Sections you have opened stay in the page until you sign out.
   fields such as your bio.
 - An update waiting in Review loads the section it would change, so it still
   shows what it replaces.
+- Settings, and the line under an entry saying who added or changed it, are
+  fetched once per session. Both were fetched again on every visit to Profile
+  and to each section, and the settings response alone is about 73,000
+  characters.
 
 ### Upgrading
 

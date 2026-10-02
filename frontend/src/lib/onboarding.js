@@ -10,15 +10,49 @@ import { api } from "./api.js";
 
 export const EMPTY_ONBOARDING = { dismissed: false, steps: {}, seen: [] };
 
-export async function getOnboarding() {
-  const settings = await api("/settings");
-  const state = settings?.onboarding;
+function normalise(state) {
   if (!state || typeof state !== "object") return { ...EMPTY_ONBOARDING };
   return {
     dismissed: !!state.dismissed,
     steps: state.steps && typeof state.steps === "object" ? state.steps : {},
     seen: Array.isArray(state.seen) ? state.seen : [],
   };
+}
+
+// Progress once read, as a promise so two readers at once share one request.
+// It rides on the settings response, which carries every section's manifest
+// and is large, so it is read once per session -- App primes it from its own
+// settings call -- and the writes below keep it current. In memory only, and
+// forgotten whenever App reloads the persona, sign-out included.
+let held = null;
+
+/** Seed from a settings request already made: `raw` is its `onboarding`, or a promise of it. */
+export function primeOnboarding(raw) {
+  held = Promise.resolve(raw).then(normalise);
+  // Marked handled here; a reader still sees the failure, and refetches.
+  held.catch(() => {});
+}
+
+export function forgetOnboarding() {
+  held = null;
+}
+
+export async function getOnboarding() {
+  held ??= api("/settings").then((settings) => normalise(settings?.onboarding));
+  try {
+    const state = await held;
+    return { ...state, steps: { ...state.steps }, seen: [...state.seen] };
+  } catch (err) {
+    held = null;
+    throw err;
+  }
+}
+
+// After a write lands, so a failed one leaves the last known state standing.
+async function update(change) {
+  if (!held) return;
+  const state = await held.catch(() => null);
+  if (state) held = Promise.resolve(change(state));
 }
 
 /**
@@ -28,6 +62,7 @@ export async function getOnboarding() {
  */
 export async function markSeen(key) {
   await api("/onboarding/seen", { method: "POST", body: JSON.stringify({ key }) });
+  await update((state) => (state.seen.includes(key) ? state : { ...state, seen: [...state.seen, key] }));
 }
 
 /**
@@ -45,4 +80,5 @@ export async function saveOnboarding(state, disabledSections) {
       onboarding: { dismissed: !!state.dismissed, steps: state.steps || {} },
     }),
   });
+  await update((current) => ({ ...current, dismissed: !!state.dismissed, steps: state.steps || {} }));
 }

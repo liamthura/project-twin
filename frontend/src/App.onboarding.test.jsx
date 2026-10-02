@@ -23,6 +23,8 @@ vi.mock("@/lib/session.js", async (importOriginal) => {
 vi.mock("@/lib/onboarding.js", () => ({
   getOnboarding: () => Promise.resolve({ dismissed: false, steps: {} }),
   saveOnboarding: () => Promise.resolve(),
+  primeOnboarding: () => {},
+  forgetOnboarding: () => {},
   EMPTY_ONBOARDING: { dismissed: false, steps: {} },
 }));
 

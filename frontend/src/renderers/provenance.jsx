@@ -5,7 +5,7 @@
 // hops below. Fetched on its own, not with the section's data: the editor saves
 // whole sections back, and nothing in here must ever ride along and be written
 // as persona data.
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { getProvenance, keepEntry, proposalsFor } from "@/lib/api.js";
@@ -13,17 +13,37 @@ import { formatDateLabel } from "./isoDate";
 
 export const ProvenanceContext = createContext(null);
 
-// { entries: {id: record}, keep(id) }. Refetched after every save (`savedAt`),
-// since a write moves the dates it shows. A failed read shows nothing: this is
+// Each section's record once fetched, so going back to a section does not
+// fetch it again. In memory only, and dropped whenever it may have moved: App
+// forgets a section it saves or refetches, and every section when it reloads
+// the persona, sign-out included.
+const held = new Map();
+
+export function forgetProvenance(section) {
+  if (section) held.delete(section);
+  else held.clear();
+}
+
+// { entries: {id: record}, keep(id) }. Refetched after every save (`savedAt`)
+// while the section is open, since a write moves the dates it shows; opening a
+// section already held uses what is held. A failed read shows nothing: this is
 // a footnote to the editor, not something to put an error in front of it for.
 export function useSectionProvenance(section, savedAt) {
-  const [entries, setEntries] = useState({});
+  const [entries, setEntries] = useState(() => held.get(section) || {});
   const load = useCallback(() => {
     getProvenance(section)
-      .then((r) => setEntries(r?.entries || {}))
+      .then((r) => {
+        const fetched = r?.entries || {};
+        held.set(section, fetched);
+        setEntries(fetched);
+      })
       .catch(() => {});
   }, [section]);
-  useEffect(load, [load, savedAt]);
+  const openedAt = useRef(savedAt);
+  useEffect(() => {
+    if (savedAt === openedAt.current && held.has(section)) return;
+    load();
+  }, [load, savedAt, section]);
   const keep = useCallback((id) => keepEntry(id).then(load), [load]);
   return { entries, keep };
 }
