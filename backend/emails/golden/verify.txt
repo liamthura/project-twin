@@ -1,0 +1,12 @@
+Confirm your email
+
+Confirm sam@example.com for sam. Then, if you ever forget your password, a reset can reach you here.
+
+Confirm email: https://mygist.example.com/auth/verify-email?token=T
+
+Works for the next hour.
+
+Didn't add this address to MyGist? Ignore this email. Nothing changes unless the link is opened.
+
+--
+MyGist · mygist.example.com
