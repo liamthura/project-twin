@@ -195,7 +195,8 @@ export function FeedbackIsland({ onAddEmail }) {
                   aria-pressed={kind === k.id}
                   disabled={sending}
                   onClick={() => setKind(k.id)}
-                  className={segmentClass(kind === k.id, false)}
+                  // Sized to their words: an equal third wrapped Something else.
+                  className={cn(segmentClass(kind === k.id, false), "flex-auto whitespace-nowrap")}
                 >
                   {k.label}
                 </button>
@@ -285,7 +286,9 @@ export function FeedbackIsland({ onAddEmail }) {
                       type="button"
                       variant="link"
                       size="sm"
-                      className="h-auto p-0 text-xs"
+                      // Inline in a sentence, so exempt from the 44px touch size
+                      // that otherwise broke the line in two on a phone.
+                      className="h-auto p-0 align-baseline text-xs coarse:min-h-0 coarse:min-w-0"
                       onClick={() => {
                         setOpen(false);
                         onAddEmail?.();
