@@ -5,10 +5,15 @@ a report is read from the account when it is emailed or listed.
 """
 import base64
 import binascii
+import logging
+import os
 
 from psycopg.types.json import Jsonb
 
 import db
+import mailer
+
+logger = logging.getLogger(__name__)
 
 KINDS = ("problem", "idea", "other")
 KIND_LABELS = {"problem": "Problem", "idea": "Idea", "other": "Something else"}
@@ -143,3 +148,51 @@ def mark_handled(report_id) -> bool:
 def screenshot_name(report) -> str:
     ext = {"jpeg": "jpg"}.get(report["screenshot_type"], report["screenshot_type"])
     return f"feedback-{report['id']}.{ext}"
+
+
+def email_for(report, who):
+    """Subject and plain-text body of the owner's copy. Also what
+    scripts/feedback.py prints for `show`."""
+    first = report["message"].strip().splitlines()[0].strip()
+    subject = f"[MyGist] {KIND_LABELS[report['kind']]}: {first[:60]}"
+    ctx = report["context"] or {}
+    version = ctx.get("version", "unknown")
+    if ctx.get("commit"):
+        version += f" ({ctx['commit']})"
+    lines = [
+        report["message"],
+        "",
+        f"From: {who['username']} ({who['email'] or 'no recovery email'})",
+        f"Page: {ctx.get('page', 'unknown')}",
+        f"Version: {version}",
+        f"Browser: {ctx.get('browser', 'unknown')}",
+        f"Screen: {ctx.get('screen', 'unknown')}",
+        "",
+        f"Report {report['id']}. Mark it handled with:",
+        f"python scripts/feedback.py done {report['id']}",
+    ]
+    return subject, "\n".join(lines)
+
+
+def notify(report_id) -> bool:
+    """Email the owner a report. Runs after the response, so nobody waits on
+    Resend. Anything that goes wrong is logged with the report's id and
+    nothing else: the report is saved, and feedback.py lists it."""
+    to = os.environ.get("FEEDBACK_TO")
+    if not to:
+        logger.info("feedback %s saved; FEEDBACK_TO is unset, so it was not emailed", report_id)
+        return False
+    try:
+        report = get_report(report_id)
+        who = sender(report["user_id"])
+        subject, text = email_for(report, who)
+        attachments = None
+        if report["screenshot"] is not None:
+            attachments = [{
+                "filename": screenshot_name(report),
+                "content": base64.b64encode(bytes(report["screenshot"])).decode(),
+            }]
+        return mailer.send_email(to, subject, text, reply_to=who["email"], attachments=attachments)
+    except Exception:
+        logger.exception("feedback %s saved but not emailed", report_id)
+        return False

@@ -24,7 +24,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urljoin
-from fastapi import FastAPI, HTTPException, UploadFile, File, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import Response, JSONResponse, FileResponse, RedirectResponse
@@ -39,6 +39,7 @@ load_dotenv()
 import auth_preflight
 import auth_proxy
 import db
+import feedback_store
 import jwt_auth
 import mcp_activity
 import watchtower
@@ -606,6 +607,37 @@ async def join_waitlist(body: WaitlistRequest):
     except waitlist_store.InvalidEmailError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {"ok": True}
+
+
+class FeedbackRequest(BaseModel):
+    kind: str
+    message: str
+    context: Dict[str, Any] = {}
+    screenshot: Optional[str] = None
+
+
+@app.post("/api/feedback")
+async def send_feedback(body: FeedbackRequest, background: BackgroundTasks):
+    """A report from the feedback island (components/FeedbackIsland.jsx).
+
+    Saved first, then emailed to the owner after the response
+    (feedback_store.notify). Who sent it comes from the session, never from
+    the body. Ten an hour per account, counted from the table, so a stuck
+    retry cannot fill the owner's inbox.
+    """
+    user_id = db.current_user_id.get()
+    if feedback_store.recent_count(user_id) >= feedback_store.HOURLY_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"That's {feedback_store.HOURLY_LIMIT} reports in the last hour. Try again later.",
+        )
+    try:
+        report = feedback_store.validate(body.kind, body.message, body.context, body.screenshot)
+    except feedback_store.InvalidFeedbackError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    report_id = feedback_store.save(user_id, *report)
+    background.add_task(feedback_store.notify, report_id)
+    return {"id": report_id}
 
 
 @app.post("/api/auth/register", deprecated=True)

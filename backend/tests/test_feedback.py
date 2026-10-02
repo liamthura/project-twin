@@ -2,9 +2,12 @@
 import base64
 
 import pytest
+from fastapi.testclient import TestClient
 
 import db
 import feedback_store as fb
+import mailer
+import main
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\0" * 32
 JPEG = b"\xff\xd8\xff\xe0" + b"\0" * 32
@@ -77,3 +80,92 @@ def test_sender_has_a_real_email_and_never_a_placeholder():
     assert fb.sender(real) == {"username": "fb-real", "email": "sam@example.com"}
     assert fb.sender(fake) == {"username": "fb-fake", "email": None}
     assert fb.sender(bare) == {"username": "fb-bare", "email": None}
+
+
+@pytest.fixture
+def outbox(monkeypatch):
+    """What notify would send, without Resend."""
+    sent = []
+    monkeypatch.setenv("FEEDBACK_TO", "owner@example.com")
+    monkeypatch.setattr(mailer, "send_email", lambda *a, **k: sent.append((a, k)) or True)
+    return sent
+
+
+def post(auth, **body):
+    return TestClient(main.app).post(
+        "/api/feedback", headers=auth, json={"kind": "problem", "message": "It broke", **body}
+    )
+
+
+def test_a_report_is_saved_and_emailed(outbox):
+    user_id, auth = account("fb-api", "sam@example.com")
+    r = post(
+        auth,
+        message="Save failed\non Profile",
+        context={"page": "#/profile", "version": "0.4.0", "commit": "abc1234"},
+        screenshot=b64(JPEG),
+    )
+    assert r.status_code == 200, r.text
+    report = fb.get_report(r.json()["id"])
+    assert str(report["user_id"]) == str(user_id) and report["kind"] == "problem"
+    (to, subject, text), extra = outbox[0]
+    assert to == "owner@example.com"
+    assert subject == "[MyGist] Problem: Save failed"
+    assert "From: fb-api (sam@example.com)" in text
+    assert "Version: 0.4.0 (abc1234)" in text
+    assert f"python scripts/feedback.py done {report['id']}" in text
+    assert extra["reply_to"] == "sam@example.com"
+    assert extra["attachments"][0]["filename"] == f"feedback-{report['id']}.jpg"
+    assert base64.b64decode(extra["attachments"][0]["content"]) == JPEG
+
+
+def test_subject_is_one_line_and_cut_to_60(outbox):
+    _, auth = account("fb-subject")
+    post(auth, kind="idea", message=("y" * 80) + "\nsecond line")
+    (_, subject, _), extra = outbox[0]
+    assert subject == "[MyGist] Idea: " + "y" * 60
+    assert "\n" not in subject
+    assert extra["reply_to"] is None and extra["attachments"] is None
+
+
+def test_bad_input_is_400_and_saves_nothing(outbox):
+    user_id, auth = account("fb-bad")
+    r = post(auth, kind="praise")
+    assert r.status_code == 400 and "kind" in r.json()["detail"]
+    assert fb.recent_count(user_id) == 0 and outbox == []
+
+
+def test_the_eleventh_in_an_hour_is_429_and_only_for_that_account(outbox):
+    _, auth = account("fb-busy")
+    _, other = account("fb-calm")
+    for _ in range(fb.HOURLY_LIMIT):
+        assert post(auth).status_code == 200
+    r = post(auth)
+    assert r.status_code == 429 and "10 reports" in r.json()["detail"]
+    assert post(other).status_code == 200
+
+
+def test_a_failed_email_still_answers_200_and_keeps_the_report(monkeypatch):
+    monkeypatch.setenv("FEEDBACK_TO", "owner@example.com")
+
+    def refuse(*a, **k):
+        raise mailer.MailError("Resend responded 500")
+
+    monkeypatch.setattr(mailer, "send_email", refuse)
+    user_id, auth = account("fb-down")
+    assert post(auth).status_code == 200
+    assert fb.recent_count(user_id) == 1
+
+
+def test_without_feedback_to_nothing_is_sent(monkeypatch):
+    monkeypatch.delenv("FEEDBACK_TO", raising=False)
+    calls = []
+    monkeypatch.setattr(mailer, "send_email", lambda *a, **k: calls.append(a))
+    _, auth = account("fb-quiet")
+    assert post(auth).status_code == 200
+    assert calls == []
+
+
+def test_signed_out_is_refused():
+    r = TestClient(main.app).post("/api/feedback", json={"kind": "idea", "message": "x"})
+    assert r.status_code == 401
