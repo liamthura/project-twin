@@ -47,11 +47,13 @@ import secrets
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import db  # noqa: E402
 import mailer  # noqa: E402
+from emails import render as emails_render  # noqa: E402
 import waitlist_store  # noqa: E402
 
 # Crockford base32 minus I, L, O and U -- the characters people mistype for one
@@ -116,25 +118,24 @@ def invite_link(base: str, code: str) -> str:
     return f"{base}/app/?invite={code}"
 
 
-def invite_email(code: str, link: str, uses: int, expires_at: datetime | None) -> tuple[str, str]:
-    """Subject and body. Plain text, because an invite is four lines and HTML
-    would be four lines wrapped in a table."""
-    lines = [
-        "You asked for an invite to MyGist, so here is one.",
-        "",
-        f"  {link}",
-        "",
-        f"That link fills the code in. To type it by hand instead, it is {code}.",
-    ]
-    if expires_at:
-        lines.append(f"It stops working on {expires_at.strftime('%-d %B %Y')}.")
-    if uses > 1:
-        lines.append(f"It is good for {uses} accounts.")
-    lines += ["", "MyGist is invite-only while it is small. Thanks for waiting."]
-    return "Your MyGist invite", "\n".join(lines)
+def invite_email(code: str, link: str, uses: int, expires_at: datetime | None) -> dict:
+    """The invite as subject, text and html, from emails/copy.json and any
+    edits in email_copy. The code is in it as well as the link, because links
+    get mangled by mail clients and by people reading on a phone."""
+    parts = urlparse(link)
+    return emails_render.compose(
+        "invite",
+        {
+            "code": code,
+            "url": link,
+            "expires": expires_at.strftime("%-d %B %Y") if expires_at else None,
+            "uses": str(uses) if uses > 1 else None,
+        },
+        origin=f"{parts.scheme}://{parts.netloc}",
+    )
 
 
-def send_email(to: str, subject: str, text: str) -> bool:
+def send_email(to: str, subject: str, text: str, html: str | None = None) -> bool:
     """mailer.send_email, failing the command loudly.
 
     Raised, not swallowed. The code is already minted and the row already
@@ -142,7 +143,7 @@ def send_email(to: str, subject: str, text: str) -> bool:
     in their inbox and no record of why.
     """
     try:
-        return mailer.send_email(to, subject, text)
+        return mailer.send_email(to, subject, text, html=html)
     except mailer.MailError as exc:
         raise SystemExit(str(exc))
 
@@ -409,8 +410,8 @@ def admit(email: str, uses: int, expires: str | None, url: str | None, send: boo
     print(f"\n  {waitlist_store.pending_count()} still waiting.")
 
     if send:
-        subject, text = invite_email(code, invite_link(base, code), uses, expires_at)
-        if send_email(email, subject, text):
+        invite = invite_email(code, invite_link(base, code), uses, expires_at)
+        if send_email(email, invite["subject"], invite["text"], html=invite["html"]):
             hint(f"Sent to {email}.")
         else:
             hint("Copy the message above, or set the two variables and run it again.")

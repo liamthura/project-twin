@@ -30,6 +30,7 @@ import { Pool } from "pg";
 import { AUTH_BASE_PATH } from "./base-path.js";
 import { poolConfig } from "./db-config.js";
 import { createMailer } from "./email.js";
+import { composeEmail } from "./emails/render.js";
 import * as invite from "./invite.js";
 import {
   mcpResource,
@@ -58,6 +59,8 @@ const baseURL = required("BETTER_AUTH_URL");
 // Logs instead of sending when no provider is configured, so reset and
 // verification can be walked end to end before Resend exists.
 const mailer = createMailer();
+// Who an email is about, in words: the name they chose, as they typed it.
+const accountName = (user) => user.displayUsername || user.username || user.name || user.email;
 
 // The MCP endpoint this instance serves, and the switch for the whole OAuth
 // surface below. Same variable, same value as the API container's
@@ -331,12 +334,7 @@ export const auth = betterAuth({
       sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
         await mailer.send({
           to: user.email,
-          subject: "Approve your MyGist email change",
-          text:
-            `Someone asked to change this MyGist account's email to ` +
-            `${newEmail}. Approve it here:\n\n${url}\n\n` +
-            `If that was not you, ignore this email — the address stays as ` +
-            `it is and nothing changes.`,
+          ...(await composeEmail(pool, "change", { username: accountName(user), newEmail, url }, baseURL)),
         });
       },
     },
@@ -399,12 +397,7 @@ export const auth = betterAuth({
     sendVerificationEmail: async ({ user, url }) => {
       await mailer.send({
         to: user.email,
-        subject: "Confirm your MyGist email",
-        text:
-          `Confirm this address so you can reset your MyGist password if you ` +
-          `ever lose it.\n\n${url}\n\n` +
-          `If you did not add this address to a MyGist account, ignore this ` +
-          `email — nothing changes until the link is opened.`,
+        ...(await composeEmail(pool, "verify", { username: accountName(user), email: user.email, url }, baseURL)),
       });
     },
   },
@@ -420,12 +413,7 @@ export const auth = betterAuth({
     sendResetPassword: async ({ user, url }) => {
       await mailer.send({
         to: user.email,
-        subject: "Reset your MyGist password",
-        text:
-          `Open this link to choose a new password:\n\n${url}\n\n` +
-          `The link expires shortly, and can be used once.\n\n` +
-          `If you did not ask for this, ignore it — your current password ` +
-          `still works and nothing has changed.`,
+        ...(await composeEmail(pool, "reset", { username: accountName(user), url }, baseURL)),
       });
     },
 

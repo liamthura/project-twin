@@ -19,6 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import db  # noqa: E402
 import feedback_store  # noqa: E402
 from scripts.access import hint, table  # noqa: E402
 
@@ -89,4 +90,9 @@ def main(argv=None) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        # As in access.py: left open, the pool's worker threads each take five
+        # seconds to give up on the way out, burying what was just printed.
+        db.get_pool().close()

@@ -307,6 +307,32 @@ web UI presents to `/api` lives fifteen minutes and is re-derived from that
 cookie on demand. MCP clients hold an access token good for ten minutes and
 refresh it themselves.
 
+### Email
+
+Password reset, email confirmation, approving an email change and invites go
+out through Resend. Set `RESEND_API_KEY` and `EMAIL_FROM` on **both
+containers**: the auth service sends the first three, and the API container
+sends invites (`scripts/access.py admit --send`) and feedback (`FEEDBACK_TO`).
+Unset, each container prints the email to its log instead of sending it.
+
+The wording of the four emails people get can change without a deploy. The
+defaults are in `emails/copy.json`. An edit goes in the `email_copy` table,
+which both containers read when they send, so it applies to the next email.
+
+```bash
+python scripts/emails.py                           # every email, edited slots marked
+python scripts/emails.py show reset                # each slot, and its default
+python scripts/emails.py set reset intro "..."     # checked, then saved
+python scripts/emails.py unset reset intro         # back to the default
+python scripts/emails.py preview reset             # writes reset.html and reset.txt
+python scripts/emails.py send-test reset you@example.com
+```
+
+Run it in the API container, where `DATABASE_URL` is. Only words change:
+links, codes and the footer come from the code, and `set` refuses a
+`{placeholder}` the email has no value for. The layout, `emails/layout.html`,
+changes with a deploy.
+
 ## Health checks
 
 `/api/health` is public and unauthenticated. Use it for orchestrator probes.

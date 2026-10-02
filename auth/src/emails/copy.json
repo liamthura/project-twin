@@ -1,0 +1,55 @@
+{
+  "verify": {
+    "placeholders": ["username", "email"],
+    "optional": [],
+    "slots": {
+      "subject": "Confirm your MyGist email",
+      "heading": "Confirm your email",
+      "intro": "Confirm {email} for {username}. Then, if you ever forget your password, a reset can reach you here.",
+      "button": "Confirm email",
+      "detail": "Works for the next hour.",
+      "fallback": "Or paste this into your browser:",
+      "note": "Didn't add this address to MyGist? Ignore this email. Nothing is confirmed unless the link is opened."
+    }
+  },
+  "reset": {
+    "placeholders": ["username"],
+    "optional": [],
+    "slots": {
+      "subject": "Reset your MyGist password",
+      "heading": "Reset your password",
+      "intro": "Someone asked to reset the password for {username}. If it was you, choose a new one.",
+      "button": "Choose a new password",
+      "detail": "Works once, for the next hour.",
+      "fallback": "Or paste this into your browser:",
+      "note": "Didn't ask for this? Ignore this email. Your password still works and nothing has changed."
+    }
+  },
+  "change": {
+    "placeholders": ["username", "newEmail"],
+    "optional": [],
+    "slots": {
+      "subject": "Approve your MyGist email change",
+      "heading": "Approve the new address",
+      "intro": "{username} asked to move from this address to {newEmail}. Approve it, then confirm from the new address, and the change is made.",
+      "button": "Approve the change",
+      "detail": "Works for the next hour.",
+      "fallback": "Or paste this into your browser:",
+      "note": "Didn't ask for this? Someone is signed in to your account, because only they can ask. Ignore this email so nothing changes, then sign out and use Forgot your password? on the sign-in page. A reset signs out every device."
+    }
+  },
+  "invite": {
+    "placeholders": ["expires", "uses"],
+    "optional": ["expires", "uses"],
+    "slots": {
+      "subject": "Your MyGist invite",
+      "heading": "You're invited",
+      "intro": "You asked for an invite, so here it is. Explain yourself once, and every assistant you connect reads the same persona.",
+      "button": "Create your account",
+      "detail": "The link above fills the code in. To type it by hand:",
+      "expires": "It stops working on {expires}.",
+      "uses": "It is good for {uses} accounts.",
+      "note": "MyGist is invite-only while it is small. Thanks for waiting."
+    }
+  }
+}

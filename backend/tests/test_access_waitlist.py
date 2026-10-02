@@ -276,11 +276,14 @@ def test_the_invite_email_carries_the_code_as_well_as_the_link():
     so the code has to be typeable out of the same message."""
     from scripts.access import invite_email
 
-    subject, text = invite_email("GRSE-0W11", "https://x.example/?invite=GRSE-0W11", 1, None)
+    out = invite_email("GRSE-0W11", "https://x.example/?invite=GRSE-0W11", 1, None)
 
-    assert "GRSE-0W11" in text
-    assert "https://x.example/?invite=GRSE-0W11" in text
-    assert subject
+    for body in (out["text"], out["html"]):
+        assert "GRSE-0W11" in body
+        assert "https://x.example/?invite=GRSE-0W11" in body
+    assert out["subject"] == "Your MyGist invite"
+    # One account: no "good for" line, and no expiry without one.
+    assert "good for" not in out["text"] and "stops working" not in out["text"]
 
 
 def test_the_invite_email_states_an_expiry_when_there_is_one():
@@ -288,10 +291,11 @@ def test_the_invite_email_states_an_expiry_when_there_is_one():
 
     from scripts.access import invite_email
 
-    _, text = invite_email(
-        "GRSE-0W11", "https://x.example/", 1, datetime(2026, 9, 9, tzinfo=timezone.utc)
+    out = invite_email(
+        "GRSE-0W11", "https://x.example/", 3, datetime(2026, 9, 9, tzinfo=timezone.utc)
     )
-    assert "9 September 2026" in text
+    assert "It stops working on 9 September 2026." in out["text"]
+    assert "It is good for 3 accounts." in out["text"]
 
 
 def test_mint_prints_a_link_but_stays_on_two_lines(waiting):

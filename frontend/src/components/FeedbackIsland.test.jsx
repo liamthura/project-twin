@@ -207,4 +207,12 @@ describe("FeedbackIsland", () => {
     const thanks = await screen.findByText("Thanks. Your feedback is in.");
     await waitFor(() => expect(thanks).toHaveFocus());
   });
+
+  it("is the editor tour's last stop (guide)", async () => {
+    const { TOURS } = await import("@/lib/guide.js");
+    render(<FeedbackIsland />);
+    const step = TOURS.editor.at(-1);
+    expect(document.querySelector(step.element)).toBe(screen.getByRole("button", { name: "Feedback" }));
+    expect(step.popover.title).toBe("Report a problem or an idea");
+  });
 });

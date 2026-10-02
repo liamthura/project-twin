@@ -1,0 +1,12 @@
+Approve the new address
+
+sam asked to move from this address to sam@new.example. Approve it, then confirm from the new address, and the change is made.
+
+Approve the change: https://mygist.example.com/auth/verify-email?token=T
+
+Works for the next hour.
+
+Didn't ask for this? Someone is signed in to your account, because only they can ask. Ignore this email so nothing changes, then sign out and use Forgot your password? on the sign-in page. A reset signs out every device.
+
+--
+MyGist · mygist.example.com

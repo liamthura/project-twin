@@ -20,7 +20,7 @@ class MailError(RuntimeError):
     """Resend refused the message, or could not be reached."""
 
 
-def send_email(to, subject, text, reply_to=None, attachments=None) -> bool:
+def send_email(to, subject, text, reply_to=None, attachments=None, html=None) -> bool:
     """Send, or print. True if it actually left the building.
 
     `attachments` is Resend's shape: [{"filename": ..., "content": <base64>}].
@@ -37,6 +37,8 @@ def send_email(to, subject, text, reply_to=None, attachments=None) -> bool:
         return False
 
     payload = {"from": sender, "to": to, "subject": subject, "text": text}
+    if html:
+        payload["html"] = html
     if reply_to:
         payload["reply_to"] = reply_to
     if attachments:

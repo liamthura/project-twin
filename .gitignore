@@ -123,3 +123,6 @@ skills-lock.json
 # a migration can be written from it. Regenerable, never read at runtime, and
 # it reappears on every run -- the migrations in versions/ are the real record.
 backend/migrations/sql/
+
+# Superpowers scratch: plan ledgers and brainstorming mockups.
+.superpowers/
