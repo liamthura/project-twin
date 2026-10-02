@@ -168,7 +168,11 @@ async function api(endpoint, options = {}, { allowRetry = true } = {}) {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`API Error ${response.status}: ${text}`);
+      // The status rides along, as it does for 401 and 403 above, so a caller
+      // can tell a 429 from a failure (the feedback island does).
+      const error = new Error(`API Error ${response.status}: ${text}`);
+      error.status = response.status;
+      throw error;
     }
 
     return response.json();
