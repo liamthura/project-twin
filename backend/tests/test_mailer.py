@@ -62,3 +62,8 @@ def test_a_refusal_is_a_mail_error(sent, monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", refuse)
     with pytest.raises(mailer.MailError, match="422"):
         mailer.send_email("a@example.com", "S", "T")
+
+
+def test_html_goes_alongside_the_text(sent):
+    mailer.send_email("a@example.com", "S", "T", html="<p>T</p>")
+    assert sent["body"]["html"] == "<p>T</p>" and sent["body"]["text"] == "T"
