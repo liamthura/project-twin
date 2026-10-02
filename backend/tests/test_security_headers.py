@@ -56,6 +56,15 @@ def test_headers_reach_short_circuited_401s(client):
     assert resp.headers["x-content-type-options"] == "nosniff"
 
 
+def test_api_responses_are_never_stored(client):
+    """Persona JSON must not outlive the page in the browser's HTTP cache, the
+    back/forward cache or a proxy. The app keeps what it has fetched in memory
+    only, and that is only worth anything if nothing else keeps a copy."""
+    assert client.get("/api/health").headers["cache-control"] == "no-store"
+    # Including a refusal: it is still an /api answer about someone's account.
+    assert client.get("/api/files").headers["cache-control"] == "no-store"
+
+
 def test_csp_is_not_sent_on_json(client):
     """CSP governs documents; on an API response it is noise."""
     resp = client.get("/api/health")

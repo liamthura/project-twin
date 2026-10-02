@@ -559,10 +559,11 @@ async function keepEntry(entityId) {
   return api(`/provenance/${encodeURIComponent(entityId)}/keep`, { method: "POST" });
 }
 
-// Entries related to `q` by meaning, from the server's index. Empty unless
-// embeddings are configured: word matches are the search dialog's own.
-async function searchMeaning(q) {
-  const data = await api(`/search?q=${encodeURIComponent(q)}`);
+// Entries matching `q` from the server's index, each marked `match: "words"`
+// or `"meaning"`. The search dialog word-searches the sections it has loaded
+// itself; this is how it reaches the ones it has not.
+async function searchEntries(q) {
+  const data = await api(`/search?q=${encodeURIComponent(q)}&limit=20`);
   return data.results || [];
 }
 
@@ -643,5 +644,5 @@ export {
   listStale,
   keepEntry,
   proposalsFor,
-  searchMeaning,
+  searchEntries,
 };

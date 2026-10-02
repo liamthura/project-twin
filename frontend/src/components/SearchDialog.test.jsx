@@ -3,9 +3,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import packs from "@/__fixtures__/packs.json";
 
-vi.mock("@/lib/api.js", () => ({ searchMeaning: vi.fn(() => Promise.resolve([])) }));
+vi.mock("@/lib/api.js", () => ({ searchEntries: vi.fn(() => Promise.resolve([])) }));
 
-import { searchMeaning } from "@/lib/api.js";
+import { searchEntries } from "@/lib/api.js";
 import { SearchDialog } from "./SearchDialog";
 import ListRenderer from "@/renderers/ListRenderer";
 import { FocusEntryContext } from "@/renderers/focusEntry";
@@ -23,7 +23,7 @@ function renderDialog(onOpen = vi.fn()) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  searchMeaning.mockResolvedValue([]);
+  searchEntries.mockResolvedValue([]);
 });
 
 describe("SearchDialog", () => {
@@ -49,7 +49,7 @@ describe("SearchDialog", () => {
   });
 
   it("adds what the server relates by meaning, never repeating a word match", async () => {
-    searchMeaning.mockResolvedValue([
+    searchEntries.mockResolvedValue([
       { entity_id: "goal_1", section: "goals", title: "Lead climb outdoors", snippet: "" },
       { entity_id: "hobby_9", section: "lifestyle", title: "Grip strength basics", snippet: "…hangboard…" },
       { entity_id: "x", section: "media", title: "A section that is turned off", snippet: "" },
@@ -65,11 +65,29 @@ describe("SearchDialog", () => {
     expect(screen.queryByText(/turned off/)).not.toBeInTheDocument();
   });
 
+  it("takes word matches for sections it has not loaded from the server", async () => {
+    // Only goals is loaded: lifestyle has never been opened on this page.
+    searchEntries.mockResolvedValue([
+      { entity_id: "hobby_1", section: "lifestyle", title: "Bouldering",
+        snippet: "Climbing twice a week", match: "words" },
+      // Goals is loaded, so the page's own search is the word search there.
+      { entity_id: "goal_2", section: "goals", title: "Climb the Old Man", match: "words" },
+    ]);
+    const user = userEvent.setup();
+    render(<SearchDialog open onOpenChange={() => {}} packs={enabled}
+      packData={{ goals: data.goals }} onOpen={vi.fn()} />);
+    await user.type(screen.getByRole("combobox"), "climb");
+    const lifestyle = await screen.findByRole("group", { name: "Lifestyle" });
+    expect(lifestyle).toHaveTextContent("Bouldering");
+    expect(screen.queryByText(/Old Man/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Related by meaning")).not.toBeInTheDocument();
+  });
+
   it("shows no meaning group when the server has none", async () => {
     const user = userEvent.setup();
     renderDialog();
     await user.type(screen.getByRole("combobox"), "climb");
-    await waitFor(() => expect(searchMeaning).toHaveBeenCalledWith("climb"));
+    await waitFor(() => expect(searchEntries).toHaveBeenCalledWith("climb"));
     expect(screen.queryByText("Related by meaning")).not.toBeInTheDocument();
   });
 });

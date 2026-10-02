@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { entityPlace, proposalSummary, updateChanges } from "./proposalSummary";
+import { entityPlace, proposalSummary, sectionsToCompare, updateChanges } from "./proposalSummary";
 import packs from "@/__fixtures__/packs.json";
 
 const PACKS = [
@@ -156,5 +156,19 @@ describe("updateChanges", () => {
     expect(updateChanges(update({ title: "Run a marathon", notes: "x" }), packs, { goals })).toBeNull();
     expect(updateChanges({ ...update({ title: "Speak French" }), action: "add" }, packs, { goals })).toBeNull();
     expect(updateChanges({ action: "update", entity: "hobby_specific", data: { hobby_name: "a", specific: "b" } }, packs, {})).toBeNull();
+  });
+});
+
+describe("sectionsToCompare", () => {
+  it("names each section an update is shown against, once, and nothing for adds", () => {
+    const rows = [
+      { action: "update", entity: "goal", data: {} },
+      { action: "update", entity: "goal", data: {} },
+      { action: "update", entity: "domain", data: {} },
+      { action: "add", entity: "hobby", data: {} },
+      { action: "update", entity: "no_such_entity", data: {} },
+    ];
+    expect(sectionsToCompare(rows, packs)).toEqual(["goals", "knowledge"]);
+    expect(sectionsToCompare([], packs)).toEqual([]);
   });
 });

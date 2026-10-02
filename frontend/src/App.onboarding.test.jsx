@@ -144,8 +144,9 @@ describe("App on an onboarding route", () => {
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "Skip for now" }));
     await waitFor(() => expect(window.location.hash).toBe("#/profile"));
-    // Once at start, once on the way out of the flow.
-    await waitFor(() => expect(apiMock.mock.calls.filter(([path]) => path === "/all").length).toBeGreaterThanOrEqual(3));
+    // Once at start, once on the way out of the flow. The page reloads its
+    // persona through Profile; the flow reads its own copy from /all.
+    await waitFor(() => expect(apiMock.mock.calls.filter(([path]) => path === "/files/profile").length).toBeGreaterThanOrEqual(2));
   });
 
   it("forgets which guides were seen when you sign out, so the next account gets its own", async () => {
@@ -170,14 +171,15 @@ describe("App on an onboarding route", () => {
   });
 
   it("starts the editor tour after Complete only once the persona has reloaded", async () => {
-    let allCalls = 0;
+    let profileCalls = 0;
     let land;
     apiMock.mockImplementation((path) => {
-      if (path === "/all") {
-        allCalls += 1;
+      if (path === "/all") return Promise.resolve({ data: { profile: {}, preferences: {} } });
+      if (path === "/files/profile") {
+        profileCalls += 1;
         // The reload on the way out of the flow is slow, as it can be online.
-        if (allCalls > 2) return new Promise((resolve) => { land = () => resolve({ data: { profile: {}, preferences: {} } }); });
-        return Promise.resolve({ data: { profile: {}, preferences: {} } });
+        if (profileCalls > 1) return new Promise((resolve) => { land = () => resolve({ data: {} }); });
+        return Promise.resolve({ data: {} });
       }
       if (path === "/settings") {
         return Promise.resolve({

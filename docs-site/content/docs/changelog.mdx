@@ -11,6 +11,26 @@ MyGist is pre-1.0, and its versions say so. Until 0.2.4 they were numbered one
 place higher, so 0.2.3 was released as 2.3.0, 0.2.2 as 2.2.0, 0.2.1 as 2.1.0,
 0.2.0 as 2.0.0 and 0.1.0 as 1.0.0. Nothing else about those releases changed.
 
+## Unreleased
+
+The editor loads a section the first time you open it, instead of your whole
+persona when the page opens. On a persona with about 190 entries, the persona
+data fetched on opening went from 143,000 characters to Profile's 8,000.
+Sections you have opened stay in the page until you sign out.
+
+- Nothing from your persona is kept outside the page: API responses are sent
+  with `Cache-Control: no-store`, so the browser does not keep a copy in its
+  cache, and signing out clears what the page held.
+- Search covers sections you have not opened through the server's index. Until
+  a section is opened, it matches that section's entries but not standalone
+  fields such as your bio.
+- An update waiting in Review loads the section it would change, so it still
+  shows what it replaces.
+
+### Upgrading
+
+Pull the image and restart. No migration.
+
 ## 0.4.3
 
 Connected AI clients read less of your persona at once, and none of it is

@@ -20,7 +20,7 @@ import { formatDateLabel } from "@/renderers/isoDate";
 import { HINTS, TOURS, celebrateFirst, showHint, startTour } from "@/lib/guide.js";
 import { atStart, getWatchtower } from "@/lib/watchtower.js";
 import InboxRow from "./InboxRow";
-import { entityPlace, findEntitySpec, humanise, proposalSummary, renderValue } from "./proposalSummary";
+import { entityPlace, findEntitySpec, humanise, proposalSummary, renderValue, sectionsToCompare } from "./proposalSummary";
 import ObservationCard from "./ObservationCard";
 import PromoteDialog, {
   defaultTarget, fillKey, missingRequired, promotedData, promotionTargets, startingValues,
@@ -96,10 +96,16 @@ const MOVES = { j: 1, ArrowDown: 1, k: -1, ArrowUp: -1 };
 
 export default function ProposalsPanel({
   onViewSection, onSectionChanged, onCounts, onOpenSettings, onConnect,
-  sectionTitles = {}, packs = [], packData = {},
+  sectionTitles = {}, packs = [], packData = {}, onNeedSections,
 }) {
   const [kind, setKind] = useState("entity");
   const [rows, setRows] = useState([]);
+  // An update is shown against what it would replace, so its section has to
+  // be on the page; ask for the ones the queue needs.
+  const compareKeys = sectionsToCompare(rows, packs).join(",");
+  useEffect(() => {
+    if (compareKeys) onNeedSections?.(compareKeys.split(","));
+  }, [compareKeys, onNeedSections]);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const [promoting, setPromoting] = useState(null);

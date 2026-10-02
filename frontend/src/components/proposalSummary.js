@@ -91,6 +91,21 @@ export function entityPlace(entity, packs) {
 const norm = (v) => String(v ?? "").trim().toLowerCase();
 
 /**
+ * The sections an update in `rows` is shown against: what it would replace has
+ * to be on the page to be shown, and the page fetches sections as they are
+ * needed rather than all at once.
+ */
+export function sectionsToCompare(rows, packs) {
+  const keys = new Set();
+  for (const row of rows || []) {
+    if (row?.action !== "update") continue;
+    const pack = (packs || []).find((p) => p?.entities?.[row.entity]);
+    if (pack) keys.add(pack.key);
+  }
+  return [...keys];
+}
+
+/**
  * What an update would overwrite: [{ field, from, to }] for each proposed
  * field that differs from the entry as it stands, or null when the entry
  * cannot be found (a child row, an entity two nodes share, a name the agent
