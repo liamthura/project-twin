@@ -44,7 +44,7 @@ import {
 } from "@/lib/routes.js";
 import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
 import { GettingStartedCard } from "@/components/GettingStartedCard";
-import { FeedbackIsland } from "@/components/FeedbackIsland";
+import { FeedbackIsland, forgetFeedbackDraft } from "@/components/FeedbackIsland";
 import SectionRenderer from "@/renderers/SectionRenderer";
 import { outline } from "@/renderers/paths";
 import { Header } from "@/shell/Header";
@@ -712,6 +712,7 @@ export default function App() {
       <WelcomeAuth
         onSuccess={({ isNew } = {}) => {
           resetSeen();
+          forgetFeedbackDraft();
           // A brand-new account lands on Welcome, not on an empty Profile:
           // that is the moment intent is highest, and Welcome is where the
           // offer to hand the work to a client is made.
@@ -822,8 +823,10 @@ export default function App() {
   };
 
   const handleSignOut = async () => {
-    // What has been seen is per account; the next one in this tab gets its own.
+    // What has been seen, and a feedback draft, are per account; the next one
+    // in this tab gets its own.
     resetSeen();
+    forgetFeedbackDraft();
     // The session cookie is HttpOnly, so only the service can revoke it.
     await signOut();
     clearConfig();

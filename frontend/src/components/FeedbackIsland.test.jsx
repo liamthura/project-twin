@@ -15,12 +15,13 @@ vi.mock("@/lib/session.js", () => ({
   isPlaceholderEmail: (email) => email.endsWith("@mygist.invalid"),
 }));
 
-const { FeedbackIsland } = await import("./FeedbackIsland");
+const { FeedbackIsland, forgetFeedbackDraft } = await import("./FeedbackIsland");
 const { Toaster } = await import("./ui/toaster");
 const { toast } = await import("./ui/use-toast");
 const { openFeedback } = await import("@/lib/feedback.js");
 
 beforeEach(() => {
+  forgetFeedbackDraft();
   sendMock.mockReset().mockResolvedValue({ id: 1 });
   shrinkMock.mockReset().mockResolvedValue(new Blob(["jpg"], { type: "image/jpeg" }));
   getSessionMock.mockReset().mockResolvedValue({ user: { email: "sam@example.com" } });
@@ -175,5 +176,35 @@ describe("FeedbackIsland", () => {
     const box = await screen.findByRole("textbox", { name: "What happened?" });
     await waitFor(() => expect(box).toHaveFocus());
     expect(box).toHaveValue('The app said: "Failed to save. Boom."\n\n');
+  });
+
+  it("keeps the draft when the island is mounted again, until it is forgotten (remount)", async () => {
+    // App mounts a new island when onboarding hands over to the editor.
+    const user = userEvent.setup();
+    const first = render(<FeedbackIsland />);
+    await user.type(await open(user), "Half a thought");
+    await user.click(screen.getByRole("button", { name: "Idea" }));
+    await user.upload(document.querySelector('input[type="file"]'), new File(["png"], "s.png", { type: "image/png" }));
+    await screen.findByAltText("Your screenshot");
+    first.unmount();
+
+    const second = render(<FeedbackIsland />);
+    expect(await open(user)).toHaveValue("Half a thought");
+    expect(screen.getByRole("button", { name: "Idea" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByAltText("Your screenshot")).toBeInTheDocument();
+    second.unmount();
+
+    forgetFeedbackDraft();
+    render(<FeedbackIsland />);
+    expect(await open(user)).toHaveValue("");
+  });
+
+  it("moves focus to the thanks once sent, so it is read out (announce)", async () => {
+    const user = userEvent.setup();
+    render(<FeedbackIsland />);
+    await user.type(await open(user), "Done");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    const thanks = await screen.findByText("Thanks. Your feedback is in.");
+    await waitFor(() => expect(thanks).toHaveFocus());
   });
 });

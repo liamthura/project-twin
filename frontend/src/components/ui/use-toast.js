@@ -25,7 +25,10 @@ let seq = 0;
 // rather than fourteen; a toast with its own action keeps it.
 function withReport(props) {
   if (props.variant !== "destructive" || props.action) return props;
-  const said = [props.title, props.description].filter((s) => typeof s === "string" && s).join(". ");
+  const full = [props.title, props.description].filter((s) => typeof s === "string" && s).join(". ");
+  // Cut: an API error carries the response body, which can be a whole HTML
+  // page, and a prefill past the 5,000-character limit could never be sent.
+  const said = full.length > 300 ? `${full.slice(0, 299)}…` : full;
   return {
     ...props,
     action: createElement(

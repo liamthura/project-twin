@@ -32,6 +32,16 @@ const KINDS = [
   { id: "other", label: "Something else", prompt: "What's on your mind?", hint: "" },
 ];
 
+// The draft outlives any one island: App mounts a new one when onboarding hands
+// over to the editor, and drops it for the loading screen in between. App
+// forgets it on sign-out, so the next account in this tab starts empty.
+const EMPTY = { kind: "problem", message: "", blob: null };
+let draft = EMPTY;
+
+export function forgetFeedbackDraft() {
+  draft = EMPTY;
+}
+
 const IMAGE_ERRORS = {
   unreadable: "That image couldn't be read. Try a PNG or JPEG.",
   "too-large": "That image is too large, even after shrinking. Try cropping it.",
@@ -39,9 +49,12 @@ const IMAGE_ERRORS = {
 
 export function FeedbackIsland({ onAddEmail }) {
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState("problem");
-  const [message, setMessage] = useState("");
-  const [shot, setShot] = useState(null); // { blob, url }
+  const [kind, setKind] = useState(() => draft.kind);
+  const [message, setMessage] = useState(() => draft.message);
+  // { blob, url }. The URL is made again here, as the last island revoked its own.
+  const [shot, setShot] = useState(() =>
+    draft.blob ? { blob: draft.blob, url: URL.createObjectURL(draft.blob) } : null,
+  );
   const [status, setStatus] = useState("idle"); // idle | sending | sent
   const [error, setError] = useState(null);
   // undefined while asking, null when there is nowhere to reply.
@@ -50,6 +63,16 @@ export function FeedbackIsland({ onAddEmail }) {
   const box = useRef(null);
   const picker = useRef(null);
   const busy = useRef(false);
+  const thanks = useRef(null);
+
+  useEffect(() => {
+    draft = { kind, message, blob: shot?.blob ?? null };
+  }, [kind, message, shot]);
+
+  // To the thanks, so a screen reader says it: the form it replaced had focus.
+  useEffect(() => {
+    if (status === "sent") thanks.current?.focus();
+  }, [status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,7 +199,7 @@ export function FeedbackIsland({ onAddEmail }) {
         </div>
 
         {status === "sent" ? (
-          <p role="status" className="py-6 text-center text-sm">
+          <p ref={thanks} tabIndex={-1} role="status" className="py-6 text-center text-sm outline-none">
             Thanks. Your feedback is in.
           </p>
         ) : (
