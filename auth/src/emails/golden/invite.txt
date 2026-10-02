@@ -4,7 +4,7 @@ You asked for an invite, so here it is. Explain yourself once, and every assista
 
 Create your account: https://mygist.example.com/app/?invite=7KQ2-MXH4
 
-The button fills the code in. To type it by hand:
+The link above fills the code in. To type it by hand:
 
 7KQ2-MXH4
 

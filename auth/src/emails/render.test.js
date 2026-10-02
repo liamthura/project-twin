@@ -55,3 +55,9 @@ test("loadOverrides maps the rows, and a failed read means the defaults", async 
   const broken = { query: async () => { throw new Error("down"); } };
   assert.deepEqual(await loadOverrides(broken, "reset"), {});
 });
+
+test("an optional line without its value is left out, even when edited", () => {
+  const { expires, uses, ...rest } = FIXTURES.invite;
+  const out = renderEmail("invite", rest, { expires: "It expires soon.", uses: "Share it." }, ORIGIN);
+  assert.ok(!out.text.includes("expires soon") && !out.text.includes("Share it"));
+});

@@ -101,10 +101,17 @@ def set_slot(name: str, slot: str, value: str) -> None:
 
 
 def unset(name: str, slot: str) -> None:
-    entry(name)
+    e = entry(name)
+    if slot not in e["slots"]:
+        raise SystemExit(f"{name} has no slot {slot}. It has: {', '.join(e['slots'])}.")
     with db.get_pool().connection() as conn:
-        conn.execute("delete from email_copy where email = %s and slot = %s", (name, slot))
-    print(f"\n  {name} {slot} is back to the default.")
+        removed = conn.execute(
+            "delete from email_copy where email = %s and slot = %s returning slot", (name, slot)
+        ).fetchone()
+    if removed:
+        print(f"\n  {name} {slot} is back to the default.")
+    else:
+        print(f"\n  {name} {slot} had no edit; it already uses the default.")
 
 
 def rendered(name: str) -> dict:

@@ -64,3 +64,27 @@ def test_a_failed_read_means_the_defaults(monkeypatch):
 
     monkeypatch.setattr(db, "get_pool", down)
     assert emails.overrides("reset") == {}
+
+
+@pytest.mark.nodb
+def test_the_change_note_points_to_a_reset_that_signs_everyone_out():
+    # Settings' Change password keeps every session alive; only a reset
+    # (revokeSessionsOnPasswordReset) puts an intruder out.
+    note = emails.DECK["change"]["slots"]["note"]
+    assert "signs out every device" in note and "Settings" not in note
+
+
+@pytest.mark.nodb
+def test_copy_claims_hold_in_both_versions():
+    # A placeholder account's address is set before the link is opened; only
+    # confirming it waits. And the text version has no button.
+    assert "Nothing is confirmed unless the link is opened." in emails.DECK["verify"]["slots"]["note"]
+    assert "button" not in emails.DECK["invite"]["slots"]["detail"].lower()
+
+
+@pytest.mark.nodb
+def test_an_optional_line_without_its_value_is_left_out_even_when_edited():
+    values = {k: v for k, v in FIXTURES["values"]["invite"].items() if k not in ("expires", "uses")}
+    out = emails.render("invite", values, {"expires": "It expires soon.", "uses": "Share it."})
+    assert "expires soon" not in out["text"] and "Share it" not in out["text"]
+    assert "expires soon" not in out["html"]

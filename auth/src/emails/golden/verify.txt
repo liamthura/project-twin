@@ -6,7 +6,7 @@ Confirm email: https://mygist.example.com/auth/verify-email?token=T
 
 Works for the next hour.
 
-Didn't add this address to MyGist? Ignore this email. Nothing changes unless the link is opened.
+Didn't add this address to MyGist? Ignore this email. Nothing is confirmed unless the link is opened.
 
 --
 MyGist · mygist.example.com

@@ -37,6 +37,10 @@ def _fill(template: str, values: dict) -> str:
 
 
 def _words(entry, overrides, slot, values, html):
+    # An optional line belongs to the value it is named after, so it goes when
+    # that value does, whatever an edit has made its wording say.
+    if slot in entry["optional"] and values.get(slot) in (None, ""):
+        return None
     raw = overrides.get(slot, entry["slots"].get(slot))
     if raw is None:
         return None

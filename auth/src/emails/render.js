@@ -25,6 +25,9 @@ const fill = (template, map) => template.replace(/\{\{(\w+)\}\}/g, (_, key) => m
 // One slot's words with its placeholders filled; null when the slot is absent,
 // or optional and missing a value.
 function words(entry, overrides, slot, values, html) {
+  // An optional line belongs to the value it is named after, so it goes when
+  // that value does, whatever an edit has made its wording say.
+  if (entry.optional.includes(slot) && (values[slot] == null || values[slot] === "")) return null;
   const raw = overrides[slot] ?? entry.slots[slot];
   if (raw == null) return null;
   let missing = false;

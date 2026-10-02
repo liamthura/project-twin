@@ -58,3 +58,10 @@ def test_send_test_sends_a_marked_copy(monkeypatch):
     (to, subject, text), extra = sent[0]
     assert to == "me@example.com" and subject == "[Test] Reset your MyGist password"
     assert "Choose a new password" in extra["html"] and "sam" in text
+
+
+def test_unset_checks_the_slot_and_says_when_there_was_no_edit(capsys):
+    with pytest.raises(SystemExit, match="reset has no slot intor"):
+        cli.main(["unset", "reset", "intor"])
+    cli.main(["unset", "reset", "intro"])
+    assert "had no edit" in capsys.readouterr().out

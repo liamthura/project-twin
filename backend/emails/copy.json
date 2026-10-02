@@ -9,7 +9,7 @@
       "button": "Confirm email",
       "detail": "Works for the next hour.",
       "fallback": "Or paste this into your browser:",
-      "note": "Didn't add this address to MyGist? Ignore this email. Nothing changes unless the link is opened."
+      "note": "Didn't add this address to MyGist? Ignore this email. Nothing is confirmed unless the link is opened."
     }
   },
   "reset": {
@@ -35,7 +35,7 @@
       "button": "Approve the change",
       "detail": "Works for the next hour.",
       "fallback": "Or paste this into your browser:",
-      "note": "Didn't ask for this? Someone is signed in to your account, because only they can ask. Ignore this email so nothing changes, then change your password in Settings → Account."
+      "note": "Didn't ask for this? Someone is signed in to your account, because only they can ask. Ignore this email so nothing changes, then sign out and use Forgot your password? on the sign-in page. A reset signs out every device."
     }
   },
   "invite": {
@@ -46,7 +46,7 @@
       "heading": "You're invited",
       "intro": "You asked for an invite, so here it is. Explain yourself once, and every assistant you connect reads the same persona.",
       "button": "Create your account",
-      "detail": "The button fills the code in. To type it by hand:",
+      "detail": "The link above fills the code in. To type it by hand:",
       "expires": "It stops working on {expires}.",
       "uses": "It is good for {uses} accounts.",
       "note": "MyGist is invite-only while it is small. Thanks for waiting."
