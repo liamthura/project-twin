@@ -16,10 +16,23 @@ header.
 
 from typing import Iterable, Optional
 
-from fastmcp.exceptions import ToolError
+from fastmcp.exceptions import ResourceError, ToolError
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 
 import scopes
+
+# Resources that hold persona data. skill:// stays public: a skill file is
+# documentation about the API, not anybody's persona.
+PERSONA_URI_PREFIX = "mygist://"
+
+
+def _may_read_persona() -> bool:
+    """Whether this request's grant covers persona:read. No grant means no."""
+    try:
+        granted = scopes.current_scopes.get()
+    except LookupError:
+        return False
+    return scopes.has(granted, scopes.READ)
 
 
 def tools_for_scopes(
@@ -144,5 +157,25 @@ class ScopeMiddleware(Middleware):
                 f"This connection is not authorised to use the {name} prompt. It "
                 f"needs the {required} scope; reconnect from MyGist's settings to "
                 f"grant it."
+            )
+        return await call_next(context)
+
+    async def on_list_resource_templates(self, context: MiddlewareContext, call_next):
+        """Hide the persona templates from a grant that cannot read them."""
+        templates = await call_next(context)
+        if _may_read_persona():
+            return templates
+        return [t for t in templates
+                if not t.uri_template.startswith(PERSONA_URI_PREFIX)]
+
+    async def on_read_resource(self, context: MiddlewareContext, call_next):
+        """Refuse a persona URI without persona:read, even one named directly."""
+        # Lower-cased: a URI scheme is case-insensitive.
+        if (str(context.message.uri).lower().startswith(PERSONA_URI_PREFIX)
+                and not _may_read_persona()):
+            raise ResourceError(
+                "This connection is not authorised to read the persona. It needs "
+                f"the {scopes.READ} scope; reconnect from MyGist's settings to "
+                "grant it."
             )
         return await call_next(context)

@@ -26,7 +26,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List
 
+from mcp.types import Annotations
+
 SKILLS_DIR = Path(__file__).parent / "skills"
+
+# Written for the model to read, not for a person to browse.
+_FOR_THE_ASSISTANT = Annotations(audience=["assistant"])
 
 # The one place the URI shape is written down.
 URI_PREFIX = "skill://mygist"
@@ -145,6 +150,7 @@ def register(mcp) -> List[Skill]:
             title=f"Skill: {skill.name}",
             description=skill.description,
             mime_type="text/markdown",
+            annotations=_FOR_THE_ASSISTANT,
         )(_reader(skill.path.read_text()))
 
     index = {
@@ -163,6 +169,7 @@ def register(mcp) -> List[Skill]:
             "rather than listing all resources if you only want the skills."
         ),
         mime_type="application/json",
+        annotations=_FOR_THE_ASSISTANT,
     )
     def read_index() -> str:
         return index_body

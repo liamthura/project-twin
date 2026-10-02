@@ -1,7 +1,7 @@
 """Tests for the smarter get_schema MCP tool: lean digest + drill-down."""
-import json
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 import server
 
@@ -16,7 +16,7 @@ def _bind_user(as_user):
 
 
 def _call(**kwargs):
-    return json.loads(get_schema(**kwargs))
+    return get_schema(**kwargs)
 
 
 # --- No-arg digest -----------------------------------------------------------
@@ -140,13 +140,13 @@ def test_file_scope_lists_only_that_file():
 # --- Error handling ----------------------------------------------------------
 
 def test_unknown_entity_returns_error():
-    result = _call(entity="does_not_exist")
-    assert "error" in result
+    with pytest.raises(ToolError):
+        _call(entity="does_not_exist")
 
 
 def test_unknown_file_returns_error():
-    result = _call(file="does_not_exist")
-    assert "error" in result
+    with pytest.raises(ToolError):
+        _call(file="does_not_exist")
 
 
 def test_basic_info_is_update_only_singleton():

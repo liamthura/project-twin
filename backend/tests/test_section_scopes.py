@@ -1,4 +1,5 @@
-import json
+import pytest
+from fastmcp.exceptions import ToolError
 import server
 from sections import SECTION_REGISTRY, ALWAYS_ON
 
@@ -40,11 +41,11 @@ def test_get_context_accepts_a_section_scope(as_user):
     p = store.load("circle")
     p["connections"] = [{"name": "Sam"}]
     store.save("circle", p)
-    ctx = json.loads(server.get_context.fn(scope="circle"))["context"]
+    ctx = server.get_context.fn(scope="circle")["context"]
     assert "circle" in ctx and "preferences" in ctx
 
 
 def test_unknown_scope_lists_valid_names(as_user):
-    out = json.loads(server.get_context.fn(scope="nope"))
-    assert "error" in out
-    assert "lifestyle" in out["error"]  # section names are advertised too
+    with pytest.raises(ToolError) as caught:
+        server.get_context.fn(scope="nope")
+    assert "lifestyle" in str(caught.value)  # section names are advertised too

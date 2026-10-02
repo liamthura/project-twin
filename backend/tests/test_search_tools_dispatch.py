@@ -4,6 +4,7 @@ import json
 import embeddings
 import persona_store
 import pytest
+from fastmcp.exceptions import ToolError
 
 
 @pytest.fixture
@@ -33,9 +34,9 @@ def test_search_context_via_dispatch(seeded):
     assert payload["results"][0]["title"] == "Ledger"
     # updated_at included: ranking is relevance-only, so a caller cannot tell a
     # stale hit from a fresh one without it.
+    # Ranking internals (score, fts_hit, distance) are not sent to the model.
     assert set(payload["results"][0]) == {"entity_id", "section", "title",
-                                          "snippet", "score", "fts_hit",
-                                          "distance", "updated_at"}
+                                          "snippet", "updated_at"}
 
 
 def test_search_context_bad_section_errors(seeded):
@@ -45,8 +46,8 @@ def test_search_context_bad_section_errors(seeded):
         tool = await server.mcp.get_tool("search_context")
         return await tool.run({"query": "x", "sections": "not_a_section"})
 
-    result = asyncio.run(_run())
-    assert "Unknown section" in result.content[0].text
+    with pytest.raises(ToolError, match="Unknown section"):
+        asyncio.run(_run())
 
 
 def test_search_context_all_requested_sections_disabled_errors(seeded):
@@ -61,10 +62,9 @@ def test_search_context_all_requested_sections_disabled_errors(seeded):
         tool = await server.mcp.get_tool("search_context")
         return await tool.run({"query": "dashboard", "sections": "projects"})
 
-    result = asyncio.run(_run())
-    text = result.content[0].text
-    assert "disabled" in text
-    assert "projects" in text
+    with pytest.raises(ToolError, match="disabled") as caught:
+        asyncio.run(_run())
+    assert "projects" in str(caught.value)
 
 
 def test_get_entity_via_dispatch(seeded):

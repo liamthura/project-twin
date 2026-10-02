@@ -4,12 +4,42 @@ description: What changed in each release, and what you have to do about it.
 ---
 
 Versions here are the app version, shown at the foot of Settings → Account as
-`v0.4.2 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
+`v0.4.3 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
 predate this page.
 
 MyGist is pre-1.0, and its versions say so. Until 0.2.4 they were numbered one
 place higher, so 0.2.3 was released as 2.3.0, 0.2.2 as 2.2.0, 0.2.1 as 2.1.0,
 0.2.0 as 2.0.0 and 0.1.0 as 1.0.0. Nothing else about those releases changed.
+
+## 0.4.3
+
+Connected AI clients read less of your persona at once, and none of it is
+lost. Every scope except `minimal` returns an index of titles, and the client
+fetches the entries it needs. On a persona with about 190 entries, `full` went
+from 148,000 characters to 22,000. See [Reading](/use/reading).
+
+- Apart from `get_raw`, the export, no read returns more than 32,000
+  characters, about 8,000 tokens. Anything
+  shortened to fit is listed under `trimmed`, with the call that reaches it.
+- Every scope that includes the learning log returns its newest 10 entries;
+  `learning` keeps its 60-day window.
+- Index entries carry `status`, so a client can tell active work from finished
+  work without fetching it.
+- Every tool says whether it only reads. ChatGPT and Claude can run the read
+  tools without asking each time. `persona_modify` and `persona_batch` are
+  marked destructive, because they can remove entries, so Claude always asks
+  before those.
+- Errors come back flagged as errors, rather than as text starting with ❌.
+- Entries and sections can be opened as MCP resources, `mygist://entity/{id}`
+  and `mygist://section/{key}`, with the same `persona:read` permission as the
+  tools.
+- Every tool description fits in 2,048 characters, where Claude Code cuts them
+  off.
+
+### Upgrading
+
+Pull the image and restart. No migration. A client that parsed `get_context`
+output expecting full entries should pass `detail="full"`.
 
 ## 0.4.2
 

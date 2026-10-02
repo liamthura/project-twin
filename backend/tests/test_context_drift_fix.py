@@ -1,4 +1,3 @@
-import json
 import server
 
 
@@ -11,7 +10,7 @@ def test_professional_scope_includes_previously_dropped_fields(as_user):
     p["languages_spoken"] = [{"name": "English"}]
     store.save("profile", p)
 
-    ctx = json.loads(server.get_context.fn(scope="professional"))["context"]["profile"]
+    ctx = server.get_context.fn(scope="professional")["context"]["profile"]
     assert ctx.get("organisation") == "Acme"
     assert ctx.get("nationality") == "British"
     assert "languages_spoken" in ctx
@@ -27,7 +26,7 @@ def test_personal_scope_includes_goals_and_languages(as_user):
     p["nationality"] = "British"
     store.save("profile", p)
 
-    full_ctx = json.loads(server.get_context.fn(scope="personal"))["context"]
+    full_ctx = server.get_context.fn(scope="personal")["context"]
     ctx = full_ctx["profile"]
     assert "goals" in full_ctx["goals"]
     assert "languages_spoken" in ctx

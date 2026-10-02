@@ -1,6 +1,8 @@
 """Tests for learning_entry full CRUD: update by topic/id, rename, related_entries."""
 import server
 import persona_store as store
+import pytest
+from fastmcp.exceptions import ToolError
 
 # `as_user` fixture is provided by tests/conftest.py.
 persona_modify = server.persona_modify.fn
@@ -47,9 +49,9 @@ def test_update_by_id_wins_over_topic(as_user):
 
 
 def test_update_not_found(as_user):
-    result = persona_modify(action="update", entity="learning_entry",
-                            data={"topic": "nope", "details": "x"})
-    assert result.startswith("❌")
+    with pytest.raises(ToolError):
+        persona_modify(action="update", entity="learning_entry",
+                       data={"topic": "nope", "details": "x"})
 
 
 # --- update: field semantics --------------------------------------------------
@@ -84,9 +86,9 @@ def test_id_and_timestamp_immutable(as_user):
 
 def test_identifier_only_update_errors(as_user):
     _add("Bare")
-    result = persona_modify(action="update", entity="learning_entry",
-                            data={"topic": "Bare"})
-    assert result.startswith("❌")
+    with pytest.raises(ToolError):
+        persona_modify(action="update", entity="learning_entry",
+                       data={"topic": "Bare"})
 
 
 # --- related_entries validation -----------------------------------------------
@@ -114,29 +116,31 @@ def test_valid_related_entry_accepted_on_update(as_user):
 
 
 def test_unknown_type_rejected(as_user):
-    result = _add("Bad", related_entries=[{"type": "planet", "id": "x"}])
-    assert result.startswith("❌") and "planet" in result
+    with pytest.raises(ToolError) as caught:
+        _add("Bad", related_entries=[{"type": "planet", "id": "x"}])
+    assert "planet" in str(caught.value)
     assert _entries() == []  # nothing written
 
 
 def test_nonexistent_id_rejected(as_user):
-    result = _add("Bad", related_entries=[{"type": "domain", "id": "domain_missing"}])
-    assert result.startswith("❌") and "domain_missing" in result
+    with pytest.raises(ToolError) as caught:
+        _add("Bad", related_entries=[{"type": "domain", "id": "domain_missing"}])
+    assert "domain_missing" in str(caught.value)
     assert _entries() == []
 
 
 def test_malformed_link_rejected(as_user):
-    result = _add("Bad", related_entries=["not-a-dict"])
-    assert result.startswith("❌")
+    with pytest.raises(ToolError):
+        _add("Bad", related_entries=["not-a-dict"])
     assert _entries() == []
 
 
 def test_rejected_update_writes_nothing(as_user):
     _add("Safe")
-    result = persona_modify(action="update", entity="learning_entry",
-                            data={"topic": "Safe", "details": "should not land",
-                                  "related_entries": [{"type": "domain", "id": "domain_missing"}]})
-    assert result.startswith("❌")
+    with pytest.raises(ToolError):
+        persona_modify(action="update", entity="learning_entry",
+                       data={"topic": "Safe", "details": "should not land",
+                       "related_entries": [{"type": "domain", "id": "domain_missing"}]})
     assert _entries()[-1]["details"] == "d"
 
 

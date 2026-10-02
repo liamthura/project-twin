@@ -52,12 +52,12 @@ def test_get_schema_names_the_proposal_path(clean_database, as_user):
     # get_schema publishes the entity vocabulary, and proposals are written in
     # exactly that vocabulary -- so an agent learning the schema in order to
     # write must be told both ways of doing it.
-    assert "propose_update" in server.get_schema.fn(entity="domain")
+    assert "propose_update" in server._compact(server.get_schema.fn(entity="domain"))
 
 
 def test_the_schema_overview_names_the_proposal_path(clean_database, as_user):
     # The no-argument call is the one an agent makes to orient itself.
-    assert "propose_update" in server.get_schema.fn()
+    assert "propose_update" in server._compact(server.get_schema.fn())
 
 
 def test_propose_update_still_names_the_direct_path():

@@ -62,14 +62,17 @@ def test_propose_update_leads_with_the_trigger_phrases():
     assert "asked writes, inferred proposes" in desc.lower()
 
 
-def test_propose_update_carries_every_entity_type():
-    # The choice between a typed suggestion and a note is made reading this
-    # text. A type missing from it is one an agent can only file as a note.
-    desc = server.propose_update.description
-    assert server._entity_types() in desc
+def test_an_unknown_entity_type_comes_back_with_every_valid_one():
+    # The vocabulary no longer fits in the description (Claude Code cuts it at
+    # 2,048 characters), so the recovery path has to name every type instead:
+    # an agent that guessed wrong gets the full list back and can retry.
+    _kwargs, error = server._validate_proposal(
+        {"kind": "entity", "entity": "nonsense", "action": "add",
+         "rationale": "r", "evidence": "e"})
+    assert error["result"] == "invalid"
     for entities in server.ENTITY_SCHEMA.values():
         for name in entities:
-            assert f" {name}" in desc, name
+            assert name in error["valid_entities"], name
 
 
 def test_propose_update_keeps_the_field_rules_and_does_not_defer_to_get_schema():

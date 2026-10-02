@@ -2,6 +2,8 @@
 import json
 
 import server
+import pytest
+from fastmcp.exceptions import ToolError
 
 
 def _call(proposals, client="Claude Desktop"):
@@ -45,9 +47,9 @@ def test_the_persona_is_not_touched(clean_database, as_user):
 
 
 def test_the_client_argument_is_required(clean_database, as_user):
-    out = _call([_entity_proposal()], client="  ")
-    assert "error" in out
-    assert out["results"] == []
+    with pytest.raises(ToolError) as caught:
+        _call([_entity_proposal()], client="  ")
+    assert "'client' is required" in str(caught.value)
 
 
 def test_missing_rationale_is_invalid(clean_database, as_user):

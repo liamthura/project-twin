@@ -17,18 +17,22 @@ persona gets.
 
 `get_context` returns a slice of your persona. There are five global scopes:
 
-| Scope | Roughly | What it is for |
-|---|---|---|
-| `minimal` | ~150 tokens | A quick "who is this": name, bio, location, role, top of mind, a few goal titles |
-| `professional` | ~3,600 | Work context: jobs, skills, projects, domains, active goals |
-| `personal` | ~1,400 | Hobbies, values, personality, wellness, active goals |
-| `learning` | ~3,400 | Domains, current learning, the learning log, active goals |
-| `full` | ~8,000 | Everything that is enabled |
+| Scope | What it is for |
+|---|---|
+| `minimal` | A quick "who is this": name, bio, location, role, top of mind, a few goal titles |
+| `professional` | Work context: jobs, skills, projects, domains, active goals |
+| `personal` | Hobbies, values, personality, wellness, active goals |
+| `learning` | Domains, current learning, the learning log, active goals |
+| `full` | Everything that is enabled |
 
-<Callout>
-Token figures are indicative, and they grow as your persona does. Read them as
-relative sizes, not as budgets.
-</Callout>
+Every scope except `minimal` returns an index: each entry as
+`{id, title, status, updated_at}`, with your preferences and the other fields
+that are not lists in full. The client reads the index and fetches the entries
+that matter by id. `minimal` comes back in full, because it is small and it is
+the read a client makes at the start of a conversation.
+
+On a persona with about 190 entries, this took `full` from 148,000 characters
+to 22,000, and `professional` from about 30,000 to 9,900.
 
 ### Which sections each scope pulls from
 
@@ -62,7 +66,8 @@ get_context(scope=["lifestyle", "circle"])
 
 ## Narrowing further
 
-Two options cut a scope down without changing which sections it covers.
+These change how much of a scope comes back, without changing which sections
+it covers.
 
 ### Filter by topic
 
@@ -74,18 +79,30 @@ Only entries relevant to the topic survive. This routes through the search
 index: semantic matching where embeddings are configured, ranked keyword
 matching otherwise.
 
-### Titles only
+### Full detail
 
 ```text
-get_context(scope="professional", detail="titles")
+get_context(scope="professional", detail="full")
 ```
 
-Every list entry collapses to a stub: `{id, title, updated_at}`. On a real
-persona this took a professional scope from around 7,100 tokens to around 1,600.
+Every entry in full, as `minimal` returns them. A client asks for this when a
+task needs all of a section, such as writing your CV. `detail="titles"` does the
+reverse for `minimal`.
 
-The client skims the stubs, then fetches the few that matter by id. The
-`updated_at` field is there so it can discount stale context. Top-of-mind
-entries untouched for over 30 days add a one-line staleness note to the output.
+Entries carry `updated_at` in both modes, so a client can discount stale
+context. Top-of-mind entries untouched for over 30 days add a one-line
+staleness note to the output.
+
+### The learning log
+
+The learning log only grows, so every scope that includes it returns the newest
+10 entries. `learning` returns the last 60 days instead. `days` and `limit`
+change either:
+
+```text
+get_context(scope="learning_log", days=30)
+get_context(scope="learning_log", limit=25)
+```
 
 ## Search and fetch
 
@@ -114,6 +131,46 @@ neighbours, covered on [Relations](/use/relations).
 Prefer this over widening a scope. Pulling a whole extra section to answer one
 question costs tokens on every turn afterwards. Two small calls cost them once.
 </Callout>
+
+## Size limits
+
+Apart from `get_raw`, no read returns more than 32,000 characters, about 8,000
+tokens. That keeps
+every result under the 10,000-token point where Claude Code starts warning, and
+well under the 25,000 at which it saves a result to a file instead of showing
+it.
+
+When a result would be bigger, MyGist shortens the largest lists until it fits:
+full entries become titles first, then a list keeps only its newest five, then
+only its count. Each cut is listed under `trimmed`, with the call that reaches
+the rest:
+
+```json
+"trimmed": {
+  "learning_log.entries": {
+    "shown": 5, "total": 52,
+    "more": "get_context(scope=\"learning_log\", days=30) or search_context(query, sections=\"learning_log\")"
+  }
+}
+```
+
+A `get_entity` batch that would pass the limit returns the entries that fit and
+marks the rest `"deferred"`, to fetch in another call. A single entry always
+comes back whole.
+
+## Resources
+
+Clients that read MCP resources can open the same data by URI:
+
+| URI | Returns |
+|---|---|
+| `mygist://entity/{id}` | One entry in full, as `get_entity` returns it |
+| `mygist://section/{key}` | One section as an index of titles |
+
+`get_context` links each section it left out, and `get_entity` links each
+deferred entry. Both need the same `persona:read` permission as the tools, and
+each link has a tool call alongside it that does the same thing, so nothing
+depends on resource support.
 
 ## Raw access
 

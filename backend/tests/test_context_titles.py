@@ -74,7 +74,7 @@ def test_titles_mode_returns_a_smaller_payload_than_full(as_user):
     # to read `token_estimate`, which was that same length over four.
     full = server.get_context.fn(scope="professional", detail="full")
     titles = server.get_context.fn(scope="professional", detail="titles")
-    assert len(titles) < len(full)
+    assert len(server._compact(titles)) < len(server._compact(full))
 
 
 def test_detail_bogus_errors(as_user):

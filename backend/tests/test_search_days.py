@@ -10,6 +10,8 @@ import db
 import embeddings
 import persona_store
 import search_index
+import pytest
+from fastmcp.exceptions import ToolError
 
 
 class VocabProvider:
@@ -107,11 +109,11 @@ def test_search_context_rejects_non_positive_days(as_user, monkeypatch):
     _seed_two_entities(None)
     import server
 
-    zero = server.search_context.fn(query="project", days=0)
-    assert "error" in zero.lower()
+    with pytest.raises(ToolError):
+        server.search_context.fn(query="project", days=0)
 
-    negative = server.search_context.fn(query="project", days=-2)
-    assert "error" in negative.lower()
+    with pytest.raises(ToolError):
+        server.search_context.fn(query="project", days=-2)
 
 
 def test_search_context_days_dispatch_path(as_user, monkeypatch):
