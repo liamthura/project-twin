@@ -1,7 +1,7 @@
 # Lean context reads — design
 
 Date: 2026-10-02
-Status: implemented on `feat/lean-context-reads`
+Status: implemented, released in 0.4.3
 
 ## Why
 
