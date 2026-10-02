@@ -161,6 +161,7 @@ export function FeedbackIsland({ onAddEmail }) {
         <button
           ref={pill}
           type="button"
+          data-guide="feedback"
           className={cn(
             "feedback-island fixed z-30 flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-lg transition-[background-color,bottom] duration-200 ease-standard hover:bg-muted motion-reduce:transition-none print:hidden coarse:min-h-11",
             open && "invisible",

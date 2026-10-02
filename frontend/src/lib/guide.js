@@ -68,6 +68,18 @@ export const TOURS = {
       element: '[data-guide="search"]',
       popover: { title: "Find anything", description: `Search your whole persona with ${SEARCH_KEY}.` },
     },
+    {
+      // The island (components/FeedbackIsland.jsx). Fixed in the corner, so
+      // the popover opens above it rather than off the screen beside it.
+      element: '[data-guide="feedback"]',
+      popover: {
+        title: "Report a problem or an idea",
+        description:
+          "Feedback sends it to whoever runs MyGist, with a screenshot if you add one. Error messages have a Report button that fills it in for you.",
+        side: "top",
+        align: "end",
+      },
+    },
   ],
 };
 
