@@ -19,6 +19,7 @@ USER_TABLES = {
     "persona_proposals": "user_id",
     "persona_provenance": "user_id",
     "persona_search": "user_id",
+    "feedback": "user_id",
     "mcp_activity": "user_id",
     "tokens": "user_id",
 }
@@ -61,6 +62,10 @@ def _account(username):
             values (%s, 'note', 'Reads everything aloud.', 'Said so.', 'Claude', %s)
             """,
             (user_id, f"fp-{username}"),
+        )
+        conn.execute(
+            "insert into feedback (user_id, kind, message) values (%s, 'problem', 'it broke')",
+            (user_id,),
         )
     # The credential row, as a Better Auth password writes it.
     db.set_password(user_id, "correcthorse2", "correcthorse1", via_session=True)

@@ -233,7 +233,7 @@ export default function OnboardingFlow({ step, onNavigate, onLeave }) {
 
   return (
     <div className="min-h-dvh bg-background">
-      <div className="mx-auto flex min-h-dvh max-w-xl flex-col px-4 py-10 sm:py-16">
+      <div className="mx-auto flex min-h-dvh max-w-xl flex-col px-4 pb-24 pt-10 sm:pt-16">
         {/* The bar alone. A "Step 1 of 3" label above it said the same thing
             twice; the words stay for screen readers. */}
         <div className="mb-8">

@@ -804,6 +804,8 @@ export default function ProposalsPanel({
         <div
           role="region"
           aria-label="Selected"
+          // globals.css lifts the feedback island over this bar while it shows.
+          data-selection-bar=""
           className="sticky bottom-4 z-10 flex flex-wrap items-center gap-2 rounded-lg border bg-background py-2 pl-3 pr-2 shadow-md"
         >
           <span className="text-sm font-medium">{chosen.length} selected</span>

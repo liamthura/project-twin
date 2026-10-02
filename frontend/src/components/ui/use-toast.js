@@ -11,14 +11,45 @@
 import { createElement } from "react";
 import { toast as sonner } from "sonner";
 
-import { ToastCard } from "./toast";
+import { openFeedback } from "@/lib/feedback.js";
+
+import { ToastAction, ToastCard } from "./toast";
 
 // Radix's default, which every caller that names no duration was written for.
 const DURATION = 5000;
 
 let seq = 0;
 
-function toast({ onClose, duration = DURATION, ...props }) {
+// Every destructive toast in the app is a failure, and with no error tracking
+// a report from the person who saw it is how the owner hears of one. One place
+// rather than fourteen; a toast with its own action keeps it.
+function withReport(props) {
+  if (props.variant !== "destructive" || props.action) return props;
+  const full = [props.title, props.description].filter((s) => typeof s === "string" && s).join(". ");
+  // Cut: an API error carries the response body, which can be a whole HTML
+  // page, and a prefill past the 5,000-character limit could never be sent.
+  const said = full.length > 300 ? `${full.slice(0, 299)}…` : full;
+  return {
+    ...props,
+    action: createElement(
+      ToastAction,
+      {
+        altText: "Report this problem",
+        // Out of the toast first. Sonner hands focus back to wherever it came
+        // from the moment it leaves a toast; done after the island had taken
+        // it, that pulled focus out of the panel and the panel closed.
+        onClick: (e) => {
+          e.currentTarget.blur();
+          openFeedback({ kind: "problem", message: `The app said: "${said}"` });
+        },
+      },
+      "Report",
+    ),
+  };
+}
+
+function toast({ onClose, duration = DURATION, ...rest }) {
+  const props = withReport(rest);
   const id = `toast-${++seq}`;
   let told = false;
   const closed = () => {

@@ -8,6 +8,7 @@ the list cannot drift from the codes.
 import os
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -261,7 +262,7 @@ def test_the_send_request_says_who_it_is(monkeypatch):
         sent["request"] = request
         return Accepted()
 
-    monkeypatch.setattr(access.urllib.request, "urlopen", capture)
+    monkeypatch.setattr(urllib.request, "urlopen", capture)
 
     assert access.send_email("maya@example.com", "Your MyGist invite", "hello")
 

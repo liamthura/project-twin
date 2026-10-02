@@ -183,15 +183,11 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
   // That flash is the deliberate direction to fail. An instance with neither an
   // invite gate nor a provider is the default and the common case, so a null
   // that reads as "no" is usually right -- and where it is wrong it costs a
-  // form that comes straight back, behind the invite gate or behind "Sign in
-  // with a password instead". Biasing the other way would hide the only way in
-  // on every instance that has no provider.
+  // form that comes straight back behind the invite gate, or a provider button
+  // that arrives under the form. Biasing the other way would hide the only way
+  // in on every instance that has no provider.
   const [inviteOnly, setInviteOnly] = useState(null);
   const [sso, setSso] = useState(null);
-  // The escape hatch. Shown permanently, not only during the migration window:
-  // it covers everyone who has an account and has not linked yet -- which
-  // includes whoever is about to link for the first time.
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [ssoError] = useState(ssoErrorFromUrl);
   const [deleted] = useState(deletedFromUrl);
   const [ssoPending, setSsoPending] = useState(false);
@@ -315,8 +311,6 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
   // Detached mode is excluded for the same reason reset is: Better Auth is
   // same-origin only, and its session cookie cannot be set from another site.
   const ssoAvailable = sso === true && !isDetached(serverUrl) && mode !== "forgot";
-  // The password form yields to the button, but never disappears.
-  const passwordFormShown = !ssoAvailable || showPasswordForm;
 
   const handleSso = async () => {
     setFormError(null);
@@ -616,8 +610,122 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
           </div>
         )}
 
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <Field
+            id="welcome-username"
+            label={acceptsEmail ? "Username or email" : "Username"}
+            error={shown("username")}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                autoComplete="username"
+                value={username}
+                onChange={change(setUsername, "username")}
+                onBlur={blur("username")}
+                placeholder={acceptsEmail ? "yourname or you@example.com" : "yourname"}
+              />
+            )}
+          </Field>
+          <Field id="welcome-password" label="Password" error={shown("password")}>
+            {(control) => (
+              <Input
+                {...control}
+                type="password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                value={password}
+                // Clears Confirm's message too: fixing this field is what makes
+                // a mismatch under the next one stale.
+                onChange={change(setPassword, "password", "confirmPassword")}
+                onBlur={blur("password")}
+                placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
+              />
+            )}
+          </Field>
+          {mode === "signup" && (
+            <Field
+              id="welcome-confirm-password"
+              label="Confirm password"
+              error={shown("confirmPassword")}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={change(setConfirmPassword, "confirmPassword")}
+                  onBlur={blur("confirmPassword")}
+                  placeholder="Re-enter password"
+                />
+              )}
+            </Field>
+          )}
+
+          {showServer && (
+            <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-left">
+              <Label className="text-xs font-medium">Server</Label>
+              <div className="flex rounded-lg bg-muted p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setConnectionType("cloud")}
+                  className={segmentClass(connectionType === "cloud")}
+                >
+                  <Globe className="h-4 w-4" />
+                  Cloud
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConnectionType("self-hosted")}
+                  className={segmentClass(connectionType === "self-hosted")}
+                >
+                  <Server className="h-4 w-4" />
+                  Self-hosted
+                </button>
+              </div>
+              {connectionType === "self-hosted" && (
+                <Field
+                  id="welcome-server-url"
+                  label="Server URL"
+                  error={shown("selfHostedUrl")}
+                >
+                  {(control) => (
+                    <Input
+                      {...control}
+                      placeholder="https://your-mygist-server.com/api"
+                      value={selfHostedUrl}
+                      onChange={change(setSelfHostedUrl, "selfHostedUrl")}
+                      onBlur={blur("selfHostedUrl")}
+                    />
+                  )}
+                </Field>
+              )}
+            </div>
+          )}
+
+          {formError && <p className="text-xs text-destructive">{formError}</p>}
+
+          <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : mode === "signup" ? (
+              "Create account"
+            ) : (
+              "Sign in"
+            )}
+          </Button>
+        </form>
+
+        {/* An option under the form, not in front of it: most accounts have not
+            linked a provider, and the form is the only way for one that has
+            not to reach Settings and link. */}
         {ssoAvailable && (
           <div className="space-y-3">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground" aria-hidden="true">
+              <span className="h-px flex-1 bg-border" />
+              or
+              <span className="h-px flex-1 bg-border" />
+            </div>
             <Button
               type="button"
               variant="sso"
@@ -631,199 +739,77 @@ export function WelcomeAuth({ intent = "app", onSuccess }) {
                 `Continue with ${SSO_LABEL}`
               )}
             </Button>
-
-            {!showPasswordForm && (
-              <p className="text-center text-xs text-muted-foreground coarse:leading-[2.75rem]">
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordForm(true)}
-                  className="tap-target underline hover:text-foreground"
-                >
-                  Sign in with a password instead
-                </button>
-              </p>
-            )}
           </div>
         )}
 
-        {passwordFormShown && (
-          <>
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-              <Field
-                id="welcome-username"
-                label={acceptsEmail ? "Username or email" : "Username"}
-                error={shown("username")}
+        <p className="text-center text-xs text-muted-foreground coarse:leading-[2.75rem]">
+          {mode === "signup" ? (
+            <>
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={() => switchMode("signin")}
+                className="tap-target underline hover:text-foreground"
               >
-                {(control) => (
-                  <Input
-                    {...control}
-                    autoComplete="username"
-                    value={username}
-                    onChange={change(setUsername, "username")}
-                    onBlur={blur("username")}
-                    placeholder={acceptsEmail ? "yourname or you@example.com" : "yourname"}
-                  />
-                )}
-              </Field>
-              <Field id="welcome-password" label="Password" error={shown("password")}>
-                {(control) => (
-                  <Input
-                    {...control}
-                    type="password"
-                    autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                    value={password}
-                    // Clears Confirm's message too: fixing this field is what makes
-                    // a mismatch under the next one stale.
-                    onChange={change(setPassword, "password", "confirmPassword")}
-                    onBlur={blur("password")}
-                    placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
-                  />
-                )}
-              </Field>
-              {mode === "signup" && (
-                <Field
-                  id="welcome-confirm-password"
-                  label="Confirm password"
-                  error={shown("confirmPassword")}
-                >
-                  {(control) => (
-                    <Input
-                      {...control}
-                      type="password"
-                      autoComplete="new-password"
-                      value={confirmPassword}
-                      onChange={change(setConfirmPassword, "confirmPassword")}
-                      onBlur={blur("confirmPassword")}
-                      placeholder="Re-enter password"
-                    />
-                  )}
-                </Field>
-              )}
-
-              {showServer && (
-                <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-left">
-                  <Label className="text-xs font-medium">Server</Label>
-                  <div className="flex rounded-lg bg-muted p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setConnectionType("cloud")}
-                      className={segmentClass(connectionType === "cloud")}
-                    >
-                      <Globe className="h-4 w-4" />
-                      Cloud
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConnectionType("self-hosted")}
-                      className={segmentClass(connectionType === "self-hosted")}
-                    >
-                      <Server className="h-4 w-4" />
-                      Self-hosted
-                    </button>
-                  </div>
-                  {connectionType === "self-hosted" && (
-                    <Field
-                      id="welcome-server-url"
-                      label="Server URL"
-                      error={shown("selfHostedUrl")}
-                    >
-                      {(control) => (
-                        <Input
-                          {...control}
-                          placeholder="https://your-mygist-server.com/api"
-                          value={selfHostedUrl}
-                          onChange={change(setSelfHostedUrl, "selfHostedUrl")}
-                          onBlur={blur("selfHostedUrl")}
-                        />
-                      )}
-                    </Field>
-                  )}
-                </div>
-              )}
-
-              {formError && <p className="text-xs text-destructive">{formError}</p>}
-
-              <Button type="submit" className="w-full" disabled={pending}>
-                {pending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : mode === "signup" ? (
-                  "Create account"
-                ) : (
-                  "Sign in"
-                )}
-              </Button>
-            </form>
-
-            <p className="text-center text-xs text-muted-foreground coarse:leading-[2.75rem]">
-              {mode === "signup" ? (
+                Sign in
+              </button>
+            </>
+          ) : (
+            <>
+              {/* While sign-up is invite-only, "Create an account" promised
+                  something most visitors cannot have. Someone holding a
+                  code still gets in the same way; everyone else is pointed
+                  at the waitlist, which is the landing page's first form. */}
+              {inviteOnly ? (
                 <>
-                  Already have an account?{" "}
+                  Have an invite code?{" "}
                   <button
                     type="button"
-                    onClick={() => switchMode("signin")}
+                    onClick={() => switchMode("signup")}
                     className="tap-target underline hover:text-foreground"
                   >
-                    Sign in
+                    Use it
                   </button>
-                </>
-              ) : (
-                <>
-                  {/* While sign-up is invite-only, "Create an account" promised
-                      something most visitors cannot have. Someone holding a
-                      code still gets in the same way; everyone else is pointed
-                      at the waitlist, which is the landing page's first form. */}
-                  {inviteOnly ? (
-                    <>
-                      Have an invite code?{" "}
-                      <button
-                        type="button"
-                        onClick={() => switchMode("signup")}
-                        className="tap-target underline hover:text-foreground"
-                      >
-                        Use it
-                      </button>
-                      {!isDetached(serverUrl) && (
-                        <>
-                          <br />
-                          No invite yet?{" "}
-                          <a href="/" className="tap-target underline hover:text-foreground">
-                            Join the waitlist
-                          </a>
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      New to MyGist?{" "}
-                      <button
-                        type="button"
-                        onClick={() => switchMode("signup")}
-                        className="tap-target underline hover:text-foreground"
-                      >
-                        Create an account
-                      </button>
-                    </>
-                  )}
-                  {/* Reset runs through Better Auth, which is same-origin only.
-                      Detached mode talks to the old endpoints, which have no reset
-                      at all -- offering it there would be a dead end. */}
                   {!isDetached(serverUrl) && (
                     <>
                       <br />
-                      <button
-                        type="button"
-                        onClick={() => switchMode("forgot")}
-                        className="tap-target underline hover:text-foreground"
-                      >
-                        Forgot your password?
-                      </button>
+                      No invite yet?{" "}
+                      <a href="/" className="tap-target underline hover:text-foreground">
+                        Join the waitlist
+                      </a>
                     </>
                   )}
                 </>
+              ) : (
+                <>
+                  New to MyGist?{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode("signup")}
+                    className="tap-target underline hover:text-foreground"
+                  >
+                    Create an account
+                  </button>
+                </>
               )}
-            </p>
-          </>
-        )}
+              {/* Reset runs through Better Auth, which is same-origin only.
+                  Detached mode talks to the old endpoints, which have no reset
+                  at all -- offering it there would be a dead end. */}
+              {!isDetached(serverUrl) && (
+                <>
+                  <br />
+                  <button
+                    type="button"
+                    onClick={() => switchMode("forgot")}
+                    className="tap-target underline hover:text-foreground"
+                  >
+                    Forgot your password?
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </p>
 
         {/* "Use an access token instead" used to share this row. Deleted per the
             prototype's change 5 -- Better Auth supersedes it -- and the cost is
