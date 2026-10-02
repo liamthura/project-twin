@@ -1,0 +1,12 @@
+Reset your password
+
+Someone asked to reset the password for sam. If it was you, choose a new one.
+
+Choose a new password: https://mygist.example.com/auth/reset-password/T?callbackURL=%2Fapp%2F
+
+Works once, for the next hour.
+
+Didn't ask for this? Ignore this email. Your password still works and nothing has changed.
+
+--
+MyGist · mygist.example.com

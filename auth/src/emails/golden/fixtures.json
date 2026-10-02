@@ -1,0 +1,9 @@
+{
+  "origin": "https://mygist.example.com",
+  "values": {
+    "verify": { "username": "sam", "email": "sam@example.com", "url": "https://mygist.example.com/auth/verify-email?token=T" },
+    "reset": { "username": "sam", "url": "https://mygist.example.com/auth/reset-password/T?callbackURL=%2Fapp%2F" },
+    "change": { "username": "sam", "newEmail": "sam@new.example", "url": "https://mygist.example.com/auth/verify-email?token=T" },
+    "invite": { "code": "7KQ2-MXH4", "url": "https://mygist.example.com/app/?invite=7KQ2-MXH4", "expires": "1 November 2026", "uses": "3" }
+  }
+}
