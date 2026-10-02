@@ -829,6 +829,10 @@ export default function App() {
     forgetFeedbackDraft();
     // The session cookie is HttpOnly, so only the service can revoke it.
     await signOut();
+    // Signed out now, so the 401 the reload is about to get means "sign in",
+    // not "the server is unreachable". hasCredential is otherwise only set on
+    // mount, which left everyone who signed out on Couldn't reach MyGist.
+    setHasCredential(false);
     clearConfig();
     loadAllData();
     loadSettings();
