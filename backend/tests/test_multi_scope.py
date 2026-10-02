@@ -1,3 +1,5 @@
+import pytest
+from fastmcp.exceptions import ToolError
 import asyncio
 import json
 
@@ -11,14 +13,14 @@ def _seed(as_user):
 
 
 def test_single_string_scope_still_works(as_user):
-    out = json.loads(server.get_context.fn(scope="minimal"))
+    out = server.get_context.fn(scope="minimal")
     assert out["scope"] == "minimal"
     assert "context" in out
 
 
 def test_two_section_scopes_union(as_user):
     _seed(as_user)
-    out = json.loads(server.get_context.fn(scope=["lifestyle", "circle"]))
+    out = server.get_context.fn(scope=["lifestyle", "circle"])
     ctx = out["context"]
     assert "lifestyle" in ctx and "circle" in ctx
     assert "preferences" in ctx  # always-on
@@ -26,7 +28,7 @@ def test_two_section_scopes_union(as_user):
 
 def test_global_and_section_mix(as_user):
     _seed(as_user)
-    ctx = json.loads(server.get_context.fn(scope=["professional", "circle"]))["context"]
+    ctx = server.get_context.fn(scope=["professional", "circle"])["context"]
     assert "circle" in ctx           # from the section scope
     assert "projects" in ctx or "profile" in ctx  # from professional
 
@@ -39,15 +41,15 @@ def test_overlapping_scopes_dedup_fields(as_user):
 
 
 def test_unknown_token_in_list_errors(as_user):
-    out = json.loads(server.get_context.fn(scope=["minimal", "bogus"]))
-    assert "error" in out
+    with pytest.raises(ToolError):
+        server.get_context.fn(scope=["minimal", "bogus"])
 
 
 def test_list_with_full_returns_everything(as_user):
     # Seed circle/lifestyle so their (list-valued) sections aren't stripped by
     # the inactive-filtering pass, which drops sections with no active items.
     _seed(as_user)
-    out = json.loads(server.get_context.fn(scope=["minimal", "full"]))
+    out = server.get_context.fn(scope=["minimal", "full"])
     # full wins → all files present
     assert set(out["context"].keys()) >= {"profile", "lifestyle", "circle", "preferences"}
 

@@ -3,7 +3,6 @@ and get_entity's `related` (stored links, always resolved) / `similar`
 (derived neighbors, on request) surfaces. Links themselves (action="link")
 are Task 2 -- here `related` is seeded directly via persona_store.save."""
 import asyncio
-import json
 
 import db
 import embeddings
@@ -14,7 +13,7 @@ from tests.test_search_query import VocabProvider
 
 
 def _get_entity(entity_id, **kwargs):
-    return json.loads(server.get_entity.fn(entity_id, **kwargs))
+    return server.get_entity.fn(entity_id, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +201,7 @@ def test_batch_get_entity_resolves_related_once(as_user, monkeypatch):
 
     monkeypatch.setattr(search_index, "resolve_titles", counting_resolve_titles)
 
-    out = json.loads(server.get_entity.fn([g1["id"], g2["id"]]))
+    out = server.get_entity.fn([g1["id"], g2["id"]])
 
     assert len(calls) == 1  # no N+1 -- one resolve_titles call for the whole batch
     assert set(calls[0]) == {pid}
@@ -216,7 +215,7 @@ def test_batch_get_entity_include_related_similar_per_entity(as_user):
     pid = server.load_json("projects.json")["projects"][0]["id"]
     gid = server.load_json("goals.json")["goals"][0]["id"]
 
-    out = json.loads(server.get_entity.fn([pid, gid], include_related=True))
+    out = server.get_entity.fn([pid, gid], include_related=True)
 
     for e in out["entities"]:
         assert "similar" in e
@@ -259,7 +258,7 @@ def test_get_raw_keeps_related(as_user):
         {"title": "Ship it", "type": "learning", "related": ["goal_deadbeef"]},
     ]})
 
-    raw = json.loads(server.get_raw.fn("goals"))
+    raw = server.get_raw.fn("goals")
 
     assert raw["goals"][0]["related"] == ["goal_deadbeef"]
 
@@ -493,7 +492,7 @@ def test_get_entity_round_trip_after_link(as_user):
     gid = server.load_json("goals.json")["goals"][0]["id"]
 
     server.execute_modify("link", "link", {"entity_id": gid, "related": [pid]})
-    out = json.loads(server.get_entity.fn(gid))
+    out = server.get_entity.fn(gid)
 
     assert {"id": pid, "title": "Ledger", "section": "projects"} in out["related"]
 
@@ -515,7 +514,7 @@ def test_link_action_passes_real_tool_schema_validation(as_user):
     result = asyncio.run(server.persona_modify.run(
         {"action": "link", "entity": "link", "data": {"entity_id": gid, "related": [pid]}}))
 
-    text = result.structured_content["result"]
+    text = result.content[0].text
     assert text.startswith("✅")
     assert persona_store.load("goals")["goals"][0]["related"] == [pid]
 
@@ -530,7 +529,7 @@ def test_unlink_action_passes_real_tool_schema_validation(as_user):
     result = asyncio.run(server.persona_modify.run(
         {"action": "unlink", "entity": "link", "data": {"entity_id": gid, "related": [pid]}}))
 
-    text = result.structured_content["result"]
+    text = result.content[0].text
     assert "✅" in text
     assert persona_store.load("goals")["goals"][0].get("related") in (None, [])
 
@@ -547,7 +546,7 @@ def test_persona_batch_schema_tolerates_link_ops_via_real_run(as_user):
         {"action": "link", "entity": "link", "data": {"entity_id": gid, "related": [pid]}},
     ]}))
 
-    text = result.structured_content["result"]
+    text = result.content[0].text
     assert "1. ✅" in text
     assert persona_store.load("goals")["goals"][0]["related"] == [pid]
 

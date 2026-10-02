@@ -1,3 +1,5 @@
+import pytest
+from fastmcp.exceptions import ToolError
 import asyncio
 import json
 
@@ -21,7 +23,7 @@ def test_get_entity_batch_list_happy_path(as_user, monkeypatch):
     hobbies = persona_store.load("lifestyle")["hobbies"]
     ids = [hobbies[0]["id"], hobbies[1]["id"]]
 
-    out = json.loads(_get_entity(ids))
+    out = _get_entity(ids)
 
     assert "entities" in out
     assert len(out["entities"]) == 2
@@ -40,7 +42,7 @@ def test_get_entity_batch_mixed_valid_and_errors(as_user, monkeypatch):
     hobby_id = persona_store.load("lifestyle")["hobbies"][0]["id"]
 
     ids = [hobby_id, "bogus_12345678", "project_deadbeef"]
-    out = json.loads(_get_entity(ids))
+    out = _get_entity(ids)
 
     assert "entities" in out
     assert len(out["entities"]) == 3
@@ -59,23 +61,25 @@ def test_get_entity_batch_mixed_valid_and_errors(as_user, monkeypatch):
 
 def test_get_entity_batch_over_cap_errors(as_user):
     ids = [f"project_{i:08x}" for i in range(26)]
-    out = _get_entity(ids)
+    with pytest.raises(ToolError) as caught:
+        _get_entity(ids)
 
-    assert "25" in out
-    assert "split" in out
+    assert "25" in str(caught.value)
+    assert "split" in str(caught.value)
 
 
 def test_get_entity_batch_empty_list_errors(as_user):
-    out = _get_entity([])
-    assert "error" in out.lower()
+    with pytest.raises(ToolError):
+        _get_entity([])
 
 
 def test_get_entity_single_string_no_entities_key(as_user):
-    out = _get_entity("bogus_12345678")
-    assert "Unknown entity id prefix" in out
+    with pytest.raises(ToolError) as caught:
+        _get_entity("bogus_12345678")
+    assert "Unknown entity id prefix" in str(caught.value)
     # Byte-compatible with the original shape: no JSON wrapping at all,
     # so "entities" cannot appear as a key.
-    assert "entities" not in out
+    assert "entities" not in str(caught.value)
 
 
 def test_get_entity_batch_rejects_non_dict_resolver_output(as_user, monkeypatch):
@@ -94,14 +98,14 @@ def test_get_entity_batch_rejects_non_dict_resolver_output(as_user, monkeypatch)
 
     real_resolve = server._resolve_entity
 
-    def fake_resolve(entity_id):
+    def fake_resolve(entity_id, bump=True):
         if entity_id == bad_id:
             return json.dumps("just a string")
-        return real_resolve(entity_id)
+        return real_resolve(entity_id, bump=bump)
 
     monkeypatch.setattr(server, "_resolve_entity", fake_resolve)
 
-    out = json.loads(_get_entity([good_id, bad_id]))
+    out = _get_entity([good_id, bad_id])
 
     assert len(out["entities"]) == 2
     assert out["entities"][0]["entity"]["name"] == "Climbing"

@@ -1,5 +1,4 @@
 """Phase 4 freshness: updated_at surfacing + top-of-mind staleness advisory."""
-import json
 
 import psycopg
 
@@ -25,7 +24,7 @@ def _first_id(file_type, list_key):
 def test_get_entity_includes_updated_at(clean_database, as_user):
     server.execute_modify("add", "hobby", {"name": "Bouldering", "skill_level": "beginner"})
     hid = _first_id("lifestyle", "hobbies")
-    payload = json.loads(server.get_entity.fn(hid))
+    payload = server.get_entity.fn(hid)
     assert payload["entity_id"] == hid
     assert "updated_at" in payload
     assert len(payload["updated_at"]) == 10  # YYYY-MM-DD
@@ -35,7 +34,7 @@ def test_get_entity_batch_includes_updated_at(clean_database, as_user):
     server.execute_modify("add", "hobby", {"name": "Bouldering"})
     server.execute_modify("add", "domain", {"name": "Rust", "level": "learning"})
     ids = [_first_id("lifestyle", "hobbies"), _first_id("knowledge", "domains")]
-    payload = json.loads(server.get_entity.fn(ids))
+    payload = server.get_entity.fn(ids)
     assert all("updated_at" in e for e in payload["entities"])
 
 
@@ -43,7 +42,8 @@ def test_titles_stubs_carry_updated_at(clean_database, as_user):
     server.execute_modify("add", "goal", {"title": "Ship phase 4"})
     ctx = server.get_scoped_context("goals", detail="titles")["context"]
     [stub] = ctx["goals"]["goals"]
-    assert set(stub) == {"id", "title", "updated_at"}
+    # status survives stubbing: an index must tell active work from finished.
+    assert set(stub) == {"id", "title", "status", "updated_at"}
 
 
 def test_stale_top_of_mind_triggers_advisory(clean_database, as_user):

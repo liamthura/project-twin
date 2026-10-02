@@ -21,7 +21,10 @@ from typing import Optional, Literal, Union, List
 import uuid
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ResourceError, ToolError
 from fastmcp.server.dependencies import get_http_request
+from fastmcp.server.middleware import Middleware
+from mcp.types import ResourceLink, ToolAnnotations
 from dotenv import load_dotenv
 
 import db
@@ -229,6 +232,80 @@ def _not_in_this_scope(result: dict) -> dict:
     return out
 
 
+# Every read result stays under this, measured on the compact JSON a client
+# receives: about 8k tokens. That is under Claude Code's 10k warning and far
+# inside its 25k cap, past which it saves the result to a file and hands the
+# model a path instead of the persona.
+RESULT_BUDGET_CHARS = 32_000
+# Room left for what is added after a result is fitted (footer, links).
+_FOOTER_RESERVE = 1_000
+# What a scope carrying the learning log shows of it by default. The log only
+# ever grows, and it is the largest section on every account.
+LEARNING_LOG_DEFAULT_LIMIT = 10
+# How many entries a list keeps once the budget has to shorten it.
+TRIM_KEEP = 5
+
+
+def _compact(obj) -> str:
+    """The JSON a client actually receives: no indent, no ASCII escaping."""
+    return json.dumps(obj, ensure_ascii=False, separators=(",", ":"), default=str)
+
+
+def _more(section: str) -> str:
+    """The call that reaches what a trimmed list left out."""
+    if section == "learning_log":
+        return ('get_context(scope="learning_log", days=30) or '
+                'search_context(query, sections="learning_log")')
+    return f'search_context(query, sections="{section}")'
+
+
+def _fit_budget(result: dict, payload: dict, detail: str) -> dict:
+    """Shrink `result`'s id-lists until `payload` fits the budget.
+
+    Largest list first, re-measuring after each cut, in three steps: full
+    entries down to titles, titles down to the newest TRIM_KEEP, then down to
+    nothing. Returns what was cut, keyed "section.list", so nothing is cut
+    without being said.
+    """
+    budget = RESULT_BUDGET_CHARS - _FOOTER_RESERVE
+    if len(_compact(payload)) <= budget:
+        return {}
+    lists = [
+        (ft, lk) for ft, sec in result.items()
+        if ft in SECTION_REGISTRY and isinstance(sec, dict)
+        for lk, _prefix in SECTION_REGISTRY[ft].id_lists
+        if isinstance(sec.get(lk), list) and sec[lk]
+    ]
+    totals = {pair: len(result[pair[0]][pair[1]]) for pair in lists}
+
+    def newest(items):
+        dicts = [e for e in items if isinstance(e, dict)]
+        dicts.sort(key=lambda e: e.get("updated_at") or e.get("timestamp") or "",
+                   reverse=True)
+        return dicts[:TRIM_KEEP]
+
+    steps = [("newest", newest), ("none", lambda items: [])]
+    if detail != "titles":
+        steps.insert(0, ("titles", lambda items: [_stub(e) for e in items]))
+
+    trimmed = {}
+    for step, shrink in steps:
+        by_size = sorted(lists, key=lambda p: len(_compact(result[p[0]][p[1]])), reverse=True)
+        for ft, lk in by_size:
+            if len(_compact(payload)) <= budget:
+                return trimmed
+            after = shrink(result[ft][lk])
+            if after == result[ft][lk]:
+                continue
+            result[ft][lk] = after
+            record = trimmed.setdefault(f"{ft}.{lk}", {"total": totals[(ft, lk)]})
+            record["shown"] = len(after)
+            if step == "titles":
+                record["detail"] = "titles"
+            record["more"] = _more(ft)
+    return trimmed
+
+
 def get_scoped_context(
     scope: Union[str, List[str]] = "minimal",
     topic: str = None,
@@ -288,6 +365,9 @@ def get_scoped_context(
     if "learning_log" in result and not topic:
         is_learning = scope == "learning" or (not isinstance(scope, str) and "learning" in scope)
         effective_days = days if days is not None else (60 if is_learning else None)
+        # Every other scope carrying the log gets its newest few, not all of it.
+        if limit is None and days is None and not is_learning:
+            limit = LEARNING_LOG_DEFAULT_LIMIT
         if effective_days and effective_days > 0:
             result = _filter_learning_log_by_time(result, effective_days, limit)
         elif limit and limit > 0:
@@ -359,6 +439,8 @@ def get_scoped_context(
     # `title` that flatten_entity happens to read.
     if detail == "titles":
         result = _stub_titles(result)
+    else:
+        _stamp_updated_at(_id_lists(result))
 
     scope_label = scope if isinstance(scope, str) else ",".join(scope)
     scope_desc = (
@@ -396,11 +478,20 @@ def get_scoped_context(
     # paid for every token counted, and it cannot un-load a scope. These counts
     # point the other way, at what has NOT been paid for yet, with an action
     # attached. See the design spec, section 4.
+    #
+    # Fitted first, so the counts below include whatever the budget cut.
+    trimmed = _fit_budget(result, payload, detail)
+    if trimmed:
+        payload["trimmed"] = trimmed
     left_behind = _not_in_this_scope(result)
     if left_behind:
         payload["not_in_this_scope"] = left_behind
     payload["note"] = (
-        "search_context(query) then get_entity(id) reaches anything not here. "
+        ("Entries are titles: get_entity([ids]) for full detail, up to 25 per "
+         "call. " if detail == "titles" else "")
+        + ("Some lists were shortened to fit; `trimmed` says how to reach the "
+           "rest. " if trimmed else "")
+        + "search_context(query) then get_entity(id) reaches anything not here. "
         "Heard something durable? propose_update. Do not narrate either."
     )
     return payload
@@ -523,40 +614,56 @@ def _filter_by_topic(data: dict, topic: str) -> dict:
                 ]
     return data
 
-def _stub_titles(data: dict) -> dict:
-    """Reduce every id-list entity in `data` to a `{"id", "title",
-    "updated_at"}` stub (updated_at day-precision, omitted for entries the
-    search index doesn't know). Applied after all other filters so stubbing
-    operates on the already-filtered result. Polarity fields (stance,
-    reaction) survive stubbing — a dislike must never read as a like."""
-    import search_index
+# What survives stubbing, where the entry has it. Polarity (stance, reaction)
+# because a dislike must never read as a like; status because an index that
+# cannot tell active work from finished work sends the model to fetch it all.
+_STUB_KEEPS = ("status", "stance", "reaction", "updated_at")
 
-    stub_lists = []  # (section_data, list_key)
+
+def _stub(e):
+    """One entity reduced to `{"id", "title"}` plus whatever _STUB_KEEPS it has."""
+    if not isinstance(e, dict):
+        return e
+    stub = {"id": e.get("id"), "title": search_index.flatten_entity(e)[0]}
+    stub.update({k: e[k] for k in _STUB_KEEPS if k in e})
+    return stub
+
+
+def _id_lists(data: dict) -> list:
+    """(section_data, list_key) for every id-list present in `data`."""
+    pairs = []
     for ft in [k for k in data if k in sections.SECTION_REGISTRY]:
-        spec = sections.SECTION_REGISTRY[ft]
         section_data = data.get(ft)
         if not isinstance(section_data, dict):
             continue
-        for list_key, _prefix in spec.id_lists:
-            if list_key in section_data and isinstance(section_data[list_key], list):
-                def _stub(e):
-                    if not isinstance(e, dict):
-                        return e
-                    stub = {"id": e.get("id"), "title": search_index.flatten_entity(e)[0]}
-                    if "stance" in e:
-                        stub["stance"] = e["stance"]
-                    if "reaction" in e:
-                        stub["reaction"] = e["reaction"]
-                    return stub
-                section_data[list_key] = [_stub(e) for e in section_data[list_key]]
-                stub_lists.append((section_data, list_key))
-    all_ids = [s["id"] for sd, lk in stub_lists for s in sd[lk]
-               if isinstance(s, dict) and s.get("id")]
-    times = search_index.entity_update_times(db.current_user_id.get(), all_ids)
-    for sd, lk in stub_lists:
-        for s in sd[lk]:
-            if isinstance(s, dict) and s.get("id") in times:
-                s["updated_at"] = times[s["id"]]
+        for list_key, _prefix in sections.SECTION_REGISTRY[ft].id_lists:
+            if isinstance(section_data.get(list_key), list):
+                pairs.append((section_data, list_key))
+    return pairs
+
+
+def _stamp_updated_at(pairs: list) -> None:
+    """Set day-precision `updated_at` on every entry in `pairs` the search index
+    knows, in one lookup. Entries it does not know are left without one."""
+    ids = [e["id"] for sd, lk in pairs for e in sd[lk]
+           if isinstance(e, dict) and e.get("id")]
+    if not ids:
+        return
+    times = search_index.entity_update_times(db.current_user_id.get(), ids)
+    for sd, lk in pairs:
+        for e in sd[lk]:
+            if isinstance(e, dict) and e.get("id") in times:
+                e["updated_at"] = times[e["id"]]
+
+
+def _stub_titles(data: dict) -> dict:
+    """Reduce every id-list entity in `data` to a stub (see _stub) carrying
+    `updated_at`. Applied after all other filters so stubbing operates on the
+    already-filtered result."""
+    pairs = _id_lists(data)
+    for sd, lk in pairs:
+        sd[lk] = [_stub(e) for e in sd[lk]]
+    _stamp_updated_at(pairs)
     return data
 
 def _mark_stale(data: dict) -> dict:
@@ -2129,75 +2236,81 @@ mcp_prompts.register(mcp)
 # clients where this tool does not.
 _GET_CONTEXT_DESCRIPTION = f"""Load the user's persona before you answer.
 
-You have never met this user. Nothing in your training data contains them, and
-nothing in this conversation will tell you what you are missing -- an answer
-built on a guess about them reads perfectly fine, so it is never corrected.
-That is the failure this tool prevents.
+You have never met this user. An answer built on a guess about them reads
+fine, so it is never corrected. CALL THIS the moment the conversation is about
+them rather than about the world: anything they call "my", have done, use,
+decided, plan or care about; and before writing in their voice, recommending a
+tool, planning their week or reviewing their code. Not for general knowledge.
 
-CALL THIS the moment the conversation is about them rather than about the
-world: anything they call "my", anything they have done, use, decided, plan or
-care about. Their persona covers the following -- each key is also a `scope`,
-and each line is worded as the user sees it in their own settings, so "you"
-there means them:
+Sections (each key is also a `scope`; lines read as the user sees them):
 {sections.describe_sections()}
 
-Call it too before any task where a wrong guess about them ends up in the
-output: writing in their voice, recommending a tool, planning their week,
-reviewing their code, drafting something they will send.
+SCOPES: "minimal" (start here: name, bio, top of mind, preferences),
+"professional", "personal", "learning", "full", any section key, or a list.
 
-Start with "minimal" -- the smallest scope, and enough for most questions.
-
-DO NOT CALL for general knowledge, or for code that has nothing to do with
-them. To find one entry, use search_context then get_entity -- never widen the
-scope to go looking.
-
-SCOPES (global):
-    minimal       Quick questions, greetings, code help: name, bio, top_of_mind, preferences
-    professional  Career, projects, technical: profile, skills, projects, code_style
-    personal      Life advice, hobbies, wellness: hobbies, personality, connections
-    learning      Skill development, roadmaps: skills, learning_log (last 60 days)
-    full          Complete dump -- prefer a targeted scope plus search_context
-
-SECTION SCOPES: any key in the list above. A section scope returns that whole
-section plus the always-on preferences (tone, detail_level, likes_dislikes,
-learning_style). Pass a list to union scopes, e.g. ["lifestyle", "circle"].
+Returns an index: entries as {{id, title, status, updated_at}}, preferences in
+full. get_entity([ids]) fetches entries in full, up to 25 per call. To find one
+entry, search_context(query) -- never widen the scope to go looking.
 
 ARGS:
-    scope: a global scope name, a section key, or a list of them
-    topic: Filter to items matching this topic (e.g. "react", "cooking")
-    include_inactive: Include inactive/paused items
-    days: Limit learning_log to last N days
-    limit: Max learning_log entries to return
-    detail: "full" (default) or "titles" -- titles mode reduces every id-list
-        entity to a lightweight {{"id", "title"}} stub for browsing before
-        pulling full detail via get_entity
+    scope: as above (default "minimal")
+    detail: "titles" or "full"; titles unless the scope is "minimal"
+    topic: keep only entries matching this
+    days, limit: learning-log window (default newest 10; "learning" 60 days)
+    include_inactive: include paused and archived entries
 
-RETURNS:
-    The scoped persona, plus `not_in_this_scope`: per-section counts of what
-    this scope left behind, and a note on how to reach it.
+`trimmed` lists anything shortened to fit, and the call that reaches it.
 """
 
+# Shared by every tool that only reads. openWorldHint is false throughout: the
+# persona is a closed store, not the web.
+_READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
 
-@mcp.tool(description=_GET_CONTEXT_DESCRIPTION)
+
+def _object_schema(**props) -> dict:
+    """An output schema naming top-level keys only, extra keys allowed -- so a
+    new pack or footer field never breaks a client that validates."""
+    return {
+        "type": "object",
+        "properties": {k: {"type": t} for k, t in props.items()},
+        "additionalProperties": True,
+    }
+
+
+@mcp.tool(
+    description=_GET_CONTEXT_DESCRIPTION,
+    title="Read persona",
+    annotations=_READ_ONLY,
+    output_schema=_object_schema(
+        scope="string", scope_description="string",
+        topic_filter=["string", "null"], context="object", trimmed="object",
+        not_in_this_scope="object", advisories="array", note="string",
+    ),
+)
 def get_context(
     scope: Union[str, List[str]] = "minimal",
     topic: Optional[str] = None,
     include_inactive: bool = False,
     days: Optional[int] = None,
     limit: Optional[int] = None,
-    detail: str = "full"
-) -> str:
+    detail: Optional[str] = None,
+) -> dict:
     """Internal. Clients see _GET_CONTEXT_DESCRIPTION above, not this."""
+    # An index by default. Bare `minimal` stays in full: it is the curated
+    # conversation-start read, and already small.
+    if detail is None:
+        detail = "full" if scope == "minimal" else "titles"
     result = get_scoped_context(scope, topic, include_inactive, days, limit, detail)
-    # Compact serialization: no indent, and no ASCII escaping of characters a
-    # persona is full of.
-    return json.dumps(result, ensure_ascii=False)
+    if "error" in result:
+        raise ToolError(result["error"])
+    return result
 
 
-@mcp.tool()
+@mcp.tool(title="Export persona", annotations=_READ_ONLY,
+          output_schema=_object_schema())
 def get_raw(
     file: str = "all"
-) -> str:
+) -> dict:
     """
     Raw dump of persona file(s) — export/debug use. For finding specific
     content, prefer search_context (ranked snippets) + get_entity (full detail).
@@ -2219,24 +2332,27 @@ def get_raw(
     ARGS:
         file: File to retrieve
 
-    RETURNS: 
-        Raw JSON for the specified file(s)
+    RETURNS:
+        Raw JSON for the specified file(s). Not size-capped: this is the export
+        path, and a whole persona can be large.
     """
     enabled = settings_store.enabled_sections()
     if file == "all":
         data = get_all_persona_data()
-        return json.dumps({k: v for k, v in data.items() if k in enabled}, indent=2)
+        return {k: v for k, v in data.items() if k in enabled}
     elif file in FILE_MAP and file in enabled:
-        return json.dumps(load_json(FILE_MAP[file]), indent=2)
+        return load_json(FILE_MAP[file])
     elif file in FILE_MAP:  # exists but disabled
-        return f"❌ Section '{file}' is disabled. Enable it in settings."
+        raise ToolError(f"Section '{file}' is disabled. Enable it in settings.")
     else:
-        return f"❌ Unknown file: {file}. Valid: all, {', '.join(persona_store.VALID_FILES)}"
+        raise ToolError(f"Unknown file: {file}. Valid: all, {', '.join(persona_store.VALID_FILES)}")
 
 
-@mcp.tool()
+@mcp.tool(title="Search persona", annotations=_READ_ONLY,
+          output_schema=_object_schema(mode="string", results="array",
+                                       query="string", note="string"))
 def search_context(query: str, sections: Union[str, List[str], None] = None,
-                    limit: int = 10, days: Optional[int] = None) -> str:
+                    limit: int = 10, days: Optional[int] = None) -> dict:
     """Search the persona for relevant entries by meaning and keywords.
 
     CALL THIS when they refer to something they told you before, or ask what
@@ -2276,41 +2392,57 @@ def search_context(query: str, sections: Union[str, List[str], None] = None,
             N days (positive integer). Omit for no filter.
     """
     if not query or not query.strip():
-        return "Error: query must be a non-empty string"
+        raise ToolError("query must be a non-empty string")
     if isinstance(sections, str):
         sections = [sections]
     valid = set(SECTION_REGISTRY)
     if sections:
         unknown = [s for s in sections if s not in valid]
         if unknown:
-            return (f"Unknown section(s): {', '.join(unknown)}. "
-                    f"Valid: {', '.join(sorted(valid))}")
+            raise ToolError(f"Unknown section(s): {', '.join(unknown)}. "
+                            f"Valid: {', '.join(sorted(valid))}")
     disabled = settings_store.get_disabled_sections()
     if sections and all(s in disabled for s in sections):
         # Every requested section is disabled -- an explicit error (same
         # wording as get_entity), not a silently-empty result set.
         if len(sections) == 1:
-            return f"❌ Section '{sections[0]}' is disabled. Enable it in settings."
-        return (f"❌ Sections {', '.join(repr(s) for s in sections)} are "
-                "disabled. Enable them in settings.")
+            raise ToolError(f"Section '{sections[0]}' is disabled. Enable it in settings.")
+        raise ToolError(f"Sections {', '.join(repr(s) for s in sections)} are "
+                        "disabled. Enable them in settings.")
     if days is not None and days <= 0:
-        return "Error: days must be a positive integer"
+        raise ToolError("days must be a positive integer")
     limit = max(1, min(int(limit), 25))
     user_id = db.current_user_id.get()
     out = search_index.search(user_id, query.strip(), sections, limit,
                                exclude_sections=list(disabled), days=days)
     out["query"] = query.strip()
+    # Ranking internals mean nothing to a model; the snippet is the evidence.
+    for hit in out["results"]:
+        for key in ("score", "fts_hit", "distance"):
+            hit.pop(key, None)
+        hit["snippet"] = _clean_snippet(hit.get("snippet"), hit.get("title"))
     # Read tools only. persona_modify and propose_update already return
     # receipts, and a nudge on a write is a nudge to write more.
     out["note"] = ("get_entity(id) for full detail on a hit. Heard something "
                    "durable? propose_update. Do not narrate either.")
-    return json.dumps(out, indent=2)
+    return out
 
 
-def _resolve_entity(entity_id: str) -> str:
-    """Resolve a single entity id to its JSON success string, or a plain
-    (non-JSON) error string. Extracted from get_entity's original body so
-    both the single-id and batch paths share identical resolution logic."""
+def _clean_snippet(snippet, title):
+    """A snippet without ts_headline's <b> tags or a repeat of the hit's title."""
+    if not isinstance(snippet, str):
+        return snippet
+    snippet = snippet.replace("<b>", "").replace("</b>", "")
+    if title and snippet.startswith(title):
+        snippet = snippet[len(title):].lstrip()
+    return snippet
+
+
+def _resolve_entity(entity_id: str, bump: bool = True):
+    """Resolve a single entity id to its payload dict, or an error string.
+    Shared by get_entity's single-id and batch paths and the entity resource.
+    `bump=False` leaves the read count to the caller, for a batch that may not
+    deliver everything it resolved."""
     loc = search_index.entity_location(entity_id)
     if loc is None:
         prefixes = sorted({p for p, _ in search_index._PREFIXES})
@@ -2331,8 +2463,9 @@ def _resolve_entity(entity_id: str) -> str:
             # A deliberate fetch of one entry, which is the only read that says
             # anything about whether that entry earns its place. Scope reads pull
             # whole sections and are counted nowhere.
-            search_index.bump_read_count(db.current_user_id.get(), [entity_id])
-            return json.dumps(payload, indent=2)
+            if bump:
+                search_index.bump_read_count(db.current_user_id.get(), [entity_id])
+            return payload
     return f"❌ Entity {entity_id} not found in {file_type}.{list_key}"
 
 
@@ -2389,8 +2522,12 @@ def _attach_relations(parsed_payloads: list, include_related: bool) -> None:
             ]
 
 
-@mcp.tool()
-def get_entity(entity_id: Union[str, List[str]], include_related: bool = False) -> str:
+@mcp.tool(title="Fetch persona entries", annotations=_READ_ONLY,
+          output_schema=_object_schema(
+              section="string", entity_id="string", entity="object",
+              updated_at="string", related="array", similar="array",
+              entities="array", note="string"))
+def get_entity(entity_id: Union[str, List[str]], include_related: bool = False) -> dict:
     """Fetch one or more persona entities in full by id (as returned by
     search_context results or embedded in get_context output).
 
@@ -2401,7 +2538,9 @@ def get_entity(entity_id: Union[str, List[str]], include_related: bool = False) 
             25 such ids, which returns `{"entities": [...]}` with one
             element per id, in order: a successful lookup's parsed JSON, or
             `{"entity_id": <id>, "error": <message>}` for any id that
-            failed to resolve.
+            failed to resolve. Ids that would push one response past its size
+            cap come back as `{"entity_id": <id>, "deferred": true}`: fetch
+            those in another call.
         include_related: When True, also attach derived `"similar"`
             neighbors (cross-section, semantically close entries) to every
             resolved entity. Stored `"related"` links (explicit, via
@@ -2416,47 +2555,118 @@ def get_entity(entity_id: Union[str, List[str]], include_related: bool = False) 
     """
     if isinstance(entity_id, str):
         result = _resolve_entity(entity_id)
-        try:
-            parsed = json.loads(result)
-        except (json.JSONDecodeError, TypeError):
-            parsed = None
-        if isinstance(parsed, dict) and "entity" in parsed:
-            _attach_relations([parsed], include_related)
-            return json.dumps(parsed, indent=2)
+        if isinstance(result, str):
+            raise ToolError(result.removeprefix("❌").strip())
+        _attach_relations([result], include_related)
         return result
 
     if not entity_id:
-        return "Error: entity_id list must not be empty."
+        raise ToolError("entity_id list must not be empty.")
     if len(entity_id) > 25:
-        return "Error: at most 25 ids per call — split into multiple calls"
+        raise ToolError("at most 25 ids per call — split into multiple calls")
 
-    entities = []
-    resolved_payloads = []
+    # In request order until the next entry would pass the budget; the rest
+    # come back deferred rather than cut. One entry is always delivered whole.
+    # ponytail: a single entry larger than the budget still exceeds it.
+    entities, resolved, used, deferring = [], [], 0, False
+    budget = RESULT_BUDGET_CHARS - _FOOTER_RESERVE
     for eid in entity_id:
-        result = _resolve_entity(eid)
-        try:
-            parsed = json.loads(result)
-        except (json.JSONDecodeError, TypeError):
-            parsed = None
-        # A successful resolution is always a JSON object carrying an
-        # "entity" key (see _resolve_entity above) -- any other shape,
-        # even if it happens to be valid JSON (e.g. a bare string), is
-        # treated as an error so it can never be silently spliced into
-        # `entities` as something that looks like a resolved entity.
-        if isinstance(parsed, dict) and "entity" in parsed:
-            entities.append(parsed)
-            resolved_payloads.append(parsed)
-        else:
+        result = None if deferring else _resolve_entity(eid, bump=False)
+        if isinstance(result, str):
             entities.append({"entity_id": eid, "error": result})
-    _attach_relations(resolved_payloads, include_related)
-    return json.dumps({"entities": entities}, indent=2)
+            continue
+        if result is not None:
+            size = len(_compact(result))
+            deferring = bool(resolved) and used + size > budget
+        if deferring:
+            entities.append({"entity_id": eid, "deferred": True})
+            continue
+        used += size
+        entities.append(result)
+        resolved.append(result)
+    _attach_relations(resolved, include_related)
+    search_index.bump_read_count(db.current_user_id.get(),
+                                 [r["entity_id"] for r in resolved])
+    out = {"entities": entities}
+    if any(e.get("deferred") for e in entities):
+        out["note"] = ("Deferred ids did not fit in one response: "
+                       "get_entity(those ids) in another call.")
+    return out
 
 
-@mcp.tool()
+# =============================================================================
+# PERSONA RESOURCES -- the same reads, addressable by URI
+# =============================================================================
+# Gated on persona:read by mcp_scopes.ScopeMiddleware, unlike the public
+# skill:// resources: these hold persona data. Read as the caller, whose user id
+# the HTTP layer sets on every /mcp request.
+
+@mcp.resource("mygist://entity/{entity_id}", name="persona-entry",
+              title="Persona entry", mime_type="application/json",
+              description="One persona entry in full, as get_entity returns it.")
+def read_entity_resource(entity_id: str) -> str:
+    result = _resolve_entity(entity_id)
+    if isinstance(result, str):
+        raise ResourceError(result.removeprefix("❌").strip())
+    _attach_relations([result], False)
+    return _compact(result)
+
+
+@mcp.resource("mygist://section/{key}", name="persona-section",
+              title="Persona section", mime_type="application/json",
+              description="One section as an index of titles, as "
+                          "get_context(scope=key) returns it.")
+def read_section_resource(key: str) -> str:
+    if key not in SECTION_REGISTRY:
+        raise ResourceError(f"Unknown section '{key}'. Valid: {', '.join(SECTION_REGISTRY)}")
+    payload = get_scoped_context(key, detail="titles")
+    if "error" in payload:
+        raise ResourceError(payload["error"])
+    return _compact(payload)
+
+
+class _LinksMiddleware(Middleware):
+    """Points at what a read left out, as resource links a client can open.
+
+    Here rather than in the tools so each tool still returns its plain payload:
+    the links are a pure function of it. Every link sits beside a tool call that
+    does the same thing (`more`, the deferred note), so a client that ignores
+    resources loses nothing. None on search hits: a line per hit, repeating an
+    id the hit already carries.
+    """
+
+    async def on_call_tool(self, context, call_next):
+        result = await call_next(context)
+        payload = result.structured_content or {}
+        if context.message.name == "get_context":
+            links = [
+                ResourceLink(type="resource_link", uri=f"mygist://section/{key}",
+                             name=key, mimeType="application/json",
+                             description=f"{count} entries not included")
+                for key, count in (payload.get("not_in_this_scope") or {}).items()
+            ]
+        elif context.message.name == "get_entity":
+            links = [
+                ResourceLink(type="resource_link", uri=f"mygist://entity/{e['entity_id']}",
+                             name=e["entity_id"], mimeType="application/json",
+                             description="Deferred: did not fit in this response")
+                for e in payload.get("entities") or [] if e.get("deferred")
+            ]
+        else:
+            return result
+        result.content = [*result.content, *links]
+        return result
+
+
+mcp.add_middleware(_LinksMiddleware())
+
+
+@mcp.tool(title="Persona schema", annotations=_READ_ONLY,
+          output_schema=_object_schema())
 def get_schema(
     file: Optional[str] = None,
     entity: Optional[str] = None
-) -> str:
+) -> dict:
     """
     Discover valid entity types for persona_modify. Digest first, then drill down.
 
@@ -2481,11 +2691,18 @@ def get_schema(
         {usage, files} digest, or {entity, file, identifier, ..., examples} detail
     """
     result = get_entity_schema(entity=entity, file=file)
-    return json.dumps(result, indent=2)
+    if "error" in result:
+        # The unknown-file message already names the valid files.
+        valid = result.get("valid_entities")
+        raise ToolError(result["error"] + (f" Valid: {', '.join(valid)}" if valid else ""))
+    return result
 
 
-@mcp.tool()
-def whoami() -> str:
+@mcp.tool(title="Connection details", annotations=_READ_ONLY,
+          output_schema=_object_schema(username=["string", "null"],
+                                       credential="string", scopes="array",
+                                       tools="array"))
+def whoami() -> dict:
     """Which MyGist account this connection is authenticated as, and what it
     may do.
 
@@ -2514,12 +2731,12 @@ def whoami() -> str:
     except Exception:
         # stdio, or a request that never passed main.py's middleware.
         credential = "unknown"
-    return json.dumps({
+    return {
         "username": user["username"] if user else None,
         "credential": credential,
         "scopes": sorted(granted),
         "tools": sorted(mcp_scopes.tools_for_scopes(granted)),
-    }, ensure_ascii=False)
+    }
 
 
 # =============================================================================
@@ -2804,7 +3021,13 @@ def _augment_add_result(action: str, entity_lower: str, data: dict,
     return result
 
 
-@mcp.tool()
+# Writes return plain-text receipts: output_schema=None stops FastMCP wrapping
+# them as {"result": "..."}.
+_EDITS = ToolAnnotations(readOnlyHint=False, destructiveHint=True,
+                         openWorldHint=False)
+
+
+@mcp.tool(title="Edit persona", annotations=_EDITS, output_schema=None)
 def persona_modify(
     action: Literal["add", "update", "remove", "link", "unlink"],
     entity: str,
@@ -2830,12 +3053,6 @@ def persona_modify(
             entity_id is the source entry, related is the target id(s) to
             connect/disconnect (a single id string is also accepted).
 
-    DATA REQUIREMENTS:
-        - Always include identifier: name, title, topic, or address (depends on entity)
-        - For update/remove: identifier matches existing item
-        - For add: identifier + any optional fields
-        - For link/unlink: {entity_id, related: [ids]} (entity is ignored)
-
     EXAMPLES:
         - ADD hobby: {action: "add", entity: "hobby", data: {name: "Photography", skill_level: "beginner"}}
         - UPDATE project: {action: "update", entity: "project", data: {name: "MyApp", status: "completed"}}
@@ -2859,10 +3076,14 @@ def persona_modify(
         supports_update = "update" in ENTITY_SCHEMA.get(file_type, {}).get(
             entity.lower(), {}).get("actions", [])
     result = execute_modify(action, entity, data)
+    # A failed write read as a success is the worst outcome here, so failures
+    # come back flagged as errors rather than as a string that starts with ❌.
+    if result.startswith("❌"):
+        raise ToolError(result.removeprefix("❌").strip())
     return _augment_add_result(action, entity.lower(), data, match, supports_update, result)
 
 
-@mcp.tool()
+@mcp.tool(title="Edit persona in bulk", annotations=_EDITS, output_schema=None)
 def persona_batch(operations: list) -> str:
     """Perform multiple persona modifications in one call.
     If unsure, use get_schema to discover valid entity types and fields.
@@ -2898,7 +3119,7 @@ def persona_batch(operations: list) -> str:
         Numbered list of results for each operation
     """
     if not operations:
-        return "❌ No operations provided"
+        raise ToolError("No operations provided")
     
     results = []
     for i, op in enumerate(operations):
@@ -3015,126 +3236,66 @@ def _validate_proposal(p: dict) -> tuple[dict | None, dict | None]:
     ), None
 
 
-def _entity_types(indent: str = "        ") -> str:
-    """The entity vocabulary, one line per section, for propose_update's
-    description.
-
-    Rendered at import from ENTITY_SCHEMA, as get_context's section block is,
-    so a pack's types reach the one text that decides between a typed
-    suggestion and a note. Pointing at get_schema instead cost an extra call
-    most agents never made, and a proposal that could not name its type went
-    in as a note the user then had to re-file by hand.
-    """
-    width = max(len(section) for section in ENTITY_SCHEMA)
-    lines = []
-    for section, entities in ENTITY_SCHEMA.items():
-        parts = []
-        for name, spec in entities.items():
-            fields = ", ".join(spec.get("required") or [spec.get("identifier") or ""])
-            part = f"{name}: {fields}" if fields else name
-            if spec.get("parent"):
-                part += f" [{spec['parent']}]"
-            if "add" not in spec.get("actions", []):
-                part += " (update only)"
-            parts.append(part)
-        lines.append(f"{indent}{section.ljust(width)}  " + " | ".join(parts))
-    return "\n".join(lines)
-
-
+# Under 2,048 characters, where Claude Code cuts a description. That ruled out
+# the entity vocabulary that used to be rendered in here: it is 1.7k characters
+# on its own, and the cut fell before it anyway. An unknown type comes back
+# `invalid` with the valid list, and the mygist-capture skill carries it.
 _PROPOSE_UPDATE_DESCRIPTION = """Propose durable persona changes you inferred from the conversation.
 
-    PROPOSE WHEN YOU HEAR:
-        "we've switched to X" / "I've started using X"      -> domain, work_skill
-        "I've been doing X for a month"                     -> domain level, hobby
-        "we shipped it" / "that's done" / "I've parked it"  -> project status
-        "always give me X first" / "stop doing Y"           -> response_format
-        "I can't stand X" / "I love X"                      -> dislike, like
-        "my sister just started a PhD"                      -> connection
-        "I want to be running 10k by March"                 -> goal
-        "I'm useless after 3pm"                             -> energy_peak, sleep
-        "I got the job" / "I've left"                       -> work_experience
-    Anything about them still true in a month is a candidate. Send ONE call with
-    a list, not one call per item. An empty review queue usually means nobody was
-    looking, not that there was nothing to say.
+PROPOSE WHEN YOU HEAR:
+    "we've switched to X" / "I've started using X" -> domain, work_skill
+    "I've been doing X for a month" -> domain level, hobby
+    "we shipped it" / "that's done" / "I've parked it" -> project status
+    "always give me X first" / "stop doing Y" -> response_format
+    "I can't stand X" / "I love X" -> dislike, like
+    "my sister just started a PhD" -> connection
+    "I want to be running 10k by March" -> goal
+    "I'm useless after 3pm" -> energy_peak, sleep
+    "I got the job" / "I've left" -> work_experience
+Anything about them still true in a month is a candidate. ONE call, a list.
 
-    THE RULE: asked writes, inferred proposes. They asked you to record it ->
-    persona_modify. You worked it out from what they said -> here. No third case;
-    "they would obviously want this" is the inferred case in disguise. This tool
-    NEVER writes -- every proposal lands in the user's review queue and they
-    approve, reject or promote it themselves, which is what makes MyGist safe to
-    leave connected.
+THE RULE: asked writes, inferred proposes. Asked to record it ->
+persona_modify. Worked it out yourself -> here. This NEVER writes: each
+proposal lands in the user's review queue. Do not propose summaries, moods,
+one-off instructions, praise, or anything you cannot quote them on.
 
-    DO NOT PROPOSE session summaries, moods, one-off task instructions, things
-    the user only asked about, praise, or anything you would struggle to quote
-    them on. When in doubt, do not propose -- an unreviewed queue helps nobody.
+ARGS:
+    proposals: list of {kind: "entity", action, entity, data, rationale,
+        evidence, confidence} -- entity is a get_schema() type -- or, only
+        when no type fits, {kind: "note", section_hint, text, rationale,
+        evidence, confidence}.
+    client: the product you run in, as a user names it ("Claude Desktop",
+        "Cursor"). Not a model name.
 
-    ARGS:
-        proposals (required): list of proposal objects, see KINDS below
-        client (required): the product you are running in, as a user would
-            name it -- "Claude Desktop", "Cursor", "Codex", "Hermes",
-            "OpenClaw". Not a model name. The user sees this on every row and
-            uses it to tell which of their tools proposed what.
+VOICE: what is saved becomes their persona, so write it first person:
+    "I review code by reading the tests first", not "The user reviews...".
+    The rationale is you, speaking to them: "You said...".
+rationale: ONE sentence, why it is durable. evidence: their words, quoted.
+data: add -> every required field; update -> identifier (and parent) plus
+    ONLY what changes; remove -> identifier and parent. Worked examples:
+    skill://mygist/mygist-writing/SKILL.md
 
-    KINDS:
-        entity -- typed and schema-valid: one of the ENTITY TYPES below.
-            {kind: "entity", action: "add"|"update"|"remove", entity: "domain",
-             data: {...}, rationale: "...", evidence: "...", confidence: 0.7}
-            get_schema(entity=...) has a type's optional fields and examples.
-
-        note -- durable, and NO type below can hold it. The last resort: the
-            user has to re-file a note by hand, so check the list first.
-            "Always lead with the recommendation" is a response_format, and
-            "I learn by breaking things" a learning_method -- not notes.
-            {kind: "note", section_hint: "preferences", text: "...",
-             rationale: "...", evidence: "...", confidence: 0.6}
-
-    ENTITY TYPES, by section (type: required fields; nested types name
-    their parent in brackets):
-@@ENTITY_TYPES@@
-
-    VOICE: what is saved becomes their persona, so it is in their voice. A
-        note's text and every free-text value in `data` read as they would
-        write it themselves, first person: "I review code by reading the tests
-        first", "I batch cook on Sundays for the week" -- not "Reviews code
-        by...", not "The user batch cooks...". Names and titles stay names
-        ("Datadog", "Postgres migration"). The rationale is you, speaking to
-        them: "You described it as how you always approach a review."
-
-    REQUIRED ON EVERY PROPOSAL:
-        rationale -- why this is durable, said to them in your words ("You
-            ..."). ONE SENTENCE. The user reads it while deciding, next to a
-            dozen others, so it has to be the reason -- not a restatement of
-            the change, and not a summary of the conversation.
-        evidence -- the user's own words that prompted it. Quote them, briefly.
-            If you cannot quote them, you have inferred too far and should not
-            propose.
-
-    HOW MUCH TO SEND IN `data`:
-        add    -- every required field, plus any optional field you actually know.
-        update -- the identifier (and parent, if it has one), plus ONLY what changes.
-        remove -- the identifier and parent. Nothing else is read.
-        Why, with worked examples: skill://mygist/mygist-writing/SKILL.md
-
-    RETURN:
-        {"results": [{n, result, ...}]} where result is one of:
-        stored | duplicate_pending | previously_rejected |
-        conflicts_with_existing | invalid
-        An invalid item never sinks the batch; the valid ones still land.
-    """.replace("@@ENTITY_TYPES@@", _entity_types())
+RETURNS {"results": [{n, result, ...}]}: stored | duplicate_pending |
+previously_rejected | conflicts_with_existing | invalid.
+"""
 
 
-@mcp.tool(description=_PROPOSE_UPDATE_DESCRIPTION)
+@mcp.tool(
+    description=_PROPOSE_UPDATE_DESCRIPTION,
+    title="Suggest a persona update",
+    # Only adds to the review queue, so not destructive -- which has to be
+    # said, because the spec's default for a tool that is not read-only is.
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False,
+                                openWorldHint=False),
+    output_schema=None,
+)
 def propose_update(proposals: list, client: str) -> str:
     """Internal. Clients see _PROPOSE_UPDATE_DESCRIPTION above, not this."""
     if not str(client or "").strip():
-        return json.dumps({
-            "error": "'client' is required: name the product you run in, "
-                     "e.g. 'Claude Desktop', 'Cursor', 'Codex'.",
-            "results": [],
-        }, ensure_ascii=False)
+        raise ToolError("'client' is required: name the product you run in, "
+                        "e.g. 'Claude Desktop', 'Cursor', 'Codex'.")
     if not proposals:
-        return json.dumps({"error": "No proposals provided", "results": []},
-                          ensure_ascii=False)
+        raise ToolError("No proposals provided")
 
     results = []
     for i, p in enumerate(proposals, start=1):
@@ -3163,7 +3324,7 @@ def propose_update(proposals: list, client: str) -> str:
                 }
         results.append(entry)
 
-    return json.dumps({"results": results}, ensure_ascii=False)
+    return _compact({"results": results})
 
 
 # =============================================================================

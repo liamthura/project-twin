@@ -36,11 +36,11 @@ def _expected_filetypes(scope: str) -> set[str]:
 def test_scopes_return_stable_shape(as_user):
     _seed()
     for scope in ALL_SCOPES:
-        out = json.loads(get_context(scope=scope))
+        out = get_context(scope=scope)
         # `not_in_this_scope` and `advisories` depend on what is seeded and
         # indexed, so the shape is required-plus-optional rather than exact.
         required = {"scope", "scope_description", "topic_filter", "context", "note"}
-        optional = {"not_in_this_scope", "advisories"}
+        optional = {"not_in_this_scope", "advisories", "trimmed"}
         assert required <= set(out.keys()) <= required | optional
         assert out["scope"] == scope
 

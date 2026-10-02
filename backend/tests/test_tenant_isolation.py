@@ -192,6 +192,12 @@ async def test_interleaved_mcp_tool_calls_never_cross_personas():
 
     _seed_persona(alice, "alice-only")
     _seed_persona(bob, "bob-only")
+    token = db.current_user_id.set(alice)
+    try:
+        persona_store.save("projects", {"projects": [{"name": "Alice's ledger"}]})
+        alice_project = persona_store.load("projects")["projects"][0]["id"]
+    finally:
+        db.current_user_id.reset(token)
 
     async def call_as(token: str) -> str:
         mcp_transport = StreamableHttpTransport(
@@ -204,9 +210,19 @@ async def test_interleaved_mcp_tool_calls_never_cross_personas():
         # them racing on one event loop instead of one at a time.
         async with Client(mcp_transport) as client:
             result = await client.call_tool("get_context", {"scope": "full"})
-        payload = json.loads(result.data)
+        payload = result.structured_content
         return payload["context"]["profile"]["basic_info"].get("name")
 
+    async def read_as(token: str, uri: str):
+        mcp_transport = StreamableHttpTransport(
+            url="http://testserver/mcp",
+            headers={"Authorization": f"Bearer {token}"},
+            httpx_client_factory=http_client_factory,
+        )
+        async with Client(mcp_transport) as client:
+            return await client.read_resource(uri)
+
+    # One lifespan for both halves: the session manager runs once per app.
     async with _run_lifespan(main.app):
         tasks = [
             call_as(alice_token if index % 2 == 0 else bob_token)
@@ -214,8 +230,26 @@ async def test_interleaved_mcp_tool_calls_never_cross_personas():
         ]
         results = await asyncio.gather(*tasks)
 
+        # The mygist:// resources ride the same per-request binding: each user
+        # reads their own projects, and one user's entry id names nothing for
+        # the other.
+        sections = await asyncio.gather(*[
+            read_as(alice_token if index % 2 == 0 else bob_token, "mygist://section/projects")
+            for index in range(10)
+        ])
+        with pytest.raises(Exception, match="not found"):
+            await read_as(bob_token, f"mygist://entity/{alice_project}")
+        own = await read_as(alice_token, f"mygist://entity/{alice_project}")
+
     for index, name in enumerate(results):
         expected = "alice-only" if index % 2 == 0 else "bob-only"
         assert name == expected, (
             f"mcp tool call {index} saw {name!r}, expected {expected!r}"
         )
+    for index, contents in enumerate(sections):
+        context = json.loads(contents[0].text)["context"]
+        titles = [p["title"] for p in context.get("projects", {}).get("projects", [])]
+        expected = ["Alice's ledger"] if index % 2 == 0 else []
+        assert titles == expected, f"resource read {index} saw {titles!r}"
+    assert json.loads(own[0].text)["entity"]["name"] == "Alice's ledger"
+

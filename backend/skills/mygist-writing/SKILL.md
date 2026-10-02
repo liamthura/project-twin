@@ -131,5 +131,5 @@ persona_modify(action="link", entity="link",
 
 `entity` is ignored for link and unlink; `"link"` is convention. Links are
 one-directional — stored on the source only — and capped at ten per entry, so
-link from the entry a reader would start at. `get_entity`'s `similar` list
-suggests candidates. `action="unlink"` removes them the same way.
+link from the entry a reader would start at. `get_entity(..., include_related=true)`
+adds a `similar` list of candidates. `action="unlink"` removes them the same way.

@@ -1,6 +1,6 @@
-import json
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 import server
 import persona_store as store
@@ -19,26 +19,26 @@ def test_get_raw_handles_every_registry_file(as_user, file):
     # trip on.
     settings_store.set_enabled_optins(["media", "aesthetics", "inventory"])
     out = get_raw(file=file)
-    data = json.loads(out)
+    data = out
     assert isinstance(data, dict)
 
 
 def test_get_raw_all_returns_every_registry_file(as_user):
     settings_store.set_enabled_optins(["media", "aesthetics", "inventory"])
-    data = json.loads(get_raw(file="all"))
+    data = get_raw(file="all")
     assert set(data.keys()) == set(store.VALID_FILES)
 
 
 def test_get_raw_default_is_all(as_user):
-    assert json.loads(get_raw()) == json.loads(get_raw(file="all"))
+    assert get_raw() == get_raw(file="all")
 
 
 def test_get_raw_unknown_file_lists_valid_files(as_user):
-    out = get_raw(file="bogus")
-    assert out.startswith("❌")
-    assert "bogus" in out
+    with pytest.raises(ToolError) as caught:
+        get_raw(file="bogus")
+    assert "bogus" in str(caught.value)
     for ft in store.VALID_FILES:
-        assert ft in out
+        assert ft in str(caught.value)
 
 
 def test_get_raw_file_param_is_not_a_hardcoded_enum():

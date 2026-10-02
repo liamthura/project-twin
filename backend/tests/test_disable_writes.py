@@ -1,3 +1,5 @@
+import pytest
+from fastmcp.exceptions import ToolError
 import server
 import settings_store as ss
 import persona_store as store
@@ -7,8 +9,9 @@ modify = server.persona_modify.fn
 
 def test_write_to_disabled_section_rejected(as_user):
     ss.set_disabled_sections(["circle"])
-    out = modify(action="add", entity="connection", data={"name": "Sam"})
-    assert "❌" in out and "disabled" in out.lower()
+    with pytest.raises(ToolError) as caught:
+        modify(action="add", entity="connection", data={"name": "Sam"})
+    assert "disabled" in str(caught.value).lower()
     # and nothing was written
     assert store.load("circle").get("connections", []) == []
 

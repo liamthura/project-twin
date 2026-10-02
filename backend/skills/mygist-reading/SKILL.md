@@ -9,6 +9,27 @@ Scoped reads mean you pay for what you need. A persona kept for a year is large;
 pulling all of it to answer "what should I call you" spends the context you need
 for the actual work.
 
+## Read the index, then fetch what you need
+
+Every scope except `minimal` returns an **index**: each entry as
+`{id, title, status, updated_at}`, plus the user's preferences in full. That is
+enough to see what exists, what is active and what is recent. Then fetch only
+the entries the question needs:
+
+```
+get_context(scope="projects")                     → titles, with status
+get_entity(entity_id=["project_1c37dab2",
+                      "project_9f00ab12"])         → just those, in full
+```
+
+`get_entity` takes up to 25 ids, so fetch several at once rather than looping.
+Pass `detail="full"` when you really do need every entry of a section in full,
+such as writing a CV from `professional`.
+
+`minimal` is the exception: it comes back in full, because it is small and
+curated (name, bio, top of mind, a few goals, preferences). It answers most
+things without a second call.
+
 ## Choosing a scope
 
 | Situation | Scope |
@@ -22,14 +43,9 @@ for the actual work.
 
 Pass a list to union scopes: `get_context(scope=["lifestyle", "circle"])`.
 
-**Any file key from `get_schema()` works as a scope**, not only the seven that
-`get_context`'s own description lists: `profile`, `goals`, `knowledge`,
-`preferences`, `projects`, `lifestyle`, `media`, `aesthetics`, `circle`,
-`learning_log`. `goals`, `media` and `aesthetics` are missing from that list and
-resolve fine — checked, not assumed.
-
-`minimal` already carries their name, bio, top-of-mind and preferences. That
-answers most things without a second call. A section scope also returns the
+**Any file key from `get_schema()` works as a scope**: `profile`, `goals`,
+`knowledge`, `preferences`, `projects`, `lifestyle`, `media`, `aesthetics`,
+`inventory`, `circle`, `learning_log`. A section scope also returns the
 always-on preferences, so you never lose the tone by narrowing.
 
 ## Filter before you widen
@@ -40,12 +56,19 @@ a bigger scope:
 ```
 get_context(scope="learning_log", days=30, limit=15)
 get_context(scope="knowledge", topic="react")
-get_context(scope="projects", detail="titles")
 get_context(scope="projects", include_inactive=true)   # paused and archived
 ```
 
-`detail="titles"` reduces every entry to `{id, title}` — a cheap index to browse
-before deciding what is worth pulling in full.
+## The learning log is a log
+
+It only ever grows, and it is the biggest section on almost every persona. So
+every scope that carries it shows the **newest 10**, as titles. `learning` shows
+the last 60 days instead. Ask for more by time or count, or search it:
+
+```
+get_context(scope="learning_log", days=30)
+search_context(query="proxmox", sections="learning_log")
+```
 
 ## Looking for one thing? Do not widen the scope
 
@@ -57,14 +80,42 @@ search_context(query="the alerting project")   → ranked snippets with ids
 get_entity(entity_id="project_1c37dab2")       → just that entry
 ```
 
-`get_entity` takes a list, so fetch several at once rather than looping. It also
-returns a `similar` list, which is where link candidates come from.
+Pass `days` to `search_context` whenever the question is about now ("lately",
+"currently"): ranking is relevance-only and has no idea what recent means.
+`get_entity(..., include_related=true)` adds a `similar` list, which is where
+link candidates come from.
+
+## When a result says `trimmed`
+
+No read returns more than about 8k tokens. When a result would, the largest
+lists are cut down — to titles first, then to their newest few — and the result
+says so:
+
+```json
+"trimmed": {"learning_log.entries": {"shown": 5, "total": 52,
+            "more": "get_context(scope=\"learning_log\", days=30) or search_context(...)"}}
+```
+
+`more` is the call that reaches the rest. A `get_entity` batch that would pass
+the cap returns what fits and marks the rest `{"entity_id": ..., "deferred":
+true}`: fetch those in another call. Nothing is ever cut without being listed,
+so if there is no `trimmed`, you have everything the scope holds.
+
+## Resources, if your client reads them
+
+The same reads are addressable by URI, and some results link to them:
+
+- `mygist://entity/{id}` is one entry in full, as `get_entity` returns it.
+- `mygist://section/{key}` is one section's index of titles.
+
+Every link sits next to a tool call that does the same thing, so a client
+without resource support loses nothing.
 
 ## `full` is a debug surface
 
-It returns everything, including things that are none of this conversation's
-business. Use it when the user asks to see or export their whole persona.
-Otherwise, not at all.
+It returns every section as an index, including things that are none of this
+conversation's business. Use it when the user asks to see their whole persona;
+`get_raw` is the export. Otherwise, not at all.
 
 ## Observations are not in any scope
 

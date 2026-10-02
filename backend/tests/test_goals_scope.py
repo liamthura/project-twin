@@ -15,7 +15,7 @@ def test_minimal_scope_stubs_active_goals_max5(as_user):
     ctx = server.get_scoped_context("minimal")["context"]
     goals = ctx["goals"]["goals"]
     assert len(goals) == 5
-    assert all(set(g) == {"id", "title"} for g in goals)
+    assert all(set(g) == {"id", "title", "updated_at"} for g in goals)
     assert all("Done goal" != g["title"] and "Dropped goal" != g["title"] for g in goals)
 
 
@@ -81,4 +81,4 @@ def test_minimal_include_inactive_still_caps_stubs(as_user):
     ctx = server.get_scoped_context("minimal", include_inactive=True)["context"]
     goals = ctx["goals"]["goals"]
     assert len(goals) == 5
-    assert all(set(g) == {"id", "title"} for g in goals)
+    assert all(set(g) == {"id", "title", "updated_at"} for g in goals)

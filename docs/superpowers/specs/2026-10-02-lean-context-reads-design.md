@@ -1,7 +1,7 @@
 # Lean context reads — design
 
 Date: 2026-10-02
-Status: designed, not implemented
+Status: implemented on `feat/lean-context-reads`
 
 ## Why
 
@@ -97,8 +97,9 @@ after stubbing. Over it, the result is cut down in steps, re-measured after
 each, until it fits:
 
 1. If the read is in full detail, cut id-lists down to titles, largest first.
-2. Shorten id-lists, largest first, to their newest 5 entries: by `updated_at`,
-   or by `timestamp` for the learning log. Entries with neither sort last.
+2. Shorten id-lists, largest first, to their newest 5 entries, by `updated_at`
+   (falling back to a learning entry's `timestamp`). Entries with neither sort
+   last.
 3. Shorten those lists to an empty list, leaving only the count in `trimmed`.
 
 "Largest" means the most serialised characters. One helper applies the cap and
@@ -328,8 +329,10 @@ Claude Code passes resource-link blocks on alongside `structuredContent`.
   by id, what a `trimmed` notice means and how to follow it, the two resource
   URIs, and the learning-log window. It picks up whatever the `get_context`
   description loses.
-- **`mygist-capture` / `mygist-writing`** pick up the entity vocabulary and
-  field rules that leave `propose_update`'s description.
+- **The entity vocabulary** that leaves `propose_update`'s description is not
+  copied into a skill, where it would go stale: `get_schema()` is its source,
+  `mygist-writing` already maps the common entities to their fields, and an
+  unknown type comes back `invalid` with every valid one.
 - **`mygist`** keeps its trigger list. Only lines that describe changed
   behaviour get edited.
 - The skill resources gain the annotation `audience: ["assistant"]`.

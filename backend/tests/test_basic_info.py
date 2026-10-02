@@ -1,5 +1,7 @@
 """Tests for the basic_info update-only singleton (top-level profile scalars)."""
 import server
+import pytest
+from fastmcp.exceptions import ToolError
 
 # `as_user` fixture is provided by tests/conftest.py.
 # persona_modify is registered as a FastMCP FunctionTool; `.fn` is the raw callable.
@@ -29,27 +31,27 @@ def test_update_multiple_fields_at_once(as_user):
 
 
 def test_update_with_no_known_field_errors(as_user):
-    result = persona_modify(action="update", entity="basic_info", data={})
-    assert result.startswith("❌")
-    result = persona_modify(action="update", entity="basic_info",
-                            data={"unknown_field": "x"})
-    assert result.startswith("❌")
+    with pytest.raises(ToolError):
+        persona_modify(action="update", entity="basic_info", data={})
+    with pytest.raises(ToolError):
+        persona_modify(action="update", entity="basic_info",
+                       data={"unknown_field": "x"})
 
 
 def test_non_update_action_errors(as_user):
-    result = persona_modify(action="add", entity="basic_info",
-                            data={"name": "X"})
-    assert result.startswith("❌")
-    result = persona_modify(action="remove", entity="basic_info",
-                            data={"name": "X"})
-    assert result.startswith("❌")
+    with pytest.raises(ToolError):
+        persona_modify(action="add", entity="basic_info",
+                       data={"name": "X"})
+    with pytest.raises(ToolError):
+        persona_modify(action="remove", entity="basic_info",
+                       data={"name": "X"})
 
 
 def test_alias_fields_do_not_leak_into_name(as_user):
     # normalize_data must NOT inject a phantom "name" from generic aliases
     # (title/label/value/item) for basic_info.
-    result = persona_modify(action="update", entity="basic_info",
-                            data={"title": "should not become name"})
-    assert result.startswith("❌")
+    with pytest.raises(ToolError):
+        persona_modify(action="update", entity="basic_info",
+                       data={"title": "should not become name"})
     profile = server.load_json("profile.json")
     assert profile.get("name", "") == ""
