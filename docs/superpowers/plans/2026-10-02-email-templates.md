@@ -14,7 +14,7 @@
 - Copy is plain text, escaped with exactly `& < > "` (both languages, so output matches byte for byte).
 - Links, codes and the footer never come from copy.
 - A failed override read sends the defaults.
-- Release 0.5.0: `frontend/package.json` + lockfile and `backend/main.py` together.
+- Release 0.4.2: `frontend/package.json` + lockfile and `backend/main.py` together.
 - Commits end with `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`.
 
 ## Review Focus
@@ -70,8 +70,8 @@
 ### Task 5: Mark, docs, version
 
 - [ ] `frontend/public/landing/email-mark.png`: the white mark, 40px, transparent, rendered with Playwright from `design/logos/mygist.svg`.
-- [ ] Docs: `run/self-hosting.mdx` gains "Email copy" (the command, the table, the defaults); changelog `0.5.0` (emails, tour step). Docs build + links.
-- [ ] Version 0.5.0. Commit.
+- [ ] Docs: `run/self-hosting.mdx` gains "Email copy" (the command, the table, the defaults); changelog `0.4.2` (emails, tour step). Docs build + links.
+- [ ] Version 0.4.2. Commit.
 
 ### Task 6: Verification
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-02
 **Status:** Design agreed in chat (visual companion: direction C3, "slim band"); spec awaiting review
-Release target **0.5.0** (ships with the unreleased editor-tour step on `feat/feedback-tour`).
+Release target **0.4.2** (ships with the unreleased editor-tour step on `feat/feedback-tour`).
 
 ## Problem
 
