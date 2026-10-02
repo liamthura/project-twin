@@ -11,14 +11,36 @@
 import { createElement } from "react";
 import { toast as sonner } from "sonner";
 
-import { ToastCard } from "./toast";
+import { openFeedback } from "@/lib/feedback.js";
+
+import { ToastAction, ToastCard } from "./toast";
 
 // Radix's default, which every caller that names no duration was written for.
 const DURATION = 5000;
 
 let seq = 0;
 
-function toast({ onClose, duration = DURATION, ...props }) {
+// Every destructive toast in the app is a failure, and with no error tracking
+// a report from the person who saw it is how the owner hears of one. One place
+// rather than fourteen; a toast with its own action keeps it.
+function withReport(props) {
+  if (props.variant !== "destructive" || props.action) return props;
+  const said = [props.title, props.description].filter((s) => typeof s === "string" && s).join(". ");
+  return {
+    ...props,
+    action: createElement(
+      ToastAction,
+      {
+        altText: "Report this problem",
+        onClick: () => openFeedback({ kind: "problem", message: `The app said: "${said}"` }),
+      },
+      "Report",
+    ),
+  };
+}
+
+function toast({ onClose, duration = DURATION, ...rest }) {
+  const props = withReport(rest);
   const id = `toast-${++seq}`;
   let told = false;
   const closed = () => {

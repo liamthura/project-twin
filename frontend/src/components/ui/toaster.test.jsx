@@ -81,3 +81,30 @@ describe("the toasts", () => {
     expect(bars[0]).toHaveStyle({ animationDuration: "8000ms" });
   });
 });
+
+describe("Report on an error", () => {
+  it("adds Report to a destructive toast, which opens the island with the error", async () => {
+    const heard = vi.fn();
+    window.addEventListener("mygist:feedback", heard);
+    render(<Toaster />);
+    act(() => {
+      toast({ variant: "destructive", title: "Failed to save", description: "Could not reach the server." });
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Report this problem" }));
+    expect(heard.mock.calls[0][0].detail).toEqual({
+      kind: "problem",
+      message: 'The app said: "Failed to save. Could not reach the server."',
+    });
+    window.removeEventListener("mygist:feedback", heard);
+  });
+
+  it("leaves a toast's own action alone, and adds nothing to a plain toast", async () => {
+    render(<Toaster />);
+    act(() => {
+      toast({ variant: "destructive", title: "Removed", action: <ToastAction altText="Undo">Undo</ToastAction> });
+      toast({ title: "Saved" });
+    });
+    expect(await screen.findByRole("button", { name: "Undo" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Report this problem" })).not.toBeInTheDocument();
+  });
+});

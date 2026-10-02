@@ -44,6 +44,7 @@ import {
 } from "@/lib/routes.js";
 import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
 import { GettingStartedCard } from "@/components/GettingStartedCard";
+import { FeedbackIsland } from "@/components/FeedbackIsland";
 import SectionRenderer from "@/renderers/SectionRenderer";
 import { outline } from "@/renderers/paths";
 import { Header } from "@/shell/Header";
@@ -766,6 +767,11 @@ export default function App() {
   // onboarding family, so the flow replaces the shell entirely -- no header,
   // no rail. `routes.js` promises the families never appear at once, and this
   // is where that promise is kept rather than quietly broken.
+  const addEmail = () => {
+    setAddEmailRequest((n) => n + 1);
+    openSettings("account");
+  };
+
   if (isOnboardingRoute(activeSection)) {
     const step = normaliseStep(activeBand);
     // A step nobody navigated to must not become a history entry, which is why
@@ -773,20 +779,23 @@ export default function App() {
     // band, one level up.
     if (step !== activeBand) goToRoute(`onboarding/${step}`, { replace: true });
     return (
-      <OnboardingFlow
-        step={step}
-        onNavigate={(next) => navigate("onboarding", next)}
-        // Review when handover's suggestions have arrived; Profile otherwise,
-        // with the editor tour after Complete.
-        onLeave={({ to, tour } = {}) => {
-          if (tour) setTourPending("first");
-          // The flow wrote through its own saves, and only hands back once
-          // they have landed; without this the editor showed, and would then
-          // save back, the persona as it was before onboarding.
-          loadAllData();
-          navigate(to || "profile", null);
-        }}
-      />
+      <>
+        <OnboardingFlow
+          step={step}
+          onNavigate={(next) => navigate("onboarding", next)}
+          // Review when handover's suggestions have arrived; Profile otherwise,
+          // with the editor tour after Complete.
+          onLeave={({ to, tour } = {}) => {
+            if (tour) setTourPending("first");
+            // The flow wrote through its own saves, and only hands back once
+            // they have landed; without this the editor showed, and would then
+            // save back, the persona as it was before onboarding.
+            loadAllData();
+            navigate(to || "profile", null);
+          }}
+        />
+        <FeedbackIsland onAddEmail={addEmail} />
+      </>
     );
   }
 
@@ -810,11 +819,6 @@ export default function App() {
     activeBand,
     pendingCount,
     onNavigate: navigate,
-  };
-
-  const addEmail = () => {
-    setAddEmailRequest((n) => n + 1);
-    openSettings("account");
   };
 
   const handleSignOut = async () => {
@@ -865,7 +869,8 @@ export default function App() {
         onOpen={openResult}
       />
 
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      {/* pb-24: the end of every page scrolls clear of the feedback island. */}
+      <div className="mx-auto max-w-6xl px-4 pb-24 pt-8">
         {/* Above the navigation rather than in a corner: an account that cannot
             be recovered is worth one line of the page until it can be. */}
         {/* On every screen, deliberately: it is a nudge. An account with no
@@ -1008,6 +1013,7 @@ export default function App() {
       </Dialog>
 
       <Toaster />
+      <FeedbackIsland onAddEmail={addEmail} />
     </div>
   );
 }
