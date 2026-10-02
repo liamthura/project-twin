@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const sendMock = vi.hoisted(() => vi.fn());
@@ -16,6 +16,8 @@ vi.mock("@/lib/session.js", () => ({
 }));
 
 const { FeedbackIsland } = await import("./FeedbackIsland");
+const { Toaster } = await import("./ui/toaster");
+const { toast } = await import("./ui/use-toast");
 const { openFeedback } = await import("@/lib/feedback.js");
 
 beforeEach(() => {
@@ -152,5 +154,26 @@ describe("FeedbackIsland", () => {
     render(<FeedbackIsland />);
     await open(user);
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  });
+
+  it("opens from an error toast's Report with focus in the box (toast)", async () => {
+    // Sonner hands focus back to where it came from when it leaves a toast,
+    // which used to close the panel the moment Report opened it.
+    const user = userEvent.setup();
+    render(
+      <>
+        <input aria-label="Name" />
+        <Toaster />
+        <FeedbackIsland />
+      </>,
+    );
+    await user.click(screen.getByLabelText("Name"));
+    act(() => {
+      toast({ variant: "destructive", title: "Failed to save", description: "Boom." });
+    });
+    await user.click(await screen.findByRole("button", { name: "Report this problem" }));
+    const box = await screen.findByRole("textbox", { name: "What happened?" });
+    await waitFor(() => expect(box).toHaveFocus());
+    expect(box).toHaveValue('The app said: "Failed to save. Boom."\n\n');
   });
 });

@@ -32,7 +32,13 @@ function withReport(props) {
       ToastAction,
       {
         altText: "Report this problem",
-        onClick: () => openFeedback({ kind: "problem", message: `The app said: "${said}"` }),
+        // Out of the toast first. Sonner hands focus back to wherever it came
+        // from the moment it leaves a toast; done after the island had taken
+        // it, that pulled focus out of the panel and the panel closed.
+        onClick: (e) => {
+          e.currentTarget.blur();
+          openFeedback({ kind: "problem", message: `The app said: "${said}"` });
+        },
       },
       "Report",
     ),
