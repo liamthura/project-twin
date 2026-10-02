@@ -399,3 +399,14 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .driver-hint {
   --driver-hint-color: hsl(var(--primary));
 }
+
+/* The feedback island (components/FeedbackIsland.jsx): clear of the iPhone
+   home bar, and lifted over Review's selection bar while it shows, whose
+   Approve and Reject would otherwise sit under it. */
+.feedback-island {
+  right: calc(1rem + env(safe-area-inset-right));
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+body:has([data-selection-bar]) .feedback-island {
+  bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
