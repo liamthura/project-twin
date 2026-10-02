@@ -24,11 +24,12 @@ waitlist row and emails the sign-up link in one go, so the list cannot drift
 from the codes -- which is exactly what happens when the two are separate
 commands and you get distracted between them.
 
-Mail goes through Resend, reading `RESEND_API_KEY` and `EMAIL_FROM`, the same
-two variables the auth service reads. With either unset it prints the message
-instead of sending, which is the same choice auth/src/email.js makes and for the
-same reason: the flow can be walked end to end before anyone has a Resend
-account, and a silent no-op would be worse than either sending or failing.
+Mail goes through Resend (mailer.py), reading `RESEND_API_KEY` and
+`EMAIL_FROM`, the same two variables the auth service reads. With either unset
+it prints the message instead of sending, which is the same choice
+auth/src/email.js makes and for the same reason: the flow can be walked end to
+end before anyone has a Resend account, and a silent no-op would be worse than
+either sending or failing.
 
 The link needs a public origin, from `--url`, `PUBLIC_URL` or `BETTER_AUTH_URL`.
 Production sets `PUBLIC_URL`, so `admit --send` needs no `--url` there. Locally
@@ -40,19 +41,17 @@ The rule that decides whether a code admits someone lives in the auth service
 duplicates that logic; this only ever writes and reads rows.
 """
 import argparse
-import json
 import os
 import re
 import secrets
 import sys
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import db  # noqa: E402
+import mailer  # noqa: E402
 import waitlist_store  # noqa: E402
 
 # Crockford base32 minus I, L, O and U -- the characters people mistype for one
@@ -96,9 +95,6 @@ def normalise_code(code: str) -> str:
 
 
 # --------------------------------------------------------------- invite links
-RESEND_ENDPOINT = "https://api.resend.com/emails"
-
-
 def base_url(explicit: str | None) -> str | None:
     """Where the sign-up form lives.
 
@@ -139,54 +135,16 @@ def invite_email(code: str, link: str, uses: int, expires_at: datetime | None) -
 
 
 def send_email(to: str, subject: str, text: str) -> bool:
-    """Send through Resend, or print when there is no provider.
+    """mailer.send_email, failing the command loudly.
 
-    Printing is deliberate rather than a fallback, and it is the same choice
-    auth/src/email.js makes for password reset: the whole flow can be walked
-    locally before anyone has a Resend account. A silent no-op would be worse
-    than either sending or failing, because you would think the mail went.
-
-    Returns True if it actually left the building.
+    Raised, not swallowed. The code is already minted and the row already
+    stamped, so silence here would leave someone marked invited with nothing
+    in their inbox and no record of why.
     """
-    api_key = os.environ.get("RESEND_API_KEY")
-    sender = os.environ.get("EMAIL_FROM")
-
-    if not api_key or not sender:
-        print("\n  Not sent: RESEND_API_KEY and EMAIL_FROM are unset here.")
-        print(f"  to:      {to}")
-        print(f"  subject: {subject}")
-        for line in text.split("\n"):
-            print(f"  {line}" if line else "")
-        return False
-
-    request = urllib.request.Request(
-        RESEND_ENDPOINT,
-        data=json.dumps({"from": sender, "to": to, "subject": subject, "text": text}).encode(),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            # Not decoration. Resend sits behind Cloudflare, which bans urllib's
-            # default `Python-urllib/3.x` signature outright -- every send came
-            # back 403 with a body of `error code: 1010`, refused at the edge
-            # before Resend ever saw the key. Any honest agent string gets
-            # through; auth/src/email.js never hit this only because fetch sends
-            # one of its own.
-            "User-Agent": "mygist-access/1.0",
-        },
-        method="POST",
-    )
     try:
-        with urllib.request.urlopen(request, timeout=15):
-            pass
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode(errors="replace")[:200]
-        # Raised, not swallowed. The code is already minted and the row already
-        # stamped, so silence here would leave someone marked invited with
-        # nothing in their inbox and no record of why.
-        raise SystemExit(f"Resend responded {exc.code}: {detail}")
-    except urllib.error.URLError as exc:
-        raise SystemExit(f"could not reach Resend: {exc.reason}")
-    return True
+        return mailer.send_email(to, subject, text)
+    except mailer.MailError as exc:
+        raise SystemExit(str(exc))
 
 
 # ------------------------------------------------------------------ printing
