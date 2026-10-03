@@ -68,7 +68,10 @@ export function GettingStartedCard({
   const [state, setState] = useState(null);
   const [needsEmail, setNeedsEmail] = useState(false);
   const [copied, setCopied] = useState(false);
-  const report = useWatchtower();
+  const shown = !!state && !state.dismissed;
+  // Only while the card is on screen: a dismissed card would otherwise fetch
+  // the whole connection report on every visit to Profile, to show nothing.
+  const report = useWatchtower({ enabled: shown });
 
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +89,6 @@ export function GettingStartedCard({
     };
   }, []);
 
-  const shown = !!state && !state.dismissed;
   useEffect(() => {
     onShownChange?.(shown);
   }, [shown, onShownChange]);

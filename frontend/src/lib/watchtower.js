@@ -28,13 +28,16 @@ export function atStart(name, fallback = "your assistant") {
 /**
  * The latest report. While `active`, asks every 3 s, then every 10 s after two
  * minutes, and not at all while the tab is hidden. Not active, it asks once,
- * hidden or not. Either way it asks again when the tab is shown.
+ * hidden or not. Either way it asks again when the tab is shown. Not
+ * `enabled`, it asks nothing at all: the report is large on a busy account,
+ * so a screen that may not show it says when it does.
  */
-export function useWatchtower({ active = false, since = null } = {}) {
+export function useWatchtower({ active = false, since = null, enabled = true } = {}) {
   // Kept with the `since` it answered, so a report asked for another one is
   // never returned: unfiltered, it would call an older assistant "connected".
   const [held, setHeld] = useState(null);
   useEffect(() => {
+    if (!enabled) return undefined;
     let cancelled = false;
     let timer;
     const started = Date.now();
@@ -65,6 +68,6 @@ export function useWatchtower({ active = false, since = null } = {}) {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [active, since]);
+  }, [active, since, enabled]);
   return held && held.since === since ? held.report : null;
 }
