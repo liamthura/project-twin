@@ -1,7 +1,7 @@
 # Datadog APM, tracing and logs — design
 
 Date: 2026-10-04
-Status: draft
+Status: implemented on feat/datadog-apm, not yet deployed
 
 ## Why
 
@@ -146,6 +146,9 @@ services:
       - DD_CONTAINER_EXCLUDE_LOGS=name:.*
       - DD_CONTAINER_INCLUDE_LOGS=<the four MyGist containers, by Coolify app uuid>
       - DD_PROCESS_AGENT_ENABLED=false
+      # Docker and Coolify probe /health on both services every 30s; without
+      # this they are most of the traces.
+      - DD_APM_FILTER_TAGS_REGEX_REJECT=http.url:.*/health$
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /proc/:/host/proc/:ro
@@ -165,6 +168,8 @@ networks:
   logs off Datadog.
 - `DD_API_KEY` and `DD_SITE` are entered in Coolify by Liam. EU1
   (`datadoghq.eu`) if the account is new.
+- The `/health` filter runs in the Agent, so the local test below can't check
+  it. Confirm on staging that health checks no longer appear in APM.
 - The include list is matched against real container names when the Agent is
   deployed. Coolify names containers by app uuid, and those names are checked
   with `docker ps`, not assumed.
@@ -205,6 +210,23 @@ API apps only), or their version reads empty.
    trace.
 4. **Prod.** The same env flip on the prod rows, after staging has passed.
 
+### What the local run showed (2026-10-04)
+
+Against `dd-apm-test-agent`, with fake secrets in every query string and body:
+
+- `POST /auth/sign-in/email` is one trace: `mygist-api` (`fastapi.request`,
+  then the httpx `http.request`) → `mygist-auth` (`web.request`) →
+  `mygist-auth-postgres` (`pg.query`, `$1` placeholders).
+- An MCP call with a bearer token gives `fastapi.request` → `postgres.query`
+  (the token lookup) in one trace.
+- No `code=`, `state=`, password, email or token appeared anywhere in the
+  captured traces.
+- The API's stdout is JSON, uvicorn's access lines included, each carrying its
+  request's `dd.trace_id` and `dd.version` set to the commit.
+- The API's Postgres spans report as service `postgres` and auth's as
+  `mygist-auth-postgres`: the two tracers' defaults. Both show up on the
+  service map as inferred databases.
+
 ## Rollback
 
 Unset `DD_AGENT_HOST` (and `NODE_OPTIONS` on auth) and restart. The image goes
@@ -212,6 +234,8 @@ back to today's behaviour. Stopping the Agent resource removes the rest.
 
 ## Out of scope
 
-RUM, the continuous profiler, Database Monitoring, source code links
+Route names on auth spans: Better Auth runs on plain `node:http` with no router
+dd-trace recognises, so auth's resources read `GET` and `POST` rather than a
+path. RUM, the continuous profiler, Database Monitoring, source code links
 (`DD_GIT_*`), monitors and dashboards. Each is its own switch once traces and
 logs are flowing, and the dashboards and monitors are Liam's to build in the UI.

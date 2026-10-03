@@ -24,6 +24,14 @@ COPY src/ ./src/
 # the production image, so it says so rather than relying on the platform to.
 ENV NODE_ENV=production
 
+# Datadog APM, opt-in: inert unless the platform sets
+# NODE_OPTIONS=--import dd-trace/initialize.mjs and DD_AGENT_HOST. The version
+# tag is the commit, as on the API. dd-trace's default query-string redaction
+# misses OAuth's code= and state=, so `.*` drops the whole query string.
+ARG SOURCE_COMMIT
+ENV DD_VERSION=$SOURCE_COMMIT
+ENV DD_TRACE_OBFUSCATION_QUERY_STRING_REGEXP=.*
+
 # curl for the healthcheck; alpine ships without it.
 RUN apk add --no-cache curl
 
