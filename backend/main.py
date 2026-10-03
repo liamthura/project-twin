@@ -121,7 +121,7 @@ async def lifespan(fastapi_app: FastAPI):
 app = FastAPI(
     title="MyGist API",
     # The app version, as frontend/package.json has it (the changelog's).
-    version="0.4.3",
+    version="0.4.4",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -434,6 +434,10 @@ async def security_headers(request: Request, call_next):
     response.headers.setdefault(
         "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
     )
+    # Persona JSON is never kept: not in the browser's HTTP or back/forward
+    # cache, not by a proxy. The app holds what it fetched in memory only.
+    if request.url.path.startswith("/api/"):
+        response.headers.setdefault("Cache-Control", "no-store")
     # CSP only governs documents; sending it on JSON is noise.
     if response.headers.get("content-type", "").startswith("text/html"):
         response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
@@ -1128,13 +1132,13 @@ async def sweep_status():
 
 @app.get("/api/search")
 async def search_persona(q: str = "", limit: int = 5):
-    """Entries related to `q` by meaning, for the app's search dialog.
+    """What the app's search dialog cannot find itself.
 
-    The dialog finds word matches itself, over the persona it already holds;
-    this is only the half it cannot do. So it answers only when embeddings are
-    configured: keyword-only ("fts") results would just repeat the dialog's
-    own matches, less completely. Sections the user turned off are skipped, as
-    search_context skips them.
+    The dialog word-searches the sections it has loaded, and loads a section
+    only when it is opened, so this covers the rest: keyword hits always
+    (`match: "words"`), and hits by meaning alone where embeddings are
+    configured (`match: "meaning"`). Sections the user turned off are skipped,
+    as search_context skips them.
     """
     if len(q.strip()) < 2:
         return {"results": []}
@@ -1143,10 +1147,11 @@ async def search_persona(q: str = "", limit: int = 5):
         db.current_user_id.get(), q.strip(), None, max(1, min(limit, 20)),
         exclude_sections=list(settings_store.get_disabled_sections()),
     )
-    if out["mode"] != "hybrid":
-        return {"results": []}
     return {"results": [
-        {k: r[k] for k in ("entity_id", "section", "title", "snippet")} for r in out["results"]
+        {"entity_id": r["entity_id"], "section": r["section"], "title": r["title"],
+         "snippet": server._clean_snippet(r["snippet"], r["title"]),
+         "match": "words" if r.get("fts_hit") else "meaning"}
+        for r in out["results"]
     ]}
 
 

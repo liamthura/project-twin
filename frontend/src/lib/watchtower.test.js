@@ -15,6 +15,19 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("useWatchtower", () => {
+  it("asks nothing while not enabled, not even when the tab comes back", async () => {
+    const { rerender } = renderHook(({ enabled }) => useWatchtower({ enabled }), {
+      initialProps: { enabled: false },
+    });
+    await act(() => vi.advanceTimersByTimeAsync(FAST_MS * 3));
+    await act(async () => document.dispatchEvent(new Event("visibilitychange")));
+    expect(apiMock).not.toHaveBeenCalled();
+    // Shown after all: it asks then.
+    rerender({ enabled: true });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(apiMock).toHaveBeenCalledTimes(1);
+  });
+
   it("fetches once when not active", async () => {
     renderHook(() => useWatchtower());
     await act(() => vi.advanceTimersByTimeAsync(FAST_MS * 3));

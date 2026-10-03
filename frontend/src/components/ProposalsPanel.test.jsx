@@ -100,6 +100,17 @@ beforeEach(() => {
   );
 });
 
+describe("ProposalsPanel and the sections it compares against", () => {
+  it("asks for the section an update is shown against", async () => {
+    // The page fetches sections as they are needed, so the panel has to ask
+    // for the one holding the entry this update would change.
+    const onNeedSections = vi.fn();
+    render(<ProposalsPanel packs={realPacks} onNeedSections={onNeedSections} />);
+    await screen.findByRole("button", { name: /^approve /i });
+    expect(onNeedSections).toHaveBeenCalledWith(["knowledge"]);
+  });
+});
+
 describe("ProposalsPanel guides", () => {
   it("starts the first-suggestion guide once suggestions are listed", async () => {
     render(<ProposalsPanel />);

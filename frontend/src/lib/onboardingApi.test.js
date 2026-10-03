@@ -7,7 +7,8 @@ vi.mock("./api.js", async (importOriginal) => {
   return { ...actual, api: apiMock };
 });
 
-const { getOnboarding, saveOnboarding, markSeen } = await import("./onboarding.js");
+const { getOnboarding, saveOnboarding, markSeen, primeOnboarding, forgetOnboarding } =
+  await import("./onboarding.js");
 // The real one: the mock above spreads every actual export and replaces only
 // `api`, and mcpUrl derives from getApiBase and localStorage rather than from
 // any request.
@@ -15,6 +16,47 @@ const { mcpUrl, docsUrl } = await import("./api.js");
 
 beforeEach(() => {
   apiMock.mockReset();
+  forgetOnboarding();
+});
+
+// Progress rides on the settings response, which is large, so it is read once
+// and kept current by the writes rather than fetched for every card that shows it.
+describe("what is held between reads", () => {
+  const settings = { disabled_sections: [], onboarding: { dismissed: false, steps: {}, seen: [] } };
+
+  it("reads settings once, however many ask at once", async () => {
+    apiMock.mockResolvedValue(settings);
+    await Promise.all([getOnboarding(), getOnboarding()]);
+    await getOnboarding();
+    expect(apiMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("answers from a primed state without a request", async () => {
+    primeOnboarding(Promise.resolve({ dismissed: true, steps: { connect: "done" } }));
+    await expect(getOnboarding()).resolves.toEqual({ dismissed: true, steps: { connect: "done" }, seen: [] });
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps what it holds current through a save and a seen guide", async () => {
+    apiMock.mockResolvedValue(settings);
+    await getOnboarding();
+    await saveOnboarding({ dismissed: true, steps: { "about-you": "done" } }, []);
+    await markSeen("guide:editor");
+    await expect(getOnboarding()).resolves.toEqual({
+      dismissed: true, steps: { "about-you": "done" }, seen: ["guide:editor"],
+    });
+    // One read, then the two writes; no second read.
+    expect(apiMock.mock.calls.filter(([path, opts]) => path === "/settings" && !opts)).toHaveLength(1);
+  });
+
+  it("reads again once forgotten, and after a failed read", async () => {
+    apiMock.mockRejectedValueOnce(new Error("offline")).mockResolvedValue(settings);
+    await expect(getOnboarding()).rejects.toThrow("offline");
+    await getOnboarding();
+    forgetOnboarding();
+    await getOnboarding();
+    expect(apiMock).toHaveBeenCalledTimes(3);
+  });
 });
 
 describe("getOnboarding", () => {

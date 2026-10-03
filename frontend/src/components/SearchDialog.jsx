@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { searchMeaning } from "@/lib/api.js";
+import { searchEntries } from "@/lib/api.js";
 import { searchPersona } from "./searchPersona";
 
 const MEANING_LIMIT = 5;
@@ -64,7 +64,7 @@ export function SearchDialog({ open, onOpenChange, packs = [], packData = {}, on
     if (query.trim().length < 2) return undefined;
     let cancelled = false;
     const timer = setTimeout(() => {
-      searchMeaning(query)
+      searchEntries(query)
         .then((rows) => { if (!cancelled) setRelated(rows); })
         .catch(() => {});
     }, 300);
@@ -76,14 +76,25 @@ export function SearchDialog({ open, onOpenChange, packs = [], packData = {}, on
 
   const titles = Object.fromEntries(packs.map((p) => [p.key, p.title]));
   const seen = new Set(results.map((r) => r.entityId).filter(Boolean));
-  const meaning = related
-    .filter((r) => titles[r.section] && !seen.has(r.entity_id))
+  const fromServer = related.filter((r) => titles[r.section] && !seen.has(r.entity_id));
+  const asResult = (r, kind) => ({
+    key: `${kind}:${r.entity_id}`, section: r.section, sectionTitle: titles[r.section],
+    place: titles[r.section], title: r.title, snippet: r.snippet, entityId: r.entity_id, band: null,
+  });
+  // A section is loaded when it has been opened, and the page searches those
+  // itself, so the server's word matches count only for the rest -- in the
+  // rail's order, so they group under their section like the page's own.
+  const order = packs.map((p) => p.key);
+  const serverWords = fromServer
+    .filter((r) => r.match === "words" && !(r.section in packData))
+    .sort((a, b) => order.indexOf(a.section) - order.indexOf(b.section))
+    .map((r) => asResult(r, "words"));
+  const meaning = fromServer
+    .filter((r) => r.match !== "words")
     .slice(0, MEANING_LIMIT)
-    .map((r) => ({
-      key: `meaning:${r.entity_id}`, section: r.section, sectionTitle: titles[r.section],
-      place: titles[r.section], title: r.title, snippet: r.snippet, entityId: r.entity_id, band: null,
-    }));
-  const all = [...results, ...meaning];
+    .map((r) => asResult(r, "meaning"));
+  const words = [...results, ...serverWords];
+  const all = [...words, ...meaning];
 
   const choose = (result) => {
     chosenRef.current = true;
@@ -104,7 +115,7 @@ export function SearchDialog({ open, onOpenChange, packs = [], packData = {}, on
 
   // Word matches grouped under their section, in the order the rail lists them.
   const groups = [];
-  for (const r of results) {
+  for (const r of words) {
     const last = groups[groups.length - 1];
     if (last?.title === r.sectionTitle) last.items.push(r);
     else groups.push({ title: r.sectionTitle, items: [r] });

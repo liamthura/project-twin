@@ -4,12 +4,39 @@ description: What changed in each release, and what you have to do about it.
 ---
 
 Versions here are the app version, shown at the foot of Settings → Account as
-`v0.4.3 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
+`v0.4.4 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
 predate this page.
 
 MyGist is pre-1.0, and its versions say so. Until 0.2.4 they were numbered one
 place higher, so 0.2.3 was released as 2.3.0, 0.2.2 as 2.2.0, 0.2.1 as 2.1.0,
 0.2.0 as 2.0.0 and 0.1.0 as 1.0.0. Nothing else about those releases changed.
+
+## 0.4.4
+
+The editor loads a section the first time you open it, instead of your whole
+persona when the page opens. On a persona with about 190 entries, the persona
+data fetched on opening went from 143,000 characters to Profile's 8,000.
+Sections you have opened stay in the page until you sign out.
+
+- Nothing from your persona is kept outside the page: API responses are sent
+  with `Cache-Control: no-store`, so the browser does not keep a copy in its
+  cache, and signing out clears what the page held.
+- Search covers sections you have not opened through the server's index. Until
+  a section is opened, it matches that section's entries but not standalone
+  fields such as your bio.
+- An update waiting in Review loads the section it would change, so it still
+  shows what it replaces.
+- Settings, and the line under an entry saying who added or changed it, are
+  fetched once per session. Both were fetched again on every visit to Profile
+  and to each section, and the settings response alone is about 73,000
+  characters.
+- The connection status behind the Getting started card is fetched only while
+  that card is on screen. Once dismissed, it was still fetched on every visit
+  to Profile, and on a busy account it is about 30,000 characters.
+
+### Upgrading
+
+Pull the image and restart. No migration.
 
 ## 0.4.3
 

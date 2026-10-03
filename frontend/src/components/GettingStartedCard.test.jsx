@@ -19,7 +19,10 @@ vi.mock("@/lib/session.js", () => ({
 vi.mock("@/lib/guide.js", () => ({ showHint: showHintMock }));
 vi.mock("@/lib/watchtower.js", async (importOriginal) => ({
   ...(await importOriginal()),
-  useWatchtower: () => watch.report,
+  useWatchtower: (opts) => {
+    watch.calls.push(opts);
+    return watch.report;
+  },
 }));
 
 const { GettingStartedCard } = await import("./GettingStartedCard");
@@ -37,6 +40,23 @@ beforeEach(() => {
   getSessionMock.mockReset().mockResolvedValue({ user: { email: "ada@example.com" } });
   showHintMock.mockClear();
   watch.report = report({ state: "none" });
+  watch.calls = [];
+});
+
+// The report is 30k on a busy account, and only the card shows it.
+describe("GettingStartedCard and the connection report", () => {
+  it("asks for it only while the card is on screen", async () => {
+    getOnboardingMock.mockResolvedValue({ dismissed: true, steps: {}, seen: [] });
+    render(<GettingStartedCard disabledSections={[]} />);
+    await waitFor(() => expect(getOnboardingMock).toHaveBeenCalled());
+    await waitFor(() => expect(watch.calls.at(-1)).toEqual({ enabled: false }));
+    expect(watch.calls.some((o) => o?.enabled)).toBe(false);
+  });
+
+  it("asks while it is showing", async () => {
+    render(<GettingStartedCard disabledSections={[]} />);
+    await waitFor(() => expect(watch.calls.at(-1)).toEqual({ enabled: true }));
+  });
 });
 
 const renderCard = (props = {}) =>

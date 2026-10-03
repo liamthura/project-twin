@@ -53,6 +53,8 @@ import { SectionMenu } from "@/shell/SectionMenu";
 import { useScrollSpy } from "@/shell/useScrollSpy";
 import { useKeyedDebounce } from "@/lib/useKeyedDebounce";
 import { TOURS, closeGuides, resetSeen, startTour } from "@/lib/guide.js";
+import { forgetOnboarding, primeOnboarding } from "@/lib/onboarding.js";
+import { forgetProvenance } from "@/renderers/provenance";
 
 // Main App
 export default function App() {
@@ -173,8 +175,19 @@ export default function App() {
   // bar and the marker chase the scroll backwards past every band on the way,
   // and the click's own destination is overwritten before it arrives.
   const spyQuietUntilRef = useRef(0);
-  // Data for enabled sections WITHOUT a bespoke editor, keyed by section key.
+  // The sections this page has fetched, keyed by section. Each one is fetched
+  // the first time it is needed (opened, searched, reviewed) and kept here,
+  // in memory only: never in localStorage, and the API answers no-store, so a
+  // persona does not outlive the session that loaded it. Signing out empties it.
   const [packData, setPackData] = useState({});
+  const packDataRef = useRef(packData);
+  packDataRef.current = packData;
+  // Sections on their way, so two asks for one section make one request; and
+  // a counter that sign-out moves on, so an answer to the last session's
+  // request cannot land in the next one.
+  const inflightRef = useRef(new Set());
+  const generationRef = useRef(0);
+  const [sectionErrors, setSectionErrors] = useState({});
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -243,7 +256,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadAllData();
+    loadPersona();
     loadSettings();
   }, []);
 
@@ -261,13 +274,14 @@ export default function App() {
   // Not while the persona reloads: the app shows only a spinner then, and a
   // tour started over it found nothing to point at and was lost.
   useEffect(() => {
-    if (!tourPending || !activePack || isLoading) return undefined;
+    // The section's data too: until it lands there is only a spinner to point at.
+    if (!tourPending || !activePack || isLoading || !(activePack.key in packData)) return undefined;
     const timer = setTimeout(() => {
       startTour("guide:editor", TOURS.editor, { force: tourPending === "force" });
       setTourPending(null);
     }, 400);
     return () => clearTimeout(timer);
-  }, [tourPending, activePack, isLoading]);
+  }, [tourPending, activePack, isLoading, packData]);
 
   // A guide belongs to the screen it points at. Moving to another section
   // takes it down, so a tour or a hint's dot cannot float over the next one.
@@ -498,6 +512,7 @@ export default function App() {
   // refetch exactly that -- no polling, and no window where the "View in ..."
   // link shows the old data.
   const refreshSection = useCallback(async (key) => {
+    forgetProvenance(key);
     try {
       const response = await api(`/files/${key}`);
       setPackData((prev) => ({ ...prev, [key]: response.data ?? {} }));
@@ -507,26 +522,80 @@ export default function App() {
     }
   }, []);
 
-  const loadAllData = async () => {
+  // Fetch whichever of `keys` this page does not have yet. Stable, so the
+  // panels that need a section can ask for it from an effect.
+  const loadSections = useCallback(async (keys) => {
+    const wanted = keys.filter((k) => !(k in packDataRef.current) && !inflightRef.current.has(k));
+    if (!wanted.length) return;
+    const generation = generationRef.current;
+    wanted.forEach((k) => inflightRef.current.add(k));
+    try {
+      const fetched = await Promise.all(wanted.map((k) => api(`/files/${k}`)));
+      if (generation !== generationRef.current) return;
+      setPackData((prev) => {
+        const next = { ...prev };
+        wanted.forEach((k, i) => {
+          if (!(k in next)) next[k] = fetched[i].data ?? {};
+        });
+        return next;
+      });
+      setSectionErrors((prev) => {
+        const next = { ...prev };
+        wanted.forEach((k) => delete next[k]);
+        return next;
+      });
+    } catch (err) {
+      if (generation !== generationRef.current) return;
+      setSectionErrors((prev) => ({ ...prev, ...Object.fromEntries(wanted.map((k) => [k, err.message])) }));
+    } finally {
+      wanted.forEach((k) => inflightRef.current.delete(k));
+    }
+  }, []);
+
+  // Start (or restart) the session's view of the persona: forget every section
+  // held, then fetch Profile alone. Profile is what the header and the Getting
+  // started card read, and its answer is what says whether the server is there
+  // and who we are; every other section waits until it is opened.
+  const loadPersona = async () => {
+    generationRef.current += 1;
+    const generation = generationRef.current;
+    inflightRef.current = new Set();
+    // What else the page holds about this account goes with it.
+    forgetOnboarding();
+    forgetProvenance();
+    setPackData({});
+    setSectionErrors({});
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api("/all");
-      // Every section is manifest-driven as of wave 6, so the whole response
-      // is pack data -- there is no bespoke editor left to carve out.
-      setPackData(response.data || {});
+      const response = await api("/files/profile");
+      if (generation !== generationRef.current) return;
+      // Merged, not replaced: the cache was emptied above, so anything else in
+      // it now was fetched for this session.
+      setPackData((prev) => ({ ...prev, profile: response.data ?? {} }));
       setIsConnected(true);
     } catch (err) {
+      if (generation !== generationRef.current) return;
       setError(err.message);
       setIsConnected(false);
     } finally {
-      setIsLoading(false);
+      if (generation === generationRef.current) setIsLoading(false);
     }
   };
 
+  // The section on screen, fetched the first time it is opened.
+  const activeKey = activePack?.key;
+  useEffect(() => {
+    if (activeKey && isConnected && !isLoading) loadSections([activeKey]);
+  }, [activeKey, isConnected, isLoading, loadSections]);
+
   const loadSettings = async () => {
+    const request = api("/settings");
+    // Onboarding progress rides on this response, which is large; the card and
+    // panels that show it read it from here instead of fetching it again.
+    primeOnboarding(request.then((s) => s?.onboarding));
     try {
-      const s = await api("/settings");
+      const s = await request;
       setDisabledSections(s.disabled_sections || []);
       setPacks(s.packs || []);
     } catch (_) {
@@ -547,6 +616,8 @@ export default function App() {
         body,
         keepalive: closing && body.length < 60000,
       });
+      // The write moved this section's dates, so its held provenance is old.
+      forgetProvenance(fileType);
       setLastSaved(new Date());
       setHasUnsavedChanges(false);
       // No success toast. This fires on every debounced flush, so editing three
@@ -607,6 +678,7 @@ export default function App() {
         method: "PUT",
         body: JSON.stringify(packData),
       });
+      forgetProvenance();
       setLastSaved(new Date());
       setHasUnsavedChanges(false);
       // This one keeps its toast: it answers a button the user just pressed,
@@ -636,12 +708,8 @@ export default function App() {
         method: "PUT",
         body: JSON.stringify({ disabled_sections: disabled, enabled_sections: optins }),
       });
-      if (wantEnabled) {
-        // Fetch fresh data but merge in ONLY the newly-enabled section —
-        // a full setState of all sections would race the debounced autosave.
-        const response = await api("/all");
-        setPackData((prev) => ({ ...prev, [key]: response.data?.[key] ?? {} }));
-      } else {
+      // A section turned on is fetched when it is opened, like any other.
+      if (!wantEnabled) {
         setPackData((prev) => {
           const rest = { ...prev };
           delete rest[key];
@@ -717,7 +785,7 @@ export default function App() {
           // that is the moment intent is highest, and Welcome is where the
           // offer to hand the work to a client is made.
           if (isNew) navigate("onboarding", DEFAULT_ONBOARDING_STEP);
-          loadAllData();
+          loadPersona();
           loadSettings();
         }}
       />
@@ -735,7 +803,7 @@ export default function App() {
             <CardDescription>{error}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button onClick={loadAllData} className="w-full">
+            <Button onClick={loadPersona} className="w-full">
               <RefreshCw className="h-4 w-4 mr-2" />
               Try again
             </Button>
@@ -752,7 +820,7 @@ export default function App() {
               <ServerPanel
                 isSignedIn={false}
                 onConnectionChange={() => {
-                  loadAllData();
+                  loadPersona();
                   loadSettings();
                 }}
                 onClose={() => setShowServerPanel(false)}
@@ -791,7 +859,7 @@ export default function App() {
             // The flow wrote through its own saves, and only hands back once
             // they have landed; without this the editor showed, and would then
             // save back, the persona as it was before onboarding.
-            loadAllData();
+            loadPersona();
             navigate(to || "profile", null);
           }}
         />
@@ -834,7 +902,7 @@ export default function App() {
     // mount, which left everyone who signed out on Couldn't reach MyGist.
     setHasCredential(false);
     clearConfig();
-    loadAllData();
+    loadPersona();
     loadSettings();
   };
 
@@ -916,7 +984,17 @@ export default function App() {
               />
             )}
 
-            {activePack && (
+            {/* Not rendered until its data is here: a section with nothing in
+                it would show empty fields, and autosave would write whatever
+                was typed into them over the real section. */}
+            {activePack && !(activePack.key in packData) && (
+              <SectionLoading
+                error={sectionErrors[activePack.key]}
+                onRetry={() => loadSections([activePack.key])}
+              />
+            )}
+
+            {activePack && activePack.key in packData && (
               <FocusEntryContext.Provider value={focusEntry}>
               <SectionRenderer
                 key={activePack.key}
@@ -949,7 +1027,7 @@ export default function App() {
                 addEmailRequest={addEmailRequest}
                 onConnect={() => navigate("onboarding", "assistant")}
                 onConnectionChange={() => {
-                  loadAllData();
+                  loadPersona();
                   loadSettings();
                 }}
               />
@@ -971,6 +1049,7 @@ export default function App() {
                 sectionTitles={sectionTitles}
                 packs={packs}
                 packData={packData}
+                onNeedSections={loadSections}
               />
             )}
 
@@ -1021,6 +1100,27 @@ export default function App() {
 
       <Toaster />
       <FeedbackIsland onAddEmail={addEmail} />
+    </div>
+  );
+}
+
+// Where a section goes while it is fetched, and what stays if that failed.
+function SectionLoading({ error, onRetry }) {
+  if (error) {
+    return (
+      <div role="alert" className="space-y-3 py-16 text-center">
+        <p className="text-sm text-muted-foreground">Couldn&apos;t load this section: {error}</p>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+          Try again
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+      Loading…
     </div>
   );
 }

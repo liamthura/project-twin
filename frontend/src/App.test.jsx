@@ -75,6 +75,10 @@ function mockApi({ packs, disabledSections = [], pendingCount = 0 }) {
     if (endpoint === "/all") {
       return Promise.resolve({ data: ALL_DATA });
     }
+    // One section at a time: what the page asks for now.
+    if (endpoint.startsWith("/files/") && !opts?.method) {
+      return Promise.resolve({ data: ALL_DATA[endpoint.slice("/files/".length)] ?? {} });
+    }
     if (endpoint === "/settings") {
       return Promise.resolve({ disabled_sections: disabledSections, packs });
     }
@@ -246,6 +250,11 @@ describe("App: circle and learning_log render through the renderer kit", () => {
     await user.click(screen.getByRole("button", { name: "Account" }));
     await user.click(await screen.findByRole("menuitem", { name: "Settings" }));
     await user.click(await screen.findByRole("switch", { name: "Auto-save" }));
+    // Open the two sections, so the page holds them: it only ever saves what
+    // it has loaded.
+    await user.click(railItem(/Circle/));
+    await user.click(railItem(/Learning log/));
+    expect(await screen.findByText("React Server Components")).toBeInTheDocument();
     await user.click(railItem(/Profile/));
     await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
     // Radix marks the rest of the page aria-hidden while a dialog is open, so
@@ -274,6 +283,8 @@ describe("App: circle and learning_log render through the renderer kit", () => {
       expect(body.circle).toEqual(circleData);
       expect(body.learning_log).toEqual(learningLogData);
       expect(body).toHaveProperty("profile");
+      // Never opened, so never fetched -- and never written back as empty.
+      expect(body).not.toHaveProperty("knowledge");
     });
   });
 });
@@ -531,5 +542,79 @@ describe("App: save feedback", () => {
 
     expect(await screen.findByText("Failed to save")).toBeInTheDocument();
     expect(chip()).toHaveAttribute("data-save-state", "unsaved");
+  });
+});
+
+// The page fetches a section the first time it is needed and keeps it, rather
+// than pulling the whole persona at load: less on the wire, and less of the
+// persona sitting in the page than the reader has looked at.
+describe("App: sections load when they are opened", () => {
+  const filesCalls = (key) =>
+    api.mock.calls.filter(([endpoint, opts]) => endpoint === `/files/${key}` && !opts?.method);
+
+  beforeEach(() => {
+    api.mockReset();
+    window.location.hash = "#/profile";
+  });
+
+  it("starts with Profile alone, and fetches a section once however often it is opened", async () => {
+    mockApi({ packs: packsFixture });
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(railItem(/Learning log/)).toBeTruthy());
+
+    expect(api.mock.calls.some(([endpoint]) => endpoint === "/all")).toBe(false);
+    expect(filesCalls("profile")).toHaveLength(1);
+    expect(filesCalls("learning_log")).toHaveLength(0);
+
+    await user.click(railItem(/Learning log/));
+    expect(await screen.findByText("React Server Components")).toBeInTheDocument();
+    await user.click(railItem(/Profile/));
+    await user.click(railItem(/Learning log/));
+    expect(await screen.findByText("React Server Components")).toBeInTheDocument();
+    expect(filesCalls("learning_log")).toHaveLength(1);
+  });
+
+  it("shows a section as loading, not as an empty editor, until its data is here", async () => {
+    let land;
+    mockApi({ packs: packsFixture });
+    const base = api.getMockImplementation();
+    api.mockImplementation((endpoint, opts) =>
+      endpoint === "/files/circle" && !opts?.method
+        ? new Promise((resolve) => { land = () => resolve({ data: circleData }); })
+        : base(endpoint, opts),
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(railItem(/Circle/)).toBeTruthy());
+
+    await user.click(railItem(/Circle/));
+    const main = screen.getByRole("main");
+    expect(await within(main).findByRole("status")).toHaveTextContent("Loading");
+    expect(within(main).queryByRole("textbox")).not.toBeInTheDocument();
+
+    await act(async () => land());
+    expect(within(main).queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByText(circleData.connections[0].name)).toBeInTheDocument();
+  });
+
+  it("says so when a section cannot be fetched, and tries again on request", async () => {
+    let fail = true;
+    mockApi({ packs: packsFixture });
+    const base = api.getMockImplementation();
+    api.mockImplementation((endpoint, opts) =>
+      endpoint === "/files/learning_log" && !opts?.method && fail
+        ? Promise.reject(new Error("Server unreachable"))
+        : base(endpoint, opts),
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(railItem(/Learning log/)).toBeTruthy());
+
+    await user.click(railItem(/Learning log/));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Server unreachable");
+    fail = false;
+    await user.click(screen.getByRole("button", { name: /try again/i }));
+    expect(await screen.findByText("React Server Components")).toBeInTheDocument();
   });
 });
