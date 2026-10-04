@@ -1,6 +1,6 @@
 {
   "name": "mygist-frontend",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "type": "module",
   "engines": {
     "node": "^22.22.2 || >=24.15.0"

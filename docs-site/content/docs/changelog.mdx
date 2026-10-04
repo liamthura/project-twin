@@ -4,12 +4,30 @@ description: What changed in each release, and what you have to do about it.
 ---
 
 Versions here are the app version, shown at the foot of Settings → Account as
-`v0.4.4 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
+`v0.4.5 (a1b2c3d)` with the commit it was built from. Releases before 0.2.1
 predate this page.
 
 MyGist is pre-1.0, and its versions say so. Until 0.2.4 they were numbered one
 place higher, so 0.2.3 was released as 2.3.0, 0.2.2 as 2.2.0, 0.2.1 as 2.1.0,
 0.2.0 as 2.0.0 and 0.1.0 as 1.0.0. Nothing else about those releases changed.
+
+## 0.4.5
+
+The API and the auth service can send traces and logs to Datadog. It stays
+off unless you turn it on: with `DD_AGENT_HOST` unset, neither image loads a
+tracer and the API's logs stay plain text.
+
+- With `DD_AGENT_HOST` set, the API traces every request, MCP calls included,
+  and writes its logs as JSON carrying each request's trace id.
+- The auth service traces when `NODE_OPTIONS=--import dd-trace/initialize.mjs`
+  is also set, and its spans join the API's trace for `/auth/*` requests.
+- Query strings are left out of spans on both services, and Postgres spans
+  carry placeholders, not values.
+
+### Upgrading
+
+Pull the image and restart. No migration. To turn tracing on, see
+[Self-hosting](/run/self-hosting#datadog).
 
 ## 0.4.4
 

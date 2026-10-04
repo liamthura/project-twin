@@ -123,6 +123,27 @@ unset and nothing is sent anywhere.
 |---|---|
 | `TYPESAFE_API_KEY` | Turns suggestions on. Promote sends the observation's note, reason and quote to TypeSafe; a tidy sends the suggested entry's name and quote. |
 | `TYPESAFE_MODEL` | Default `jev-latest` |
+
+### Datadog
+
+Optional. Point the API at a Datadog Agent and it traces each request, with
+spans for its Postgres queries and outgoing HTTP calls, and writes its logs as
+JSON that links to those traces. Leave `DD_AGENT_HOST` unset and no tracer
+loads.
+
+| Variable | Notes |
+|---|---|
+| `DD_AGENT_HOST` | The Agent's hostname. Turns tracing and JSON logs on for the API. |
+| `DD_SERVICE`, `DD_ENV` | How the service is named and grouped in Datadog. On the API, `DD_VERSION` defaults to the commit stamp the image was built with. |
+
+The auth service traces when its container has `DD_AGENT_HOST` and
+`NODE_OPTIONS=--import dd-trace/initialize.mjs`, and its spans join the API's
+trace for `/auth/*` requests. Set `NODE_OPTIONS` at runtime only. If your
+platform also passes it to the build, `npm ci` tries to load dd-trace before it
+is installed and the build fails.
+
+Query strings are left out of spans on both services. Postgres spans carry the
+SQL with its placeholders, not the values.
 | `TYPESAFE_API_URL` | Default `https://api.typesafe.ai/v1/systemone` |
 
 The types it chooses between are the ones your section packs let an
