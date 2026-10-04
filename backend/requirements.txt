@@ -46,6 +46,10 @@ httpx==0.28.1
 # Section pack manifest validation (boot-time)
 jsonschema==4.25.1
 
+# Datadog APM and log correlation. Loaded only when DD_AGENT_HOST is set (see
+# the top of main.py); otherwise it is installed and inert.
+ddtrace==4.15.4
+
 # Schema migrations. Pulls in SQLAlchemy, which the application itself does
 # not use -- there are no ORM models and every query is raw psycopg. Alembic
 # is here for versioned, ordered, reviewable migrations; autogenerate is

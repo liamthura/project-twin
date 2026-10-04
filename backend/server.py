@@ -44,12 +44,45 @@ from sections import SECTION_REGISTRY
 # Load environment variables
 load_dotenv()
 
-# Setup logging
-logging.basicConfig(
-    stream=sys.stderr,
-    level=logging.DEBUG if os.getenv("DEBUG", "false").lower() == "true" else logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+class JsonFormatter(logging.Formatter):
+    """One JSON object per line, for Datadog. `level`, `timestamp` and
+    `dd.trace_id` are attributes its default pipeline already remaps, so logs
+    link to traces with no parsing rules. The dd.* fields are put on the record
+    by ddtrace's log injection."""
+
+    def format(self, record):
+        out = {
+            "timestamp": datetime.fromtimestamp(record.created, timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        for key in ("dd.trace_id", "dd.span_id", "dd.service", "dd.env", "dd.version"):
+            if key in record.__dict__:
+                out[key] = record.__dict__[key]
+        if record.exc_info:
+            out["error.stack"] = self.formatException(record.exc_info)
+        return json.dumps(out, default=str)
+
+
+# Setup logging. stderr, not stdout: under `python server.py` stdout is the MCP
+# stdio channel.
+_log_level = logging.DEBUG if os.getenv("DEBUG", "false").lower() == "true" else logging.INFO
+if os.getenv("DD_AGENT_HOST"):
+    _handler = logging.StreamHandler(sys.stderr)
+    _handler.setFormatter(JsonFormatter())
+    logging.basicConfig(level=_log_level, handlers=[_handler])
+    # uvicorn gives its loggers their own plain-text handlers before it imports
+    # the app. Route them through the JSON one instead.
+    for _name in ("uvicorn", "uvicorn.access"):
+        logging.getLogger(_name).handlers.clear()
+        logging.getLogger(_name).propagate = True
+else:
+    logging.basicConfig(
+        stream=sys.stderr,
+        level=_log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
 logger = logging.getLogger(__name__)
 
 # Persona data is now stored in Postgres, scoped to the current request's user.

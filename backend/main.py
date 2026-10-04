@@ -7,13 +7,27 @@ Single entry point serving:
 - Health check at /health
 """
 
+import os
+
+# Datadog APM, opt-in. This has to run before fastapi, psycopg and httpx are
+# imported so ddtrace can patch them. With DD_AGENT_HOST unset nothing loads,
+# which is what every self-hosted instance gets.
+if os.getenv("DD_AGENT_HOST"):
+    _commit = os.getenv("APP_COMMIT") or os.getenv("SOURCE_COMMIT")
+    if _commit:
+        os.environ.setdefault("DD_VERSION", _commit)
+    # Query strings carry OAuth's code= and state=, which ddtrace's default
+    # redaction does not cover. Keep them off spans altogether.
+    os.environ.setdefault("DD_HTTP_SERVER_TAG_QUERY_STRING", "false")
+    os.environ.setdefault("DD_TRACE_HTTP_CLIENT_TAG_QUERY_STRING", "false")
+    import ddtrace.auto  # noqa: F401
+
 import base64
 import contextlib
 import copy
 import hashlib
 import json
 import mimetypes
-import os
 import re
 import secrets
 import sys
@@ -121,7 +135,7 @@ async def lifespan(fastapi_app: FastAPI):
 app = FastAPI(
     title="MyGist API",
     # The app version, as frontend/package.json has it (the changelog's).
-    version="0.4.4",
+    version="0.4.5",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
