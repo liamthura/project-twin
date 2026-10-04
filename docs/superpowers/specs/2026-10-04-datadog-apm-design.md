@@ -146,6 +146,9 @@ services:
       - DD_CONTAINER_EXCLUDE_LOGS=name:.*
       - DD_CONTAINER_INCLUDE_LOGS=<the four MyGist containers, by Coolify app uuid>
       - DD_PROCESS_AGENT_ENABLED=false
+      # The Agent auto-attaches a Redis check to every redis image; the ones on
+      # this host belong to Coolify and other apps and need passwords.
+      - DD_IGNORE_AUTOCONF=redisdb
       # Docker and Coolify probe /health on both services every 30s; without
       # this they are most of the traces.
       - DD_APM_FILTER_TAGS_REGEX_REJECT=http.url:.*/health$
